@@ -10,7 +10,7 @@ import (
 )
 
 func TestLibraryPutRouteIsNative(t *testing.T) {
-	handler := New(config.Config{AccessToken: "secret", NodeEnv: "development", Upstream: "http://127.0.0.1:1"})
+	handler := New(config.Config{AccessToken: "secret", NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPut, "/api/catalog/assets/library", bytes.NewBufferString(`{}`))
 	request.Header.Set("x-app-token", "secret")

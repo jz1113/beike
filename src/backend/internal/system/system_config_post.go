@@ -111,7 +111,7 @@ func serveModelProbe(w http.ResponseWriter, r *http.Request, cfg config.Config, 
 	} else if !cfg.Production() && strings.TrimSpace(os.Getenv("AI_DRAWING_BASE_URL")) != "" {
 		baseURL = strings.TrimSpace(os.Getenv("AI_DRAWING_BASE_URL"))
 	}
-	baseURL = normalizeGatewayBaseURL(baseURL)
+	baseURL = gateway.NormalizeGatewayBaseURL(baseURL)
 	model := "gpt-5.6-luna"
 	if text, ok := payload["model"].(string); ok && text != "" {
 		model = text

@@ -64,17 +64,18 @@ func UploadRef() http.Handler {
 			mimeType = "image/jpeg"
 		}
 		if config := storage.ResolveObjectConfig(storageConfigHeader(r)); config != nil {
-			key := storage.ObjectKey("refs", extension(mimeType, header.Filename), header.Filename)
+			key := storage.ObjectKeyWithConfig(*config, "refs", extension(mimeType, header.Filename), header.Filename)
 			if err := storage.Objects.Put(r.Context(), *config, key, mimeType, body); err != nil {
 				httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "对象存储上传失败: 请检查存储配置"})
 				return
 			}
-			if config.Provider == "oss" {
-				httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "参考文件已上传，但无法生成临时访问签名"})
+			url, err := storage.ReferenceObjectURL(r.Context(), *config, key)
+			if err != nil {
+				httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "参考文件已上传，但无法生成临时访问签名，请检查存储 Endpoint 与地域配置"})
 				return
 			}
 			httpx.WriteJSON(w, http.StatusOK, map[string]any{
-				"success": true, "url": storage.PermanentObjectURL(*config, key),
+				"success": true, "url": url,
 				"mediaType": mediaKind(isVideo), "filename": header.Filename,
 			})
 			return

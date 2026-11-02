@@ -22,7 +22,9 @@ export function videoModeIds(model: string) {
   const id = canonicalModelId(model).toLowerCase();
   if (/seedance/.test(id)) return SEEDANCE_MODES;
   if (id === 'viduq3' || id === 'viduq3-mix') return ['omni'];
-  if (id === 'viduq3-turbo' || id === 'viduq3-pro' || id === 'viduq4-preview') return FULL_MODES;
+  if (id === 'viduq3-pro') return FRAME_MODES;
+  if (id === 'viduq3-turbo') return FULL_MODES;
+  if (id === 'viduq4-preview') return ['omni', 'first_frame'];
   if (/omni[_-]flash|gemini-omni/.test(id)) return SEEDANCE_MODES;
   if (/^veo3\.1/.test(id)) return FULL_MODES;
   if (/sora/.test(id)) return ['first_frame', 'text'];
@@ -91,9 +93,12 @@ export function videoInputError(input: {
   if ((mode === 'edit' || mode === 'extend') && !videos.length) return '请添加需要编辑或延长的参考视频';
   const grokClip = /grok/i.test(model) && (mode === 'edit' || mode === 'extend');
   if (videos.length && !referenceVideoAllowed(model) && !grokClip) return '当前模型的参考视频尚未接入，请使用图片或文字';
-  if (/^viduq3(?:-mix)?$/.test(model) && !images.length) return '该模型需要参考图片，请添加素材';
-  if (/^vidu/.test(model) && images.length > 15) return 'Vidu 最多支持 15 张参考图片';
   const canonical = canonicalModelId(model).toLowerCase();
+  if ((/^viduq3(?:-mix)?$/.test(canonical) || canonical === 'viduq4-preview' || mode === 'omni') && /^vidu/.test(canonical) && !images.length) return '该模型需要参考图片，请添加素材';
+  if (/^vidu/.test(canonical)) {
+    const maxViduImages = canonical === 'viduq4-preview' ? 15 : 7;
+    if (images.length > maxViduImages) return `Vidu 最多支持 ${maxViduImages} 张参考图片`;
+  }
   if (/omni[_-]flash|gemini-omni/.test(canonical) && (images.length > 7 || videos.length > 3)) return 'Omni Flash 最多支持 7 张参考图片、3 个参考视频';
   if (/^veo-?3\.1/.test(canonical) && mode === 'omni' && images.length > 3) return 'Veo 最多支持 3 张参考图片';
   if (/^wan3/.test(model) && (images.length > 10 || videos.length > 5)) return '万相最多支持 10 张参考图、5 个参考视频';

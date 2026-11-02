@@ -1,0 +1,40 @@
+.sales-asset-view-layout { display: grid; grid-template-columns: 204px minmax(0, 1fr); gap: 20px; }
+.sales-asset-view-layout h3 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; color: var(--sales-ink); font-size: 12px; font-weight: 600; }
+.sales-asset-view-layout h3 span, .sales-asset-main-view > p { color: var(--sales-muted); font-size: 11px; font-weight: 400; }
+.sales-asset-main-view > p { margin-top: 10px; line-height: 1.7; }
+.sales-persona-views { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.sales-persona-view { position: relative; min-width: 0; aspect-ratio: 3 / 4; border: 1px dashed var(--sales-line); border-radius: 12px; background: var(--sales-subtle); overflow: hidden; transition: border-color .15s ease; }
+.sales-persona-view:hover { border-color: var(--sales-accent-line); }
+.sales-scene-views .sales-asset-main-view .sales-persona-view { aspect-ratio: 4 / 3; }
+.sales-asset-grid-views .sales-persona-view { aspect-ratio: auto; height: 124px; }
+.sales-asset-grid-views .sales-persona-placeholder { gap: 5px; padding: 10px 5px 24px; }
+.sales-asset-grid-views .sales-persona-placeholder strong { font-size: 11px; }
+.sales-asset-grid-views .sales-persona-view:not(.has-image) .sales-persona-view-label { display: none; }
+.sales-persona-view.has-image { border-style: solid; }
+.sales-persona-dialog .sales-persona-upload { position: absolute; inset: 0; margin: 0; cursor: pointer; }
+.sales-persona-upload:focus-within { outline: 2px solid var(--sales-accent); outline-offset: -3px; border-radius: 10px; }
+.sales-persona-upload img { width: 100%; height: 100%; object-fit: contain; }
+.sales-persona-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.sales-persona-upload input:disabled { cursor: default; }
+.sales-persona-placeholder, .sales-persona-loading { display: flex; height: 100%; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: var(--sales-muted); padding: 12px 8px 32px; text-align: center; }
+.sales-persona-placeholder strong { font-size: 13px; font-weight: 500; }
+.sales-persona-placeholder small { font-size: 11px; }
+.sales-persona-view-label { position: absolute; bottom: 8px; left: 8px; pointer-events: none; border-radius: 5px; padding: 2px 7px; color: var(--sales-muted); background: var(--sales-subtle); font-size: 11px; }
+.has-image .sales-persona-view-label { background: #0009; color: #fff; }
+.sales-persona-remove { position: absolute; top: 7px; right: 7px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: #fff; background: #0008; }
+.sales-persona-loading { position: absolute; inset: 0; background: #0009; color: #fff; padding: 12px; font-size: 12px; pointer-events: none; }
+.sales-persona-complete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: -4px 0 6px; }
+.sales-persona-complete p { color: var(--sales-muted); font-size: 12px; }
+.sales-persona-complete-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 100%; }
+.sales-persona-complete-actions > div { max-width: 100%; }
+.sales-persona-complete .sales-persona-model { height: 36px; gap: 6px; border: 1px solid var(--sales-line); border-radius: 8px; background: var(--sales-subtle); color: var(--sales-ink); }
+.sales-persona-complete .sales-persona-model:not(:disabled):is(:hover, [aria-expanded="true"]) { border-color: var(--sales-accent-line); background: var(--sales-accent-bg); }
+.sales-persona-history { color: var(--sales-muted); font-size: 12px; }
+.sales-persona-history summary { cursor: pointer; }
+.sales-persona-history > div { display: flex; gap: 8px; overflow-x: auto; padding-top: 8px; }
+.sales-persona-history img { width: 80px; height: 106px; object-fit: contain; border-radius: 6px; }
+@media (max-width: 540px) {
+  .sales-asset-view-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .sales-asset-main-view .sales-persona-view { width: 110px; }
+  .sales-asset-grid-views .sales-persona-view { height: 96px; }
+}

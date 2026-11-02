@@ -32,11 +32,11 @@ func TestVideoModeTableMatchesOfficialCapabilities(t *testing.T) {
 		{"kling-video-v3-omni", full},
 		{"viduq3", []string{"omni"}},
 		{"viduq3-mix", []string{"omni"}},
-		{"viduq3-pro", full},
+		{"viduq3-pro", framed},
 		{"viduq3-turbo", full},
-		{"viduq4-preview", full},
-		{"vidu-q4-preview", full},
-		{"viduq4", full},
+		{"viduq4-preview", []string{"omni", "first_frame"}},
+		{"vidu-q4-preview", []string{"omni", "first_frame"}},
+		{"viduq4", []string{"omni", "first_frame"}},
 		{"veo3.1", full},
 		{"veo3.1-fast", full},
 		{"omni_flash-10s", seedance},
@@ -90,6 +90,20 @@ func TestVideoInputRejectsUnimplementedCombinations(t *testing.T) {
 	}, "MiniMax-H3")
 	if mixed != "" {
 		t.Fatalf("minimax mixed reference: %s", mixed)
+	}
+	viduPro := videoInputError(map[string]json.RawMessage{
+		"ref_mode": rawJSON(t, "omni"), "images": rawJSON(t, []string{first, last}),
+		"duration": rawJSON(t, 5), "resolution": rawJSON(t, "720P"), "aspect_ratio": rawJSON(t, "16:9"),
+	}, "viduq3-pro")
+	if !strings.Contains(viduPro, "尚未接入") {
+		t.Fatalf("viduq3-pro multi-ref omni: %s", viduPro)
+	}
+	viduProSingle := buildVideoPayload("viduq3-pro", "海边", map[string]json.RawMessage{
+		"ref_mode": rawJSON(t, "omni"), "images": rawJSON(t, []string{first}),
+		"duration": rawJSON(t, 5), "resolution": rawJSON(t, "720P"), "aspect_ratio": rawJSON(t, "9:16"),
+	})
+	if !strings.Contains(viduProSingle.endpoints[0], "/img2video") {
+		t.Fatalf("viduq3-pro single image fallback: %v", viduProSingle.endpoints)
 	}
 }
 

@@ -1,7 +1,6 @@
 package workshop
 
 import (
-	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,6 +9,8 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 )
 
 func WorkspaceGet(cfg config.Config) http.Handler {
@@ -19,7 +20,7 @@ func WorkspaceGet(cfg config.Config) http.Handler {
 			writeFail(w, http.StatusBadRequest, "无效的电商图文模式", "bad_request")
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "工作区读取失败，已保留原记录，请检查本地服务", "internal_error")
 			return
@@ -89,7 +90,7 @@ func WorkspacePut(cfg config.Config) http.Handler {
 			writeFail(w, http.StatusBadRequest, "工作区格式不正确", "bad_request")
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "工作区保存失败，请重试", "internal_error")
 			return

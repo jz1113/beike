@@ -3,7 +3,7 @@ package generate
 import (
 	"strings"
 
-	"beike.local/cloud/src/backend/internal/system"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 type speechAttempt struct {
@@ -28,7 +28,7 @@ func speechFamily(model string) string {
 }
 
 func speechAttempts(req SpeechRequest) []speechAttempt {
-	root := strings.TrimRight(system.NormalizeGatewayBaseURL(req.Base), "/")
+	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(req.Base), "/")
 	format := strings.ToLower(strings.TrimSpace(req.Format))
 	if format == "" {
 		format = "mp3"

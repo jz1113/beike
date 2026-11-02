@@ -1,7 +1,8 @@
+import { fetchCoverFeedSamples } from '../api/coverTemplateApi';
 import { useEffect, useRef, useState } from 'react';
 import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import { uploadStudioFile } from '@client/shared/api/uploadStudioFile';
-import { CoverDeconstructError, deconstructCoverSample, fetchCoverMemory } from '../api/coverMemoryApi';
+import { CoverDeconstructError, deconstructCoverSample } from '../api/coverMemoryApi';
 import {
   canStartCoverFeed,
   coverFeedPhase,
@@ -80,8 +81,8 @@ export function useCoverSampleFeed(reloadMemory: () => Promise<unknown>) {
         return false;
       }
       try {
-        const memory = await fetchCoverMemory();
-        const reconciled = reconcileCoverFeedJob({ id: job.id, status: 'uncertain', url, requestKey, sampleId: error instanceof CoverDeconstructError ? error.sampleId : undefined }, memory.samples, startedAt);
+        const samples = await fetchCoverFeedSamples(requestKey);
+        const reconciled = reconcileCoverFeedJob({ id: job.id, status: 'uncertain', url, requestKey, sampleId: error instanceof CoverDeconstructError ? error.sampleId : undefined }, samples, startedAt);
         patch(job.id, reconciled);
         return reconciled.status === 'done';
       } catch {
@@ -125,11 +126,11 @@ export function useCoverSampleFeed(reloadMemory: () => Promise<unknown>) {
     runningRef.current = true;
     setNotice(null);
     try {
-      const memory = await fetchCoverMemory();
       const startedAt = new Date(0).toISOString();
       for (const job of jobsRef.current.filter((candidate) => candidate.status === 'uncertain')) {
-        const matched = memory.samples.find((sample) => sample.id === job.sampleId || Boolean(job.requestKey && sample.requestKey === job.requestKey));
-        if (matched) patch(job.id, reconcileCoverFeedJob(job, memory.samples, startedAt));
+        const samples = job.requestKey ? await fetchCoverFeedSamples(job.requestKey) : [];
+        const matched = samples.find((sample) => sample.id === job.sampleId || Boolean(job.requestKey && sample.requestKey === job.requestKey));
+        if (matched) patch(job.id, reconcileCoverFeedJob(job, samples, startedAt));
         else if (job.requestKey && job.url && job.selectionId) {
           // Replay the exact request key: an existing operation can never dispatch twice.
           await runJob(job, job.selectionId, startedAt, job.effort);

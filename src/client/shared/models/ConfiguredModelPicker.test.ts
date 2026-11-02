@@ -16,7 +16,12 @@ const storage = {
 beforeEach(() => {
   data.clear();
   configureDomainRuntime({ storage });
-  vi.stubGlobal('window', { localStorage: storage });
+  vi.stubGlobal('window', {
+    localStorage: storage,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  });
   vi.stubGlobal('localStorage', storage);
 });
 
@@ -61,6 +66,20 @@ describe('ConfiguredModelPicker', () => {
     expect(triggerHtml).toContain('aria-label="反推视觉模型"');
     expect(triggerHtml).toContain('Gemini 3.7 Flash');
     expect(triggerHtml).toContain('Comfly 网关');
+
+    const agentHtml = renderToStaticMarkup(createElement(ConfiguredModelPicker, {
+      ariaLabel: '参考脚本拆解模型',
+      options: [
+        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash · 默认' },
+      ],
+      value: 'gemini-3.8-flash',
+      onChange: vi.fn(),
+      variant: 'agent',
+      showReasoning: true,
+    }));
+    expect(agentHtml).toContain('aria-label="参考脚本拆解模型"');
+    expect(agentHtml).toContain('Gemini 3.8 Flash');
+    expect(agentHtml).toContain('思考强度：中');
 
     const modalHtml = renderToStaticMarkup(createElement(PromptBarModelPickerModal, {
       isOpen: true,

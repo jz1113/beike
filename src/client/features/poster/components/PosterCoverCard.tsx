@@ -46,8 +46,8 @@ export const PosterCoverCard = memo(function PosterCoverCard({ item, index, isRu
   const saveTitle = () => {
     if (isRunning) return;
     const title = normalizeCoverTitle(editingTitle);
-    if (title.length < 7 || title.length > 12) {
-      setEditingError('封面标题请保持 7–12 字，不会自动截断词语。');
+    if (title.length < 4 || title.length > 18) {
+      setEditingError('封面标题请保持 4–18 字，不会自动截断词语。');
       return;
     }
     if (onEditTitle(item.id, editingTitle)) onStopEdit();
@@ -65,8 +65,8 @@ export const PosterCoverCard = memo(function PosterCoverCard({ item, index, isRu
       {!item.resultUrl && item.generatedSceneUrl && <button type="button" onClick={() => onDownloadOriginalScene(item, index)} className="absolute right-10 top-2 inline-flex h-7 w-7 items-center justify-center text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.9)] transition-transform hover:scale-110" aria-label="下载原生图" title="下载原生图，尚未完成成品规格导出"><Download className="h-4 w-4" /></button>}
       {isEditing ? (
         <div className="mt-2 space-y-1.5">
-          <input autoFocus value={editingTitle} disabled={isRunning} maxLength={60} onChange={(event) => { setEditingTitle(event.target.value); setEditingError(null); }} onKeyDown={(event) => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') { event.preventDefault(); saveTitle(); } else if (event.key === 'Escape') { event.stopPropagation(); onStopEdit(); } }} aria-label="修改封面标题，7至12字" aria-invalid={Boolean(editingError)} aria-describedby={editingError ? titleErrorId : undefined} className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-rose-400 disabled:opacity-50 dark:bg-[#18191c]" />
-          <div className="flex items-center justify-between gap-1"><span className="text-[10px] text-slate-500 dark:text-slate-400">7–12 字{item.status === 'complete' || item.generatedSceneUrl ? '，保存后需重新生成' : ''}</span><div className="flex shrink-0 gap-1"><button type="button" onClick={onStopEdit} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10" aria-label="取消修改标题"><X className="h-3.5 w-3.5" /></button><button type="button" onClick={saveTitle} disabled={isRunning} className="rounded-md bg-slate-950 p-1 text-white disabled:opacity-40" aria-label="保存封面标题"><Check className="h-3.5 w-3.5" /></button></div></div>
+          <input autoFocus value={editingTitle} disabled={isRunning} maxLength={60} onChange={(event) => { setEditingTitle(event.target.value); setEditingError(null); }} onKeyDown={(event) => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') { event.preventDefault(); saveTitle(); } else if (event.key === 'Escape') { event.stopPropagation(); onStopEdit(); } }} aria-label="修改封面标题，4至18字" aria-invalid={Boolean(editingError)} aria-describedby={editingError ? titleErrorId : undefined} className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-rose-400 disabled:opacity-50 dark:bg-[#18191c]" />
+          <div className="flex items-center justify-between gap-1"><span className="text-[10px] text-slate-500 dark:text-slate-400">4–18 字{item.status === 'complete' || item.generatedSceneUrl ? '，保存后需重新生成' : ''}</span><div className="flex shrink-0 gap-1"><button type="button" onClick={onStopEdit} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10" aria-label="取消修改标题"><X className="h-3.5 w-3.5" /></button><button type="button" onClick={saveTitle} disabled={isRunning} className="rounded-md bg-slate-950 p-1 text-white disabled:opacity-40" aria-label="保存封面标题"><Check className="h-3.5 w-3.5" /></button></div></div>
           {editingError && <p id={titleErrorId} role="alert" className="text-[11px] leading-4 text-rose-600">{editingError}</p>}
         </div>
       ) : (

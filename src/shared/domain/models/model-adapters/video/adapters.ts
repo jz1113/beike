@@ -1,4 +1,4 @@
-import { videoInputError } from '@shared/domain/media/videoCapabilities';
+import { resolveVideoMode, videoInputError } from '@shared/domain/media/videoCapabilities';
 import { buildSeedanceOfficialPayload } from './seedance';
 import type { VideoAdapterInput, VideoModelAdapter } from '../types';
 import {
@@ -234,7 +234,7 @@ export const viduVideoAdapter: VideoModelAdapter = {
   build: (input) => {
     const modelId = normalizeVideoModelId(input.model);
     const images = collectVideoImages(input);
-    const mode = input.refMode || (images.length ? 'omni' : 'text');
+    const mode = resolveVideoMode(modelId, input.refMode, images.length, input.videos?.length || 0);
     assertVideoInput(input, modelId, mode);
     const endpointMode = mode === 'first_last_frame' ? 'start-end' : mode === 'first_frame' ? 'img2video' : mode === 'text' ? 'text2video' : 'reference';
     const payload: Record<string, unknown> = {

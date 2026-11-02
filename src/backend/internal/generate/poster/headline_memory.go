@@ -10,6 +10,7 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func HeadlineMemory(cfg config.Config) http.Handler {
@@ -138,7 +139,7 @@ func openCoverDB(cfg config.Config) (*sql.DB, bool) {
 	if strings.TrimSpace(cfg.SQLiteFile()) == "" {
 		return nil, false
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return nil, false
 	}

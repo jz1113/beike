@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestGeminiNanoBanana21OpenAICompatiblePayload(t *testing.T) {
@@ -115,11 +116,11 @@ func TestGeminiNativeGenerateContentProtocolAndThoughtFiltering(t *testing.T) {
 		}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	handler := Image(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	reqBody := `{"prompt":"中华美食海报","model":"gemini-nano-banana-2.1","size":"1152x1536","aspectRatio":"3:4","quality":"high","customProtocol":"gemini","customApiKey":"gem-secret","customBaseUrl":"` + server.URL + `"}`
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(reqBody)))
@@ -145,7 +146,7 @@ func TestGeminiNativeGenerateContentProtocolAndThoughtFiltering(t *testing.T) {
 }
 
 func TestGeminiReferenceImageLimitRule(t *testing.T) {
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
+	handler := Image(config.Config{NodeEnv: "development"})
 	refs := make([]string, 15)
 	for i := range refs {
 		refs[i] = "https://example.com/" + Itoa(i+1) + ".jpg"

@@ -1,13 +1,14 @@
 package generate
 
 import (
-	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 )
 
 func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]json.RawMessage) {
@@ -28,7 +29,7 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 	}
 	content := workshopAnalyzeContent(cfg, payload, binding, shotCount)
 	messages := []any{map[string]any{"role": "user", "content": content}}
-	text, data, status, err := ChatCompletionJSON(r.Context(), base, apiKey, model, messages, 0.4, 240*time.Second)
+	text, data, status, err := gateway.ChatCompletionJSON(r.Context(), base, apiKey, model, messages, 0.4, 240*time.Second)
 	if err != nil || status >= 300 || text == "" {
 		message := "视觉分析失败"
 		if err != nil {
@@ -37,7 +38,7 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": message})
 		return
 	}
-	parsed := DecodeObject(text)
+	parsed := gateway.DecodeObject(text)
 	if parsed == nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "视觉模型没有返回合法 JSON"})
 		return

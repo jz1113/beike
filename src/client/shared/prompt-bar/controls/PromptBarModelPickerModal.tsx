@@ -174,13 +174,18 @@ export function PromptBarModelPickerModal({
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+        triggerRef.current?.focus();
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [isOpen, onClose, triggerRef, panelRef]);
 
@@ -237,6 +242,7 @@ export function PromptBarModelPickerModal({
                     onSelect={(modelId) => {
                       onSelectModel(selectionIdFor(modelId));
                       onClose();
+                      triggerRef.current?.focus();
                     }}
                   />
                 ))}
@@ -247,7 +253,9 @@ export function PromptBarModelPickerModal({
       </div>
     </div>
   );
-  return typeof document === 'undefined' ? panel : createPortal(panel, document.body);
+  const dialogHost = triggerRef.current?.closest('dialog[open]');
+  const portalTarget = dialogHost || (typeof document !== 'undefined' ? document.body : null);
+  return portalTarget ? createPortal(panel, portalTarget) : panel;
 }
 
 function ModelRow({

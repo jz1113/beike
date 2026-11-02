@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
@@ -54,6 +55,14 @@ type depthStatus struct {
 	detail string
 }
 
+var depthEnvCache struct {
+	sync.Mutex
+	root      string
+	python    string
+	status    depthStatus
+	expiresAt time.Time
+}
+
 func FFmpegReady(root string) bool {
 	_, ok := binaryReady(root, "ffmpeg")
 	return ok
@@ -68,15 +77,24 @@ func DepthModelReady(root string) bool {
 }
 
 func checkDepthEnv(root string) depthStatus {
+	python := strings.TrimSpace(os.Getenv("DEPTH_VIDEO_PYTHON"))
+	if python == "" {
+		python = "python3"
+	}
+	now := time.Now()
+	depthEnvCache.Lock()
+	if depthEnvCache.root == root && depthEnvCache.python == python && now.Before(depthEnvCache.expiresAt) {
+		cached := depthEnvCache.status
+		depthEnvCache.Unlock()
+		return cached
+	}
+	depthEnvCache.Unlock()
+
 	script := filepath.Join(root, "tools/scripts/depth/infer_video_depth.py")
 	fallback := depthStatus{detail: "Python 深度环境未检测"}
 	if _, err := os.Stat(script); err != nil {
 		fallback.detail = "推理脚本缺失"
 		return fallback
-	}
-	python := strings.TrimSpace(os.Getenv("DEPTH_VIDEO_PYTHON"))
-	if python == "" {
-		python = "python3"
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -84,8 +102,17 @@ func checkDepthEnv(root string) depthStatus {
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "PYTHONWARNINGS=ignore")
 	out, err := cmd.CombinedOutput()
-	parsed, ok := parseDepthStdout(string(out))
-	if ok {
+	if parsed, ok := parseDepthStdout(string(out)); ok {
+		ttl := 10 * time.Second
+		if parsed.DepthModelReady {
+			ttl = 10 * time.Minute
+		}
+		depthEnvCache.Lock()
+		depthEnvCache.root = root
+		depthEnvCache.python = python
+		depthEnvCache.status = parsed
+		depthEnvCache.expiresAt = time.Now().Add(ttl)
+		depthEnvCache.Unlock()
 		return parsed
 	}
 	if err != nil {

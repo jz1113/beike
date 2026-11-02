@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestLayerDecompositionRequiresGatewayKey(t *testing.T) {
 	t.Setenv("ARK_LAYER_API_KEY", "")
 	t.Setenv("AI_DRAWING_API_KEY", "")
 	t.Setenv("AI_API_KEY", "")
-	handler := LayerDecomposition(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := LayerDecomposition(config.Config{})
 	body := `{"model":"seedream-v5-pro/layer-decomposition","image":"data:image/png;base64,aGVsbG8=","size":"auto"}`
 	missing := httptest.NewRecorder()
 	handler.ServeHTTP(missing, httptest.NewRequest(http.MethodPost, "/api/generate/layer-decomposition", strings.NewReader(body)))
@@ -22,14 +23,14 @@ func TestLayerDecompositionRequiresGatewayKey(t *testing.T) {
 		t.Fatalf("key %d %s", missing.Code, missing.Body.String())
 	}
 	t.Setenv("ARK_LAYER_API_KEY", "official")
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client {
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client {
 		return &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			body := `{"data":[{"url":"https://cdn.example.com/a.png","size":"100x80"},{"url":"https://cdn.example.com/b.png","size":"100x80"}]}`
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
 		})}
 	}
-	t.Cleanup(func() { ModelHTTP = previous })
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 	official := httptest.NewRecorder()
 	handler.ServeHTTP(official, httptest.NewRequest(http.MethodPost, "/api/generate/layer-decomposition", strings.NewReader(body)))
 	if official.Code != http.StatusOK || !strings.Contains(official.Body.String(), "https://cdn.example.com/a.png") || !strings.Contains(official.Body.String(), `"temporaryUrls":true`) {
@@ -38,7 +39,7 @@ func TestLayerDecompositionRequiresGatewayKey(t *testing.T) {
 }
 
 func TestLayerDecompositionRejectsWrongModel(t *testing.T) {
-	handler := LayerDecomposition(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := LayerDecomposition(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/layer-decomposition", strings.NewReader(`{"model":"other","image":"data:image/png;base64,aGVsbG8=","size":"auto"}`)))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "请选择支持图层拆分的模型") {

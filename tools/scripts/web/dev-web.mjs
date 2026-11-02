@@ -4,7 +4,6 @@
  */
 import {
   VITE_PORT,
-  buildGateway,
   ensureAppDatabase,
   getWorkspaceRoot,
   healthOk,
@@ -23,9 +22,9 @@ import {
   writeApiPort,
 } from './web-shared.mjs';
 import { ownsWebProcess, stopWebProcess } from './web-processes.mjs';
-import { watchGatewaySkill } from './gateway-skill-watcher.mjs';
 import { join, resolve } from 'node:path';
 
+const started = Date.now();
 const workspaceRoot = getWorkspaceRoot();
 const isolated = process.env.BEIKE_ISOLATED_DEV === '1';
 let apiPort = readApiPort(workspaceRoot, { isolated });
@@ -33,10 +32,8 @@ const vitePort = isolated ? VITE_PORT + 1 : VITE_PORT;
 const appDataDir = resolve(process.env.AZHUO_DATA_DIR || (isolated ? join(resolveAppDataDir(), 'development') : resolveAppDataDir()));
 let gatewayChild = null;
 let viteChild = null;
-let stopSkillWatcher = null;
 
 const shutdown = (code = 0) => {
-  stopSkillWatcher?.();
   killChild(viteChild);
   killChild(gatewayChild);
   process.exit(code);
@@ -71,29 +68,12 @@ try {
   }
   writeApiPort(workspaceRoot, apiPort, { isolated });
   gatewayChild = startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, isolated });
-  stopSkillWatcher = watchGatewaySkill({
-    workspaceRoot,
-    rebuild: () => {
-      console.log('→ 带货规则已更新，正在重建 Go API…');
-      buildGateway(workspaceRoot);
-    },
-    restart: async () => {
-      if (!(await stopWebProcess(workspaceRoot, 'gateway', isolated))) {
-        throw new Error('原开发 API 已由其它启动器接管，请重新运行 pnpm dev');
-      }
-      gatewayChild = startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, isolated, build: false });
-      if (!(await waitFor(() => healthOk(apiPort), 'Go API 规则同步', 60000, gatewayChild))) {
-        throw new Error('Go API 规则同步启动失败，请查看上方日志');
-      }
-    },
-    onError: (error) => console.error(`✗ 带货规则同步失败：${error.message}`),
-  });
   if (!(await waitFor(() => healthOk(apiPort), `Go API http://127.0.0.1:${apiPort}`, 60000, gatewayChild))) shutdown(1);
   if (!reuseVite) viteChild = startViteServer({ workspaceRoot, apiPort, appDataDir, accessToken, vitePort, isolated });
   if (!(await waitFor(() => viteOk(vitePort), `Vite http://127.0.0.1:${vitePort}`, 60000, viteChild))) shutdown(1);
 
   const url = `http://127.0.0.1:${vitePort}`;
-  console.log(`\n✓ 贝壳云图 Web 已就绪：${url}\n  ${isolated ? '隔离开发数据' : '用户数据'}：${appDataDir}\n  按 Ctrl+C 停止本次启动的服务。`);
+  console.log(`\n✓ 贝壳云图 Web 已就绪：${url}（共 ${((Date.now() - started) / 1000).toFixed(1)} 秒）\n  ${isolated ? '隔离开发数据' : '用户数据'}：${appDataDir}\n  按 Ctrl+C 停止本次启动的服务。`);
   if (process.env.BEIKE_NO_OPEN !== '1') openBrowser(url);
 } catch (error) {
   console.error(`✗ ${error.message}`);

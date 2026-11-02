@@ -74,9 +74,10 @@ describe('poster design audit metadata', () => {
   it('accepts long original titles while keeping itemTitle within the API limit', async () => {
     vi.mocked(apiRequest).mockResolvedValue(Response.json({ success: true, data: { title: item.coverTitle } }));
     const originalTitle = '长标题'.repeat(100);
-    await directCoverDesign({ ...item, originalTitle }, item.coverTitle, 'vision-model');
+    await directCoverDesign({ ...item, originalTitle }, item.coverTitle, 'vision-model', { supplementaryRequirements: '暖白配色，避免贴纸' });
     const body = JSON.parse(vi.mocked(apiRequest).mock.calls[0][2]!.body as string);
     expect(body.originalTitle).toBe(originalTitle);
+    expect(body.supplementaryRequirements).toBe('暖白配色，避免贴纸');
     expect(body.itemTitle).toHaveLength(200);
     expect(body.imageUrls).toEqual(['/storage/local/product.png']);
   });

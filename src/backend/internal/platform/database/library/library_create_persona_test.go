@@ -39,9 +39,15 @@ func TestCreatePersonaKeepsOrganizationRules(t *testing.T) {
 		"productCategoryIds": `["jewelry","jewelry",""]`,
 		"isUniversal":        true,
 		"albumId":            "album",
+		"avatarUrl":          "/face.jpg",
+		"sourceImages":       []any{"/body.jpg", "/face.jpg"},
 	})
 	if err != nil || !strings.Contains(string(item), `"name":"新人设博主"`) || !strings.Contains(string(item), `"productCategoryIds":"[\"jewelry\"]"`) || !strings.Contains(string(item), `"isUniversal":true`) || !strings.Contains(string(item), `"albumId":"album"`) {
 		t.Fatalf("persona %s %v", item, err)
+	}
+	var sourceImages, avatar string
+	if err := db.QueryRow(`SELECT "sourceImages", "avatarUrl" FROM "PersonaAsset"`).Scan(&sourceImages, &avatar); err != nil || sourceImages != `["/body.jpg","/face.jpg"]` || avatar != "/face.jpg" {
+		t.Fatalf("lost persona anchors: %s %s %v", sourceImages, avatar, err)
 	}
 	var assetType string
 	if err := db.QueryRow(`SELECT "assetType" FROM "PromptAssetRegistry"`).Scan(&assetType); err != nil || assetType != "persona" {

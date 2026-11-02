@@ -1,11 +1,12 @@
 package library
 
 import (
-	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 )
 
 func motherReplacementHandler(cfg config.Config) http.HandlerFunc {
@@ -15,7 +16,7 @@ func motherReplacementHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "缺少有效母组 ID"})
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取母组换图状态失败"})
 			return

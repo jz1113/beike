@@ -31,10 +31,6 @@ func InitialRuleRevision() RuleRevision {
 	return RuleRevision{Version: 0, Entries: []RuleEntry{}, Note: "初始规则", CreatedAt: nil}
 }
 
-func OpenWrite(path string) (*sql.DB, error) {
-	return sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)")
-}
-
 func ListKeywordRules(ctx context.Context, db *sql.DB, workspace string) (RuleRevision, []RuleRevision, error) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT "version", "entriesJson", "note", "createdAt"

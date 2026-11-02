@@ -15,7 +15,7 @@ const REQUIRED_DIRS = [
   'src/client/public', 'tools/configs', 'tools/scripts', 'tools/launchers', 'docs', 'tools/deploy',
   'src/client/features/poster', 'src/client/features/keywords', 'src/client/features/sales',
   'src/shared/domain/sales', 'src/backend/internal/keywords', 'src/backend/internal/gateway',
-  'src/backend/internal/generate/poster', 'src/backend/internal/generate/sales',
+  'src/backend/internal/generate/poster',
 ];
 const REQUIRED_FILES = [
   'package.json', 'pnpm-lock.yaml', 'go.mod', 'go.sum', 'tsconfig.json',

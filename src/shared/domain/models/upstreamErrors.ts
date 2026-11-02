@@ -3,6 +3,102 @@ export function hasChineseText(text: string): boolean {
   return /[\u4e00-\u9fff]/.test(text);
 }
 
+/** 剥离网关或上游嵌套的 JSON 错误壳（如 `{"code":"1501","message":"..."}`），并对敏感素材提示做友好化 */
+export function unwrapJsonErrorMessage(raw: string): string {
+  let text = raw.trim();
+  const prefixMatch = text.match(/^[^{]*failed[^{]*(\{[\s\S]+\})$/i);
+  if (prefixMatch?.[1]) {
+    text = prefixMatch[1].trim();
+  }
+  if (text.startsWith('{') && text.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        for (const key of ['message', 'error', 'fail_reason', 'failReason', 'reason']) {
+          const value = parsed[key];
+          if (typeof value === 'string' && value.trim()) {
+            return unwrapJsonErrorMessage(value);
+          }
+          if (value && typeof value === 'object' && !Array.isArray(value)) {
+            const innerMsg = (value as Record<string, unknown>).message;
+            if (typeof innerMsg === 'string' && innerMsg.trim()) {
+              return unwrapJsonErrorMessage(innerMsg);
+            }
+          }
+        }
+      }
+    } catch {
+      /* Non-JSON error text stays intact. */
+    }
+  }
+  const lower = text.toLowerCase();
+  if (lower.includes('videourls[') && (lower.includes('sensitive') || text.includes('敏感')) && !text.startsWith('参考视频未通过安全检测')) {
+    return `参考视频未通过安全检测（可能包含敏感画面或真人未报备素材），请更换合规的参考视频后重试：${text}`;
+  }
+  if (lower.includes('imageurls[') && (lower.includes('sensitive') || text.includes('敏感')) && !text.startsWith('参考图片未通过安全检测')) {
+    return `参考图片未通过安全检测（可能包含敏感内容或违规画面），请更换参考图片后重试：${text}`;
+  }
+  return redactSignedMediaUrls(text);
+}
+
+const ERROR_URL_PATTERN = /https?:\/\/[^\s"'<>|，。；：！？]+/gi;
+
+function summarizeErrorMediaUrl(raw: string): { label: string; signed: boolean } | null {
+  const lower = raw.toLowerCase();
+  const signed =
+    lower.includes('x-oss-') ||
+    lower.includes('x-amz-') ||
+    lower.includes('signature=') ||
+    lower.includes('q-sign-') ||
+    lower.includes('/seedance/refs/');
+  let pathPart = raw;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.pathname) pathPart = parsed.pathname;
+  } catch {
+    const qIdx = pathPart.indexOf('?');
+    if (qIdx >= 0) pathPart = pathPart.slice(0, qIdx);
+  }
+  const segments = pathPart.replace(/\/+$/, '').split('/').filter(Boolean);
+  let base = segments[segments.length - 1] || '';
+  try {
+    const decoded = decodeURIComponent(base).trim();
+    if (decoded) base = decoded;
+  } catch {
+    /* keep raw basename */
+  }
+  const dotIdx = base.lastIndexOf('.');
+  const ext = dotIdx >= 0 ? base.slice(dotIdx).toLowerCase() : '';
+  const isVideo = ['.mp4', '.mov', '.webm', '.m4v'].includes(ext);
+  const isImage = ['.png', '.jpg', '.jpeg', '.webp'].includes(ext);
+  if (!signed && !isVideo && !isImage && raw.length < 80) {
+    return null;
+  }
+  const kind = isVideo ? '参考视频' : isImage ? '参考图片' : '参考素材';
+  const label = base && base.length <= 40 ? `【${kind}：${base}】` : `【${kind}】`;
+  return { label, signed };
+}
+
+/** 折叠报错中混入的 OSS/S3 预签名长链接，保留可读文件名与后续真实错误原因 */
+export function redactSignedMediaUrls(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed.includes('http://') && !trimmed.includes('https://')) {
+    return trimmed;
+  }
+  return trimmed
+    .replace(ERROR_URL_PATTERN, (match) => {
+      const clean = match.replace(/[.,;:)\]}]+$/, '');
+      const suffix = match.slice(clean.length);
+      const summary = summarizeErrorMediaUrl(clean);
+      if (!summary) return match;
+      if (clean === trimmed && summary.signed) {
+        return `${summary.label}处理失败（上游仅返回临时签名链接，请检查素材合规性或对象存储访问权限后重试）`;
+      }
+      return `${summary.label}${suffix}`;
+    })
+    .trim();
+}
+
 function extractErrorMessage(err: unknown): { name: string; message: string } {
   if (err instanceof Error) {
     return { name: err.name || '', message: err.message || '' };
@@ -158,7 +254,7 @@ function humanizeGenericMessage(name: string, message: string, fallback: string)
  */
 export function formatUserError(err: unknown, fallback = '操作失败，请稍后重试'): string {
   const { name, message } = extractErrorMessage(err);
-  const trimmed = message.trim().replace(/context deadline exceeded/gi, '上游生图超时');
+  const trimmed = unwrapJsonErrorMessage(message).replace(/context deadline exceeded/gi, '上游生图超时');
 
   if (/上游生图超时/.test(trimmed) && !hasChineseText(message)) {
     return '上游生图超时';
@@ -180,7 +276,7 @@ export function formatUserError(err: unknown, fallback = '操作失败，请稍�
 /** @deprecated 请改用 formatUserError */
 export function humanizeUpstreamError(raw?: string | null): string {
   if (!raw || typeof raw !== 'string') return '模型渲染失败，请稍后重试';
-  const trimmed = raw.trim();
+  const trimmed = unwrapJsonErrorMessage(raw);
   if (hasChineseText(trimmed)) return trimmed;
   return humanizeUpstreamMessage(humanizeGenericMessage('', trimmed, '模型渲染失败，请稍后重试'));
 }

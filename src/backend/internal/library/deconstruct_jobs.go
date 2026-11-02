@@ -1,13 +1,14 @@
 package library
 
 import (
-	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 )
 
 func deconstructJobsHandler(cfg config.Config) http.HandlerFunc {
@@ -17,7 +18,7 @@ func deconstructJobsHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "任务 ID 无效"})
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "读取后台反推任务失败"})
 			return

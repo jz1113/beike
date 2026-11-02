@@ -1,7 +1,6 @@
 package library
 
 import (
-	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -13,6 +12,8 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 )
 
 func libraryPutHandler(cfg config.Config) http.HandlerFunc {
@@ -43,7 +44,7 @@ func libraryPutHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		storeLibraryNumbers(data)
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeLibraryPutFailure(w, "操作失败，请稍后重试")
 			return

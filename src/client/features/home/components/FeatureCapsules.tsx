@@ -11,7 +11,7 @@ interface Props {
 }
 
 const capsules = [
-  { id: 'video_sales', title: '电商视频', hint: '贴商品链接，采集图文后生成无字幕电商视频', icon: Captions },
+  { id: 'video_sales', title: '电商视频', hint: '采集商品、选择参考图、免费提取图片文字', icon: Captions },
   { id: 'workshop', title: '电商图文', hint: '从商品到批量图文的一站式创作', icon: ShoppingBag },
   { id: 'headline_poster', title: '封面', hint: '商品与标题，一次生成吸睛封面', icon: Brush },
   { id: 'keyword_review', title: '词包', hint: '批量语义分类，审核内容是否值得制作', icon: FilePen },

@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
+import { downloadVideosInBrowser } from '../api/browserVideoDownloads';
 import { parseVideoSheet, type VideoSheetItem } from '../model/collectorVideoSheet';
 
 export type VideoDownloadStatus = 'pending' | 'running' | 'success' | 'failed';
@@ -62,6 +63,11 @@ export function useVideoDownloadQueue(showToast: Toast) {
   const [running, setRunning] = useState(false);
   const [folderName, setFolderName] = useState(() => (rememberedDirectory ? folderLabel(rememberedDirectory) : ''));
   const [directory, setDirectory] = useState(rememberedDirectory);
+  const [downloadMode, setDownloadMode] = useState<'local' | 'browser'>('local');
+  const directoryTokenRef = useRef('');
+  const browserModeRef = useRef(false);
+  const downloadAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => { downloadAbortRef.current?.abort(); }, []);
   const [importEpoch, setImportEpoch] = useState(0);
   const itemsRef = useRef<VideoDownloadItem[]>([]);
   const directoryRef = useRef(rememberedDirectory);
@@ -110,7 +116,19 @@ export function useVideoDownloadQueue(showToast: Toast) {
   const pickFolder = async () => {
     try {
       const response = await apiFetch('/api/system/video-downloads/pick-directory', { method: 'POST' });
-      const body = await readApiBody<{ directory: string }>(response);
+      const body = await readApiBody<{ mode?: 'local' | 'browser'; directory?: string; directoryToken?: string }>(response);
+      if (body.mode === 'browser') {
+        browserModeRef.current = true;
+        setDownloadMode('browser');
+        directoryRef.current = 'browser';
+        setDirectory('browser');
+        setFolderName('浏览器下载');
+        return true;
+      }
+      if (!body.directory || !body.directoryToken) throw new Error('保存位置授权未确认，请重新选择文件夹');
+      directoryTokenRef.current = body.directoryToken;
+      browserModeRef.current = false;
+      setDownloadMode('local');
       directoryRef.current = body.directory;
       setDirectory(body.directory);
       setFolderName(folderLabel(body.directory));
@@ -145,34 +163,47 @@ export function useVideoDownloadQueue(showToast: Toast) {
       showToast('请先导入含标题和视频链接的表格');
       return;
     }
-    if (!directoryRef.current) {
-      showToast('请先选择保存文件夹');
-      return;
-    }
     const selected = source.filter((item) => item.status === 'pending' || (retryFailed && item.status === 'failed'));
     if (!selected.length) {
       showToast(retryFailed ? '没有失败项需要重试' : '没有待下载的视频');
       return;
     }
-    const chosen = new Set(selected.map((item) => item.id));
-    replaceItems(source.map((item) => (chosen.has(item.id) ? { ...item, status: 'pending', error: undefined } : item)));
-    pausedRef.current = false;
     runningRef.current = true;
+    pausedRef.current = false;
+    jobRef.current = '';
     setRunning(true);
-    const workers = clampConcurrency(concurrency);
-    showToast(`开始下载 ${selected.length} 个视频（${workers} 路并发）`);
     try {
+      if ((!directoryRef.current || (!browserModeRef.current && !directoryTokenRef.current)) && !await pickFolder()) return;
+      if (pausedRef.current) return;
+      const chosen = new Set(selected.map((item) => item.id));
+      replaceItems(source.map((item) => (chosen.has(item.id) ? { ...item, status: 'pending', error: undefined } : item)));
+      const workers = clampConcurrency(concurrency);
+      showToast(browserModeRef.current ? `开始下载 ${selected.length} 个视频，请允许浏览器保存文件` : `开始下载 ${selected.length} 个视频（${workers} 路并发）`);
+      if (browserModeRef.current) {
+        const controller = new AbortController();
+        downloadAbortRef.current = controller;
+        await downloadVideosInBrowser(selected, controller.signal, (id, status, error) => {
+          replaceItems(itemsRef.current.map(item => item.id === id ? { ...item, status, error } : item));
+        });
+        if (!pausedRef.current) {
+          const failed = itemsRef.current.filter(item => item.status === 'failed').length;
+          showToast(failed ? `下载结束，${failed} 个视频失败，可重试` : '视频已交给浏览器保存，请查看下载列表');
+        }
+        return;
+      }
       const response = await apiFetch('/api/system/video-downloads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           directory: directoryRef.current,
+          directoryToken: directoryTokenRef.current,
           concurrency: workers,
           items: selected.map((item) => ({ filename: item.filename, url: item.url })),
         }),
       });
       const body = await readApiBody<{ jobId: string }>(response);
       jobRef.current = body.jobId;
+      if (pausedRef.current) await apiFetch(`/api/system/video-downloads/${body.jobId}/cancel`, { method: 'POST' });
       await waitForJob(body.jobId);
       if (!pausedRef.current) {
         const failed = itemsRef.current.filter((item) => item.status === 'failed').length;
@@ -182,7 +213,7 @@ export function useVideoDownloadQueue(showToast: Toast) {
     } catch (error) {
       if (!pausedRef.current) {
         const message = formatUserError(error);
-        if (message.includes('保存文件夹不存在') || message.includes('请选择本机文件夹')) {
+        if (message.includes('保存文件夹不存在') || message.includes('请选择本机文件夹') || message.includes('重新选择')) {
           directoryRef.current = '';
           setDirectory('');
           setFolderName('');
@@ -191,6 +222,7 @@ export function useVideoDownloadQueue(showToast: Toast) {
         showToast(message);
       }
     } finally {
+      downloadAbortRef.current = null;
       runningRef.current = false;
       setRunning(false);
     }
@@ -199,6 +231,7 @@ export function useVideoDownloadQueue(showToast: Toast) {
   const pause = async () => {
     if (!runningRef.current) return;
     pausedRef.current = true;
+    downloadAbortRef.current?.abort();
     stopWaitRef.current?.();
     const jobId = jobRef.current;
     if (jobId) {
@@ -219,6 +252,7 @@ export function useVideoDownloadQueue(showToast: Toast) {
     running,
     folderName,
     directory,
+    downloadMode,
     importFile,
     importEpoch,
     pickFolder,

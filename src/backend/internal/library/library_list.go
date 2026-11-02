@@ -1,7 +1,6 @@
 package library
 
 import (
-	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -10,13 +9,15 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 )
 
 func serveLibraryList(cfg config.Config, w http.ResponseWriter, r *http.Request, assetType string) {
 	query := r.URL.Query()
 	page := boundedQueryInt(query.Get("page"), 1, 1, 0)
 	pageSize := boundedQueryInt(query.Get("pageSize"), 50, 1, 100)
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 		return

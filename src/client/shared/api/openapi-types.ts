@@ -1046,6 +1046,38 @@ export interface paths {
         patch: operations["patch_api_generate_headline_memory_usages_id"];
         trace?: never;
     };
+    "/api/generate/headline-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_generate_headline_templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/generate/headline-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patch_api_generate_headline_templates_id"];
+        trace?: never;
+    };
     "/api/generate/headline-title": {
         parameters: {
             query?: never;
@@ -1158,6 +1190,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/generate/seedance/precheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_generate_seedance_precheck"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/generate/upload-ref": {
         parameters: {
             query?: never;
@@ -1184,87 +1232,6 @@ export interface paths {
         get: operations["get_api_generate_video"];
         put?: never;
         post: operations["post_api_generate_video"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/video-sales/analyze": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_generate_video_sales_analyze"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/video-sales/compose": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** @deprecated */
-        post: operations["post_api_generate_video_sales_compose"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/video-sales/finalize-prompts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_generate_video_sales_finalize_prompts"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/video-sales/script": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_generate_video_sales_script"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/video-sales/select-images": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_generate_video_sales_select_images"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1345,6 +1312,475 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["post_api_pets_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/asset-view-grid": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 将一张人物或场景九宫格裁切为当前工作区的九张 JPG */
+        post: operations["post_api_sales_asset_view_grid"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/asset-view-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_asset_view_jobs"];
+        put?: never;
+        post: operations["post_api_sales_asset_view_jobs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/atlas/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_atlas_catalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/atlas/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_sales_atlas_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/atlas/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_atlas_media"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/audio-mix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_sales_audio_mix"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/bgm/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_bgm_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/ocr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 使用本地 RapidOCR 提取一张商品原图的文字 */
+        post: operations["post_api_sales_ocr"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/plan-adapt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_sales_plan_adapt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_presets"];
+        put?: never;
+        post: operations["post_api_sales_presets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/presets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_api_sales_presets_id"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_products"];
+        put?: never;
+        post: operations["post_api_sales_products"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_products_id"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_api_sales_products_id"];
+        options?: never;
+        head?: never;
+        patch: operations["patch_api_sales_products_id"];
+        trace?: never;
+    };
+    "/api/sales/prompts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取当前工作区各环节的实际提示词与默认版本 */
+        get: operations["get_api_sales_prompts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/prompts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 保存指定环节提示词，传 null 恢复默认 */
+        put: operations["put_api_sales_prompts_id"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/script-analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_sales_script_analysis"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/script-analysis/prompt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_script_analysis_prompt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/script-normalize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_sales_script_normalize"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/script-taxonomy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_script_taxonomy"];
+        put?: never;
+        post: operations["post_api_sales_script_taxonomy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/script-taxonomy/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_api_sales_script_taxonomy_id"];
+        options?: never;
+        head?: never;
+        patch: operations["patch_api_sales_script_taxonomy_id"];
+        trace?: never;
+    };
+    "/api/sales/script-video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_sales_script_video"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/scripts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_scripts"];
+        put?: never;
+        post: operations["post_api_sales_scripts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/scripts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_api_sales_scripts_id"];
+        options?: never;
+        head?: never;
+        patch: operations["patch_api_sales_scripts_id"];
+        trace?: never;
+    };
+    "/api/sales/studio-assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_studio_assets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/studio-bgms/builtin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_sales_studio_bgms_builtin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/studio-bgms/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_sales_studio_bgms_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/studio-sounds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_sales_studio_sounds"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/studio-sounds/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_api_sales_studio_sounds_id"];
+        options?: never;
+        head?: never;
+        patch: operations["patch_api_sales_studio_sounds_id"];
+        trace?: never;
+    };
+    "/api/sales/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 根据商品原图、核对文字及商品卖点转买点技能整理卖点文案 */
+        post: operations["post_api_sales_summary"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1536,6 +1972,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** @description 本机专用。要求应用写凭证和当前工作区的原生目录选择授权；生产环境禁止写服务器目录。 */
         post: operations["post_api_system_video_downloads"];
         delete?: never;
         options?: never;
@@ -1611,6 +2048,42 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        SalesPrompt: {
+            id: string;
+            title: string;
+            description: string;
+            prompt: string;
+            defaultPrompt: string;
+            version: string;
+            customized: boolean;
+        };
+        VideoDownloadRequest: {
+            directory: string;
+            directoryToken: string;
+            /**
+             * @default 100
+             * @enum {integer}
+             */
+            concurrency: 0 | 100;
+            items: {
+                /** @description 单个安全视频文件名；同名已存在时拒绝覆盖 */
+                filename: string;
+                /** @description 由后端视频代理安全策略校验的远程 URL */
+                url: string;
+            }[];
+        };
+        VideoDownloadSnapshot: {
+            jobId: string;
+            directory: string;
+            running: boolean;
+            items: {
+                filename: string;
+                url: string;
+                /** @enum {string} */
+                status: "pending" | "running" | "success" | "failed";
+                error?: string;
+            }[];
+        };
         CategoryLearningNote: {
             id: string;
             /** @enum {string} */
@@ -1666,202 +2139,6 @@ export interface components {
         } & {
             [key: string]: unknown;
         });
-        VideoSalesCatalogImage: {
-            index: number;
-            url: string;
-            role: string;
-        };
-        /** @description 仅接受当前流程；保留商品目录原始编号，仅处理允许集合 */
-        VideoSalesWorkflowRequest: {
-            /** @enum {integer} */
-            workflowVersion: 3;
-            imageCatalog: components["schemas"]["VideoSalesCatalogImage"][];
-            eligibleImageIndexes: number[];
-            selectedColor?: string;
-            model?: string;
-            customBaseUrl?: string;
-            customApiKey?: string;
-            /**
-             * @default auto
-             * @enum {string}
-             */
-            textProtocol: "auto" | "openai" | "gemini" | "anthropic";
-        };
-        VideoSalesAnalyzeRequest: {
-            /** @enum {integer} */
-            workflowVersion: 3;
-            imageCatalog: components["schemas"]["VideoSalesCatalogImage"][];
-            eligibleImageIndexes: number[];
-            selectedColor?: string;
-            model?: string;
-            customBaseUrl?: string;
-            customApiKey?: string;
-            /**
-             * @default auto
-             * @enum {string}
-             */
-            textProtocol: "auto" | "openai" | "gemini" | "anthropic";
-            productName: string;
-            brand?: string;
-            /** @enum {string} */
-            category: "fashion";
-            productDescription?: string;
-        };
-        /** @enum {string} */
-        VideoSalesAspectRatio: "9:16" | "16:9" | "3:4" | "1:1";
-        VideoSalesScriptRequest: {
-            /** @enum {integer} */
-            workflowVersion: 3;
-            imageCatalog: components["schemas"]["VideoSalesCatalogImage"][];
-            eligibleImageIndexes: number[];
-            selectedColor?: string;
-            model?: string;
-            customBaseUrl?: string;
-            customApiKey?: string;
-            /**
-             * @default auto
-             * @enum {string}
-             */
-            textProtocol: "auto" | "openai" | "gemini" | "anthropic";
-            productName: string;
-            /** @enum {string} */
-            category: "fashion";
-            brand?: string;
-            productDescription?: string;
-            productAnalysis?: string;
-            targetAudience?: string;
-            targetDuration: number;
-            aspectRatio: components["schemas"]["VideoSalesAspectRatio"];
-            /**
-             * @default live_presenter
-             * @enum {string}
-             */
-            videoMode: "product_closeup" | "graphic_montage" | "scene_demo" | "live_presenter";
-        };
-        /** @description 按需 1 至 4 张，依赖只能指向前序素材 */
-        VideoSalesPlannedAsset: {
-            id: string;
-            /** @enum {string} */
-            kind: "person" | "face" | "scene" | "keyframe";
-            label: string;
-            prompt: string;
-            required: boolean;
-            referenceAssetIds?: string[];
-            usesProduct?: boolean;
-            /** @description 使用商品的素材必须明确提供非空原始编号；旧计划缺失时需更新脚本 */
-            productImageIndexes?: number[];
-        } & ({
-            /** @enum {unknown} */
-            usesProduct: true;
-            productImageIndexes: unknown;
-        } | {
-            /** @enum {unknown} */
-            usesProduct?: false;
-            productImageIndexes?: unknown;
-        });
-        VideoSalesShot: {
-            shotId: number;
-            type?: string;
-            duration?: number;
-            description?: string;
-            camera?: string;
-            /** @enum {string} */
-            speechMode: "on_camera" | "voiceover";
-            voiceover: string;
-            prompt?: string;
-            imageIndex?: number;
-            /** @enum {string} */
-            visualSource?: "product_image" | "ai_generate";
-            /** @enum {string} */
-            transition?: "direct_concat";
-            selectionReason?: string;
-        };
-        /** @description 仅当前服饰脚本，分镜为整段时间轴，总时长精确匹配请求 */
-        VideoSalesScript: {
-            id: string;
-            title: string;
-            /** @enum {string} */
-            beat?: "unbox" | "lifestyle" | "accessory";
-            /** @enum {string} */
-            deliveryMode: "single";
-            assets: components["schemas"]["VideoSalesPlannedAsset"][];
-            totalDuration: number;
-            shots: components["schemas"]["VideoSalesShot"][];
-            seo?: {
-                [key: string]: unknown;
-            };
-            fullPrompt?: string;
-        };
-        VideoSalesSelectRequest: {
-            /** @enum {integer} */
-            workflowVersion: 3;
-            imageCatalog: components["schemas"]["VideoSalesCatalogImage"][];
-            eligibleImageIndexes: number[];
-            selectedColor?: string;
-            model?: string;
-            customBaseUrl?: string;
-            customApiKey?: string;
-            /**
-             * @default auto
-             * @enum {string}
-             */
-            textProtocol: "auto" | "openai" | "gemini" | "anthropic";
-            shots: components["schemas"]["VideoSalesShot"][];
-        };
-        VideoSalesActualReference: {
-            id: string;
-            /** @enum {string} */
-            kind: "product" | "person" | "face" | "scene" | "keyframe";
-            label: string;
-            url: string;
-        };
-        VideoSalesFinalizeRequest: {
-            /** @enum {integer} */
-            workflowVersion: 3;
-            imageCatalog: components["schemas"]["VideoSalesCatalogImage"][];
-            eligibleImageIndexes: number[];
-            selectedColor?: string;
-            model?: string;
-            customBaseUrl?: string;
-            customApiKey?: string;
-            /**
-             * @default auto
-             * @enum {string}
-             */
-            textProtocol: "auto" | "openai" | "gemini" | "anthropic";
-            /** @enum {string} */
-            operation: "finalize";
-            /** @enum {string} */
-            category: "fashion";
-            shots: (components["schemas"]["VideoSalesShot"] & unknown)[];
-            actualReferences: components["schemas"]["VideoSalesActualReference"][];
-            assets: components["schemas"]["VideoSalesPlannedAsset"][];
-            targetDuration: number;
-            aspectRatio: components["schemas"]["VideoSalesAspectRatio"];
-            videoModel?: string;
-            videoRefMode?: string;
-            videoResolution?: string;
-            brand?: string;
-            productName?: string;
-            productAnalysis?: string;
-            productDescription?: string;
-        };
-        VideoSalesFinalizeResponse: {
-            /** @enum {boolean} */
-            success: true;
-            model?: string;
-            usage?: {
-                [key: string]: unknown;
-            };
-            fullPrompt: string;
-            prompts: {
-                shotId: number;
-                /** @enum {string} */
-                speechMode: "on_camera" | "voiceover";
-                prompt: string;
-            }[];
-            languageWarnings?: string[];
-        };
         CollectVariantMetadata: {
             /** @enum {integer} */
             version: 1;
@@ -1875,8 +2152,83 @@ export interface components {
             requestedSkuId?: string;
             selectedVariantId?: string;
         };
+        SalesSummaryImage: {
+            index: number;
+            url: string;
+        };
+        /** @description 去重后最多16张原图、合计20MiB；核对文字合计最多60000字。 */
+        SalesSummaryRequest: {
+            productName: string;
+            brand: string;
+            facts: string;
+            referenceImages: components["schemas"]["SalesSummaryImage"][];
+            textImages: (components["schemas"]["SalesSummaryImage"] & {
+                text: string;
+            })[];
+            model: string;
+            /** @enum {string} */
+            textProtocol?: "auto" | "openai" | "gemini" | "anthropic";
+            customBaseUrl?: string;
+            customApiKey?: string;
+            /** @enum {string} */
+            apiFormat?: "openai-responses";
+            allowInsecureHttp?: boolean;
+        };
+        SalesSummaryResult: {
+            /**
+             * @description 来自商品资料的关键使用与养护限制；补足已收录标签中的明确限制。
+             * @default []
+             */
+            cautions: string[];
+            summary: string;
+            points: {
+                feature: string;
+                benefit: string;
+                expression: string;
+                sources: string[];
+            }[];
+            copy: string;
+            /**
+             * @description 成稿生成时参考的买点，使用 points 中从 1 开始的编号；旧结果默认空数组。
+             * @default []
+             */
+            copyPointIndexes: number[];
+            conflicts: string[];
+            questions: string[];
+        };
+        SalesOCRRequest: {
+            imageUrl: string;
+            /** @default false */
+            force: boolean;
+        };
+        SalesOCRResult: {
+            engine: string;
+            width: number;
+            height: number;
+            text: string;
+            cached: boolean;
+            lines: {
+                box: number[][];
+                text: string;
+                confidence: number;
+            }[];
+        };
     };
-    responses: never;
+    responses: {
+        /** @description 请求、授权或运行环境不允许此操作；error 含可展示的原因 */
+        VideoDownloadError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    /** @enum {boolean} */
+                    success: false;
+                    error: string;
+                };
+            };
+        };
+    };
     parameters: never;
     requestBodies: never;
     headers: never;
@@ -3664,6 +4016,42 @@ export interface operations {
             };
         };
     };
+    get_api_generate_headline_templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_api_generate_headline_templates_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     post_api_generate_headline_title: {
         parameters: {
             query?: never;
@@ -3826,6 +4214,24 @@ export interface operations {
             };
         };
     };
+    post_api_generate_seedance_precheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     post_api_generate_upload_ref: {
         parameters: {
             query?: never;
@@ -3877,142 +4283,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    post_api_generate_video_sales_analyze: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VideoSalesAnalyzeRequest"];
-            };
-        };
-        responses: {
-            /** @description 仅分析允许的商品图 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        success?: boolean;
-                        analysis?: {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    post_api_generate_video_sales_compose: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 逐镜拼接已停用，历史片段仅支持查询和下载 */
-            410: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_generate_video_sales_finalize_prompts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VideoSalesFinalizeRequest"];
-            };
-        };
-        responses: {
-            /** @description 仅 finalize 返回整段及分段视频提示词；素材由用户人工确认 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VideoSalesFinalizeResponse"];
-                };
-            };
-            /** @description validate-assets 已停用，请人工确认素材 */
-            410: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_generate_video_sales_script: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VideoSalesScriptRequest"];
-            };
-        };
-        responses: {
-            /** @description 仅服饰技能，返回单条视频交付模式及按需素材计划，不接受旧创作请求 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        success: boolean;
-                        scripts: components["schemas"]["VideoSalesScript"][];
-                    };
-                };
-            };
-        };
-    };
-    post_api_generate_video_sales_select_images: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VideoSalesSelectRequest"];
-            };
-        };
-        responses: {
-            /** @description 只能选取模型实际查看过且在允许集合内的商品图片 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        success?: boolean;
-                        assignments?: {
-                            shotId: number;
-                            imageIndex: number;
-                            reason: string;
-                        }[];
-                    };
-                };
             };
         };
     };
@@ -4106,6 +4376,896 @@ export interface operations {
         responses: {
             /** @description 沿用现有 JSON 或二进制响应 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_asset_view_grid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "persona" | "scene";
+                    /** @description 当前工作区存储路径、公网图片 URL 或图片 data URL */
+                    imageUrl: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 按从左到右、从上到下顺序裁切的九张 JPG；重试复用同一输出路径 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        images: {
+                            /** @enum {string} */
+                            view: "face" | "front" | "side" | "threeQuarterLeft" | "threeQuarterRight" | "back" | "sideRight" | "upperBody" | "backThreeQuarter" | "left" | "right" | "reverse" | "frontWide" | "leftWide" | "rightWide" | "reverseLeft" | "reverseRight" | "detail";
+                            url: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description 参数或原图读取失败；读取失败包含 image_read_failed 错误码 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 图像格式或尺寸无效 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 裁切并发已满，可稍后处理原图 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 裁切保存失败，可复用同一九宫格重试 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 裁切取消或超时，可继续处理原图 */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_asset_view_jobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_asset_view_jobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_atlas_catalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_atlas_import: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_atlas_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_audio_mix: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_bgm_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_ocr: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesOCRRequest"];
+            };
+        };
+        responses: {
+            /** @description 逐行原图坐标、置信度、文字及缓存标记 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        result: components["schemas"]["SalesOCRResult"];
+                    };
+                };
+            };
+            /** @description 请求或原图无效、越界或超过限制 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 识别失败，可更换图片后重试 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 识别服务忙，请稍后重试 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 运行环境未安装，请执行 pnpm setup:ocr */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 识别已取消或超时 */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_plan_adapt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_presets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_presets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_api_sales_presets_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_products: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_products: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_products_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_api_sales_products_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_api_sales_products_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_prompts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前提示词列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        prompts: components["schemas"]["SalesPrompt"][];
+                    };
+                };
+            };
+            /** @description 提示词存储读取失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    put_api_sales_prompts_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    prompt: string | null;
+                    expectedVersion: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 已保存的提示词 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        prompt: components["schemas"]["SalesPrompt"];
+                    };
+                };
+            };
+            /** @description 提示词内容或版本参数无效 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未知提示词环节 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 服务端版本已变化，保留草稿并重新读取版本后再保存 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 提示词存储读写失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_script_analysis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_script_analysis_prompt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_script_normalize: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_script_taxonomy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_script_taxonomy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_api_sales_script_taxonomy_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_api_sales_script_taxonomy_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_script_video: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_scripts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_scripts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_api_sales_scripts_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_api_sales_scripts_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_studio_assets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_studio_bgms_builtin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_studio_bgms_import: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_studio_sounds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_api_sales_studio_sounds_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_api_sales_studio_sounds_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesSummaryRequest"];
+            };
+        };
+        responses: {
+            /** @description 带来源的卖点、消费者买点、推荐文案及待确认信息 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        result: components["schemas"]["SalesSummaryResult"];
+                        model: string;
+                        skillVersion: string;
+                    };
+                };
+            };
+            /** @description 资料、图片来源、渠道配置无效或超过限制 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 模型失败、超时或返回内容不完整；不自动重试或生成替代文案 */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 商品原图读取取消或超时 */
+            504: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4336,51 +5496,83 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoDownloadRequest"];
+            };
+        };
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 已创建本机后台下载任务 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        jobId: string;
+                    };
+                };
             };
+            400: components["responses"]["VideoDownloadError"];
+            401: components["responses"]["VideoDownloadError"];
+            403: components["responses"]["VideoDownloadError"];
+            429: components["responses"]["VideoDownloadError"];
+            503: components["responses"]["VideoDownloadError"];
         };
     };
     get_api_system_video_downloads_jobId: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                jobId: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 仅返回当前工作区所属任务 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["VideoDownloadSnapshot"];
+                };
             };
+            401: components["responses"]["VideoDownloadError"];
+            404: components["responses"]["VideoDownloadError"];
+            503: components["responses"]["VideoDownloadError"];
         };
     };
     post_api_system_video_downloads_jobId_cancel: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                jobId: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 已请求取消当前工作区所属任务 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                    };
+                };
             };
+            401: components["responses"]["VideoDownloadError"];
+            404: components["responses"]["VideoDownloadError"];
+            503: components["responses"]["VideoDownloadError"];
         };
     };
     post_api_system_video_downloads_pick_directory: {
@@ -4392,13 +5584,30 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 生产返回浏览器模式；本机返回选定目录和内存授权，授权限当前工作区、8 小时内有效 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        /** @enum {string} */
+                        mode: "browser";
+                    } | {
+                        /** @enum {boolean} */
+                        success: true;
+                        /** @enum {string} */
+                        mode: "local";
+                        directory: string;
+                        directoryToken: string;
+                    };
+                };
             };
+            400: components["responses"]["VideoDownloadError"];
+            401: components["responses"]["VideoDownloadError"];
+            503: components["responses"]["VideoDownloadError"];
         };
     };
     post_api_workshop_tasks_taskId_review: {

@@ -1,0 +1,111 @@
+.sales-workspace-nav {
+  display: flex;
+  height: 100%;
+  flex-shrink: 0;
+  align-items: stretch;
+}
+
+.sales-workspace-underline-tabs {
+  display: inline-flex;
+  height: 100%;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.sales-mode-tab {
+  position: relative;
+  display: inline-flex;
+  height: 100%;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 2px solid transparent;
+  padding: 0 10px;
+  color: var(--sales-muted);
+  font-size: 13px;
+  font-weight: 500;
+  transition: color 120ms, border-color 120ms;
+}
+
+.sales-mode-tab:hover:not(:disabled) {
+  color: var(--sales-ink);
+}
+
+.sales-mode-tab.is-active {
+  border-bottom-color: var(--sales-ink);
+  color: var(--sales-ink);
+  font-weight: 600;
+}
+
+.sales-mode-tab:disabled {
+  opacity: 0.45;
+}
+
+.sales-unsaved-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--sales-warn);
+}
+
+/* 顶栏中央三步线性进度导航 */
+.sales-editor-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sales-step-connector {
+  width: 18px;
+  height: 1px;
+  background: var(--sales-line-strong);
+}
+
+.sales-step-item {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 5px;
+  padding: 0 8px;
+  color: var(--sales-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: color 120ms, background-color 120ms;
+}
+
+.sales-step-item:hover {
+  background: var(--sales-subtle);
+  color: var(--sales-ink);
+}
+
+.sales-step-num {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--sales-line-strong);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sales-step-item.is-active {
+  color: var(--sales-ink);
+  font-weight: 600;
+}
+
+.sales-step-item.is-active .sales-step-num {
+  border-color: var(--sales-cta-bg);
+  background: var(--sales-cta-bg);
+  color: var(--sales-cta-ink);
+}
+
+.sales-step-item.is-done {
+  color: var(--sales-ink);
+}
+
+.sales-step-item.is-done .sales-step-num {
+  border-color: var(--sales-ink);
+}

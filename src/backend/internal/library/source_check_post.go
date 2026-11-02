@@ -1,7 +1,6 @@
 package library
 
 import (
-	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -15,6 +14,8 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
@@ -54,7 +55,7 @@ func sourceCheckPostHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "查重失败"})
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "查重失败"})
 			return

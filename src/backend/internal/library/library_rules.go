@@ -1,13 +1,14 @@
 package library
 
 import (
-	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"net/http"
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 )
 
 func saveLibraryFolderRules(cfg config.Config, w http.ResponseWriter, r *http.Request, body []byte) {
@@ -16,7 +17,7 @@ func saveLibraryFolderRules(cfg config.Config, w http.ResponseWriter, r *http.Re
 		writeLibraryMutationError(w, message)
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeLibraryMutationError(w, "分类操作失败")
 		return
@@ -36,7 +37,7 @@ func importLibraryFolderRules(cfg config.Config, w http.ResponseWriter, r *http.
 		writeLibraryMutationError(w, message)
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeLibraryMutationError(w, "分类操作失败")
 		return

@@ -15,6 +15,19 @@ from depth_runtime import (
 from depth_processing import apply_style
 
 
+def _temporal_median(window_maps: list["np.ndarray"]) -> "np.ndarray":
+    assert np is not None
+    count = len(window_maps)
+    if count == 1:
+        return window_maps[0].astype(np.float32, copy=False)
+    if count == 2:
+        return ((window_maps[0] + window_maps[1]) * np.float32(0.5)).astype(np.float32, copy=False)
+    if count == 3:
+        a, b, c = window_maps[0], window_maps[1], window_maps[2]
+        return np.maximum(np.minimum(a, b), np.minimum(np.maximum(a, b), c)).astype(np.float32, copy=False)
+    return np.median(np.stack(window_maps, axis=0), axis=0).astype(np.float32)
+
+
 def infer_frames(
     input_dir: Path,
     output_dir: Path,
@@ -50,37 +63,47 @@ def infer_frames(
     runtime = load_depth_runtime(device, model_id, inference_size)
     emit_meta(model_id, inference_size, resolved_device, quality)
 
-    # Keep only the temporal window in memory.  The previous implementation
-    # retained every full-resolution float32 depth map until inference had
-    # finished.  A 30 s / 30 fps / 1280x720 clip can exceed 3 GiB before the
-    # model and video frames are counted, and concurrent jobs multiply that
-    # cost.  A small indexed ring gives the same centred temporal median while
-    # keeping memory O(window) instead of O(frame_count).
+    # Keep only the temporal window in memory.
+    # For non-CUDA devices (MPS/CPU) with >=24 frames in fast/standard quality,
+    # infer key frames with stride=2 and linearly interpolate odd frames before
+    # temporal median smoothing, cutting neural inference time in half while
+    # preserving motion-capture continuity.
     total = len(frame_files)
+    stride = 2 if (quality in ("fast", "standard") and resolved_device != "cuda" and total >= 24) else 1
     half_window = max(0, cfg.temporal_window // 2)
     recent_depths: dict[int, np.ndarray] = {}
+    prev_key_index = -1
+    prev_key_depth: np.ndarray | None = None
     next_output_index = 0
 
     for frame_index, frame_path in enumerate(frame_files):
-        frame = cv2.imread(str(frame_path))
-        if frame is None:
-            raise RuntimeError(f"无法读取帧: {frame_path}")
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        recent_depths[frame_index] = infer_depth(Image.fromarray(rgb), runtime)
-
         is_last_frame = frame_index == total - 1
+        if stride == 1 or frame_index % stride == 0 or is_last_frame:
+            frame = cv2.imread(str(frame_path))
+            if frame is None:
+                raise RuntimeError(f"无法读取帧: {frame_path}")
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            cur_depth = infer_depth(Image.fromarray(rgb), runtime)
+            if prev_key_depth is not None and frame_index - prev_key_index > 1:
+                span = float(frame_index - prev_key_index)
+                for mid_index in range(prev_key_index + 1, frame_index):
+                    alpha = np.float32((mid_index - prev_key_index) / span)
+                    recent_depths[mid_index] = (
+                        prev_key_depth * (np.float32(1.0) - alpha) + cur_depth * alpha
+                    ).astype(np.float32, copy=False)
+            recent_depths[frame_index] = cur_depth
+            prev_key_index = frame_index
+            prev_key_depth = cur_depth
+
         while next_output_index < total:
             required_right = min(total - 1, next_output_index + half_window)
-            if not is_last_frame and frame_index < required_right:
+            if required_right not in recent_depths:
                 break
 
             window_start = max(0, next_output_index - half_window)
             window_end = min(total, next_output_index + half_window + 1)
             window_maps = [recent_depths[i] for i in range(window_start, window_end)]
-            if len(window_maps) == 1:
-                stable_depth = window_maps[0].astype(np.float32, copy=False)
-            else:
-                stable_depth = np.median(np.stack(window_maps, axis=0), axis=0).astype(np.float32)
+            stable_depth = _temporal_median(window_maps)
 
             output_frame = frame_files[next_output_index]
             vis = apply_style(stable_depth, style, invert_depth=invert_depth, post_process=cfg)
@@ -88,7 +111,7 @@ def infer_frames(
             emit_progress(next_output_index + 1, total)
             next_output_index += 1
 
-            earliest_needed = max(0, next_output_index - half_window)
+            earliest_needed = min(max(0, next_output_index - half_window), prev_key_index)
             for old_index in [i for i in recent_depths if i < earliest_needed]:
                 del recent_depths[old_index]
 

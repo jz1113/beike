@@ -15,7 +15,7 @@ import (
 
 func TestAssistantVideoMedia(t *testing.T) {
 	t.Setenv("AZHUO_CACHE_DIR", t.TempDir())
-	handler := Media(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := Media(config.Config{})
 	webm := append([]byte{0x1A, 0x45, 0xDF, 0xA3}, []byte("rest")...)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/assistant/media", strings.NewReader(string(webm)))
@@ -47,7 +47,7 @@ func TestAssistantImageMedia(t *testing.T) {
 	if err := png.Encode(&encoded, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
 		t.Fatal(err)
 	}
-	handler := Media(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := Media(config.Config{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/assistant/media", &encoded)
 	request.Header.Set("Content-Type", "image/png")

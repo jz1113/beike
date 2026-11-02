@@ -72,7 +72,7 @@ func wanbangQuota(info string) string {
 }
 
 func probeMediaCatalog(ctx context.Context, client *http.Client, baseURL, apiKey, model string) (int, map[string]any) {
-	data, status, err := authorizedJSON(ctx, client, http.MethodGet, ModelsURL(baseURL), apiKey, nil)
+	data, status, err := authorizedJSON(ctx, client, http.MethodGet, gateway.ModelsURL(baseURL), apiKey, nil)
 	if err != nil || status < 200 || status >= 300 {
 		code := status
 		if code == 0 {
@@ -113,7 +113,7 @@ func probeChat(ctx context.Context, client *http.Client, baseURL, apiKey, model 
 		"model": model, "max_tokens": 10,
 		"messages": []map[string]string{{"role": "user", "content": "Ping. Reply \"PONG\" only."}},
 	})
-	_, status, err := authorizedJSON(ctx, client, http.MethodPost, ChatCompletionsURL(baseURL), apiKey, payload)
+	_, status, err := authorizedJSON(ctx, client, http.MethodPost, gateway.ChatCompletionsURL(baseURL), apiKey, payload)
 	if err != nil || status < 200 || status >= 300 {
 		return http.StatusBadRequest, map[string]any{"success": false, "status": status, "error": "接口响应异常"}
 	}

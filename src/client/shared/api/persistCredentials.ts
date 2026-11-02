@@ -1,6 +1,8 @@
 import { credentialSetBatch, type CredentialKey } from '@client/shared/api/credentialClient';
 import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@client/shared/api/gatewayClient';
 
+export const STORAGE_CONFIG_CHANGED_EVENT = 'beike:storage-config-changed';
+
 export interface StorageConfig {
   enabled?: boolean;
   provider?: 'oss' | 'qiniu' | 'cloudinary' | 'cos' | 'r2' | 's3' | 'minio' | 'supabase';
@@ -126,6 +128,8 @@ export function persistStorageConfig(config: {
     storage_materials_prefix: (config.materialsPrefix || 'canvas-materials/').trim(),
     storage_cloud_name: (config.cloudName || '').trim(),
     storage_zone: (config.zone || 'z2').trim(),
+  }, () => {
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(STORAGE_CONFIG_CHANGED_EVENT));
   });
 }
 

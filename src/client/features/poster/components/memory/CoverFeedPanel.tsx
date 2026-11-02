@@ -62,8 +62,8 @@ export function CoverFeedPanel({
     <section className="w-[min(92vw,380px)] rounded-3xl border border-violet-200/80 bg-white/95 p-4 text-slate-900 shadow-2xl dark:border-violet-300/20 dark:bg-[#16161a] dark:text-slate-100" aria-label="封面样张收件">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-black">投喂给小怪兽</h3>
-          <p className="mt-1 text-[11px] leading-5 text-slate-500">一次 1 到 10 张。JPG、PNG、WebP，或装有这些图片的 ZIP。确认后才会逐张反推。</p>
+          <h3 className="text-sm font-black">添加封面模板</h3>
+          <p className="mt-1 text-[11px] leading-5 text-slate-500">每批最多 100 张，总量不超过 200MB；ZIP 不超过 32MB。逐张反推，每张独立保存为模板。</p>
         </div>
         <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10" aria-label="关闭投喂"><X className="h-4 w-4" /></button>
       </div>
@@ -123,7 +123,7 @@ export function CoverFeedPanel({
       <p className="sr-only" aria-live="polite">{selected ? `当前模型 ${coverVisionModelLabel(selected)}` : '没有可用的反推模型'}，思考强度 {coverEffortLabel(selected, effort)}，{jobs.length} 张样张</p>
       <div className="mt-3 flex justify-end gap-2">
         {uncertain && <button type="button" onClick={onRetry} className="rounded-xl px-3 py-2 text-xs font-bold text-slate-500">刷新核对</button>}
-        <button type="button" disabled={busy || !ready || !selected || selected.unavailable} onClick={onStart} className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">投喂并反推</button>
+        <button type="button" disabled={busy || !ready || !selected || selected.unavailable} onClick={onStart} className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">反推并保存模板</button>
       </div>
     </section>
   );

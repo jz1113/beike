@@ -29,11 +29,17 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 	if len(videos) > 0 && !referenceVideoAllowed(model) && !grokClip {
 		return "当前模型的参考视频尚未接入，请使用图片或文字"
 	}
-	if regexp.MustCompile(`^viduq3(?:-mix)?$`).MatchString(model) && len(images) == 0 {
+	if regexp.MustCompile(`(?i)^vidu`).MatchString(model) && (regexp.MustCompile(`(?i)^viduq3(?:-mix)?$`).MatchString(model) || viduQ4Preview(model) || mode == "omni") && len(images) == 0 {
 		return "该模型需要参考图片，请添加素材"
 	}
-	if regexp.MustCompile(`^vidu`).MatchString(model) && len(images) > 15 {
-		return "Vidu 最多支持 15 张参考图片"
+	if regexp.MustCompile(`(?i)^vidu`).MatchString(model) {
+		maxViduImages := 7
+		if viduQ4Preview(model) {
+			maxViduImages = 15
+		}
+		if len(images) > maxViduImages {
+			return "Vidu 最多支持 " + Itoa(maxViduImages) + " 张参考图片"
+		}
 	}
 	if regexp.MustCompile(`(?i)omni[_-]flash|gemini-omni`).MatchString(model) && (len(images) > 7 || len(videos) > 3) {
 		return "Omni Flash 最多支持 7 张参考图片、3 个参考视频"
@@ -173,8 +179,12 @@ func videoModes(model string) []string {
 		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
 	case id == "viduq3" || id == "viduq3-mix":
 		return []string{"omni"}
-	case id == "viduq3-turbo" || id == "viduq3-pro" || viduQ4Preview(id):
+	case id == "viduq3-pro":
+		return framed
+	case id == "viduq3-turbo":
 		return full
+	case viduQ4Preview(id):
+		return []string{"omni", "first_frame"}
 	case regexp.MustCompile(`omni[_-]flash|gemini-omni`).MatchString(id):
 		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
 	case regexp.MustCompile(`^veo3\.1`).MatchString(id):

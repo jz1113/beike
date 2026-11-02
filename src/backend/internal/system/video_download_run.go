@@ -8,8 +8,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/platform/network"
@@ -27,11 +29,14 @@ type videoDownloadItem struct {
 type videoDownloadJob struct {
 	mu          sync.Mutex
 	id          string
+	owner       string
 	directory   string
 	concurrency int
 	items       []videoDownloadItem
 	running     bool
 	cancel      context.CancelFunc
+	finishedAt  time.Time
+	done        chan struct{}
 }
 
 type videoDownloadSnapshot struct {
@@ -41,30 +46,12 @@ type videoDownloadSnapshot struct {
 	Items     []videoDownloadItem `json:"items"`
 }
 
-var videoDownloadJobs = struct {
-	sync.Mutex
-	items map[string]*videoDownloadJob
-}{items: map[string]*videoDownloadJob{}}
-
 func newVideoDownloadJob(directory string, concurrency int, items []videoDownloadItem) *videoDownloadJob {
 	var buf [8]byte
 	_, _ = rand.Read(buf[:])
 	copied := make([]videoDownloadItem, len(items))
 	copy(copied, items)
-	return &videoDownloadJob{id: hex.EncodeToString(buf[:]), directory: directory, concurrency: concurrency, items: copied}
-}
-
-func storeVideoDownloadJob(job *videoDownloadJob) {
-	videoDownloadJobs.Lock()
-	videoDownloadJobs.items[job.id] = job
-	videoDownloadJobs.Unlock()
-}
-
-func lookupVideoDownloadJob(id string) (*videoDownloadJob, bool) {
-	videoDownloadJobs.Lock()
-	job, ok := videoDownloadJobs.items[id]
-	videoDownloadJobs.Unlock()
-	return job, ok
+	return &videoDownloadJob{id: hex.EncodeToString(buf[:]), directory: directory, concurrency: concurrency, items: copied, finishedAt: time.Now(), done: make(chan struct{})}
 }
 
 func (job *videoDownloadJob) snapshot() videoDownloadSnapshot {
@@ -83,6 +70,7 @@ func (job *videoDownloadJob) setStatus(index int, status, message string) {
 }
 
 func (job *videoDownloadJob) run(ctx context.Context, cfg config.Config) {
+	defer close(job.done)
 	indexes := make(chan int, len(job.items))
 	for index := range job.items {
 		indexes <- index
@@ -122,6 +110,7 @@ func (job *videoDownloadJob) run(ctx context.Context, cfg config.Config) {
 	group.Wait()
 	job.mu.Lock()
 	job.running = false
+	job.finishedAt = time.Now()
 	job.mu.Unlock()
 }
 
@@ -162,18 +151,33 @@ func saveVideoFile(ctx context.Context, cfg config.Config, dir, name, rawURL str
 	if response.ContentLength > maxVideoProxyBytes {
 		return errors.New("视频超过 200MB")
 	}
-	partial := dest + ".part"
-	file, err := os.OpenFile(partial, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	return writeVideoDownload(ctx, dir, dest, response.Body)
+}
+
+// Exclusive creation and linking never replace an existing file or follow a
+// destination symlink. Root confines all writes even if a parent is renamed.
+func writeVideoDownload(ctx context.Context, dir, dest string, body io.Reader) error {
+	root, err := os.OpenRoot(dir)
 	if err != nil {
 		return errors.New("无法写入保存文件夹")
 	}
-	written, copyErr := copyCapped(file, response.Body, maxVideoProxyBytes)
+	defer root.Close()
+	nonce := make([]byte, 16)
+	if _, err = rand.Read(nonce); err != nil {
+		return err
+	}
+	partial := ".beike-download-" + hex.EncodeToString(nonce) + ".part"
+	file, err := root.OpenFile(partial, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return errors.New("无法写入保存文件夹")
+	}
+	defer root.Remove(partial)
+	written, copyErr := copyCapped(file, body, maxVideoProxyBytes)
 	closeErr := file.Close()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	if copyErr != nil || closeErr != nil || written == 0 {
-		_ = os.Remove(partial)
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
 		if errors.Is(copyErr, errVideoTooLarge) {
 			return errors.New("视频超过 200MB")
 		}
@@ -182,10 +186,11 @@ func saveVideoFile(ctx context.Context, cfg config.Config, dir, name, rawURL str
 		}
 		return errors.New("视频下载失败")
 	}
-	_ = os.Remove(dest)
-	if err = os.Rename(partial, dest); err != nil {
-		_ = os.Remove(partial)
-		return errors.New("无法写入保存文件夹")
+	if err = root.Link(partial, filepath.Base(dest)); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return errors.New("同名文件已存在，请更换文件名或保存文件夹")
+		}
+		return errors.New("无法安全保存视频，保存文件夹需支持文件硬链接")
 	}
 	return nil
 }

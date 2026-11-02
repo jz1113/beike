@@ -11,7 +11,7 @@ import (
 )
 
 func TestLibraryPutRejectsInvalidEdits(t *testing.T) {
-	handler := libraryPutHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := libraryPutHandler(config.Config{})
 	status, body := putLibrary(t, handler, `{}`)
 	if status != http.StatusBadRequest || body["error"] != "缺少 assetType、id 或 data" || body["success"] != nil {
 		t.Fatalf("missing %d %#v", status, body)

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 // Audio handles audio generation (TTS / Music) endpoints.
@@ -125,7 +125,7 @@ func submitAudio(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	}
 	if result.Usage != nil {
 		body["usage"] = result.Usage
-		rememberTaskUsage(r.Context(), cfg, taskID, result.Usage)
+		rememberTaskUsage(r.Context(), cfg, scopeOf(r, "audio"), taskID, result.Usage)
 	}
 	httpx.WriteJSON(w, http.StatusOK, body)
 }
@@ -173,7 +173,7 @@ func audioPoll(cfg config.Config, w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	if taskID != "" {
-		status, result, reason, usage, ok, err := taskStatus(r.Context(), db, taskID)
+		status, result, reason, usage, ok, err := taskStatus(r.Context(), db, scopeOf(r, "audio"), taskID)
 		if err == nil && ok {
 			body := map[string]any{
 				"success":    true,
@@ -192,8 +192,8 @@ func audioPoll(cfg config.Config, w http.ResponseWriter, r *http.Request) {
 		var id, result, status string
 		err := db.QueryRowContext(r.Context(), `
 			SELECT "taskId", "resultUrl", "status" FROM "ImageTask"
-			WHERE "idempotencyKey" = ? AND "mediaType" = 'audio'
-			ORDER BY "createdAt" DESC LIMIT 1`, taskKey).Scan(&id, &result, &status)
+			WHERE "workspaceId" = ? AND "idempotencyKey" = ? AND "mediaType" = 'audio'
+			ORDER BY "createdAt" DESC LIMIT 1`, workspaceOf(r), taskKey).Scan(&id, &result, &status)
 		if err == nil && id != "" {
 			body := map[string]any{
 				"success":   true,
@@ -202,7 +202,7 @@ func audioPoll(cfg config.Config, w http.ResponseWriter, r *http.Request) {
 				"resultUrl": result,
 				"audioUrl":  result,
 			}
-			putStoredUsage(body, readTaskUsage(r.Context(), db, id))
+			putStoredUsage(body, readTaskUsage(r.Context(), db, scopeOf(r, "audio"), id))
 			httpx.WriteJSON(w, http.StatusOK, body)
 			return
 		}
@@ -221,7 +221,7 @@ func audioCredentials(cfg config.Config, r *http.Request, payload map[string]jso
 	}
 	base := ImageDefaultBase()
 	if clientBase != "" {
-		base = system.NormalizeGatewayBaseURL(clientBase)
+		base = gateway.NormalizeGatewayBaseURL(clientBase)
 	}
 
 	apiKey := rawString(payload, "customApiKey")

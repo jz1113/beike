@@ -110,4 +110,14 @@ describe('mapCollectedSalesProduct', () => {
     expect(product.sellingPoints).not.toContain('0.660');
     expect(product.sellingPoints).not.toContain('不可定制');
   });
+
+  it('prioritizes fashion category over color words like 咖啡条 in sweater titles', () => {
+    const product = mapCollectedSalesProduct({
+      product: {
+        title: '红袖（hopeshow）今年流行漂亮针织衫2025冬装新款咖啡条721',
+        mainImages: ['https://example.com/main.jpg'],
+      },
+    }, '10233097548161');
+    expect(product.category).toBe('fashion');
+  });
 });

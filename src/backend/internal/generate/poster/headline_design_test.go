@@ -1,7 +1,6 @@
 package poster
 
 import (
-	"beike.local/cloud/src/backend/internal/generate"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +8,7 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestCoverPromptsDescribeXiaohongshuDesign(t *testing.T) {
@@ -17,7 +17,7 @@ func TestCoverPromptsDescribeXiaohongshuDesign(t *testing.T) {
 		t.Fatal(title)
 	}
 	design := coverDirectorPrompt("原标题", "洗完衣服不发灰", "3:4", "洗衣机", "上一张是深底", []string{"- [纠正] 不要挡住品牌"})
-	for _, phrase := range []string{"咬住", "三色分工", "先写标题怎么被读到"} {
+	for _, phrase := range []string{"摄影", "不继承样张品牌", "画面类型与比例", "只上传当前商品图"} {
 		if !strings.Contains(design, phrase) {
 			t.Fatalf("missing %s", phrase)
 		}
@@ -66,7 +66,7 @@ func TestDeconstructRejectsEmptyModelAndMultipleImages(t *testing.T) {
 }
 
 func TestHeadlineDesignSchemaOrder(t *testing.T) {
-	handler := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := HeadlineDesign(config.Config{})
 	missing := httptest.NewRecorder()
 	handler.ServeHTTP(missing, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{}`)))
 	if missing.Code != http.StatusBadRequest || !strings.Contains(missing.Body.String(), "imageUrls: Required") {
@@ -87,7 +87,7 @@ func TestHeadlineDesignSchemaOrder(t *testing.T) {
 func TestHeadlineDesignRequiresKey(t *testing.T) {
 	t.Setenv("AI_DRAWING_API_KEY", "")
 	t.Setenv("AI_API_KEY", "")
-	handler := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := HeadlineDesign(config.Config{})
 	body := `{"imageUrls":["https://img.alicdn.com/a.jpg"],"originalTitle":"台灯","coverTitle":"台灯"}`
 	missing := httptest.NewRecorder()
 	handler.ServeHTTP(missing, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(body)))
@@ -99,7 +99,7 @@ func TestHeadlineDesignRequiresKey(t *testing.T) {
 	if unknown.Code != http.StatusBadRequest || !strings.Contains(unknown.Body.String(), "此 DeepSeek 官方模型尚未适配") {
 		t.Fatalf("model %d %s", unknown.Code, unknown.Body.String())
 	}
-	blocked := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "production"})
+	blocked := HeadlineDesign(config.Config{NodeEnv: "production"})
 	gateway := httptest.NewRecorder()
 	blocked.ServeHTTP(gateway, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{"imageUrls":["https://img.alicdn.com/a.jpg"],"originalTitle":"台灯","coverTitle":"台灯","customBaseUrl":"http://127.0.0.1","textProtocol":"openai","customApiKey":"secret"}`)))
 	if gateway.Code != http.StatusBadRequest || !strings.Contains(gateway.Body.String(), "当前接口地址与服务器允许的视觉网关不一致") {
@@ -108,7 +108,7 @@ func TestHeadlineDesignRequiresKey(t *testing.T) {
 }
 
 func TestHeadlineDesignRequiresTitles(t *testing.T) {
-	handler := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := HeadlineDesign(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{"imageUrls":["https://img.alicdn.com/a.jpg"]}`)))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "缺少原标题或已确认的封面标题") {
@@ -131,13 +131,13 @@ func TestHeadlineDesignReturnsPlan(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer server.Close()
-	previous := generate.ModelHTTP
-	generate.ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { generate.ModelHTTP = previous })
-	handler := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := HeadlineDesign(config.Config{NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(`{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"originalTitle":"台灯","coverTitle":"台灯","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "integrated-cover-v5") || !strings.Contains(response.Body.String(), "标题文字锁定") {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "reference-cover-v6") || !strings.Contains(response.Body.String(), "标题文字锁定") {
 		t.Fatalf("design %d %s", response.Code, response.Body.String())
 	}
 }

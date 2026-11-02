@@ -1,7 +1,6 @@
 package assets
 
 import (
-	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,6 +8,8 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 )
 
 func assetTasksDeleteHandler(cfg config.Config) http.HandlerFunc {
@@ -37,7 +38,7 @@ func assetTasksDeleteHandler(cfg config.Config) http.HandlerFunc {
 				return
 			}
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "操作失败，请稍后重试"})
 			return

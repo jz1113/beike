@@ -20,7 +20,7 @@ except ImportError:  # pragma: no cover
     np = None
     median_filter = None
 
-DEFAULT_DEPTH_MODEL = "depth-anything/Depth-Anything-V2-Base-hf"
+DEFAULT_DEPTH_MODEL = "depth-anything/Depth-Anything-V2-Small-hf"
 
 
 @dataclass(frozen=True)
@@ -40,12 +40,12 @@ QUALITY_PROFILES: dict[str, tuple[str, PostProcessConfig, dict[str, int]]] = {
     "fast": (
         "depth-anything/Depth-Anything-V2-Small-hf",
         PostProcessConfig(bilateral_d=5, bilateral_sigma=12, temporal_window=3),
-        {"default": 518, "cuda": 518, "mps": 518, "cpu": 518},
+        {"default": 350, "cuda": 518, "mps": 350, "cpu": 350},
     ),
     "standard": (
-        "depth-anything/Depth-Anything-V2-Base-hf",
+        "depth-anything/Depth-Anything-V2-Small-hf",
         PostProcessConfig(bilateral_d=5, bilateral_sigma=12, temporal_window=3),
-        {"default": 518, "cuda": 518, "mps": 518, "cpu": 518},
+        {"default": 350, "cuda": 518, "mps": 350, "cpu": 350},
     ),
     "high": (
         "depth-anything/Depth-Anything-V2-Large-hf",
@@ -60,7 +60,7 @@ QUALITY_PROFILES: dict[str, tuple[str, PostProcessConfig, dict[str, int]]] = {
             stretch_lo=2.0,
             stretch_hi=98.0,
         ),
-        {"default": 768, "cuda": 1024, "mps": 768, "cpu": 518},
+        {"default": 518, "cuda": 1024, "mps": 518, "cpu": 518},
     ),
 }
 
@@ -114,7 +114,14 @@ def resolve_inference_size(
 ) -> int:
     if override > 0:
         return override
-    return size_map.get(device, size_map.get("default", 518))
+    return size_map.get(device, size_map.get("default", 350))
+
+
+def _load_pretrained_offline_first(loader: Any, model_id: str, **kwargs: Any) -> Any:
+    try:
+        return loader.from_pretrained(model_id, local_files_only=True, **kwargs)
+    except Exception:
+        return loader.from_pretrained(model_id, **kwargs)
 
 
 def load_depth_runtime(device: str, model_id: str, inference_size: int) -> DepthRuntime:
@@ -123,12 +130,13 @@ def load_depth_runtime(device: str, model_id: str, inference_size: int) -> Depth
 
     resolved = resolve_device(device)
     torch_device = torch.device("cuda:0" if resolved == "cuda" else resolved)
-    processor = AutoImageProcessor.from_pretrained(
+    processor = _load_pretrained_offline_first(
+        AutoImageProcessor,
         model_id,
         size={"height": inference_size, "width": inference_size},
-        use_fast=True,
+        use_fast=False,
     )
-    model = AutoModelForDepthEstimation.from_pretrained(model_id)
+    model = _load_pretrained_offline_first(AutoModelForDepthEstimation, model_id)
     model.to(torch_device)
     model.eval()
     return DepthRuntime(
@@ -145,13 +153,13 @@ def infer_depth(image: Image.Image, runtime: DepthRuntime) -> "np.ndarray":
 
     inputs = runtime.processor(images=image, return_tensors="pt")
     inputs = {key: value.to(runtime.device) for key, value in inputs.items()}
-    with torch.no_grad():
+    with torch.inference_mode():
         outputs = runtime.model(**inputs)
-    post = runtime.processor.post_process_depth_estimation(
-        outputs,
-        target_sizes=[(image.height, image.width)],
-    )
-    return post[0]["predicted_depth"].detach().cpu().numpy().astype(np.float32)
+        post = runtime.processor.post_process_depth_estimation(
+            outputs,
+            target_sizes=[(image.height, image.width)],
+        )
+    return post[0]["predicted_depth"].detach().cpu().numpy().astype(np.float32, copy=False)
 
 
 def check_env() -> int:

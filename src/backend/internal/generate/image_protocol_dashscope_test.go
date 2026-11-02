@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestDashscopeRoutesSyncAndAsync(t *testing.T) {
@@ -27,9 +29,9 @@ func TestDashscopeRoutesSyncAndAsync(t *testing.T) {
 		_, _ = w.Write([]byte(`{"output":{"choices":[{"message":{"content":[{"image":"https://cdn.example/a.png"}]}}]}}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 
 	syncResult, err := (dashscopeImageProtocol{}).Submit(imageRequest{
 		Ctx: context.Background(), Base: server.URL, APIKey: "secret", Model: "qwen-image-2.0",
@@ -89,9 +91,9 @@ func TestDashscopePollAndErrors(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 
 	parsed, _, ok := (dashscopeImageProtocol{}).Poll(imagePollRequest{Ctx: context.Background(), Base: server.URL, APIKey: "secret", TaskID: "task-1"})
 	if !ok || parsed.status != "SUCCESS" || parsed.result != "https://cdn.example/b.png" {
@@ -193,9 +195,9 @@ func TestDashscopeStorageReferenceBecomesDataURL(t *testing.T) {
 		_, _ = w.Write([]byte(`{"output":{"choices":[{"message":{"content":[{"image":"https://cdn.example/c.png"}]}}]}}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 
 	result, err := (dashscopeImageProtocol{}).Submit(imageRequest{
 		Ctx: context.Background(), Base: server.URL, APIKey: "secret", Model: "qwen-image-edit",

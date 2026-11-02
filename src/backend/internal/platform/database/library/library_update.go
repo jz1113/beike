@@ -32,6 +32,9 @@ func UpdateLibraryAsset(ctx context.Context, db *sql.DB, workspace, assetType, i
 		}
 	}()
 	if assetType == "action" {
+		if err := validateActionMediaUpdate(ctx, tx, workspace, id, data); err != nil {
+			return nil, err
+		}
 		if err := requireActionScene(ctx, tx, workspace, data); err != nil {
 			return nil, err
 		}
@@ -131,7 +134,7 @@ func libraryColumn(name string) bool {
 		"productCategoryIds", "isUniversal", "albumName", "reversePromptZh", "reversePromptEn",
 		"hasHuman", "shotFraming", "productFrameRatio", "sceneSummary", "outfitSummary", "actionSummary",
 		"personaSummary", "productSubcategory", "displayNumber", "sourceImageIndices", "groupIndex",
-		"contentSummary", "architectureSummary", "replaceableSlots", "shotPromptsJson":
+		"contentSummary", "architectureSummary", "replaceableSlots", "shotPromptsJson", "mediaType", "mediaUrl", "sourceUrl":
 		return true
 	default:
 		return false

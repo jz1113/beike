@@ -15,7 +15,6 @@ import (
 	"beike.local/cloud/src/backend/internal/assistant"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate/depth"
-	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/keywords"
 	"beike.local/cloud/src/backend/internal/library"
 	"beike.local/cloud/src/backend/internal/platform/database"
@@ -51,7 +50,7 @@ func main() {
 		} else if count > 0 {
 			log.Printf("→ [任务自愈] 已自动终止 %d 个未提交的生成任务", count)
 		}
-		if db, err := httpx.OpenDB(cfg); err == nil {
+		if db, err := database.OpenRequired(cfg.SQLiteFile()); err == nil {
 			if err := learning.RecoverRuns(context.Background(), db); err != nil {
 				log.Printf("[API] 细分技能分析恢复未完成: %v", err)
 			}
@@ -84,6 +83,9 @@ func main() {
 	assistant.FlushTelemetry()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	if err := system.DrainVideoDownloads(ctx); err != nil {
+		log.Printf("[API] 下载关闭超时: %v", err)
+	}
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("[API] 关闭超时: %v", err)
 	}
@@ -108,5 +110,7 @@ func sweep(cfg config.Config) {
 	if count := system.PurgeExpiredMediaReviews(cfg.MediaReviewRoot(), time.Now()); count > 0 {
 		log.Printf("→ [媒体审查] 已清理 %d 个过期待核记录", count)
 	}
+	system.PurgeExpiredVideoDownloads(time.Now())
+	system.PurgeExpiredProxyCache()
 	assets.CleanupAssistantMedia(time.Now())
 }

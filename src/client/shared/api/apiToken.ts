@@ -4,8 +4,9 @@
  * 安全约定：
  * - localStorage 仅保存 **过期时间元数据**（key 前缀 `app_token_meta_`）；
  *   不再保存真实 token 明文。
- * - 真实 token 通过 document.cookie 由后端 Set-Cookie 下发（HttpOnly 模式下由后端保证，
- *   此处仅作为同步兼容层保留 SameSite=Lax 写入以支持旧版部署）。
+ * - 当前 app_token 由后端 Set-Cookie 或客户端 document.cookie 写入，
+ *   可被同源脚本读取，并非 HttpOnly 会话；客户端据此构造 API 请求头。
+ * - 托管入口依赖 HTTPS、Nginx 网页认证和 Go 端口隔离，应用 token 不单独充当登录边界。
  * - 兼容旧部署：读取时若发现 localStorage 中存在旧 token，会在读取后立即清除并仅保留过期元数据。
  */
 
@@ -106,12 +107,12 @@ export function getClientAccessToken(): string {
 }
 
 /**
- * 由后端 Set-Cookie 下发；此处仅同步过期时间元数据
+ * 同步客户端可读 Cookie 与过期时间元数据；保持当前请求头认证方式。
  */
 export function setClientAccessToken(_token: string): void {
   if (typeof window === 'undefined') return;
   writeMeta();
-  // 后端应当通过 Set-Cookie 写入 HttpOnly Cookie；此处保留兼容旧版的能力
+  // 当前 API 需要读取 Cookie 生成请求头，不能单独改成 HttpOnly。
   writeCookie(TOKEN_COOKIE_NAME, _token.trim(), TOKEN_TTL_SECONDS);
 }
 

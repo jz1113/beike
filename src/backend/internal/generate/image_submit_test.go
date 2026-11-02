@@ -14,11 +14,12 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func TestImageRejectsEmptyPromptAndUnknownModel(t *testing.T) {
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := Image(config.Config{})
 	empty := httptest.NewRecorder()
 	handler.ServeHTTP(empty, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"  "}`)))
 	if empty.Code != http.StatusBadRequest || !strings.Contains(empty.Body.String(), "提示词不能为空") {
@@ -34,7 +35,7 @@ func TestImageRejectsEmptyPromptAndUnknownModel(t *testing.T) {
 func TestImageGatewayMismatchAndMissingKey(t *testing.T) {
 	t.Setenv("AI_DRAWING_API_KEY", "")
 	t.Setenv("AI_API_KEY", "")
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
+	handler := Image(config.Config{NodeEnv: "development"})
 	gapnet := httptest.NewRecorder()
 	handler.ServeHTTP(gapnet, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customBaseUrl":"https://api.gapnet.ai/endpoint","customApiKey":"secret"}`)))
 	if gapnet.Code != http.StatusBadRequest || !strings.Contains(gapnet.Body.String(), "gpt-image-2 请使用 Comfly") {
@@ -48,7 +49,7 @@ func TestImageGatewayMismatchAndMissingKey(t *testing.T) {
 }
 
 func TestWorkshopOriginalRequiresProductImage(t *testing.T) {
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
+	handler := Image(config.Config{NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"secret","workshopMode":"storyboard_generate"}`)))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "原创生图缺少商品垫图") {
@@ -57,7 +58,7 @@ func TestWorkshopOriginalRequiresProductImage(t *testing.T) {
 }
 
 func TestImageModelRules(t *testing.T) {
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
+	handler := Image(config.Config{NodeEnv: "development"})
 	qwen := httptest.NewRecorder()
 	handler.ServeHTTP(qwen, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"改成白底","model":"qwen-image-edit","customApiKey":"secret"}`)))
 	if qwen.Code != http.StatusBadRequest || !strings.Contains(qwen.Body.String(), "Qwen 图像编辑需要至少一张参考图") {
@@ -87,15 +88,15 @@ func TestImageTaskKeyResolvesDirectPoll(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`CREATE TABLE ImageTask (
-		taskId TEXT, workspaceId TEXT, idempotencyKey TEXT, resultUrl TEXT, status TEXT, failReason TEXT, createdAt TEXT, mediaType TEXT
+		taskId TEXT, workspaceId TEXT, idempotencyKey TEXT, resultUrl TEXT, status TEXT, failReason TEXT, createdAt TEXT, mediaType TEXT, id TEXT
 	)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO ImageTask VALUES ('direct_from_key','local','idem-1','https://example.com/b.jpg','SUCCESS',NULL,'2026-01-01','image')`); err != nil {
+	if _, err := db.Exec(`INSERT INTO ImageTask VALUES ('direct_from_key','local','idem-1','https://example.com/b.jpg','SUCCESS',NULL,'2026-01-01','image','receipt')`); err != nil {
 		t.Fatal(err)
 	}
 	_ = db.Close()
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + dbPath})
+	handler := Image(config.Config{DatabaseURL: "file:" + dbPath})
 	found := httptest.NewRecorder()
 	handler.ServeHTTP(found, httptest.NewRequest(http.MethodGet, "/api/generate/image?taskKey=idem-1", nil))
 	if found.Code != http.StatusOK || !strings.Contains(found.Body.String(), "direct_from_key") || !strings.Contains(found.Body.String(), "https://example.com/b.jpg") {
@@ -109,14 +110,14 @@ func TestDirectImagePollReadsRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`CREATE TABLE ImageTask (taskId TEXT, resultUrl TEXT, status TEXT, failReason TEXT)`); err != nil {
+	if _, err := db.Exec(`CREATE TABLE ImageTask (taskId TEXT, resultUrl TEXT, status TEXT, failReason TEXT, workspaceId TEXT, mediaType TEXT)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO ImageTask VALUES ('direct_ok','https://example.com/a.jpg','SUCCESS',NULL)`); err != nil {
+	if _, err := db.Exec(`INSERT INTO ImageTask VALUES ('direct_ok','https://example.com/a.jpg','SUCCESS',NULL,'local','image')`); err != nil {
 		t.Fatal(err)
 	}
 	_ = db.Close()
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + dbPath})
+	handler := Image(config.Config{DatabaseURL: "file:" + dbPath})
 	found := httptest.NewRecorder()
 	handler.ServeHTTP(found, httptest.NewRequest(http.MethodGet, "/api/generate/image?taskId=direct_ok", nil))
 	if found.Code != http.StatusOK || !strings.Contains(found.Body.String(), `"status":"SUCCESS"`) || !strings.Contains(found.Body.String(), "https://example.com/a.jpg") {
@@ -130,7 +131,7 @@ func TestDirectImagePollReadsRecord(t *testing.T) {
 }
 
 func TestImagePollRequiresTask(t *testing.T) {
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := Image(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/generate/image", nil))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "缺少 taskId 参数") {
@@ -147,9 +148,9 @@ func TestImageSubmitAndPollUseGateway(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":{"status":"SUCCESS","url":"https://cdn.example.com/out.jpg"}}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 	dbPath := filepath.Join(t.TempDir(), "images.db")
 	db, err := database.OpenWrite(dbPath)
 	if err != nil {
@@ -164,7 +165,7 @@ func TestImageSubmitAndPollUseGateway(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = db.Close()
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + dbPath, NodeEnv: "development"})
+	handler := Image(config.Config{DatabaseURL: "file:" + dbPath, NodeEnv: "development"})
 	created := httptest.NewRecorder()
 	handler.ServeHTTP(created, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
 	if created.Code != http.StatusOK || !strings.Contains(created.Body.String(), `"taskId":"img-task-1"`) || !strings.Contains(created.Body.String(), `"status":"IN_PROGRESS"`) {
@@ -225,10 +226,10 @@ func TestImageEditSubmitsMultipart(t *testing.T) {
 		_, _ = w.Write([]byte(`{"task_id":"edit-1"}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := Image(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	body := `{"prompt":"改封面","model":"gpt-image-2","size":"1024x1024","quality":"high","customApiKey":"secret","customBaseUrl":"` + server.URL + `","images":["data:image/png;base64,` + tinyPNG + `"]}`
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(body)))
@@ -249,10 +250,10 @@ func TestImageGenerationStaysJSON(t *testing.T) {
 		_, _ = w.Write([]byte(`{"task_id":"json-1"}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := Image(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"taskId":"json-1"`) {
@@ -267,10 +268,10 @@ func TestImageEditRejectsBadDataURL(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := Image(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	body := `{"prompt":"改封面","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"` + server.URL + `","images":["data:image/png;base64,%%%"]}`
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(body)))
@@ -386,13 +387,13 @@ func boundaryOf(contentType string) string {
 
 func TestNativeQwenImageRejectsNonDashscopeGateway(t *testing.T) {
 	called := false
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client {
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client {
 		called = true
 		return http.DefaultClient
 	}
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := Image(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"qwen-image-3.0-pro","customApiKey":"secret","customBaseUrl":"https://ai.comfly.org"}`)))
 	if response.Code != http.StatusBadRequest || called {
@@ -411,10 +412,10 @@ func TestGatewayQwenImageIsNotForcedToDashscope(t *testing.T) {
 		_, _ = w.Write([]byte(`{"error":{"message":"令牌不合法"}}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := Image(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"qwen-image","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
 	if !called || strings.Contains(response.Body.String(), "千问原生生图接口") {
@@ -428,10 +429,10 @@ func TestImageUpstreamRejectionReturns400WithSubmissionRejected(t *testing.T) {
 		_, _ = w.Write([]byte(`{"error":{"code":"invalid_request","message":"令牌不合法","type":"new_api_error"}}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := Image(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"invalid-key","customBaseUrl":"`+server.URL+`"}`)))
 	if response.Code != http.StatusBadRequest {
@@ -457,10 +458,10 @@ func TestImageTaskKeySeesPendingSubmission(t *testing.T) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := Image(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	created := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`))
 	request.Header.Set("x-idempotency-key", "idem-pending")
@@ -496,10 +497,10 @@ func TestImageTaskKeyReturnsUpstreamFailure(t *testing.T) {
 		_, _ = w.Write([]byte(`{"error":{"message":"尺寸不合法"}}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := Image(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	created := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`))
 	request.Header.Set("x-idempotency-key", "idem-fail")

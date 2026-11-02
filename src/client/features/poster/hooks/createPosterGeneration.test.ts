@@ -103,3 +103,34 @@ describe('poster production after workflow extraction', () => {
   });
 
 });
+
+
+describe('prepare and render phases', () => {
+  it('persists a preview without submitting an image, then renders without another design call', async () => {
+    const { context, item, runner } = fixture(false);
+    vi.mocked(directCoverDesign).mockResolvedValue({ memorySampleId: 'sample', memoryEntryIds: [], design: {
+      title: item.originalTitle, titleLines: [item.originalTitle], imagePrompt: '已审阅的完整方案',
+    } });
+    await runner.runBatch(false, 'design');
+    expect(generateFinalCover).not.toHaveBeenCalled();
+    expect(context.itemsRef.current[0]).toMatchObject({ status: 'idle', prompt: '已审阅的完整方案' });
+    expect(context.persistActiveBatch).toHaveBeenCalled();
+    vi.mocked(generateFinalCover).mockResolvedValue('https://example.com/result.jpg');
+    await runner.runBatch(false, 'render');
+    expect(directCoverDesign).toHaveBeenCalledOnce();
+    expect(generateFinalCover).toHaveBeenCalledOnce();
+    expect(context.itemsRef.current[0].status).toBe('complete');
+  });
+  it('never designs an unprepared item when asked to render', async () => {
+    const { runner } = fixture(false);
+    await runner.runBatch(false, 'render');
+    expect(directCoverDesign).not.toHaveBeenCalled();
+    expect(generateFinalCover).not.toHaveBeenCalled();
+  });
+  it('does not reconcile an image during the design-only phase', async () => {
+    const { runner } = fixture(true);
+    await runner.runBatch(false, 'design');
+    expect(generateFinalCover).not.toHaveBeenCalled();
+    expect(directCoverDesign).not.toHaveBeenCalled();
+  });
+});

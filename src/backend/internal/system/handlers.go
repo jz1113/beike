@@ -22,10 +22,9 @@ func MediaReview(cfg config.Config) http.Handler { return mediaReviewHandler(cfg
 
 type CatalogModel = catalogModel
 
-func NormalizeGatewayBaseURL(raw string) string { return normalizeGatewayBaseURL(raw) }
-func AllowCustomBase(cfg config.Config) bool    { return allowCustomBase(cfg) }
-func SafeHTTPSGateway(raw string) bool          { return safeHTTPSGateway(raw) }
-func PublicHTTPGateway(raw string) bool         { return publicHTTPGateway(raw) }
+func AllowCustomBase(cfg config.Config) bool { return allowCustomBase(cfg) }
+func SafeHTTPSGateway(raw string) bool       { return safeHTTPSGateway(raw) }
+func PublicHTTPGateway(raw string) bool      { return publicHTTPGateway(raw) }
 func GatewayGET(ctx context.Context, client *http.Client, rawURL, token, userID string) (map[string]any, int, error) {
 	return gatewayGET(ctx, client, rawURL, token, userID)
 }

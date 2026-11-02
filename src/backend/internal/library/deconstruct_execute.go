@@ -1,7 +1,6 @@
 package library
 
 import (
-	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -20,6 +19,8 @@ import (
 	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"beike.local/cloud/src/backend/internal/platform/media"
 	"beike.local/cloud/src/backend/internal/platform/storage"
 )
@@ -165,7 +166,7 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 			stored["provenance"] = "workshop_generated"
 		}
 		raw, _ := json.Marshal(stored)
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			return http.StatusInternalServerError, map[string]any{"success": false, "error": "参考样本保存失败，请核对审核队列"}
 		}
@@ -270,7 +271,7 @@ func loadDeconstructImage(cfg config.Config, image string) (string, error) {
 }
 
 func existingReview(cfg config.Config, r *http.Request, id string) (map[string]any, bool) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return nil, false
 	}

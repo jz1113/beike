@@ -21,7 +21,7 @@ import (
 var sampleOLE []byte
 
 func TestExtractPlainDocument(t *testing.T) {
-	handler := ExtractDocument(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := ExtractDocument(config.Config{})
 	body, contentType := documentForm(t, "notes.txt", "text/plain", "第一行\n第二行")
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/assistant/extract-document", body)
@@ -41,7 +41,7 @@ func TestExtractPlainDocument(t *testing.T) {
 }
 
 func TestExtractOfficeDocuments(t *testing.T) {
-	handler := ExtractDocument(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := ExtractDocument(config.Config{})
 	docx := officeZip(t, map[string]string{
 		"word/document.xml": `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>你好世界</w:t></w:r></w:p></w:body></w:document>`,
 	})
@@ -92,7 +92,7 @@ func TestExtractSpreadsheet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := ExtractDocument(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := ExtractDocument(config.Config{})
 	body, contentType := documentBytes(t, "prices.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer.Bytes())
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/assistant/extract-document", body)
@@ -104,7 +104,7 @@ func TestExtractSpreadsheet(t *testing.T) {
 }
 
 func TestExtractOLESpreadsheet(t *testing.T) {
-	handler := ExtractDocument(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := ExtractDocument(config.Config{})
 	check := func(name string, data []byte, status int, fragment string) {
 		t.Helper()
 		body, contentType := documentBytes(t, name, "application/vnd.ms-excel", data)
@@ -133,7 +133,7 @@ func oleFatOverflow() []byte {
 }
 
 func TestExtractPDF(t *testing.T) {
-	handler := ExtractDocument(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := ExtractDocument(config.Config{})
 	body, contentType := documentBytes(t, "note.pdf", "application/pdf", simplePDF([]string{"CoverText"}))
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/assistant/extract-document", body)

@@ -10,7 +10,8 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/generate"
+	"beike.local/cloud/src/backend/internal/gateway"
+
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/media"
 	"beike.local/cloud/src/backend/internal/platform/storage"
@@ -51,7 +52,7 @@ func headlineImages(cfg config.Config, r *http.Request, urls []string) ([]string
 			out = append(out, image)
 			continue
 		}
-		status, raw, err := generate.PostModelHeaders(r.Context(), http.MethodGet, item, "", nil, 20*time.Second, media.RemoteImageHeaders(item))
+		status, raw, err := gateway.PostModelHeaders(r.Context(), http.MethodGet, item, "", nil, 20*time.Second, media.RemoteImageHeaders(item))
 		if err != nil || status < 200 || status >= 300 || len(raw) == 0 {
 			return nil, "unread"
 		}

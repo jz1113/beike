@@ -1,18 +1,19 @@
 package catalog
 
 import (
-	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"io"
 	"net/http"
 	"path/filepath"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 )
 
 func categoriesHandler(cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "架构操作失败，请稍后重试。"})
 			return
@@ -39,7 +40,7 @@ func categoryPreviewHandler(cfg config.Config) http.HandlerFunc {
 			writeCategoryPreviewError(w)
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeCategoryPreviewError(w)
 			return
@@ -66,7 +67,7 @@ func categoryApplyHandler(cfg config.Config) http.HandlerFunc {
 			writeCategoryApplyError(w)
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeCategoryApplyError(w)
 			return

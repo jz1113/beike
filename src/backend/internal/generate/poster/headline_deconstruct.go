@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
 )
@@ -115,7 +116,7 @@ func HeadlineDeconstruct(cfg config.Config) http.Handler {
 			content = append(content, map[string]any{"type": "image_url", "image_url": map[string]any{"url": img}})
 		}
 
-		text, usageData, status, err := generate.ChatCompletionJSONWithEffort(r.Context(), base, key, model, []any{map[string]any{"role": "user", "content": content}}, 0.2, 120*time.Second, effort)
+		text, usageData, status, err := gateway.ChatCompletionJSONWithEffort(r.Context(), base, key, model, []any{map[string]any{"role": "user", "content": content}}, 0.2, 120*time.Second, effort)
 		if err != nil || status >= 300 || strings.TrimSpace(text) == "" {
 			markCoverSample(r, cfg, workspace, sampleID, "failed", "", headlineErrorText(err, status, "反推分析模型响应异常"))
 			code := headlineFailure(err, status)
@@ -123,7 +124,7 @@ func HeadlineDeconstruct(cfg config.Config) http.Handler {
 			return
 		}
 
-		parsed := generate.DecodeObject(text)
+		parsed := gateway.DecodeObject(text)
 		if parsed == nil {
 			markCoverSample(r, cfg, workspace, sampleID, "failed", "", "反推模型未返回合法 JSON 特征")
 			httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "反推模型未返回合法 JSON 特征"})
@@ -151,7 +152,7 @@ func HeadlineDeconstruct(cfg config.Config) http.Handler {
 			"model":    model,
 			"sampleId": sampleID,
 		}
-		if usage := generate.NormalizeUsage(usageData); usage != nil {
+		if usage := gateway.NormalizeUsage(usageData); usage != nil {
 			response["usage"] = usage
 		}
 		httpx.WriteJSON(w, http.StatusOK, response)

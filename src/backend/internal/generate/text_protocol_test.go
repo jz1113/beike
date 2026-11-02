@@ -52,15 +52,15 @@ func TestChatCompletionNativeProtocols(t *testing.T) {
 				_, _ = w.Write([]byte(tc.reply))
 			}))
 			defer server.Close()
-			previous := ModelHTTP
-			ModelHTTP = func() *http.Client { return server.Client() }
-			defer func() { ModelHTTP = previous }()
+			previous := gateway.ModelHTTP
+			gateway.ModelHTTP = func() *http.Client { return server.Client() }
+			defer func() { gateway.ModelHTTP = previous }()
 			ctx := gateway.WithTextProtocol(context.Background(), tc.protocol)
-			text, raw, status, err := ChatCompletionJSON(ctx, server.URL, "secret", tc.model, []any{map[string]any{"role": "user", "content": "test"}}, .2, time.Second)
+			text, raw, status, err := gateway.ChatCompletionJSON(ctx, server.URL, "secret", tc.model, []any{map[string]any{"role": "user", "content": "test"}}, .2, time.Second)
 			if err != nil || status != 200 || text != `{"ok":true}` || calls != 1 {
 				t.Fatalf("status %d text %s calls %d err %v", status, text, calls, err)
 			}
-			if usage := NormalizeUsage(raw); usage["totalTokens"] != float64(5) {
+			if usage := gateway.NormalizeUsage(raw); usage["totalTokens"] != float64(5) {
 				t.Fatalf("usage %#v", usage)
 			}
 		})
@@ -80,10 +80,10 @@ func TestChatCompletionJSONEffortLeavesDeepSeekDisabled(t *testing.T) {
 		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"stop","message":{"content":"{\"ok\":true}"}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	defer func() { ModelHTTP = previous }()
-	text, _, status, err := ChatCompletionJSONWithEffort(context.Background(), server.URL, "secret", "deepseek-official:deepseek-flash", []any{map[string]any{"role": "user", "content": "test"}}, .2, time.Second, "high")
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	defer func() { gateway.ModelHTTP = previous }()
+	text, _, status, err := gateway.ChatCompletionJSONWithEffort(context.Background(), server.URL, "secret", "deepseek-official:deepseek-flash", []any{map[string]any{"role": "user", "content": "test"}}, .2, time.Second, "high")
 	if err != nil || status != 200 || text != `{"ok":true}` {
 		t.Fatalf("status %d text %s err %v", status, text, err)
 	}
@@ -135,12 +135,12 @@ func TestNativeCopyFailureDoesNotFallbackOrReplay(t *testing.T) {
 			}
 			_, _ = w.Write([]byte(reply))
 		}))
-		previous := ModelHTTP
-		ModelHTTP = func() *http.Client { return server.Client() }
+		previous := gateway.ModelHTTP
+		gateway.ModelHTTP = func() *http.Client { return server.Client() }
 		body := `{"model":"gemini-2.5-flash","productTitle":"台灯","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
 		rec := httptest.NewRecorder()
 		Copywriting(config.Config{}).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body)))
-		ModelHTTP = previous
+		gateway.ModelHTTP = previous
 		server.Close()
 		if rec.Code != 502 || calls != 1 || strings.Contains(rec.Body.String(), `"fromFallback":true`) {
 			t.Fatalf("status %d calls %d body %s", rec.Code, calls, rec.Body.String())

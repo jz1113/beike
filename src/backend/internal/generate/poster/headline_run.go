@@ -1,7 +1,6 @@
 package poster
 
 import (
-	"beike.local/cloud/src/backend/internal/generate"
 	"context"
 	"errors"
 	"net/http"
@@ -10,8 +9,9 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
+	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 func runHeadlineTitle(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]any) {
@@ -29,23 +29,23 @@ func runHeadlineTitle(cfg config.Config, w http.ResponseWriter, r *http.Request,
 	for _, image := range images {
 		content = append(content, map[string]any{"type": "image_url", "image_url": map[string]any{"url": image}})
 	}
-	text, usageData, status, err := generate.ChatCompletionJSON(r.Context(), base, key, model, []any{map[string]any{"role": "user", "content": content}}, 0.35, 90*time.Second)
+	text, usageData, status, err := gateway.ChatCompletionJSON(r.Context(), base, key, model, []any{map[string]any{"role": "user", "content": content}}, 0.35, 90*time.Second)
 	if err != nil || status >= 300 {
 		httpx.WriteJSON(w, headlineFailure(err, status), map[string]any{"success": false, "error": headlineErrorText(err, status, "标题改写模型 "+model+" 返回 HTTP "+generate.Itoa(status))})
 		return
 	}
-	parsed := generate.DecodeObject(text)
+	parsed := gateway.DecodeObject(text)
 	title := ""
 	if parsed != nil {
 		title, _ = parsed["title"].(string)
 	}
 	title = normalizeHeadline(title)
-	if !regexp.MustCompile(`^[\x{3400}-\x{9fff}]{7,12}$`).MatchString(title) {
-		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "标题改写模型未返回 7–12 字的有效主标题，未截断或提交后续任务"})
+	if !regexp.MustCompile(`^[\x{3400}-\x{9fff}]{4,18}$`).MatchString(title) {
+		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "标题改写模型未返回 4–18 字的有效主标题，未截断或提交后续任务"})
 		return
 	}
 	body := map[string]any{"success": true, "data": map[string]any{"title": title}, "model": model}
-	if usage := generate.NormalizeUsage(usageData); usage != nil {
+	if usage := gateway.NormalizeUsage(usageData); usage != nil {
 		body["usage"] = usage
 	}
 	httpx.WriteJSON(w, http.StatusOK, body)
@@ -83,11 +83,11 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 		httpx.WriteJSON(w, code, map[string]any{"success": false, "error": memoryErr.Error()})
 		return
 	}
-	content := []any{map[string]any{"type": "text", "text": coverDirectorPrompt(original, cover, ratio, generate.StringField(payload, "productName"), generate.StringField(payload, "previousDesign"), memory.Lines)}}
+	content := []any{map[string]any{"type": "text", "text": coverDirectorPrompt(original, cover, ratio, generate.StringField(payload, "productName"), generate.StringField(payload, "previousDesign"), memory.Lines, generate.StringField(payload, "supplementaryRequirements"))}}
 	for _, image := range images {
 		content = append(content, map[string]any{"type": "image_url", "image_url": map[string]any{"url": image}})
 	}
-	text, usageData, status, err := generate.ChatCompletionJSON(r.Context(), base, key, model, []any{map[string]any{"role": "user", "content": content}}, 0.65, 90*time.Second)
+	text, usageData, status, err := gateway.ChatCompletionJSON(r.Context(), base, key, model, []any{map[string]any{"role": "user", "content": content}}, 0.65, 90*time.Second)
 	if err != nil || status >= 300 || strings.TrimSpace(text) == "" {
 		code := headlineFailure(err, status)
 		if strings.TrimSpace(text) == "" && err == nil && status < 300 {
@@ -96,7 +96,7 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 		httpx.WriteJSON(w, code, map[string]any{"success": false, "error": headlineErrorText(err, status, "设计模型 "+model+" 没有返回有效内容")})
 		return
 	}
-	parsed := generate.DecodeObject(text)
+	parsed := gateway.DecodeObject(text)
 	if parsed == nil {
 		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "设计模型没有返回合法 JSON"})
 		return
@@ -107,11 +107,11 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 		return
 	}
 	usageID, auditErr := recordDesignMemory(r, cfg, payload, memory, design)
-	body := map[string]any{"success": true, "data": design, "model": model, "promptVersion": "integrated-cover-v5", "memorySampleId": memory.SampleID, "memoryEntryIds": memory.IDs, "memoryUsageId": usageID, "memoryRevisionId": memory.RevisionID}
+	body := map[string]any{"success": true, "data": design, "model": model, "promptVersion": "reference-cover-v6", "memorySampleId": memory.SampleID, "memoryEntryIds": memory.IDs, "memoryUsageId": usageID, "memoryRevisionId": memory.RevisionID}
 	if auditErr != nil {
 		body["memoryWarning"] = "设计已完成，但引用记录未保存；请保留本次设计，勿重复付费设计"
 	}
-	if usage := generate.NormalizeUsage(usageData); usage != nil {
+	if usage := gateway.NormalizeUsage(usageData); usage != nil {
 		body["usage"] = usage
 	}
 	httpx.WriteJSON(w, http.StatusOK, body)
@@ -127,13 +127,13 @@ func headlineCredentials(cfg config.Config, r *http.Request, payload map[string]
 	}
 	base := generate.ImageDefaultBase()
 	if clientBase != "" {
-		base = system.NormalizeGatewayBaseURL(clientBase)
+		base = gateway.NormalizeGatewayBaseURL(clientBase)
 	}
 	return base, generate.HeadlineAPIKey(cfg, r, payload, clientBase)
 }
 
 func headlineTitlePrompt(original, product string) string {
-	return "你是小红书封面的标题编辑。只返回 JSON：{\"title\":\"7-12个纯中文字符\"}。原标题：" + original + "。商品名：" + product + "。标题必须是 7 到 12 个纯中文字，读起来像一条笔记封面：结论或使用场景放在前面，品类名能省则省。每个字都带信息，从对象、变化、感受、对比里留下两样。事实只来自原标题和商品图，没有依据就不写参数、价格、功效或品牌背书。出现必入、神器、绝绝子、yyds、真的绝了、实拍体验时整句重写。例如「洗衣效果很到位」写成「洗完衣服不发灰」。"
+	return "你是小红书封面的标题编辑。只返回 JSON：{\"title\":\"4-18个纯中文字符\"}。原标题：" + original + "。商品名：" + product + "。标题必须是 4 到 18 个纯中文字，优先两行，每行4—9字，短标题可一行。保持原意，不把外观当成效果证据。读起来像一条笔记封面：结论或使用场景放在前面，品类名能省则省。每个字都带信息，从对象、变化、感受、对比里留下两样。事实只来自原标题和商品图，没有依据就不写参数、价格、功效或品牌背书。出现必入、神器、绝绝子、yyds、真的绝了、实拍体验时整句重写。例如「洗衣效果很到位」写成「洗完衣服不发灰」。"
 }
 
 func designMemoryForRequest(r *http.Request, cfg config.Config, payload map[string]any) (coverDesignMemory, error) {

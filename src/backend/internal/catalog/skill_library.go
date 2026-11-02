@@ -8,12 +8,13 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 )
 
 func Skills(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeSkillError(w, http.StatusInternalServerError, "技能库加载失败")
 			return

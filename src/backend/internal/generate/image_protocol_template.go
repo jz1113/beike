@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -60,7 +61,7 @@ func (templateImageProtocol) Submit(req imageRequest) (imageSubmitResult, error)
 	if strings.TrimSpace(body) != "" {
 		payload = json.RawMessage(body)
 	}
-	status, raw, callErr := PostModelHeaders(req.context(), spec.Submit.methodOrPost(), renderedURL, req.APIKey, payload, 180*time.Second, headers)
+	status, raw, callErr := gateway.PostModelHeaders(req.context(), spec.Submit.methodOrPost(), renderedURL, req.APIKey, payload, 180*time.Second, headers)
 	if callErr != nil {
 		return imageSubmitResult{}, callErr
 	}
@@ -88,7 +89,7 @@ func (templateImageProtocol) Poll(req imagePollRequest) (pollParsed, map[string]
 	if renderErr != nil {
 		return pollParsed{}, nil, false
 	}
-	status, raw, callErr := PostModelHeaders(req.context(), http.MethodGet, renderedURL, req.APIKey, nil, 8*time.Second, headers)
+	status, raw, callErr := gateway.PostModelHeaders(req.context(), http.MethodGet, renderedURL, req.APIKey, nil, 8*time.Second, headers)
 	if callErr != nil || status < 200 || status >= 300 {
 		return pollParsed{}, nil, false
 	}

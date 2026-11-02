@@ -1,7 +1,7 @@
 import { generationBatchContext, generationPromptSources } from '@client/shared/agent/generationBatchSources';
 import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import type { AssistantRunMode, ReferenceScope } from '@shared/domain/assistant/taskPolicy';
-import { persistAssistantImages } from '../api/persistAssistantImages';
+import { persistAssistantMedia } from '@client/shared/api/persistAssistantMedia';
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { recordAssistantChatUsage } from '../model/assistantUsage';
@@ -190,7 +190,7 @@ export function useAssistantChatStream({
     abortControllerRef.current = abortCtrl;
     setSendingSessionId(sessionId);
     try {
-      attachmentsToSend = await persistAssistantImages(attachmentsToSend, abortCtrl.signal);
+      attachmentsToSend = await persistAssistantMedia(attachmentsToSend, abortCtrl.signal);
       abortCtrl.signal.throwIfAborted();
       if (useAppStore.getState().currentAssistantSessionId !== sessionId || !useAppStore.getState().assistantSessions.some((session) => session.id === sessionId)) {
         throw new Error('会话已切换，原草稿已保留，请返回原会话发送');

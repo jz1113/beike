@@ -23,6 +23,7 @@ interface Props {
   modelId: string;
   supportedAspectRatios?: string[];
   supportedResolutions?: string[];
+  supportedDurations?: number[];
   mode: string;
   aspect: string;
   resolution: string;
@@ -75,6 +76,7 @@ export function PromptBarVideoTab({
   modelId,
   supportedAspectRatios,
   supportedResolutions,
+  supportedDurations,
   mode,
   aspect,
   resolution,
@@ -101,6 +103,10 @@ export function PromptBarVideoTab({
       label: videoResolutionLabel(modelId, item),
     }));
   const enabledResolutions = resolutions.map((item) => item.id);
+
+  useEffect(() => {
+    if (modes.length && !modes.some((item) => item.id === mode)) onMode(modes[0].id);
+  }, [mode, modes.map((item) => item.id).join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const next = nearestId(currentAspect, aspectOrder, enabledAspects);
@@ -134,7 +140,9 @@ export function PromptBarVideoTab({
   const durationBlock = (
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-slate-500 dark:text-slate-400">时长</div>
-      <VideoDurationRulerSlider value={duration} modelId={modelId} onChange={onDuration} />
+      {supportedDurations?.length === 0
+        ? <p className="text-xs text-amber-600 dark:text-amber-300">当前模型时长不足以完成整条脚本，请更换模型或参考脚本。</p>
+        : <VideoDurationRulerSlider value={duration} modelId={modelId} allowedDurations={supportedDurations} onChange={onDuration} />}
     </div>
   );
 

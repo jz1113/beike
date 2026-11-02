@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestImageBatchSubmitsTogetherAndKeepsSiblingReceipt(t *testing.T) {
@@ -41,10 +42,10 @@ func TestImageBatchSubmitsTogetherAndKeepsSiblingReceipt(t *testing.T) {
 		_, _ = w.Write([]byte(`{"task_id":"task-` + prompt + `"}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler := ImageBatch(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := ImageBatch(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	body := `{"items":[` + imageBatchItem("left", "左图", "idem-left", server.URL) + `,` + imageBatchItem("right", "右图", "idem-right", server.URL) + `]}`
 	response := httptest.NewRecorder()
 	done := make(chan struct{})
@@ -87,7 +88,7 @@ func TestImageBatchRejectsTwentyOne(t *testing.T) {
 	for index := range items {
 		items[index] = imageBatchItem(fmt.Sprintf("a%d", index), "一只猫", "", "https://ai.comfly.org")
 	}
-	handler := ImageBatch(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
+	handler := ImageBatch(config.Config{NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/image-batch", strings.NewReader(`{"items":[`+strings.Join(items, ",")+`]}`)))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "一批最多提交 20 张图片") {
@@ -102,10 +103,10 @@ func TestImageBatchReusesIdempotencyKey(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example.com/reused.jpg"}]}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler := ImageBatch(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := ImageBatch(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	item := imageBatchItem("once", "一只猫", "idem-reuse", server.URL)
 	first := httptest.NewRecorder()
 	handler.ServeHTTP(first, httptest.NewRequest(http.MethodPost, "/api/generate/image-batch", strings.NewReader(`{"items":[`+item+`]}`)))

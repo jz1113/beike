@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
 	reviewsvc "beike.local/cloud/src/backend/internal/keywords/review"
@@ -150,7 +151,7 @@ func loadKeywordRules(cfg config.Config, r *http.Request, version *int) ([]revie
 	if version != nil && *version == 0 {
 		return nil, 0, nil
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return nil, http.StatusInternalServerError, map[string]any{"success": false, "error": "词包审核失败"}
 	}
@@ -179,7 +180,7 @@ func keywordCredentials(cfg config.Config, r *http.Request, provider, model, bas
 		if strings.TrimSpace(model) == "" {
 			return "", "", http.StatusBadRequest, "请选择有效的 DeepSeek 模型"
 		}
-		baseURL = system.NormalizeGatewayBaseURL(baseURL)
+		baseURL = gateway.NormalizeGatewayBaseURL(baseURL)
 		if baseURL != keywordDeepSeekBaseURL {
 			return "", "", http.StatusBadRequest, "词包审核只接受 DeepSeek 官方接口，请到设置里填写 DeepSeek API Key"
 		}
@@ -194,7 +195,10 @@ func keywordCredentials(cfg config.Config, r *http.Request, provider, model, bas
 	}
 	baseURL, apiKey, err := resolveKeywordGateway(cfg, r, baseURL, apiKey)
 	if err != nil {
-		return "", "", http.StatusInternalServerError, err.Error()
+		// The request was rejected before any upstream call. Returning a client
+		// error prevents the browser from treating a bad channel URL as an
+		// unbilled gateway outage and retrying the same invalid request.
+		return "", "", http.StatusBadRequest, err.Error()
 	}
 	if apiKey == "" {
 		return "", "", http.StatusBadRequest, "未配置模型网关 API Key，请到设置里填写"
@@ -215,14 +219,14 @@ func resolveKeywordGateway(cfg config.Config, r *http.Request, bodyBase, bodyKey
 		return "", "", errors.New("当前接口地址与服务器允许的视觉网关不一致。请在设置 → 服务接口配置中改为服务器配置的网关地址，或联系管理员配置该网关；密钥未发送到其他网关。")
 	}
 	defaults := defaultGatewayBase()
-	base := system.NormalizeGatewayBaseURL(defaults)
+	base := gateway.NormalizeGatewayBaseURL(defaults)
 	if clientBase != "" && (system.AllowCustomBase(cfg) || system.SafeHTTPSGateway(clientBase)) {
-		base = system.NormalizeGatewayBaseURL(clientBase)
+		base = gateway.NormalizeGatewayBaseURL(clientBase)
 	}
 	if base == "" {
 		base = defaults
 	}
-	thirdParty := clientBase != "" && system.NormalizeGatewayBaseURL(clientBase) != system.NormalizeGatewayBaseURL(defaults)
+	thirdParty := clientBase != "" && gateway.NormalizeGatewayBaseURL(clientBase) != gateway.NormalizeGatewayBaseURL(defaults)
 	if customKey == "" && !thirdParty && !cfg.Production() {
 		customKey = strings.TrimSpace(os.Getenv("AI_DRAWING_API_KEY"))
 		if customKey == "" {

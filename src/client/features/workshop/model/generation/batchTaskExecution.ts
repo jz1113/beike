@@ -3,16 +3,20 @@ import { enforceLookConsistency, isGenericLook } from '@shared/domain/media/draw
 import { closestWorkshopOutputAspect } from './generationHelpers';
 import { resolveWorkshopImageSize } from './workshopImageSize';
 import { assertOutputDimensions, parseOutputDimensions } from '@shared/domain/media/outputDimensions';
-import { finishWorkshopSingleOutput } from './workshopSingleOutput';
+import type { finishWorkshopSingleOutput } from './workshopSingleOutput';
 import { isActionAllowedForProduct } from '@shared/domain/products/phoneProductPolicy';
-import { submitImageGenTaskResult } from '@client/shared/api/generation/generationApi';
+import type { submitImageGenTaskResult } from '@client/shared/api/generation/generationApi';
 import { captureLearningContext } from './learningContext';
 import type { BatchTaskItem } from '../batchTypes';
 import type { BatchProductItem } from '../batchTypes';
-import { compressProductImageIfNeeded } from './generationHelpers';
 import { workshopReferenceInput, workshopReferenceBudget } from './workshopReferenceInput';
 
 export interface TaskExecutionConfig {
+  io: {
+    compressReference: (image: string) => Promise<string>;
+    submitImage: typeof submitImageGenTaskResult;
+    finishOutput: typeof finishWorkshopSingleOutput;
+  };
   selectedQuality: 'high' | 'medium' | 'low';
   selectedAspect: '3:4' | '1:1' | '9:16' | '16:9';
   selectedImageGenModel: string;
@@ -72,14 +76,14 @@ export async function executeSingleImageTask(
     ...item.selectedProductImages,
   ].filter((img): img is string => Boolean(img)))).slice(0, maxProductRefs);
   const safeProductImages = await Promise.all(
-    productReferenceCandidates.map((img) => compressProductImageIfNeeded(img)),
+    productReferenceCandidates.map((img) => config.io.compressReference(img)),
   );
   const safeProductImg = safeProductImages[0];
   const referenceInput = workshopReferenceInput([shot], safeProductImages.length);
-  const compositionReferenceImages = await Promise.all(referenceInput.compositionReferenceImages.map(compressProductImageIfNeeded));
+  const compositionReferenceImages = await Promise.all(referenceInput.compositionReferenceImages.map(image => config.io.compressReference(image)));
   promptText = [promptText, referenceInput.instruction].filter(Boolean).join('\n\n');
   const safeAnchorFaceUrl = !skipFace && anchorFaceUrl
-    ? await compressProductImageIfNeeded(anchorFaceUrl)
+    ? await config.io.compressReference(anchorFaceUrl)
     : undefined;
   const qualityTier = (config.selectedQuality || 'high') as 'high' | 'medium' | 'low';
   if (config.outputSize) {
@@ -99,7 +103,7 @@ export async function executeSingleImageTask(
   config.onGenerationSizeResolved?.(pixelSize);
   config.onLearningContextResolved?.(captureLearningContext(item, shot, { ...config, selectedAspect: aspect, productReferenceImages: productReferenceCandidates, anchorFaceUrl: skipFace ? undefined : anchorFaceUrl }, 'single_shot'));
   await config.beforeSubmit?.();
-  const generated = await submitImageGenTaskResult(
+  const generated = await config.io.submitImage(
     {
       prompt: promptText,
       model: config.selectedImageGenModel,
@@ -129,5 +133,5 @@ export async function executeSingleImageTask(
       onTaskSubmitted: config.onTaskSubmitted,
     }
   );
-  return finishWorkshopSingleOutput(generated, pixelSize, outputSize, `${item.id}-${shot.shot_no}.jpg`);
+  return config.io.finishOutput(generated, pixelSize, outputSize, `${item.id}-${shot.shot_no}.jpg`);
 }

@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestConcurrentTextRequestsKeepIndependentProtocols(t *testing.T) {
@@ -47,9 +49,9 @@ func TestConcurrentTextRequestsKeepIndependentProtocols(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	defer func() { ModelHTTP = previous }()
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	defer func() { gateway.ModelHTTP = previous }()
 	results := make(chan error, 2)
 	for _, input := range []struct{ protocol, key, want string }{
 		{"anthropic", "claude-key", "claude"}, {"gemini", "gemini-key", "gemini"},
@@ -63,7 +65,7 @@ func TestConcurrentTextRequestsKeepIndependentProtocols(t *testing.T) {
 		go func() {
 			// Match asynchronous consumers that outlive the incoming request.
 			ctx := context.WithoutCancel(r.Context())
-			text, _, status, err := ChatCompletion(ctx, server.URL, input.key, "shared-alias", []any{map[string]any{"role": "user", "content": "test"}}, .2, 3*time.Second)
+			text, _, status, err := gateway.ChatCompletion(ctx, server.URL, input.key, "shared-alias", []any{map[string]any{"role": "user", "content": "test"}}, .2, 3*time.Second)
 			if err == nil && (status != 200 || text != input.want) {
 				err = fmt.Errorf("%s got status %d text %q", input.protocol, status, text)
 			}

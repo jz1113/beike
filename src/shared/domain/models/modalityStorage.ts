@@ -410,7 +410,11 @@ export function resolveModalityModelRoute(
     : models.find((item) => item.isDefault) || models[0];
   const legacyChannelId = legacy?.providerId || (legacy?.channel && readStoredApiProviders().some((item) => item.id === legacy.channel) ? legacy.channel : undefined);
   const channel = providerCredentials(matched?.channelId || legacyChannelId);
-  const modelProtocol = matched ? configuredTextProtocol(matched) : legacy ? configuredTextProtocol(legacy) : undefined;
+  const configuredModelProtocol = matched ? configuredTextProtocol(matched) : legacy ? configuredTextProtocol(legacy) : undefined;
+  // `auto` is a preference reset, not a transport override. Treat it as
+  // unset here so a configured channel or its base URL can still determine
+  // the actual wire protocol.
+  const modelProtocol = configuredModelProtocol === 'auto' ? undefined : configuredModelProtocol;
   const routeBaseUrl = useDefaultChannel
     ? globalConfig.baseUrl
     : matched?.baseUrl?.trim() || legacy?.customBaseUrl?.trim() || channel?.baseUrl || globalConfig.baseUrl;

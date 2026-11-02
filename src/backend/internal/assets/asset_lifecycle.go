@@ -1,7 +1,6 @@
 package assets
 
 import (
-	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,6 +9,8 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 )
 
 func assetLifecycleHandler(cfg config.Config, action string) http.HandlerFunc {
@@ -32,7 +33,7 @@ func assetLifecycleHandler(cfg config.Config, action string) http.HandlerFunc {
 			}
 			reason = parsed
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{
 				"success": false, "error": "资产生命周期操作失败", "code": "bad_request",

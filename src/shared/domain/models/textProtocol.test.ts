@@ -43,6 +43,15 @@ describe('text protocol selection', () => {
     expect(resolveModalityModelRoute('chat', 'route-b')).toMatchObject({ textProtocol: 'openai', baseUrl: 'https://b.test', apiKey: 'b' });
     expect(resolveModalityModelRoute('image', 'gemini-image')).not.toHaveProperty('textProtocol');
   });
+  it('lets an auto model protocol inherit the configured channel protocol', () => {
+    data.set('beike_modality_models_v1_chat', JSON.stringify([
+      { id: 'chat-auto', modelId: 'gemini-3-flash', name: 'Gemini via relay', modality: 'chat', channelId: 'auto-channel', textProtocol: 'auto' },
+    ]));
+    data.set('beike_api_providers_v2', JSON.stringify([
+      { id: 'auto-channel', baseUrl: 'https://auto-channel.example', apiKey: 'key', providerType: 'openai' },
+    ]));
+    expect(resolveModalityModelRoute('chat', 'chat-auto').textProtocol).toBe('openai');
+  });
 });
 
 describe('confirmed thinking capabilities', () => {

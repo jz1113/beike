@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
@@ -13,28 +14,44 @@ import (
 const maxVideoDownloadItems = 500
 
 type videoDownloadRequest struct {
-	Directory   string              `json:"directory"`
-	Concurrency int                 `json:"concurrency"`
-	Items       []videoDownloadItem `json:"items"`
+	DirectoryToken string              `json:"directoryToken"`
+	Directory      string              `json:"directory"`
+	Concurrency    int                 `json:"concurrency"`
+	Items          []videoDownloadItem `json:"items"`
 }
 
 func PickVideoDirectory(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !videoDownloadAuthorized(w, r, cfg) {
+		owner, ok := videoDownloadWorkspace(w, r, cfg)
+		if !ok {
 			return
 		}
-		directory, err := pickVideoDirectory(r.Context())
+		if cfg.Production() {
+			httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "mode": "browser"})
+			return
+		}
+		directory, err := selectVideoDirectory(r.Context())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": err.Error()})
 			return
 		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "directory": directory})
+		token, err := grantVideoDirectory(owner, directory)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": err.Error()})
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "mode": "local", "directory": directory, "directoryToken": token})
 	})
 }
 
 func StartVideoDownload(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !videoDownloadAuthorized(w, r, cfg) {
+		owner, ok := videoDownloadWorkspace(w, r, cfg)
+		if !ok {
+			return
+		}
+		if cfg.Production() {
+			httpx.WriteJSON(w, http.StatusForbidden, map[string]any{"success": false, "error": "托管环境请使用浏览器下载，不能写入服务器目录"})
 			return
 		}
 		payload, message := decodeVideoDownload(w, r, cfg)
@@ -42,23 +59,33 @@ func StartVideoDownload(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": message})
 			return
 		}
-		ctx, cancel := context.WithCancel(context.Background())
+		if !hasVideoDirectoryGrant(owner, payload.Directory, payload.DirectoryToken) {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "保存位置授权已失效，请重新选择文件夹"})
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 		job := newVideoDownloadJob(payload.Directory, payload.Concurrency, payload.Items)
+		job.owner = owner
 		job.cancel = cancel
 		job.running = true
-		storeVideoDownloadJob(job)
-		go job.run(ctx, cfg)
+		if !storeVideoDownloadJob(job) {
+			cancel()
+			httpx.WriteJSON(w, http.StatusTooManyRequests, map[string]any{"success": false, "error": "下载任务繁忙或服务正在关闭，请稍后重试"})
+			return
+		}
+		go func() { defer cancel(); job.run(ctx, cfg) }()
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "jobId": job.id})
 	})
 }
 
 func VideoDownloadStatus(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !videoDownloadAuthorized(w, r, cfg) {
+		owner, ok := videoDownloadWorkspace(w, r, cfg)
+		if !ok {
 			return
 		}
 		job, ok := lookupVideoDownloadJob(r.PathValue("jobId"))
-		if !ok {
+		if !ok || job.owner != owner {
 			httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "error": "下载任务不存在"})
 			return
 		}
@@ -68,11 +95,12 @@ func VideoDownloadStatus(cfg config.Config) http.Handler {
 
 func CancelVideoDownload(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !videoDownloadAuthorized(w, r, cfg) {
+		owner, ok := videoDownloadWorkspace(w, r, cfg)
+		if !ok {
 			return
 		}
 		job, ok := lookupVideoDownloadJob(r.PathValue("jobId"))
-		if !ok {
+		if !ok || job.owner != owner {
 			httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "error": "下载任务不存在"})
 			return
 		}
@@ -83,16 +111,21 @@ func CancelVideoDownload(cfg config.Config) http.Handler {
 	})
 }
 
-func videoDownloadAuthorized(w http.ResponseWriter, r *http.Request, cfg config.Config) bool {
+func videoDownloadWorkspace(w http.ResponseWriter, r *http.Request, cfg config.Config) (string, bool) {
 	if cfg.AccessToken == "" {
 		httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "error": "服务端未配置访问令牌，请联系管理员"})
-		return false
+		return "", false
 	}
-	if !proxyAuthorized(r, cfg) {
-		httpx.WriteJSON(w, http.StatusUnauthorized, map[string]any{"success": false, "error": "未授权：缺少有效的访问凭证或媒体签名"})
-		return false
+	if !httpx.Authorized(r, cfg) {
+		httpx.WriteJSON(w, http.StatusUnauthorized, map[string]any{"success": false, "error": "未授权：缺少有效的访问凭证"})
+		return "", false
 	}
-	return true
+	owner, ok := httpx.ResolveWorkspace(r, cfg)
+	if !ok {
+		httpx.WriteJSON(w, http.StatusUnauthorized, map[string]any{"success": false, "error": "缺少工作区密钥"})
+		return "", false
+	}
+	return owner, true
 }
 
 func decodeVideoDownload(w http.ResponseWriter, r *http.Request, cfg config.Config) (videoDownloadRequest, string) {

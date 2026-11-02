@@ -1,7 +1,6 @@
 package library
 
 import (
-	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,6 +8,8 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 )
 
 func deconstructReviewsHandler(cfg config.Config) http.HandlerFunc {
@@ -17,7 +18,7 @@ func deconstructReviewsHandler(cfg config.Config) http.HandlerFunc {
 		if r.URL.Query().Get("status") == "rejected" {
 			status = "rejected"
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "读取审核列表失败"})
 			return
@@ -59,7 +60,7 @@ func deconstructReviewsPostHandler(cfg config.Config) http.HandlerFunc {
 		if action == "restore" {
 			from, to = "rejected", "pending"
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "服务器内部错误", "code": "internal_error"})
 			return

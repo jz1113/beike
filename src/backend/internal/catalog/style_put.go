@@ -1,13 +1,14 @@
 package catalog
 
 import (
-	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"io"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 )
 
 func styleRecipesPutHandler(cfg config.Config) http.HandlerFunc {
@@ -32,7 +33,7 @@ func styleRecipesPutHandler(cfg config.Config) http.HandlerFunc {
 			writeStyleSaveFailure(w)
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeStyleSaveFailure(w)
 			return

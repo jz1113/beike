@@ -7,11 +7,47 @@
 - 安装与构建使用 Node.js 22、pnpm 10.13.1、Go 1.26 或更高稳定版本；安装脚本检查并准备 Go。生产重启只运行已有构建产物。
 - `pnpm build` 执行类型检查并构建 `tools/build/ui/` 与 `tools/build/beike-api`；`pnpm build:api` 可单独更新后端。Windows API 为 `.exe`，服务器须使用目标系统的构建产物。
 - Go 提供 API、静态页与素材访问；systemd 运行 `tools/scripts/web/start-web.mjs`，Nginx 反向代理到 `127.0.0.1:3000`。
-- 本地 `pnpm dev` 在 `pnpm skills:build` 更新带货规则后自动重建并重启 Go API，使内嵌规则与页面同步；规则检查或构建失败时保留原服务并输出错误。生产环境仍须完整构建前后端并重启服务；版本不一致时仅刷新页面不能更新后台内嵌规则。
 - 生产数据库、`.env`、`storage/` 与备份放在数据目录，不随源码发布覆盖。API 启动时执行版本化迁移与官方种子；迁移失败须排障，不能删除用户库。
 - 执行模板在 `tools/deploy/`：`bootstrap-ubuntu.sh`、`beike.service`、`env.production.example`、HTTP / HTTPS Nginx 配置及 `enable-https.sh`。
 
 网络放行 SSH、80、443，SSH 来源限制为管理端；应用 3000 端口只供本机代理，不向公网开放。公网地址和域名使用实际部署值，不在文档中保存某台服务器 IP 或登录信息。
+
+Nginx 默认请求体上限为 `64m`；仅九宫格裁切接口 `/api/sales/asset-view-grid` 单独设为 `96m`，为最大 64 MiB 原图的 Base64 JSON 留出空间。已有部署升级时需同步 HTTP / HTTPS 模板中的该精确匹配代理规则，保留认证、代理头与超时配置，运行 `sudo nginx -t` 通过后再执行 `sudo systemctl reload nginx`。
+
+## 浏览器凭据与入口边界
+
+当前应用不是独立账号登录系统。Go 静态页会下发 `app_token`，客户端也会读写此 Cookie 并生成 API 访问头；它不是 HttpOnly Cookie，不能把直接访问 Go 静态页视作已经登录。工作区密钥用于数据作用域，不替代入口身份认证。生产必须保留 Nginx 网页认证、HTTPS 与仅监听回环地址的 Go 端口，不能只依赖应用令牌对公网提供保护。
+
+网页设置中的第三方凭据保存在浏览器 localStorage，属于明文、同源脚本可读的持久数据，不是系统钥匙串或加密保险箱。本机数据、浏览器配置和同源脚本应按此边界保护。迁移到 HttpOnly 会话需另行设计请求头、Cookie、媒体签名、过期与跨站保护的整体协议，当前没有仅切换 Cookie 标志。
+
+## OSS 参考视频存储
+
+本地开发使用 `pnpm dev` 同时运行 Go API 与前端。`pnpm dev:ui` 只启动前端；出现“本地后台服务未连接”时，先确认 `http://127.0.0.1:3000/api/health` 返回成功，再排查 OSS。API 端口以实际启动日志为准。
+
+网页设置选择“存储 → 阿里云 OSS”，配置值与 OSS 控制台中同一个 Bucket 对应：
+
+OSS 上传与删除使用阿里云官方 Go SDK V2 的 OSS V4 签名，地域从标准 Endpoint 推导；其他 S3 兼容存储继续使用对应协议。不能直接把 AWS S3 的签名请求作为 OSS 原生 V4 请求。
+
+- `Bucket`：只填存储桶名称，不带协议、域名或目录。
+- `Endpoint`：填写该桶所在地域的外网 Endpoint，例如北京为 `https://oss-cn-beijing.aliyuncs.com`，不带 Bucket 名称，不使用 `-internal` 内网地址。
+- `AK ID / AK Secret`：使用具备目标桶对象上传、读取及删除权限的 RAM 用户凭据；可将权限范围限制为该桶的 `oss:PutObject`、`oss:GetObject`、`oss:DeleteObject`。
+- `API 前缀`：例如 `seedance/`；参考视频上传到此前缀下的 `refs/`。支持中文目录，配置经 JSON Unicode 转义后放入 HTTP 请求头，后端解析还原原始目录名。
+- `素材前缀`：例如 `canvas-materials/`。
+- `公开访问域名 / CDN`：未绑定自有域名时可留空，系统生成 `https://桶名.Endpoint/对象路径`。
+
+保存配置后点击“测试上传”。此测试写入临时对象并尝试删除，成功只表示连接和写入正常，不验证公网读取，返回的测试 URL 也不作为长期可用链接。
+
+通过参考上传接口提交的 OSS 视频返回有效期 24 小时的 OSS V4 签名读取 URL，支持私有桶，无需修改整个桶的读写权限。重试时重新上传获取新的签名，不把过期的临时 URL 当作永久素材地址。
+
+全局素材和成品存储仍返回永久对象 URL。需要对此类 URL 开放匿名读取时，专用公开素材桶可设为“公共读”，保持写入受鉴权控制；OSS 全局或 Bucket 层面的“阻止公共访问”会覆盖公开读取设置。应用不自动修改桶权限。
+
+验证公网读取时，将实际视频的签名 URL 或公开对象 URL 在未登录阿里云的无痕窗口直接打开。能播放或下载才说明模型可读取；不要通过访问 Bucket 根地址判断，公共读也不代表允许匿名列举文件。当前参考上传接口的 multipart 请求体上限为 32 MiB，视频需为表单保留余量。
+
+若出现 `InvalidBucketName`，核对 Bucket 纯名称和 Endpoint；`SignatureDoesNotMatch` 核对密钥配对、地域和设备时间。Secret 只能从创建时保留的原始密钥文件或创建界面获取，不使用脱敏星号、登录密码或其他 Key 对应的 Secret；无法找回时由用户在 RAM 创建一对新的 AccessKey，再在本机同时替换两个字段。`AccessDenied` 核对 RAM 授权及对象读取权限。修改源码后，本机开发须重启 Go API；生产部署先执行 `pnpm build:api` 并按升级流程重启服务。
+
+OSS 返回签名错误及签名原文时，后台会比较本次客户端签名原文与 OSS 返回值，只显示比较结论，不输出密钥或签名原文。“签名原文一致”时优先核对当前 AK ID 与 Secret 的配对；更换 RAM 用户后，应在应用中检查 AK ID 是否也已同步更新，保存并重新打开设置确认。“签名原文不一致”时检查签名配置及网络代理是否改写请求。
+
+官方说明：[地域与 Endpoint](https://help.aliyun.com/zh/oss/user-guide/regions-and-endpoints)、[RAM Policy](https://help.aliyun.com/zh/oss/user-guide/ram-policy)、[访问权限](https://help.aliyun.com/zh/oss/user-guide/oss-bucket-acl)、[阻止公共访问](https://help.aliyun.com/zh/oss/user-guide/block-public-access)。
 
 ## 首次安装
 
@@ -113,3 +149,15 @@ python3 tools/scripts/depth/infer_video_depth.py --check-env
 ```
 
 `pnpm run setup:depth-env` 使用 `DEPTH_VIDEO_PYTHON` 指定的解释器；不设置时使用 `python3`。
+
+## 视频表格下载
+
+托管环境（`NODE_ENV=production`）由浏览器逐个接收视频并保存到浏览器设置的下载位置；页面提示完成表示已交给浏览器，实际保存结果请检查浏览器下载列表。首次批量保存可能需要允许多个文件下载。浏览器模式不发送本机目录，服务器拒绝客户端指定目录写入。
+
+本机环境继续使用原生文件夹选择器和后台目录下载。仅记住路径不构成写授权：刷新页面、服务重启或授权超过 8 小时后需重新选择目录。授权限当前工作区和选定目录；任务读取和取消也校验工作区，媒体只读签名不能启动下载。每次任务最多 500 个视频、单个不超过 200MiB，最长运行 2 小时。
+
+本机下载使用独占临时文件与硬链接发布，拒绝覆盖已有文件或同名软链接；目录必须支持硬链接（常见本地 APFS/NTFS/ext4 支持，部分移动盘或网络盘不支持），失败时更换支持的保存目录。取消和失败清理本次临时文件，不截断已有文件。托管环境按浏览器自身规则处理同名文件。
+
+## 商品图片文字识别
+
+以实际运行 Go API 的用户执行 `pnpm setup:ocr`（Python 3.9–3.12），为服务安装 CPU 版 RapidOCR 及随包中文模型。安装命令与服务须使用相同的 `AZHUO_DATA_DIR`；也可统一设置 `OCR_PYTHON` 指向已有环境。部署须保留 `tools/scripts/ocr/recognize.py` 与 requirements/setup 脚本，模型推理无需付费 API。环境未安装时接口返回 503，其他功能可正常使用。详细限制及缓存规则见[电商视频商品准备](video-sales.md)。

@@ -7,21 +7,22 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestNormalizeUsageReadsTokenAliases(t *testing.T) {
-	top := NormalizeUsage(map[string]any{"usage": map[string]any{"prompt_tokens": 3.0, "completion_tokens": 4.0, "total_tokens": 7.0}})
+	top := gateway.NormalizeUsage(map[string]any{"usage": map[string]any{"prompt_tokens": 3.0, "completion_tokens": 4.0, "total_tokens": 7.0}})
 	if top["promptTokens"] != 3.0 || top["completionTokens"] != 4.0 || top["totalTokens"] != 7.0 {
 		t.Fatalf("chat %#v", top)
 	}
-	nested := NormalizeUsage(map[string]any{"data": map[string]any{"usage": map[string]any{"input_tokens": "11", "output_tokens": 22.0}}})
+	nested := gateway.NormalizeUsage(map[string]any{"data": map[string]any{"usage": map[string]any{"input_tokens": "11", "output_tokens": 22.0}}})
 	if nested["promptTokens"] != 11.0 || nested["completionTokens"] != 22.0 || nested["totalTokens"] != 33.0 {
 		t.Fatalf("image %#v", nested)
 	}
-	if NormalizeUsage(map[string]any{"usage": map[string]any{"prompt_tokens": 0.0}}) != nil {
+	if gateway.NormalizeUsage(map[string]any{"usage": map[string]any{"prompt_tokens": 0.0}}) != nil {
 		t.Fatal("empty usage should be omitted")
 	}
-	if NormalizeUsage(map[string]any{"message": "ok"}) != nil {
+	if gateway.NormalizeUsage(map[string]any{"message": "ok"}) != nil {
 		t.Fatal("missing usage should be omitted")
 	}
 }
@@ -35,10 +36,10 @@ func TestImagePollReturnsUpstreamUsage(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":{"status":"SUCCESS","url":"https://cdn.example.com/out.jpg","usage":{"input_tokens":11,"output_tokens":22,"total_tokens":33}}}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler := Image(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := Image(config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"})
 	created := httptest.NewRecorder()
 	handler.ServeHTTP(created, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
 	if created.Code != http.StatusOK {

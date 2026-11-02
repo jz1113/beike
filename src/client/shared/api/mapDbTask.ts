@@ -1,6 +1,7 @@
 import type { GenerationTask } from '@client/store/appStoreTypes';
 import { DEPTH_IMAGE_MODEL_ID, DEPTH_VIDEO_MODEL_ID } from '@shared/domain/media/depthVideo';
 import { toUiGenerationStatus } from '@shared/domain/core/taskStatus';
+import { unwrapJsonErrorMessage } from '@shared/domain/models/upstreamErrors';
 import { getAssetTime, resolveAssetMediaType } from '@client/shared/utils/assetTaskData';
 
 /** Asset archives also accept audio/documents without widening generation submission contracts. */
@@ -35,11 +36,11 @@ export function mapDbTaskToGenerationTask(t: Record<string, unknown>): AssetHist
     prompt,
     model,
     mediaType,
-    size: typeof t.size === 'string' && t.size.trim() ? t.size : undefined,
+    size: typeof t.size === 'string' && t.quality ? String(t.size) : typeof t.size === 'string' && t.size.trim() ? t.size : undefined,
     quality: typeof t.quality === 'string' && t.quality.trim() ? t.quality : undefined,
     status,
     resultUrl,
-    failReason: typeof t.failReason === 'string' ? t.failReason : undefined,
+    failReason: typeof t.failReason === 'string' && t.failReason.trim() ? unwrapJsonErrorMessage(t.failReason) : undefined,
     progress: typeof t.progress === 'string' ? t.progress : status === 'SUCCESS' ? '100%' : status === 'FAILURE' ? '0%' : undefined,
     createdAt: getAssetTime(t.createdAt),
     referenceImages,

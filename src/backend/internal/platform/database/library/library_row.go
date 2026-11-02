@@ -135,6 +135,7 @@ var outfitAssetColumns = []assetColumn{
 }
 
 var actionAssetColumns = []assetColumn{
+	textColumn("mediaType"), textColumn("mediaUrl"), textColumn("sourceUrl"),
 	textColumn("id"), textColumn("workspaceId"), textColumn("title"), textColumn("action"), textColumn("shotType"),
 	textColumn("spatialType"), nullColumn("camera"), textColumn("suitableAnatomy"), textColumn("tags"),
 	nullColumn("coverUrl"), nullColumn("sourceImages"), nullColumn("reversePrompt"), nullColumn("dimensions"),

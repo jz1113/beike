@@ -13,7 +13,7 @@ import (
 	"beike.local/cloud/src/backend/internal/system"
 )
 
-func extractDepthFrames(root, input, outDir string, maxWidth int) (int, float64, error) {
+func extractDepthFrames(root, input, outDir string, maxWidth int, probedFPS float64) (int, float64, error) {
 	ffmpeg, ok := system.FFmpegBinary(root)
 	if !ok {
 		return 0, 0, errors.New("FFmpeg 不可用")
@@ -21,9 +21,11 @@ func extractDepthFrames(root, input, outDir string, maxWidth int) (int, float64,
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return 0, 0, err
 	}
-	probe, err := system.ProbeVideo(root, input)
-	if err != nil {
-		return 0, 0, err
+	fps := probedFPS
+	if fps <= 0 {
+		if probe, err := system.ProbeVideo(root, input); err == nil {
+			fps = probe.FPS
+		}
 	}
 	if maxWidth <= 0 {
 		maxWidth = 1280
@@ -39,7 +41,6 @@ func extractDepthFrames(root, input, outDir string, maxWidth int) (int, float64,
 	if count == 0 {
 		return 0, 0, errors.New("抽帧失败：未生成任何帧")
 	}
-	fps := probe.FPS
 	if fps <= 0 {
 		fps = 24
 	}
@@ -61,7 +62,7 @@ func encodeDepthFrames(root, framesDir, output string, fps float64, crf int, pre
 		fps = 1
 	}
 	if preset == "" {
-		preset = "medium"
+		preset = "veryfast"
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()

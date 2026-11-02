@@ -38,21 +38,17 @@ const LEGACY_STYLE_IDS = new Set([
   'recipe_jewelry_master',
 ]);
 
-function canonicalizeArchId(id: string): string {
-  return id;
-}
-
 function readInitialSelectedArchId(): string {
   if (typeof window === 'undefined') return 'auto';
   try {
     const stored = localStorage.getItem(WORKSHOP_SELECTED_ARCH_KEY);
-    if (stored && stored.trim() && !LEGACY_STYLE_IDS.has(stored)) return canonicalizeArchId(stored);
+    if (stored && stored.trim() && !LEGACY_STYLE_IDS.has(stored)) return stored;
     const raw = sessionStorage.getItem('workshop_original_draft');
     if (raw) {
       const draft = JSON.parse(raw) as { selectedStyleId?: string };
       const legacy = draft?.selectedStyleId;
       if (typeof legacy === 'string' && legacy.trim() && !LEGACY_STYLE_IDS.has(legacy)) {
-        return canonicalizeArchId(legacy);
+        return legacy;
       }
     }
   } catch {}

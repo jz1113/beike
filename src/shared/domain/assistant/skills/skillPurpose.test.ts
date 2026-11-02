@@ -10,7 +10,7 @@ const base: AssistantSkill = { id: 'user', name: '视频技能', prompt: '完整
 
 describe('runtime skills and creation templates', () => {
   it('explicitly separates all builtin runtime instructions from the concrete creation example', () => {
-    expect(BUILTIN_AGENT_RUNTIME_SKILLS).toHaveLength(13);
+    expect(BUILTIN_AGENT_RUNTIME_SKILLS).toHaveLength(12);
     expect(BUILTIN_AGENT_RUNTIME_SKILLS.every(skill => skill.meta?.kind === 'agent')).toBe(true);
     expect(BUILTIN_ASSISTANT_SKILLS.filter(skill => resolveSkillKind(skill) === 'creation').map(skill => skill.id)).toEqual(['creation-first-person-scholar']);
     expect(composeSkillCatalog(BUILTIN_ASSISTANT_SKILLS).map(skill => skill.id)).toEqual(BUILTIN_AGENT_RUNTIME_SKILLS.map(skill => skill.id));

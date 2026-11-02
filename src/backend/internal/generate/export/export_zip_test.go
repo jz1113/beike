@@ -21,7 +21,7 @@ func TestExportZipPacksDataURL(t *testing.T) {
 	payload := `{"folderName":"图集","images":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"copywritingTitle":"标题"}`
 	request := httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", bytes.NewBufferString(payload))
 	response := httptest.NewRecorder()
-	ExportZip(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, request)
+	ExportZip(config.Config{}).ServeHTTP(response, request)
 	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "application/zip" {
 		t.Fatalf("status %d type %s body %s", response.Code, response.Header().Get("Content-Type"), response.Body.String())
 	}
@@ -83,7 +83,7 @@ func TestExportZipNotesPartialFailure(t *testing.T) {
 	png := base64.StdEncoding.EncodeToString([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'})
 	payload := `{"folderName":"图集","images":["data:image/png","data:image/png;base64,` + png + `"]}`
 	response := httptest.NewRecorder()
-	ExportZip(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
+	ExportZip(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("partial %d %s", response.Code, response.Body.String())
 	}
@@ -133,7 +133,7 @@ func TestRemoteExportFailureText(t *testing.T) {
 
 func TestExportZipReportsFailedMedia(t *testing.T) {
 	response := httptest.NewRecorder()
-	ExportZip(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(`{"images":["data:image/png"]}`)))
+	ExportZip(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(`{"images":["data:image/png"]}`)))
 	if response.Code != http.StatusBadGateway || !strings.Contains(response.Body.String(), "所有媒体文件均未能下载，请检查文件地址后重试") {
 		t.Fatalf("failed %d %s", response.Code, response.Body.String())
 	}
@@ -151,7 +151,7 @@ func TestMatrixPacksStoredImage(t *testing.T) {
 	}
 	payload := `{"offlineMatrix":true,"batchTitle":"批次","products":[{"skuId":"sku1","promptAssetGroupName":"组","copywritingTitle":"封面","images":[{"url":"/storage/shot.png","originalUrl":"https://cdn.example.com/a.png"}]}]}`
 	response := httptest.NewRecorder()
-	ExportZip(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
+	ExportZip(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("stored %d %s", response.Code, response.Body.String())
 	}
@@ -193,7 +193,7 @@ func TestMatrixPacksInlineImage(t *testing.T) {
 	png := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 	payload := `{"offlineMatrix":true,"batchTitle":"批次","products":[{"skuId":"sku1","promptAssetGroupName":"组","copywritingTitle":"封面","images":["data:image/png;base64,` + png + `"]}]}`
 	response := httptest.NewRecorder()
-	ExportZip(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
+	ExportZip(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("inline %d %s", response.Code, response.Body.String())
 	}
@@ -212,7 +212,7 @@ func TestMatrixPacksInlineImage(t *testing.T) {
 		t.Fatal("zip 里没有内嵌镜头")
 	}
 	remote := httptest.NewRecorder()
-	ExportZip(config.Config{Root: filepath.Join("..", "..", "..", "..", ".."), Upstream: "http://127.0.0.1:1"}).ServeHTTP(remote, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(`{"offlineMatrix":true,"products":[{"images":["https://example.com/a.jpg"]}]}`)))
+	ExportZip(config.Config{Root: filepath.Join("..", "..", "..", "..", "..")}).ServeHTTP(remote, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(`{"offlineMatrix":true,"products":[{"images":["https://example.com/a.jpg"]}]}`)))
 	if remote.Code != http.StatusBadGateway || !strings.Contains(remote.Body.String(), "所有媒体文件均未能下载，请检查文件地址后重试") || strings.Contains(remote.Body.String(), "上游 API 未就绪") {
 		t.Fatalf("remote %d %s", remote.Code, remote.Body.String())
 	}
@@ -237,7 +237,7 @@ func TestMatrixRemoteHostAllowlist(t *testing.T) {
 func TestTextMatrixNeedsAnImage(t *testing.T) {
 	payload := `{"offlineMatrix":true,"batchTitle":"批次","products":[{"skuId":"sku1","promptAssetGroupName":"组","title":"台灯","copywritingTitle":"封面","copywritingContent":"正文","category":"家居","images":[]}]}`
 	response := httptest.NewRecorder()
-	ExportZip(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
+	ExportZip(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "没有可打包的媒体素材") {
 		t.Fatalf("empty shots %d %s", response.Code, response.Body.String())
 	}
@@ -247,7 +247,7 @@ func TestMatrixKeepsPartialImageFailure(t *testing.T) {
 	png := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 	payload := `{"offlineMatrix":true,"batchTitle":"批次","products":[{"skuId":"sku1","promptAssetGroupName":"组","copywritingTitle":"封面","images":["data:image/png;base64,bm90cG5n","data:image/png;base64,` + png + `"]}]}`
 	response := httptest.NewRecorder()
-	ExportZip(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
+	ExportZip(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("partial %d %s", response.Code, response.Body.String())
 	}
@@ -273,14 +273,14 @@ func TestMatrixKeepsPartialImageFailure(t *testing.T) {
 func TestEmptyMatrixUsesLocalZip(t *testing.T) {
 	payload := `{"offlineMatrix":true,"products":[],"folderName":"图集","images":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="]}`
 	response := httptest.NewRecorder()
-	ExportZip(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
+	ExportZip(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
 	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "application/zip" {
 		t.Fatalf("empty matrix %d %s", response.Code, response.Body.String())
 	}
 }
 
 func TestExportZipLimitsMatrixAndCopy(t *testing.T) {
-	handler := ExportZip(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := ExportZip(config.Config{})
 	var products []string
 	for range 126 {
 		products = append(products, `{"images":["a","b","c","d"]}`)

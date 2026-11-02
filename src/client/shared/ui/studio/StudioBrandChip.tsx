@@ -6,15 +6,17 @@ interface Props {
   icon: ReactNode;
   onBack: () => void;
   inline?: boolean;
+  disabled?: boolean;
 }
 
-export function StudioBrandChip({ title, icon, onBack, inline = false }: Props) {
+export function StudioBrandChip({ title, icon, onBack, inline = false, disabled = false }: Props) {
   const button = (
     <button
       type="button"
       onClick={onBack}
+      disabled={disabled}
       className="pointer-events-auto group flex h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 text-sm font-black tracking-tight text-slate-900 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white dark:border-white/10 dark:bg-[#1B1B1E]/90 dark:text-white dark:hover:border-white/20 dark:hover:bg-[#26262B]"
-      title={`${title} · 点击返回首页`}
+      title={disabled ? `${title} · 请先等待任务完成或停止等待` : `${title} · 点击返回首页`}
     >
       <ToolSuiteMark>{icon}</ToolSuiteMark>
       <span className="hidden truncate leading-none sm:inline">{title}</span>

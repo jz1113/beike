@@ -1,12 +1,13 @@
 package catalog
 
 import (
-	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
-	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
+	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
 )
 
 func styleRecipesHandler(cfg config.Config) http.HandlerFunc {
@@ -22,7 +23,7 @@ func styleRecipesHandler(cfg config.Config) http.HandlerFunc {
 		if pageSize > 100 {
 			pageSize = 100
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "架构操作失败，请稍后重试。"})
 			return
@@ -56,7 +57,7 @@ func styleRecipesDeleteHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "缺少 id 参数"})
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "架构操作失败，请稍后重试。"})
 			return

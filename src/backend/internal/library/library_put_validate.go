@@ -164,11 +164,14 @@ var (
 	actionEditFields = map[string]editSpec{
 		"title": spec("string", false), "action": spec("string", false), "shotType": spec("string", false),
 		"spatialType": spec("string", false), "camera": spec("string", true), "suitableAnatomy": spec("string", false),
-		"tags": spec("string", false), "sourceImages": spec("string", true), "provenance": spec("string", false),
+		"tags": spec("string", false), "coverUrl": spec("string", true), "mediaType": spec("string", false),
+		"mediaUrl": spec("string", true), "sourceUrl": spec("string", true), "dimensions": spec("string", true),
+		"sourceImages": spec("string", true), "provenance": spec("string", false),
 		"sceneId": spec("string", true), "shotOrder": spec("number", false), "usageCount": spec("number", false),
-		"isFavorite": spec("bool", false),
+		"isFavorite": spec("bool", false), "productCategoryIds": spec("string", false),
 	}
 	personaEditFields = map[string]editSpec{
+		"avatarUrl":  spec("string", true),
 		"dimensions": spec("string", true), "name": spec("string", false), "description": spec("string", false),
 		"tags": spec("string", false), "sourceImages": spec("string", true), "provenance": spec("string", false),
 		"usageCount": spec("number", false), "isFavorite": spec("bool", false), "albumId": spec("string", true),

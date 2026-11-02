@@ -1,38 +1,44 @@
 package generate
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 type keyedImageTask struct {
-	taskID, status, result, reason string
-	found                          bool
+	recordID, taskID, status, result, reason string
+	found                                    bool
 }
 
 func lookupImageTaskByKey(cfg config.Config, r *http.Request, key string) (keyedImageTask, error) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return keyedImageTask{}, err
 	}
 	defer db.Close()
-	var taskID, status, result, reason sql.NullString
-	err = db.QueryRowContext(r.Context(), `
-		SELECT "taskId", "status", "resultUrl", "failReason" FROM "ImageTask"
+	return readImageSubmission(r.Context(), db, workspaceOf(r), key)
+}
+
+func readImageSubmission(ctx context.Context, db *sql.DB, workspace, key string) (keyedImageTask, error) {
+	var recordID, taskID, status, result, reason sql.NullString
+	err := db.QueryRowContext(ctx, `
+		SELECT "id", "taskId", "status", "resultUrl", "failReason" FROM "ImageTask"
 		WHERE "workspaceId" = ? AND "idempotencyKey" = ?
 			AND COALESCE(NULLIF("mediaType", ''), 'image') = 'image'
-		ORDER BY "createdAt" DESC LIMIT 1`, httpx.WorkspaceFrom(r), key).Scan(&taskID, &status, &result, &reason)
+		ORDER BY "createdAt" DESC LIMIT 1`, workspace, key).Scan(&recordID, &taskID, &status, &result, &reason)
 	if err == sql.ErrNoRows {
 		return keyedImageTask{}, nil
 	}
 	if err != nil {
 		return keyedImageTask{}, err
 	}
-	return keyedImageTask{taskID.String, status.String, result.String, reason.String, true}, nil
+	return keyedImageTask{recordID.String, taskID.String, status.String, result.String, reason.String, true}, nil
 }
 
 func imageTaskStillSubmitting(taskID string) bool {
@@ -40,13 +46,13 @@ func imageTaskStillSubmitting(taskID string) bool {
 }
 
 func writeDirectImagePoll(cfg config.Config, w http.ResponseWriter, r *http.Request, taskID string) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "taskId": taskID, "error": "查询同步任务失败，请稍后重试"})
 		return
 	}
 	defer db.Close()
-	state, result, reason, usage, ok, queryErr := taskStatus(r.Context(), db, taskID)
+	state, result, reason, usage, ok, queryErr := taskStatus(r.Context(), db, scopeOf(r, "image"), taskID)
 	if queryErr != nil || !ok {
 		if queryErr == nil && !ok {
 			httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "taskId": taskID, "error": "未找到同步任务记录"})

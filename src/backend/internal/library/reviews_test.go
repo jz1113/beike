@@ -28,7 +28,7 @@ func TestReviewRejectAndRestore(t *testing.T) {
 		('other','elsewhere','别人的','{}','pending','2026-02-01T00:00:00.000Z')`); err != nil {
 		t.Fatal(err)
 	}
-	cfg := config.Config{DatabaseURL: "file:" + path, Upstream: "http://127.0.0.1:1"}
+	cfg := config.Config{DatabaseURL: "file:" + path}
 	if status := postReview(t, cfg, `{"id":"new","action":"reject"}`); status != http.StatusOK {
 		t.Fatalf("reject status %d", status)
 	}

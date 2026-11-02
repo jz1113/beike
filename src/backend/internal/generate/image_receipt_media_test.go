@@ -1,7 +1,6 @@
 package generate
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -46,10 +45,6 @@ func TestImageReceiptLookupAndReuseFilterMedia(t *testing.T) {
 			if err != nil || !row.found || row.taskID != "direct_image" {
 				t.Fatalf("lookup: %+v %v", row, err)
 			}
-			id, taskID, result, ok := reuseImageTask(context.Background(), db, "local", "shared")
-			if !ok || id != "image-row" || taskID != "direct_image" || result != "https://cdn.example/image.png" {
-				t.Fatalf("reuse: %s %s %s %v", id, taskID, result, ok)
-			}
 			response := httptest.NewRecorder()
 			Image(cfg).ServeHTTP(response, request)
 			if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "https://cdn.example/image.png") || strings.Contains(response.Body.String(), "video.mp4") {
@@ -63,9 +58,7 @@ func TestImageReceiptLookupAndReuseFilterMedia(t *testing.T) {
 			if err != nil || row.found {
 				t.Fatalf("video-only key must not resolve as image: %+v %v", row, err)
 			}
-			if _, _, _, ok := reuseImageTask(context.Background(), db, "local", "shared"); ok {
-				t.Fatal("video-only key reused as image")
-			}
+
 		})
 	}
 }

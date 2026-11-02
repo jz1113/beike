@@ -1,0 +1,312 @@
+/* Stage 3 生成成片：左中暗色视频舞台 + 右侧素材与声音检查栏 + 底部 56px 导出操作栏 */
+.sales-delivery-shell {
+  container: sales-delivery / inline-size;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--sales-surface);
+}
+
+.sales-delivery-main {
+  display: grid;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-y: auto;
+}
+
+.sales-delivery-stage-col {
+  display: flex;
+  min-height: 360px;
+  min-width: 0;
+  flex-direction: column;
+  padding: 16px;
+  background: var(--sales-canvas);
+}
+
+.sales-delivery-inspector-col {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border-top: 1px solid var(--sales-line);
+  background: var(--sales-surface);
+}
+
+.sales-delivery-shell .sales-delivery-step {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--sales-line);
+  border-radius: 0;
+  padding: 14px 16px;
+  background: var(--sales-surface);
+}
+
+.sales-delivery-shell .sales-delivery-step:last-child {
+  border-bottom: 0;
+}
+
+.sales-delivery-shell .sales-delivery-step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sales-delivery-shell .sales-delivery-step-head > strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--sales-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sales-step-number {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--sales-subtle);
+  color: var(--sales-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sales-delivery-stage-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--sales-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sales-delivery-notice {
+  border-left: 2px solid var(--sales-warn);
+  padding: 2px 0 2px 10px;
+  color: var(--sales-warn);
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+
+.sales-video-settings-inline {
+  display: inline-flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sales-delivery-bottom-hint {
+  overflow: hidden;
+  color: var(--sales-muted);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 引用素材 3 列紧凑核对卡片 */
+.sales-reference-review .sales-reference-body { display: flex; flex-direction: column; gap: 10px; }
+.sales-reference-review .sales-reference-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.sales-reference-review .sales-reference-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sales-line);
+  border-radius: 5px;
+  background: var(--sales-subtle);
+  transition: border-color 120ms ease;
+}
+.sales-reference-review .sales-reference-card:hover { border-color: var(--sales-ink); }
+.sales-reference-review .sales-reference-preview {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 88px;
+  padding: 4px;
+  background: var(--sales-subtle);
+}
+.sales-reference-review .sales-reference-preview img,
+.sales-reference-review .sales-reference-preview video {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  object-fit: contain;
+}
+.sales-reference-review .sales-reference-slot-tag {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  border-radius: 4px;
+  padding: 1px 5px;
+  background: rgba(17, 17, 17, 0.78);
+  color: #f4f4f5;
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sales-reference-review .sales-reference-preview > span {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 4px;
+  padding: 2px 5px;
+  background: rgba(17, 17, 17, 0.78);
+  color: #fff;
+  font-size: 9px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.sales-reference-review .sales-reference-card:hover .sales-reference-preview > span { opacity: 1; }
+.sales-reference-review .sales-reference-caption {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid var(--sales-line);
+  padding: 6px 7px;
+  background: var(--sales-surface);
+}
+.sales-reference-review .sales-reference-caption > strong { color: var(--sales-ink); font-size: 11px; font-weight: 600; }
+.sales-reference-review .sales-reference-caption > span,
+.sales-reference-review .sales-reference-caption > small {
+  overflow: hidden;
+  color: var(--sales-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sales-reference-review .sales-reference-edit-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+.sales-reference-review .sales-reference-edit-actions > button { min-height: 26px; font-size: 11.5px; }
+.sales-reference-review .sales-reference-toggle { display: inline-flex; align-items: center; gap: 4px; min-height: 26px; color: var(--sales-muted); font-size: 11px; }
+.sales-reference-review .sales-reference-toggle[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.sales-reference-review .sales-reference-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--sales-line);
+  border-radius: 5px;
+  padding: 8px 10px;
+  background: var(--sales-subtle);
+  color: var(--sales-ink);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.sales-reference-review .sales-reference-confirm input { width: 15px; height: 15px; flex-shrink: 0; accent-color: var(--sales-ink); }
+.sales-reference-review .sales-reference-confirm.is-confirmed { border-color: var(--sales-ink); background: var(--sales-surface); }
+.sales-reference-review .sales-reference-warnings { border: 1px solid var(--sales-line-strong); border-radius: 5px; padding: 8px 10px; background: var(--sales-warn-bg); color: var(--sales-warn); font-size: 11px; line-height: 1.65; }
+.sales-reference-review .sales-reference-warnings summary { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600; }
+.sales-reference-review .sales-reference-warnings summary > svg:last-child { margin-left: auto; }
+.sales-reference-review .sales-reference-warnings p { margin-top: 6px; }
+.sales-reference-review .sales-reference-dialog { width: min(880px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 16px; border: 1px solid var(--sales-line-strong); border-radius: 8px; background: var(--sales-surface); color: var(--sales-ink); }
+.sales-reference-review .sales-reference-dialog::backdrop { background: rgba(0, 0, 0, 0.72); }
+.sales-reference-review .sales-reference-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; font-size: 13px; }
+.sales-reference-review .sales-reference-dialog > img,
+.sales-reference-review .sales-reference-dialog > video { display: block; width: 100%; max-height: calc(100dvh - 130px); object-fit: contain; }
+
+/* 配音、BGM 与字幕草稿 */
+.sales-delivery-music { display: flex; flex-direction: column; gap: 8px; }
+.sales-delivery-music > span { display: flex; align-items: center; gap: 6px; color: var(--sales-ink); font-size: 12px; font-weight: 500; }
+.sales-delivery-music small { margin-left: auto; color: var(--sales-muted); font-size: 10.5px; font-weight: 400; }
+.sales-delivery-shell .sales-bgm-picker { margin: 0; border: 0; padding: 0; gap: 8px; }
+.sales-delivery-shell .sales-bgm-row select { min-width: 0; margin: 0; height: 32px; font-size: 12px; }
+.sales-delivery-shell .sales-bgm-meta { flex-wrap: wrap; gap: 8px; }
+.sales-delivery-voice, .sales-delivery-subtitles { border: 1px solid var(--sales-line); border-radius: 5px; background: var(--sales-surface); }
+.sales-delivery-voice > summary, .sales-delivery-subtitles > summary { display: flex; align-items: center; gap: 7px; padding: 8px 10px; color: var(--sales-ink); font-size: 12px; font-weight: 500; cursor: pointer; }
+.sales-delivery-voice > summary > span, .sales-delivery-subtitles > summary > span { margin-left: auto; color: var(--sales-muted); font-size: 10.5px; font-weight: 400; }
+.sales-delivery-voice-body, .sales-delivery-subtitles-body { display: flex; flex-direction: column; gap: 9px; border-top: 1px solid var(--sales-line); padding: 10px; background: var(--sales-subtle); }
+.sales-delivery-voice-body > label { display: flex; align-items: center; gap: 8px; color: var(--sales-muted); font-size: 11.5px; }
+.sales-delivery-voice-body select { min-width: 0; flex: 1; height: 30px; border: 1px solid var(--sales-line-strong); border-radius: 5px; padding: 0 8px; background: var(--sales-surface); color: var(--sales-ink); font-size: 12px; }
+.sales-delivery-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sales-delivery-subtitles-body > p { display: flex; gap: 8px; color: var(--sales-muted); font-size: 11.5px; line-height: 1.65; }
+.sales-delivery-subtitles-body > p > span { color: var(--sales-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.sales-delivery-subtitles-body > a { align-self: flex-start; }
+
+/* 中性暗调视频舞台（无蓝紫霓虹渐变） */
+.sales-delivery-preview {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #262626;
+  border-radius: 6px;
+  padding: 12px 14px;
+  background: #141414;
+  color: #e5e5e5;
+}
+.sales-delivery-preview-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.sales-delivery-preview-heading > strong { display: inline-flex; align-items: center; gap: 7px; color: #f5f5f5; font-size: 12.5px; font-weight: 600; }
+.sales-viewfinder-dot { width: 7px; height: 7px; border-radius: 999px; background: #737373; }
+.sales-viewfinder-dot.is-rec { background: #ef4444; animation: salesViewfinderPulse 1.4s ease-in-out infinite; }
+.sales-viewfinder-dot.is-ready { background: #22c55e; }
+@keyframes salesViewfinderPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.sales-viewfinder-meta { border: 1px solid #2e2e2e; border-radius: 4px; padding: 2px 8px; background: #1d1d1d; color: #a3a3a3; font-size: 11px; font-variant-numeric: tabular-nums; }
+.sales-delivery-preview-switch { display: inline-flex; gap: 2px; border: 1px solid #2e2e2e; border-radius: 5px; padding: 2px; background: #1d1d1d; }
+.sales-delivery-preview-switch > button { height: 24px; border-radius: 3px; padding: 0 9px; color: #a3a3a3; font-size: 11px; font-weight: 500; }
+.sales-delivery-preview-switch > button:hover { color: #f5f5f5; }
+.sales-delivery-preview-switch > button[aria-pressed="true"] { background: #f5f5f5; color: #141414; font-weight: 600; }
+.sales-delivery-screen {
+  position: relative;
+  display: flex;
+  min-height: 280px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #242424;
+  border-radius: 5px;
+  background: #0b0b0b;
+}
+.sales-delivery-screen > video { display: block; width: 100%; height: 100%; max-height: calc(100dvh - 230px); object-fit: contain; }
+.sales-viewfinder-generating { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 28px; text-align: center; }
+.sales-viewfinder-generating > strong { color: #f5f5f5; font-size: 13.5px; font-weight: 600; }
+.sales-viewfinder-generating > p { max-width: 260px; color: #a3a3a3; font-size: 11.5px; line-height: 1.65; }
+.sales-delivery-preview-empty { display: flex; max-width: 280px; flex-direction: column; align-items: center; gap: 9px; padding: 32px 20px; text-align: center; }
+.sales-delivery-preview-icon { display: flex; width: 46px; height: 46px; align-items: center; justify-content: center; border: 1px solid #2e2e2e; border-radius: 6px; background: #181818; color: #d4d4d4; }
+.sales-delivery-preview-empty > strong { color: #f5f5f5; font-size: 14px; font-weight: 600; }
+.sales-delivery-preview-empty > p { color: #a3a3a3; font-size: 12px; line-height: 1.7; }
+.sales-delivery-preview-empty > span { margin-top: 2px; border: 1px solid #2a2a2a; border-radius: 4px; padding: 2px 8px; background: #161616; color: #a3a3a3; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.sales-delivery-preview-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.sales-delivery-preview-status { display: inline-flex; align-items: center; gap: 6px; color: #d4d4d4; font-size: 11.5px; }
+.sales-delivery-preview-status.is-done { color: #4ade80; }
+.sales-delivery-preview-footnote { color: #737373; font-size: 11px; }
+.sales-delivery-download { border-color: #363636 !important; background: #202020 !important; color: #f5f5f5 !important; }
+.sales-delivery-download:hover { background: #2c2c2c !important; }
+
+@container sales-delivery (min-width: 880px) {
+  .sales-delivery-main {
+    grid-template-columns: minmax(0, 1fr) 372px;
+    overflow: hidden;
+  }
+  .sales-delivery-stage-col {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .sales-delivery-inspector-col {
+    border-top: 0;
+    border-left: 1px solid var(--sales-line);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+}
+
+@media (max-width: 640px) {
+  .sales-reference-review .sales-reference-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sales-delivery-screen { min-height: 220px; }
+}

@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"beike.local/cloud/src/backend/internal/generate"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
@@ -55,9 +55,9 @@ func TestHeadlineHTTPNativeProtocolPropagation(t *testing.T) {
 				_ = json.NewEncoder(w).Encode(map[string]any{"content": []any{map[string]any{"type": "text", "text": tc.reply}}, "stop_reason": "end_turn", "usage": map[string]any{"input_tokens": 1, "output_tokens": 2}})
 			}))
 			defer server.Close()
-			previous := generate.ModelHTTP
-			generate.ModelHTTP = func() *http.Client { return server.Client() }
-			defer func() { generate.ModelHTTP = previous }()
+			previous := gateway.ModelHTTP
+			gateway.ModelHTTP = func() *http.Client { return server.Client() }
+			defer func() { gateway.ModelHTTP = previous }()
 			post := func(protocol string) *httptest.ResponseRecorder {
 				body := `{"model":"shared-vision","originalTitle":"台灯测评","coverTitle":"台灯","imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"textProtocol":` + protocol + `,"customBaseUrl":"` + server.URL + `","customApiKey":"cover-key"}`
 				r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))

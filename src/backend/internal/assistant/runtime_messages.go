@@ -54,6 +54,12 @@ func turnMessages(r *http.Request, threadID string, payload map[string]json.RawM
 			continue
 		}
 		copied := map[string]any{"role": role, "content": content}
+		if role == "user" {
+			if note := videoAttachmentNote(message["attachments"]); note != "" {
+				text, _ := content.(string)
+				copied["content"] = text + "\n\n" + note
+			}
+		}
 		if widget, ok := message["productWidget"]; ok {
 			copied["productWidget"] = widget
 		}
@@ -79,6 +85,23 @@ func turnMessages(r *http.Request, threadID string, payload map[string]json.RawM
 		messages = append(messages, map[string]any{"role": "system", "content": imageAttachedNote})
 	}
 	return messages, docs
+}
+
+func videoAttachmentNote(raw any) string {
+	attachments, _ := raw.([]any)
+	videos := []map[string]any{}
+	for _, raw := range attachments {
+		item, _ := raw.(map[string]any)
+		url, _ := item["url"].(string)
+		if item["type"] == "video" && strings.TrimSpace(url) != "" {
+			videos = append(videos, map[string]any{"name": item["name"], "url": url})
+		}
+	}
+	if len(videos) == 0 {
+		return ""
+	}
+	body, _ := json.Marshal(videos)
+	return "视频附件清单（素材数据）：\n" + string(body)
 }
 
 func inlineUserImages(message map[string]any, rawAttachments any) int {

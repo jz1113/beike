@@ -124,3 +124,15 @@ func TestSubmitVideoRejectsClientError(t *testing.T) {
 		t.Fatalf("%#v", result)
 	}
 }
+
+func TestPresentVideoErrorRedactsSignedOSSURLsBeforeClipping(t *testing.T) {
+	signedURL := "https://jinzhuo11.oss-cn-beijing.aliyuncs.com/seedance/refs/202610/%E8%A7%86%E9%A2%91%E5%8F%82%E8%80%831.mp4?x-oss-credential=LTAI5t6uxgrYLFmsaBCUc1SX%2F20261031%2Fcn-beijing%2Foss%2Faliyun_v4_request&x-oss-date=20261031T080000Z&x-oss-expires=86400&x-oss-signature=abcdef1234567890"
+	withTrailingReason := presentVideoError(signedURL + ": Input material may contain sensitive content: videoUrls[0]")
+	if strings.Contains(withTrailingReason, "x-oss-credential") || !strings.Contains(withTrailingReason, "视频参考1.mp4") || !strings.Contains(withTrailingReason, "参考视频未通过安全检测") {
+		t.Fatalf("unexpected formatted error: %s", withTrailingReason)
+	}
+	bareURL := presentVideoError(signedURL[:180])
+	if strings.Contains(bareURL, "x-oss-credential") || !strings.Contains(bareURL, "【参考视频：视频参考1.mp4】处理失败") {
+		t.Fatalf("unexpected bare url fallback: %s", bareURL)
+	}
+}

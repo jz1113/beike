@@ -21,6 +21,7 @@ import { readReportedUsage } from '@client/shared/utils/modelUsage';
 import { submitPreparedAssistantTurn } from '../model/assistantTurnRecovery';
 import { fetchAssistantTurnSnapshot } from '../api/runs';
 import { loadPromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
+import { shouldAnalyzeVideoDirectly } from '@shared/domain/assistant/mediaAnalysis';
 export { deriveLegacyState } from './assistantTurnItems';
 
 export interface RunTurnParams {
@@ -153,6 +154,7 @@ export function useAssistantTurn() {
     const routeOptions = getMultimodalClientOverrides(model);
     const upstreamModel = model.startsWith('deepseek-official:') ? model : selectedTextModel(model).modelId;
     const prefs = loadPromptPreferences();
+    const directVideo = shouldAnalyzeVideoDirectly(messages, skillId);
 
     const res = await submitPreparedAssistantTurn(nextTurnId, params.onTurnPrepared, () => apiFetch('/api/assistant/turn/start', {
       method: 'POST',
@@ -175,8 +177,8 @@ export function useAssistantTurn() {
         skillId,
         allowedTools,
         ...(skillResources?.length ? { skillResources } : {}),
-        ...(skillCatalog?.length ? { skillCatalog } : {}),
-        enableAgentTools: true,
+        ...(!directVideo && skillCatalog?.length ? { skillCatalog } : {}),
+        enableAgentTools: !directVideo,
         language,
         clientContext,
         sessionApprovals: stateRef.current.sessionApprovals,

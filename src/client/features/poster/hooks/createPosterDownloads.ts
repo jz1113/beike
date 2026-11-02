@@ -56,6 +56,22 @@ export function createPosterDownloads(context: Pick<PosterState,
     }
   };
 
+  const exportPlans = async () => {
+    if (runningRef.current || exportingRef.current || restoringRef.current || importingRef.current || !ensureWorkspaceReady()) return;
+    const ready = itemsRef.current.filter(item => item.prompt && item.designPlan);
+    if (!ready.length) return;
+    setIsExportingIfAlive(true);
+    try {
+      const zip = new JSZip();
+      ready.forEach((item, index) => zip.file(`${String(index + 1).padStart(3, '0')}_${safeBaseName(item.originalTitle, '封面')}.txt`, item.prompt!));
+      zip.file('素材对应.json', JSON.stringify(ready.map(item => ({ id: item.id, originalTitle: item.originalTitle, coverTitle: item.coverTitle, sourceImageUrl: item.sourceImageUrl, aspectRatio: item.format.aspectRatio, memorySampleId: item.memorySampleId })), null, 2));
+      const archive = await zip.generateAsync({ type: 'blob' });
+      if (aliveRef.current && ensureWorkspaceReady()) await saveToDownloadDir('封面提示词方案.zip', archive);
+      setNoticeIfAlive('提示词方案已导出，每份文本搭配对应商品图即可使用。');
+    } catch (error) { setNoticeIfAlive(`方案导出失败：${error instanceof Error ? error.message : '未知错误'}`); }
+    finally { setIsExportingIfAlive(false); }
+  };
+
   const downloadOne = async (item: PosterItem, index: number) => {
     if (!item.resultUrl || !ensureWorkspaceReady()) return;
     try {
@@ -80,5 +96,5 @@ export function createPosterDownloads(context: Pick<PosterState,
   };
 
 
-  return { exportZip, downloadOne, downloadOriginalScene };
+  return { exportZip, exportPlans, downloadOne, downloadOriginalScene };
 }

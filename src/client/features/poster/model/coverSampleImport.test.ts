@@ -30,8 +30,8 @@ describe('cover sample import', () => {
     await expect(importCoverSamples([unsafe], decode)).resolves.toMatchObject({ error: '压缩包包含不安全的路径' });
     const nested = await zipOf({ 'again.zip': new Uint8Array([1, 2, 3]) });
     await expect(importCoverSamples([nested], decode)).resolves.toMatchObject({ error: '压缩包里不能再包含压缩包' });
-    const tooMany = Array.from({ length: 11 }, (_, index) => jpeg(`图${index}.jpg`));
-    await expect(importCoverSamples(tooMany, decode)).resolves.toMatchObject({ error: '一次最多投喂 10 张封面，请减少后再投喂' });
+    const tooMany = Array.from({ length: 101 }, (_, index) => jpeg(`图${index}.jpg`));
+    await expect(importCoverSamples(tooMany, decode)).resolves.toMatchObject({ error: '一次最多投喂 100 张封面，请减少后再投喂' });
   });
 
   it('skips a disguised image and reports the reason', async () => {

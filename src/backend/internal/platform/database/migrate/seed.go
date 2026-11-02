@@ -14,12 +14,17 @@ func seedOfficialCatalog(ctx context.Context, db execer, root, databasePath stri
 		return nil
 	}
 	recipes, err := loadRecipes(filepath.Join(root, "src/shared/data/officialMasterRecipes.json"))
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	upserted, err := upsertRecipes(ctx, db, recipes)
-	if err != nil {
-		return err
+	upserted := 0
+	if os.IsNotExist(err) {
+		log.Print("→ 官方架构种子缺失，保留现有架构与用户偏好")
+	} else {
+		if err != nil {
+			return err
+		}
+		upserted, err = upsertRecipes(ctx, db, recipes)
+		if err != nil {
+			return err
+		}
 	}
 	inserted, err := seedPromptAssets(ctx, db, filepath.Join(root, "src/shared/data/promptAssets.json"))
 	if err != nil {
@@ -47,9 +52,6 @@ func loadRecipes(path string) ([]recipeRow, error) {
 func upsertRecipes(ctx context.Context, db execer, recipes []recipeRow) (int, error) {
 	if len(recipes) == 0 {
 		if err := exec(ctx, db, `DELETE FROM "StyleRecipe" WHERE "workspaceId" = ?`, officialWorkspace); err != nil {
-			return 0, err
-		}
-		if err := exec(ctx, db, `DELETE FROM "PromptAssetUsageEvent" WHERE "eventType" = 'recipe_hidden'`); err != nil {
 			return 0, err
 		}
 		return 0, nil

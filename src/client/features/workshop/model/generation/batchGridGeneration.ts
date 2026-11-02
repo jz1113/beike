@@ -16,7 +16,7 @@ import { workshopReferenceInput, workshopReferenceBudget } from './workshopRefer
 export async function runGridImageTask(
   item: BatchProductItem,
   pendingShots: ShotPrompt[],
-  config: TaskExecutionConfig,
+  config: Omit<TaskExecutionConfig, 'io'>,
   setItems: React.Dispatch<React.SetStateAction<BatchProductItem[]>>,
   bumpProgress: (ok: boolean, n: number) => void,
   recoveryOnly = false,

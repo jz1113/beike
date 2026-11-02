@@ -37,6 +37,14 @@ func TestKeywordReviewRejectsLookupAndDuplicate(t *testing.T) {
 	}
 }
 
+func TestKeywordReviewRejectsUnsafeGatewayAsClientError(t *testing.T) {
+	body := `{"provider":"gateway","model":"custom-model","customBaseUrl":"http://127.0.0.1:8080","customApiKey":"secret","rulesVersion":0,"rows":[{"id":"1","query":"猫砂"}]}`
+	got := executeKeywordReview(config.Config{NodeEnv: "production"}, httptest.NewRequest(http.MethodPost, "/api/generate/keyword-review", strings.NewReader(body)), nil)
+	if got.status != http.StatusBadRequest || !strings.Contains(got.body["error"].(string), "接口地址") {
+		t.Fatalf("status=%d body=%#v", got.status, got.body)
+	}
+}
+
 func TestKeywordReviewReplaysIdempotentResult(t *testing.T) {
 	t.Setenv("AZHUO_DATA_DIR", t.TempDir())
 	calls := 0

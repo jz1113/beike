@@ -10,7 +10,7 @@ import (
 )
 
 func TestCanvasTextBlocksUnsafeGateway(t *testing.T) {
-	handler := CanvasText(config.Config{NodeEnv: "production", Upstream: "http://127.0.0.1:1"})
+	handler := CanvasText(config.Config{NodeEnv: "production"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/canvas-text", strings.NewReader(`{"model":"gpt","prompt":"写一句","customBaseUrl":"http://127.0.0.1/v1"}`)))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "密钥未发送到其他网关") {
@@ -31,7 +31,7 @@ func TestCanvasTextReadsChatCompletion(t *testing.T) {
 	previous := canvasHTTP
 	canvasHTTP = func() *http.Client { return server.Client() }
 	t.Cleanup(func() { canvasHTTP = previous })
-	handler := CanvasText(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := CanvasText(config.Config{})
 	request := httptest.NewRequest(http.MethodPost, "/api/generate/canvas-text", strings.NewReader(`{"model":"gpt","prompt":"写一句","customBaseUrl":"`+server.URL+`","customApiKey":"secret"}`))
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -41,7 +41,7 @@ func TestCanvasTextReadsChatCompletion(t *testing.T) {
 }
 
 func TestCanvasTextRejectsEmptyPrompt(t *testing.T) {
-	handler := CanvasText(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := CanvasText(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/canvas-text", strings.NewReader(`{"model":"gpt","prompt":"  "}`)))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "最多 20000 字") {
@@ -59,7 +59,7 @@ func TestCanvasTextReadsResponsesAPI(t *testing.T) {
 	previous := canvasHTTP
 	canvasHTTP = func() *http.Client { return server.Client() }
 	t.Cleanup(func() { canvasHTTP = previous })
-	handler := CanvasText(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
+	handler := CanvasText(config.Config{NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/canvas-text", strings.NewReader(`{"model":"gpt","prompt":"写一句","apiFormat":"openai-responses","customBaseUrl":"`+server.URL+`","customApiKey":"secret"}`)))
 	if response.Code != http.StatusOK || path != "/v1/responses" || !strings.Contains(response.Body.String(), `"text":"响应正文"`) {

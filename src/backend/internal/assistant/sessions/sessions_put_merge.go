@@ -11,6 +11,7 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 const sessionTimeMax = 8_640_000_000_000_000
@@ -27,7 +28,7 @@ func discardOlderSnapshots(r *http.Request, cfg config.Config, payload map[strin
 	if len(sessions) == 0 || len(sessions) > 50 {
 		return nil, false
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return nil, false
 	}

@@ -43,8 +43,8 @@ export async function rewriteCoverTitle(item: PosterItem, titleModel: string, si
     const data = await response.json().catch(() => ({}));
     if (data?.success) recordChatTokens({ modelId: data.model || titleModel, type: 'chat', usage: data.usage });
     const title = normalizeCoverTitle((data?.data as HeadlineTitleResponse | undefined)?.title || '');
-    if (data?.success && title.length >= 7 && title.length <= 12) return title;
-    throw new Error(data?.error || '标题改写模型没有返回 7–12 字的有效标题');
+    if (data?.success && title.length >= 4 && title.length <= 18) return title;
+    throw new Error(data?.error || '标题改写模型没有返回 4–18 字的有效标题');
   } catch (error) {
     throw new Error(`标题改写阶段失败，已停止后续封面设计和生图：${error instanceof Error ? error.message : '未知错误'}`);
   }
@@ -57,6 +57,7 @@ export async function directCoverDesign(
   options?: {
     batchId?: string;
     previousDesign?: string;
+    supplementaryRequirements?: string;
     memorySampleId?: string;
     memoryUsageId?: string;
     signal?: AbortSignal;
@@ -76,6 +77,7 @@ export async function directCoverDesign(
         itemId: item.id,
         itemTitle: (item.originalTitle || item.productName).slice(0, 200),
         previousDesign: options?.previousDesign,
+        supplementaryRequirements: options?.supplementaryRequirements,
         memorySampleId: options?.memorySampleId || 'auto',
         memoryUsageId: options?.memoryUsageId,
         imageUrls: [posterModelImageUrl(item.sourceImageUrl, window.location.origin)],
@@ -159,7 +161,7 @@ export async function generateFinalCover(
       originalTitle,
       coverTitle,
       productName,
-      promptVersion: 'integrated-cover-v5',
+      promptVersion: 'reference-cover-v6',
     },
   }, { isAborted, idempotencyKey: recovery.submissionKey, onTaskSubmitted: (id) => {
     if (!recovery.signal?.aborted) recovery.onTaskSubmitted?.(id);

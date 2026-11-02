@@ -10,7 +10,7 @@ import (
 )
 
 func TestDeconstructProgressRequiresTask(t *testing.T) {
-	handler := deconstructProgressHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := deconstructProgressHandler(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/catalog/assets/deconstruct/progress", nil))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "缺少有效的任务 ID") {

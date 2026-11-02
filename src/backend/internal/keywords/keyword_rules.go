@@ -16,7 +16,7 @@ import (
 
 func keywordRulesGetHandler(cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "读取审核规则失败"})
 			return
@@ -48,7 +48,7 @@ func keywordRulesPutHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": message})
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "保存审核规则失败"})
 			return

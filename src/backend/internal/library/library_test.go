@@ -10,7 +10,7 @@ import (
 )
 
 func TestLibraryFilteredListStaysProxied(t *testing.T) {
-	handler := libraryGetHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := libraryGetHandler(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/catalog/assets/library?type=scene&category=chinese_style", nil))
 	if response.Code != http.StatusInternalServerError {
@@ -29,7 +29,7 @@ func TestLibraryFilteredListStaysProxied(t *testing.T) {
 }
 
 func TestLibraryPostProxiesOtherActions(t *testing.T) {
-	handler := libraryPostHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := libraryPostHandler(config.Config{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/catalog/assets/library", bytes.NewBufferString(`{"action":"create"}`))
 	handler.ServeHTTP(response, request)
@@ -75,7 +75,7 @@ func TestLibraryPostProxiesOtherActions(t *testing.T) {
 }
 
 func TestLibraryAllListStaysProxied(t *testing.T) {
-	handler := libraryGetHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := libraryGetHandler(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/catalog/assets/library?type=scene", nil))
 	if response.Code != http.StatusInternalServerError {
@@ -88,7 +88,7 @@ func TestLibraryAllListStaysProxied(t *testing.T) {
 	}
 }
 func TestLibraryClearStaysProxied(t *testing.T) {
-	handler := libraryDeleteHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := libraryDeleteHandler(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/api/catalog/assets/library?action=clear-database", nil))
 	if response.Code != http.StatusInternalServerError {

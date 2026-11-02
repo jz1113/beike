@@ -208,6 +208,12 @@ func geminiParts(ctx context.Context, msg map[string]any) ([]any, error) {
 				return nil, failTextImage(part, err)
 			}
 			out = append(out, map[string]any{"inlineData": map[string]any{"mimeType": mime, "data": data}})
+		case "video_url":
+			mime, data, err := textVideo(ctx, textString(textMap(part["video_url"])["url"]))
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, map[string]any{"inlineData": map[string]any{"mimeType": mime, "data": data}})
 		default:
 			return nil, errors.New("unsupported Gemini message content part")
 		}

@@ -5,7 +5,6 @@ import { GenerationEngineHost } from '@client/features/generate/components/Gener
 import { abortActiveGenerationEngine } from '@client/features/generate/hooks/useGenerationEngine';
 import { syncAppTokenCookie } from '@client/shared/api/apiClient';
 import { syncWorkspaceCookie } from '@client/shared/api/workspaceClient';
-import { migrateLegacyCredentialsOnce } from '@client/shared/api/credentialClient';
 import { repairWorkflowModelsInStorage, resolveStoredMultimodalModelId } from '@shared/domain/models/workflowModels';
 import { usePreventBrowserFileOpen } from '@client/shared/hooks/useFileDropZone';
 import { useViewportDensity } from '@client/shared/hooks/useMediaQuery';
@@ -107,7 +106,6 @@ export default function App() {
     if (useAppStore.getState().selectedVisionModel !== selectedModel) {
       useAppStore.getState().setSelectedVisionModel(selectedModel);
     }
-    void migrateLegacyCredentialsOnce();
     void useAppStore.getState().refreshAssistantSkills().catch(() => {});
   }, []);
 
@@ -295,7 +293,7 @@ export default function App() {
 
                 <ViewKeepAlivePanel view="video_sales" currentView={pageView}>
                   <AppErrorBoundary title="电商视频异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
-                    <SalesStudio onBack={() => setCurrentView('home')} onOpenSettings={navigateToSettings} />
+                    <SalesStudio onBack={() => setCurrentView('home')} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 

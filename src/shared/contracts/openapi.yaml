@@ -647,6 +647,18 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/generate/headline-templates:
+    get:
+      operationId: get_api_generate_headline_templates
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/generate/headline-templates/{id}':
+    patch:
+      operationId: patch_api_generate_headline_templates_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
   /api/generate/headline-title:
     post:
       operationId: post_api_generate_headline_title
@@ -699,6 +711,12 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/generate/seedance/precheck:
+    post:
+      operationId: post_api_generate_seedance_precheck
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
   /api/generate/upload-ref:
     post:
       operationId: post_api_generate_upload_ref
@@ -716,108 +734,6 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
-  /api/generate/video-sales/analyze:
-    post:
-      operationId: post_api_generate_video_sales_analyze
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VideoSalesAnalyzeRequest'
-      responses:
-        '200':
-          description: 仅分析允许的商品图
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  analysis:
-                    type: object
-                    additionalProperties: true
-  /api/generate/video-sales/compose:
-    post:
-      operationId: post_api_generate_video_sales_compose
-      deprecated: true
-      responses:
-        '410':
-          description: 逐镜拼接已停用，历史片段仅支持查询和下载
-  /api/generate/video-sales/finalize-prompts:
-    post:
-      operationId: post_api_generate_video_sales_finalize_prompts
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VideoSalesFinalizeRequest'
-      responses:
-        '200':
-          description: 仅 finalize 返回整段及分段视频提示词；素材由用户人工确认
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VideoSalesFinalizeResponse'
-        '410':
-          description: validate-assets 已停用，请人工确认素材
-  /api/generate/video-sales/script:
-    post:
-      operationId: post_api_generate_video_sales_script
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VideoSalesScriptRequest'
-      responses:
-        '200':
-          description: 仅服饰技能，返回单条视频交付模式及按需素材计划，不接受旧创作请求
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [success, scripts]
-                properties:
-                  success:
-                    type: boolean
-                  scripts:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/VideoSalesScript'
-  /api/generate/video-sales/select-images:
-    post:
-      operationId: post_api_generate_video_sales_select_images
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VideoSalesSelectRequest'
-      responses:
-        '200':
-          description: 只能选取模型实际查看过且在允许集合内的商品图片
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  assignments:
-                    type: array
-                    items:
-                      type: object
-                      required: [shotId, imageIndex, reason]
-                      properties:
-                        shotId:
-                          type: integer
-                        imageIndex:
-                          type: integer
-                        reason:
-                          type: string
   /api/generate/video/bind:
     post:
       operationId: post_api_generate_video_bind
@@ -860,6 +776,392 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/sales/asset-view-grid:
+    post:
+      operationId: post_api_sales_asset_view_grid
+      summary: 将一张人物或场景九宫格裁切为当前工作区的九张 JPG
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, imageUrl]
+              properties:
+                kind:
+                  type: string
+                  enum: [persona, scene]
+                imageUrl:
+                  type: string
+                  minLength: 1
+                  description: 当前工作区存储路径、公网图片 URL 或图片 data URL
+      responses:
+        '200':
+          description: 按从左到右、从上到下顺序裁切的九张 JPG；重试复用同一输出路径
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, images]
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+                  images:
+                    type: array
+                    minItems: 9
+                    maxItems: 9
+                    items:
+                      type: object
+                      required: [view, url]
+                      properties:
+                        view:
+                          type: string
+                          enum: [face, front, side, threeQuarterLeft, threeQuarterRight, back, sideRight, upperBody, backThreeQuarter, left, right, reverse, frontWide, leftWide, rightWide, reverseLeft, reverseRight, detail]
+                        url:
+                          type: string
+        '400':
+          description: 参数或原图读取失败；读取失败包含 image_read_failed 错误码
+        '422':
+          description: 图像格式或尺寸无效
+        '429':
+          description: 裁切并发已满，可稍后处理原图
+        '504':
+          description: 裁切取消或超时，可继续处理原图
+        '500':
+          description: 裁切保存失败，可复用同一九宫格重试
+  /api/sales/asset-view-jobs:
+    get:
+      operationId: get_api_sales_asset_view_jobs
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_sales_asset_view_jobs
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/atlas/catalog:
+    get:
+      operationId: get_api_sales_atlas_catalog
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/atlas/import:
+    post:
+      operationId: post_api_sales_atlas_import
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/atlas/media:
+    get:
+      operationId: get_api_sales_atlas_media
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/audio-mix:
+    post:
+      operationId: post_api_sales_audio_mix
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/sales/bgm/{id}':
+    get:
+      operationId: get_api_sales_bgm_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/ocr:
+    post:
+      operationId: post_api_sales_ocr
+      summary: 使用本地 RapidOCR 提取一张商品原图的文字
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SalesOCRRequest'
+      responses:
+        '200':
+          description: 逐行原图坐标、置信度、文字及缓存标记
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, result]
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+                  result:
+                    $ref: '#/components/schemas/SalesOCRResult'
+        '400':
+          description: 请求或原图无效、越界或超过限制
+        '422':
+          description: 识别失败，可更换图片后重试
+        '429':
+          description: 识别服务忙，请稍后重试
+        '503':
+          description: 运行环境未安装，请执行 pnpm setup:ocr
+        '504':
+          description: 识别已取消或超时
+  /api/sales/plan-adapt:
+    post:
+      operationId: post_api_sales_plan_adapt
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/presets:
+    get:
+      operationId: get_api_sales_presets
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_sales_presets
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/sales/presets/{id}':
+    delete:
+      operationId: delete_api_sales_presets_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/products:
+    get:
+      operationId: get_api_sales_products
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_sales_products
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/sales/products/{id}':
+    delete:
+      operationId: delete_api_sales_products_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    get:
+      operationId: get_api_sales_products_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    patch:
+      operationId: patch_api_sales_products_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/prompts:
+    get:
+      operationId: get_api_sales_prompts
+      summary: 读取当前工作区各环节的实际提示词与默认版本
+      responses:
+        '200':
+          description: 当前提示词列表
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, prompts]
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+                  prompts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SalesPrompt'
+        '500':
+          description: 提示词存储读取失败
+  '/api/sales/prompts/{id}':
+    put:
+      operationId: put_api_sales_prompts_id
+      summary: 保存指定环节提示词，传 null 恢复默认
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt, expectedVersion]
+              properties:
+                prompt:
+                  type: string
+                  nullable: true
+                  minLength: 1
+                  maxLength: 60000
+                expectedVersion:
+                  type: string
+                  minLength: 1
+      responses:
+        '200':
+          description: 已保存的提示词
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, prompt]
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+                  prompt:
+                    $ref: '#/components/schemas/SalesPrompt'
+        '400':
+          description: 提示词内容或版本参数无效
+        '404':
+          description: 未知提示词环节
+        '409':
+          description: 服务端版本已变化，保留草稿并重新读取版本后再保存
+        '500':
+          description: 提示词存储读写失败
+  /api/sales/script-analysis:
+    post:
+      operationId: post_api_sales_script_analysis
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/script-analysis/prompt:
+    get:
+      operationId: get_api_sales_script_analysis_prompt
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/script-normalize:
+    post:
+      operationId: post_api_sales_script_normalize
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/script-taxonomy:
+    get:
+      operationId: get_api_sales_script_taxonomy
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_sales_script_taxonomy
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/sales/script-taxonomy/{id}':
+    delete:
+      operationId: delete_api_sales_script_taxonomy_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    patch:
+      operationId: patch_api_sales_script_taxonomy_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/script-video:
+    post:
+      operationId: post_api_sales_script_video
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/scripts:
+    get:
+      operationId: get_api_sales_scripts
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_sales_scripts
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/sales/scripts/{id}':
+    delete:
+      operationId: delete_api_sales_scripts_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    patch:
+      operationId: patch_api_sales_scripts_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/studio-assets:
+    get:
+      operationId: get_api_sales_studio_assets
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/studio-bgms/builtin:
+    get:
+      operationId: get_api_sales_studio_bgms_builtin
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/studio-bgms/import:
+    post:
+      operationId: post_api_sales_studio_bgms_import
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/studio-sounds:
+    post:
+      operationId: post_api_sales_studio_sounds
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  '/api/sales/studio-sounds/{id}':
+    delete:
+      operationId: delete_api_sales_studio_sounds_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    patch:
+      operationId: patch_api_sales_studio_sounds_id
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/sales/summary:
+    post:
+      operationId: post_api_sales_summary
+      summary: 根据商品原图、核对文字及商品卖点转买点技能整理卖点文案
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SalesSummaryRequest'
+      responses:
+        '200':
+          description: 带来源的卖点、消费者买点、推荐文案及待确认信息
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, result, model, skillVersion]
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+                  result:
+                    $ref: '#/components/schemas/SalesSummaryResult'
+                  model:
+                    type: string
+                  skillVersion:
+                    type: string
+        '400':
+          description: 资料、图片来源、渠道配置无效或超过限制
+        '502':
+          description: 模型失败、超时或返回内容不完整；不自动重试或生成替代文案
+        '504':
+          description: 商品原图读取取消或超时
   /api/system/config:
     get:
       operationId: get_api_system_config
@@ -934,27 +1236,124 @@ paths:
   /api/system/video-downloads:
     post:
       operationId: post_api_system_video_downloads
+      description: 本机专用。要求应用写凭证和当前工作区的原生目录选择授权；生产环境禁止写服务器目录。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoDownloadRequest'
       responses:
         '200':
-          description: 沿用现有 JSON 或二进制响应
+          description: 已创建本机后台下载任务
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, jobId]
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+                  jobId:
+                    type: string
+        '400':
+          $ref: '#/components/responses/VideoDownloadError'
+        '401':
+          $ref: '#/components/responses/VideoDownloadError'
+        '403':
+          $ref: '#/components/responses/VideoDownloadError'
+        '429':
+          $ref: '#/components/responses/VideoDownloadError'
+        '503':
+          $ref: '#/components/responses/VideoDownloadError'
   '/api/system/video-downloads/{jobId}':
     get:
       operationId: get_api_system_video_downloads_jobId
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
       responses:
         '200':
-          description: 沿用现有 JSON 或二进制响应
+          description: 仅返回当前工作区所属任务
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoDownloadSnapshot'
+        '401':
+          $ref: '#/components/responses/VideoDownloadError'
+        '404':
+          $ref: '#/components/responses/VideoDownloadError'
+        '503':
+          $ref: '#/components/responses/VideoDownloadError'
   '/api/system/video-downloads/{jobId}/cancel':
     post:
       operationId: post_api_system_video_downloads_jobId_cancel
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
       responses:
         '200':
-          description: 沿用现有 JSON 或二进制响应
+          description: 已请求取消当前工作区所属任务
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+        '401':
+          $ref: '#/components/responses/VideoDownloadError'
+        '404':
+          $ref: '#/components/responses/VideoDownloadError'
+        '503':
+          $ref: '#/components/responses/VideoDownloadError'
   /api/system/video-downloads/pick-directory:
     post:
       operationId: post_api_system_video_downloads_pick_directory
       responses:
         '200':
-          description: 沿用现有 JSON 或二进制响应
+          description: 生产返回浏览器模式；本机返回选定目录和内存授权，授权限当前工作区、8 小时内有效
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [success, mode]
+                    properties:
+                      success:
+                        type: boolean
+                        enum: [true]
+                      mode:
+                        type: string
+                        enum: [browser]
+                  - type: object
+                    required: [success, mode, directory, directoryToken]
+                    properties:
+                      success:
+                        type: boolean
+                        enum: [true]
+                      mode:
+                        type: string
+                        enum: [local]
+                      directory:
+                        type: string
+                      directoryToken:
+                        type: string
+        '400':
+          $ref: '#/components/responses/VideoDownloadError'
+        '401':
+          $ref: '#/components/responses/VideoDownloadError'
+        '503':
+          $ref: '#/components/responses/VideoDownloadError'
   '/api/workshop/tasks/{taskId}/review':
     post:
       operationId: post_api_workshop_tasks_taskId_review
@@ -962,7 +1361,90 @@ paths:
         '200':
           description: 沿用现有 JSON 或二进制响应
 components:
+  responses:
+    VideoDownloadError:
+      description: 请求、授权或运行环境不允许此操作；error 含可展示的原因
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [success, error]
+            properties:
+              success:
+                type: boolean
+                enum: [false]
+              error:
+                type: string
   schemas:
+    SalesPrompt:
+      type: object
+      required: [id, title, description, prompt, defaultPrompt, version, customized]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        prompt:
+          type: string
+        defaultPrompt:
+          type: string
+        version:
+          type: string
+        customized:
+          type: boolean
+    VideoDownloadRequest:
+      type: object
+      required: [directory, directoryToken, items]
+      properties:
+        directory:
+          type: string
+        directoryToken:
+          type: string
+        concurrency:
+          type: integer
+          enum: [0, 100]
+          default: 100
+        items:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            required: [filename, url]
+            properties:
+              filename:
+                type: string
+                description: 单个安全视频文件名；同名已存在时拒绝覆盖
+              url:
+                type: string
+                description: 由后端视频代理安全策略校验的远程 URL
+    VideoDownloadSnapshot:
+      type: object
+      required: [jobId, directory, running, items]
+      properties:
+        jobId:
+          type: string
+        directory:
+          type: string
+        running:
+          type: boolean
+        items:
+          type: array
+          items:
+            type: object
+            required: [filename, url, status]
+            properties:
+              filename:
+                type: string
+              url:
+                type: string
+              status:
+                type: string
+                enum: [pending, running, success, failed]
+              error:
+                type: string
     CategoryLearningNote:
       type: object
       required: [id, kind, content, createdAt]
@@ -1070,579 +1552,6 @@ components:
               enum: [auto, low, medium, high, xhigh, max]
               default: medium
           additionalProperties: true
-    VideoSalesCatalogImage:
-      type: object
-      required: [index, url, role]
-      properties:
-        index:
-          type: integer
-          minimum: 0
-        url:
-          type: string
-          minLength: 1
-        role:
-          type: string
-          minLength: 1
-    VideoSalesWorkflowRequest:
-      type: "object"
-      required:
-        - "workflowVersion"
-        - "imageCatalog"
-        - "eligibleImageIndexes"
-      properties:
-        workflowVersion:
-          type: "integer"
-          enum:
-            - 3
-        imageCatalog:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/VideoSalesCatalogImage"
-          minItems: 1
-          maxItems: 40
-        eligibleImageIndexes:
-          type: "array"
-          items:
-            type: "integer"
-            minimum: 0
-          minItems: 1
-          maxItems: 40
-          uniqueItems: true
-        selectedColor:
-          type: "string"
-          maxLength: 200
-        model:
-          type: "string"
-        customBaseUrl:
-          type: "string"
-        customApiKey:
-          type: "string"
-        textProtocol:
-          type: "string"
-          enum:
-            - "auto"
-            - "openai"
-            - "gemini"
-            - "anthropic"
-          default: "auto"
-      description: "仅接受当前流程；保留商品目录原始编号，仅处理允许集合"
-    VideoSalesAnalyzeRequest:
-      type: "object"
-      required:
-        - "workflowVersion"
-        - "imageCatalog"
-        - "eligibleImageIndexes"
-        - "productName"
-        - "category"
-      properties:
-        workflowVersion:
-          type: "integer"
-          enum:
-            - 3
-        imageCatalog:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/VideoSalesCatalogImage"
-          minItems: 1
-          maxItems: 40
-        eligibleImageIndexes:
-          type: "array"
-          items:
-            type: "integer"
-            minimum: 0
-          minItems: 1
-          maxItems: 40
-          uniqueItems: true
-        selectedColor:
-          type: "string"
-          maxLength: 200
-        model:
-          type: "string"
-        customBaseUrl:
-          type: "string"
-        customApiKey:
-          type: "string"
-        textProtocol:
-          type: "string"
-          enum:
-            - "auto"
-            - "openai"
-            - "gemini"
-            - "anthropic"
-          default: "auto"
-        productName:
-          type: "string"
-          minLength: 1
-        brand:
-          type: "string"
-        category:
-          type: "string"
-          enum:
-            - "fashion"
-        productDescription:
-          type: "string"
-          maxLength: 4000
-      additionalProperties: false
-    VideoSalesAspectRatio:
-      type: "string"
-      enum:
-        - "9:16"
-        - "16:9"
-        - "3:4"
-        - "1:1"
-    VideoSalesScriptRequest:
-      type: "object"
-      required:
-        - "workflowVersion"
-        - "imageCatalog"
-        - "eligibleImageIndexes"
-        - "productName"
-        - "category"
-        - "targetDuration"
-        - "aspectRatio"
-      properties:
-        workflowVersion:
-          type: "integer"
-          enum:
-            - 3
-        imageCatalog:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/VideoSalesCatalogImage"
-          minItems: 1
-          maxItems: 40
-        eligibleImageIndexes:
-          type: "array"
-          items:
-            type: "integer"
-            minimum: 0
-          minItems: 1
-          maxItems: 40
-          uniqueItems: true
-        selectedColor:
-          type: "string"
-          maxLength: 200
-        model:
-          type: "string"
-        customBaseUrl:
-          type: "string"
-        customApiKey:
-          type: "string"
-        textProtocol:
-          type: "string"
-          enum:
-            - "auto"
-            - "openai"
-            - "gemini"
-            - "anthropic"
-          default: "auto"
-        productName:
-          type: "string"
-          minLength: 1
-          maxLength: 100
-        category:
-          type: "string"
-          enum:
-            - "fashion"
-        brand:
-          type: "string"
-        productDescription:
-          type: "string"
-          maxLength: 4000
-        productAnalysis:
-          type: "string"
-          maxLength: 8000
-        targetAudience:
-          type: "string"
-          maxLength: 200
-        targetDuration:
-          type: "integer"
-          minimum: 10
-          maximum: 120
-        aspectRatio:
-          $ref: "#/components/schemas/VideoSalesAspectRatio"
-        videoMode:
-          type: "string"
-          enum:
-            - "product_closeup"
-            - "graphic_montage"
-            - "scene_demo"
-            - "live_presenter"
-          default: "live_presenter"
-      additionalProperties: false
-    VideoSalesPlannedAsset:
-      type: "object"
-      required:
-        - "id"
-        - "kind"
-        - "label"
-        - "prompt"
-        - "required"
-      properties:
-        id:
-          type: "string"
-          minLength: 1
-        kind:
-          type: "string"
-          enum:
-            - "person"
-            - "face"
-            - "scene"
-            - "keyframe"
-        label:
-          type: "string"
-          minLength: 1
-        prompt:
-          type: "string"
-          minLength: 1
-        required:
-          type: "boolean"
-        referenceAssetIds:
-          type: "array"
-          items:
-            type: "string"
-            minLength: 1
-          uniqueItems: true
-        usesProduct:
-          type: "boolean"
-        productImageIndexes:
-          type: "array"
-          items:
-            type: "integer"
-            minimum: 0
-          uniqueItems: true
-          description: "使用商品的素材必须明确提供非空原始编号；旧计划缺失时需更新脚本"
-      description: "按需 1 至 4 张，依赖只能指向前序素材"
-      oneOf:
-        -
-          required:
-            - "usesProduct"
-            - "productImageIndexes"
-          properties:
-            usesProduct:
-              enum:
-                - true
-            productImageIndexes:
-              minItems: 1
-        -
-          properties:
-            usesProduct:
-              enum:
-                - false
-            productImageIndexes:
-              maxItems: 0
-    VideoSalesShot:
-      type: "object"
-      required:
-        - "shotId"
-        - "speechMode"
-        - "voiceover"
-      properties:
-        shotId:
-          type: "integer"
-          minimum: 1
-        type:
-          type: "string"
-        duration:
-          type: "integer"
-          minimum: 1
-        description:
-          type: "string"
-        camera:
-          type: "string"
-        speechMode:
-          type: "string"
-          enum:
-            - "on_camera"
-            - "voiceover"
-        voiceover:
-          type: "string"
-          minLength: 1
-        prompt:
-          type: "string"
-        imageIndex:
-          type: "integer"
-          minimum: 0
-        visualSource:
-          type: "string"
-          enum:
-            - "product_image"
-            - "ai_generate"
-        transition:
-          type: "string"
-          enum:
-            - "direct_concat"
-        selectionReason:
-          type: "string"
-    VideoSalesScript:
-      type: "object"
-      required:
-        - "id"
-        - "title"
-        - "totalDuration"
-        - "shots"
-        - "deliveryMode"
-        - "assets"
-      properties:
-        id:
-          type: "string"
-        title:
-          type: "string"
-        beat:
-          type: "string"
-          enum:
-            - "unbox"
-            - "lifestyle"
-            - "accessory"
-        deliveryMode:
-          type: "string"
-          enum:
-            - "single"
-        assets:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/VideoSalesPlannedAsset"
-          minItems: 1
-          maxItems: 4
-        totalDuration:
-          type: "integer"
-        shots:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/VideoSalesShot"
-          minItems: 1
-          maxItems: 40
-        seo:
-          type: "object"
-          additionalProperties: true
-        fullPrompt:
-          type: "string"
-      description: "仅当前服饰脚本，分镜为整段时间轴，总时长精确匹配请求"
-    VideoSalesSelectRequest:
-      type: "object"
-      required:
-        - "workflowVersion"
-        - "imageCatalog"
-        - "eligibleImageIndexes"
-        - "shots"
-      properties:
-        workflowVersion:
-          type: "integer"
-          enum:
-            - 3
-        imageCatalog:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/VideoSalesCatalogImage"
-          minItems: 1
-          maxItems: 40
-        eligibleImageIndexes:
-          type: "array"
-          items:
-            type: "integer"
-            minimum: 0
-          minItems: 1
-          maxItems: 40
-          uniqueItems: true
-        selectedColor:
-          type: "string"
-          maxLength: 200
-        model:
-          type: "string"
-        customBaseUrl:
-          type: "string"
-        customApiKey:
-          type: "string"
-        textProtocol:
-          type: "string"
-          enum:
-            - "auto"
-            - "openai"
-            - "gemini"
-            - "anthropic"
-          default: "auto"
-        shots:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/VideoSalesShot"
-          minItems: 1
-          maxItems: 40
-      additionalProperties: false
-    VideoSalesActualReference:
-      type: "object"
-      required:
-        - "id"
-        - "kind"
-        - "label"
-        - "url"
-      properties:
-        id:
-          type: "string"
-          minLength: 1
-        kind:
-          type: "string"
-          enum:
-            - "product"
-            - "person"
-            - "face"
-            - "scene"
-            - "keyframe"
-        label:
-          type: "string"
-          minLength: 1
-        url:
-          type: "string"
-          minLength: 1
-    VideoSalesFinalizeRequest:
-      type: "object"
-      required:
-        - "workflowVersion"
-        - "imageCatalog"
-        - "eligibleImageIndexes"
-        - "operation"
-        - "category"
-        - "shots"
-        - "actualReferences"
-        - "assets"
-        - "targetDuration"
-        - "aspectRatio"
-      properties:
-        workflowVersion:
-          type: "integer"
-          enum:
-            - 3
-        imageCatalog:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/VideoSalesCatalogImage"
-          minItems: 1
-          maxItems: 40
-        eligibleImageIndexes:
-          type: "array"
-          items:
-            type: "integer"
-            minimum: 0
-          minItems: 1
-          maxItems: 40
-          uniqueItems: true
-        selectedColor:
-          type: "string"
-          maxLength: 200
-        model:
-          type: "string"
-        customBaseUrl:
-          type: "string"
-        customApiKey:
-          type: "string"
-        textProtocol:
-          type: "string"
-          enum:
-            - "auto"
-            - "openai"
-            - "gemini"
-            - "anthropic"
-          default: "auto"
-        operation:
-          type: "string"
-          enum:
-            - "finalize"
-        category:
-          type: "string"
-          enum:
-            - "fashion"
-        shots:
-          type: "array"
-          items:
-            allOf:
-              -
-                $ref: "#/components/schemas/VideoSalesShot"
-              -
-                required:
-                  - "imageIndex"
-                  - "duration"
-          minItems: 1
-          maxItems: 40
-        actualReferences:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/VideoSalesActualReference"
-          minItems: 1
-          maxItems: 44
-        assets:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/VideoSalesPlannedAsset"
-          minItems: 1
-          maxItems: 4
-        targetDuration:
-          type: "integer"
-          minimum: 10
-          maximum: 120
-        aspectRatio:
-          $ref: "#/components/schemas/VideoSalesAspectRatio"
-        videoModel:
-          type: "string"
-        videoRefMode:
-          type: "string"
-        videoResolution:
-          type: "string"
-        brand:
-          type: "string"
-          maxLength: 100
-        productName:
-          type: "string"
-          maxLength: 100
-        productAnalysis:
-          type: "string"
-          maxLength: 8000
-        productDescription:
-          type: "string"
-          maxLength: 4000
-      additionalProperties: false
-    VideoSalesFinalizeResponse:
-      type: "object"
-      required:
-        - "success"
-        - "fullPrompt"
-        - "prompts"
-      properties:
-        success:
-          type: "boolean"
-          enum:
-            - true
-        model:
-          type: "string"
-        usage:
-          type: "object"
-          additionalProperties: true
-        fullPrompt:
-          type: "string"
-          minLength: 1
-        prompts:
-          type: "array"
-          items:
-            type: "object"
-            required:
-              - "shotId"
-              - "speechMode"
-              - "prompt"
-            properties:
-              shotId:
-                type: "integer"
-                minimum: 1
-              speechMode:
-                type: "string"
-                enum:
-                  - "on_camera"
-                  - "voiceover"
-              prompt:
-                type: "string"
-                minLength: 1
-          minItems: 1
-        languageWarnings:
-          type: "array"
-          items:
-            type: "string"
     CollectVariantMetadata:
       type: object
       required: [version, variants]
@@ -1674,3 +1583,185 @@ components:
           type: string
         selectedVariantId:
           type: string
+    SalesSummaryImage:
+      type: object
+      required: [index, url]
+      properties:
+        index:
+          type: integer
+          minimum: 0
+          maximum: 99999
+        url:
+          type: string
+          minLength: 1
+          maxLength: 8192
+    SalesSummaryRequest:
+      type: object
+      required: [productName, brand, facts, referenceImages, textImages, model]
+      description: 去重后最多16张原图、合计20MiB；核对文字合计最多60000字。
+      properties:
+        productName:
+          type: string
+          maxLength: 2000
+        brand:
+          type: string
+          maxLength: 500
+        facts:
+          type: string
+          maxLength: 20000
+        referenceImages:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/SalesSummaryImage'
+        textImages:
+          type: array
+          maxItems: 16
+          items:
+            allOf:
+              - $ref: '#/components/schemas/SalesSummaryImage'
+              - type: object
+                required: [text]
+                properties:
+                  text:
+                    type: string
+                    minLength: 1
+                    maxLength: 40000
+        model:
+          type: string
+          minLength: 1
+          maxLength: 200
+        textProtocol:
+          type: string
+          enum: [auto, openai, gemini, anthropic]
+        customBaseUrl:
+          type: string
+          maxLength: 8192
+        customApiKey:
+          type: string
+          maxLength: 8192
+        apiFormat:
+          type: string
+          enum: [openai-responses]
+        allowInsecureHttp:
+          type: boolean
+    SalesSummaryResult:
+      type: object
+      required: [summary, points, copy, conflicts, questions]
+      properties:
+        cautions:
+          type: array
+          maxItems: 6
+          default: []
+          description: 来自商品资料的关键使用与养护限制；补足已收录标签中的明确限制。
+          items:
+            type: string
+            minLength: 1
+            maxLength: 1000
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        points:
+          type: array
+          maxItems: 6
+          items:
+            type: object
+            required: [feature, benefit, expression, sources]
+            properties:
+              feature:
+                type: string
+                minLength: 1
+                maxLength: 1000
+              benefit:
+                type: string
+                minLength: 1
+                maxLength: 1000
+              expression:
+                type: string
+                minLength: 1
+                maxLength: 1000
+              sources:
+                type: array
+                minItems: 1
+                maxItems: 16
+                items:
+                  type: string
+        copy:
+          type: string
+          maxLength: 4000
+        copyPointIndexes:
+          type: array
+          maxItems: 3
+          uniqueItems: true
+          default: []
+          description: 成稿生成时参考的买点，使用 points 中从 1 开始的编号；旧结果默认空数组。
+          items:
+            type: integer
+            minimum: 1
+            maximum: 6
+        conflicts:
+          type: array
+          maxItems: 6
+          items:
+            type: string
+            minLength: 1
+            maxLength: 1000
+        questions:
+          type: array
+          maxItems: 3
+          items:
+            type: string
+            minLength: 1
+            maxLength: 1000
+    SalesOCRRequest:
+      type: object
+      required: [imageUrl]
+      properties:
+        imageUrl:
+          type: string
+          minLength: 1
+          maxLength: 8192
+        force:
+          type: boolean
+          default: false
+    SalesOCRResult:
+      type: object
+      required: [engine, width, height, text, lines, cached]
+      properties:
+        engine:
+          type: string
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        text:
+          type: string
+          maxLength: 100000
+        cached:
+          type: boolean
+        lines:
+          type: array
+          maxItems: 5000
+          items:
+            type: object
+            required: [box, text, confidence]
+            properties:
+              box:
+                type: array
+                minItems: 4
+                maxItems: 4
+                items:
+                  type: array
+                  minItems: 2
+                  maxItems: 2
+                  items:
+                    type: number
+              text:
+                type: string
+              confidence:
+                type: number
+                minimum: 0
+                maximum: 1

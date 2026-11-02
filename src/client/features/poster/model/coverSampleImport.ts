@@ -1,8 +1,8 @@
-export const COVER_SAMPLE_MAX_IMAGES = 10;
+export const COVER_SAMPLE_MAX_IMAGES = 100;
 export const COVER_SAMPLE_MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 export const COVER_SAMPLE_MAX_ZIP_BYTES = 32 * 1024 * 1024;
-export const COVER_SAMPLE_MAX_ENTRIES = 64;
-export const COVER_SAMPLE_MAX_EXPANDED_BYTES = COVER_SAMPLE_MAX_IMAGE_BYTES * COVER_SAMPLE_MAX_IMAGES;
+export const COVER_SAMPLE_MAX_ENTRIES = 512;
+export const COVER_SAMPLE_MAX_EXPANDED_BYTES = 200 * 1024 * 1024;
 export const COVER_SAMPLE_MAX_RATIO = 80;
 
 export interface CoverSampleDraft {
@@ -73,6 +73,7 @@ export async function importCoverSamples(
   if (collected.length === 0) {
     return { drafts: [], skipped, error: skipped[0] ? `没有可投喂的封面：${skipped[0].reason}` : '没有可投喂的封面图片' };
   }
+  if (collected.reduce((total, item) => total + item.file.size, 0) > COVER_SAMPLE_MAX_EXPANDED_BYTES) return { drafts: [], skipped, error: '本批图片总量超过200MB，请分批投喂' };
   if (already + collected.length > COVER_SAMPLE_MAX_IMAGES) {
     return { drafts: [], skipped, error: `一次最多投喂 ${COVER_SAMPLE_MAX_IMAGES} 张封面，请减少后再投喂` };
   }

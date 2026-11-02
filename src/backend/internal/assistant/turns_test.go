@@ -24,7 +24,7 @@ func TestThreadTurnsRejectsMissingAndDeleted(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = db.Close()
-	handler := ThreadTurns(config.Config{DatabaseURL: "file:" + dbPath, Upstream: "http://127.0.0.1:1"})
+	handler := ThreadTurns(config.Config{DatabaseURL: "file:" + dbPath})
 	missing := httptest.NewRecorder()
 	handler.ServeHTTP(missing, httptest.NewRequest(http.MethodGet, "/api/assistant/threads//turns", nil))
 	if missing.Code != http.StatusBadRequest || !strings.Contains(missing.Body.String(), "缺少 threadId") {
@@ -41,19 +41,19 @@ func TestThreadTurnsRejectsMissingAndDeleted(t *testing.T) {
 
 func TestRunsMarkDeprecated(t *testing.T) {
 	all := httptest.NewRecorder()
-	AllRuns(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(all, httptest.NewRequest(http.MethodGet, "/api/assistant/runs", nil))
+	AllRuns(config.Config{}).ServeHTTP(all, httptest.NewRequest(http.MethodGet, "/api/assistant/runs", nil))
 	if all.Header().Get("Deprecation") != "true" || !strings.Contains(all.Header().Get("Link"), "/api/assistant/threads/:threadId/turns") {
 		t.Fatalf("all runs headers %v", all.Header())
 	}
 	missing := httptest.NewRecorder()
-	ThreadRuns(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(missing, httptest.NewRequest(http.MethodGet, "/api/assistant/threads//runs", nil))
+	ThreadRuns(config.Config{}).ServeHTTP(missing, httptest.NewRequest(http.MethodGet, "/api/assistant/threads//runs", nil))
 	if missing.Code != http.StatusBadRequest || missing.Header().Get("Deprecation") != "true" {
 		t.Fatalf("thread runs %d %v", missing.Code, missing.Header())
 	}
 }
 
 func TestTurnSnapshotRequiresID(t *testing.T) {
-	handler := TurnSnapshot(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := TurnSnapshot(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/assistant/turns//snapshot", nil))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "缺少 turnId") {

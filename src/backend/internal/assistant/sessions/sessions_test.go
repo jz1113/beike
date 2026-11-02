@@ -15,7 +15,7 @@ import (
 
 func TestDeleteSessionRequiresID(t *testing.T) {
 	response := httptest.NewRecorder()
-	DeleteSession(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/api/assistant/sessions", nil))
+	DeleteSession(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/api/assistant/sessions", nil))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "缺少 id") {
 		t.Fatalf("status %d body %s", response.Code, response.Body.String())
 	}
@@ -37,7 +37,7 @@ func TestSaveSessionsSkipsEmptyDefault(t *testing.T) {
 	}
 	_ = db.Close()
 	response := httptest.NewRecorder()
-	SaveSessions(config.Config{DatabaseURL: "file:" + dbPath, Upstream: "http://127.0.0.1:1"}).ServeHTTP(
+	SaveSessions(config.Config{DatabaseURL: "file:" + dbPath}).ServeHTTP(
 		response, httptest.NewRequest(http.MethodPut, "/api/assistant/sessions", strings.NewReader(`{"sessions":[{"id":"new","title":"新对话","messages":[]}]}`)))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "拒绝用空默认会话覆盖已有对话") {
 		t.Fatalf("status %d body %s", response.Code, response.Body.String())
@@ -120,7 +120,7 @@ func threadMessages(t *testing.T, dbPath string) string {
 func putSessions(t *testing.T, dbPath, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	response := httptest.NewRecorder()
-	SaveSessions(config.Config{DatabaseURL: "file:" + dbPath, Upstream: "http://127.0.0.1:1"}).ServeHTTP(
+	SaveSessions(config.Config{DatabaseURL: "file:" + dbPath}).ServeHTTP(
 		response, httptest.NewRequest(http.MethodPut, "/api/assistant/sessions", strings.NewReader(body)))
 	return response
 }

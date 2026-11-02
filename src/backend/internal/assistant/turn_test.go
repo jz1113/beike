@@ -11,14 +11,14 @@ import (
 
 func TestChatMarksDeprecated(t *testing.T) {
 	response := httptest.NewRecorder()
-	Chat(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/assistant/chat", strings.NewReader(`{}`)))
+	Chat(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/assistant/chat", strings.NewReader(`{}`)))
 	if response.Code != http.StatusBadRequest || response.Header().Get("Deprecation") != "true" || !strings.Contains(response.Header().Get("Link"), "/api/assistant/turn/start") {
 		t.Fatalf("chat %d %s %v", response.Code, response.Body.String(), response.Header())
 	}
 }
 
 func TestAssistantTurnValidation(t *testing.T) {
-	cfg := config.Config{Upstream: "http://127.0.0.1:1"}
+	cfg := config.Config{}
 	start := StartTurn(cfg)
 	missing := httptest.NewRecorder()
 	start.ServeHTTP(missing, httptest.NewRequest(http.MethodPost, "/api/assistant/turn/start", strings.NewReader(`{}`)))

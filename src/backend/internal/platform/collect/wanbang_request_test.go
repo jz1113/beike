@@ -197,3 +197,25 @@ func TestWanbangTransportTimeoutBudget(t *testing.T) {
 		t.Fatalf("status=%d calls=%d body=%s", result.Status, calls, mustJSON(t, result.Body))
 	}
 }
+
+func TestWanbangDetailRequestAllowsSlowResponsesAndHonorsCallerDeadline(t *testing.T) {
+	for _, shorter := range []bool{false, true} {
+		ctx := context.Background()
+		if shorter {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
+			defer cancel()
+		}
+		client := &http.Client{Transport: collectRoundTripper(func(r *http.Request) (*http.Response, error) {
+			deadline, ok := r.Context().Deadline()
+			remaining := time.Until(deadline)
+			if !ok || (!shorter && remaining < 50*time.Second) || (shorter && remaining > 2*time.Second) {
+				t.Fatalf("unexpected request deadline: %s (shorter=%v)", remaining, shorter)
+			}
+			return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"item":{"title":"ok"}}`))}, nil
+		})}
+		if _, _, err := requestWanbang(ctx, client, "https://api-gw.onebound.cn/jd/item_get_pro/"); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

@@ -37,4 +37,11 @@ describe('image task query routing', () => {
       headers: expect.objectContaining({ 'x-custom-api-key': 'selected-key' }),
     }));
   });
+
+  it('preserves a selected channel independently from the upstream model and forwards cancellation', async () => {
+    const signal = new AbortController().signal;
+    await pollGenerationTask('task', 'video', 'doubao-seedance-2.5', { modelSelection: 'channel-b', signal });
+    expect(getGatewayClientHeaders).toHaveBeenCalledWith('channel-b');
+    expect(apiFetch).toHaveBeenCalledWith('/api/generate/video?taskId=task&model=doubao-seedance-2.5', expect.objectContaining({ signal }));
+  });
 });

@@ -128,7 +128,7 @@ func storageAccess(cfg config.Config, r *http.Request) (string, int, string) {
 }
 
 func legacyMediaAllowed(cfg config.Config, r *http.Request, workspace, rel string) bool {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return false
 	}

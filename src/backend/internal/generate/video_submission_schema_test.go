@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/database/migrate"
 )
@@ -23,6 +24,10 @@ func TestNestedVideoPromptPersistsBeforeUpstream(t *testing.T) {
 		if json.NewDecoder(r.Body).Decode(&body) != nil {
 			t.Errorf("upstream body")
 			http.Error(w, "bad", http.StatusBadRequest)
+			return
+		}
+		if r.URL.Path == "/seedance/v3/assets/create" {
+			_, _ = w.Write([]byte(`{"code":0,"msg":"success","data":{"assetId":"asset-front-1","status":"Active"}}`))
 			return
 		}
 		calls.Add(1)
@@ -45,9 +50,9 @@ func TestNestedVideoPromptPersistsBeforeUpstream(t *testing.T) {
 		_, _ = fmt.Fprintf(w, `{"task_id":"upstream-%d"}`, calls.Load())
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 
 	root, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
 	if err != nil {

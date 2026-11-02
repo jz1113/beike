@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 func runCopywriting(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]any) {
@@ -21,8 +21,8 @@ func runCopywriting(cfg config.Config, w http.ResponseWriter, r *http.Request, p
 		map[string]any{"role": "system", "content": copySystemPrompt},
 		map[string]any{"role": "user", "content": prompt},
 	}
-	text, data, status, err := ChatCompletionJSON(r.Context(), base, key, model, messages, 0.7, 18*time.Second)
-	parsed := DecodeObject(text)
+	text, data, status, err := gateway.ChatCompletionJSON(r.Context(), base, key, model, messages, 0.7, 18*time.Second)
+	parsed := gateway.DecodeObject(text)
 	if err != nil || status >= 300 || parsed == nil {
 		if !TextFallbackAllowed(r.Context(), model) {
 			httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "文案模型调用失败，请检查模型配置后重试"})
@@ -85,7 +85,7 @@ func copyCredentials(cfg config.Config, r *http.Request, payload map[string]any)
 	if base == "" {
 		base = ImageDefaultBase()
 	}
-	return system.NormalizeGatewayBaseURL(base), key
+	return gateway.NormalizeGatewayBaseURL(base), key
 }
 
 func formatCleanContent(raw, fallback string) string {

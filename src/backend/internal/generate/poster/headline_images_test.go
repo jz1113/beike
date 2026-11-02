@@ -11,7 +11,8 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/generate"
+	"beike.local/cloud/src/backend/internal/gateway"
+
 	"beike.local/cloud/src/backend/internal/httpx"
 )
 
@@ -42,9 +43,9 @@ func TestHeadlineImagesReadLocalUploadsWithoutHTTP(t *testing.T) {
 }
 
 func TestHeadlineImagePreflightIncludesRetailHeaders(t *testing.T) {
-	old := generate.ModelHTTP
-	defer func() { generate.ModelHTTP = old }()
-	generate.ModelHTTP = func() *http.Client {
+	old := gateway.ModelHTTP
+	defer func() { gateway.ModelHTTP = old }()
+	gateway.ModelHTTP = func() *http.Client {
 		return &http.Client{Transport: headlineImageTransport(func(r *http.Request) (*http.Response, error) {
 			if r.Header.Get("Referer") != "https://www.taobao.com/" || r.Header.Get("User-Agent") == "" {
 				t.Error("retail image request omitted anti-hotlink headers")

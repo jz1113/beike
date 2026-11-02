@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 func runLayer(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]any) {
@@ -31,7 +31,7 @@ func runLayer(cfg config.Config, w http.ResponseWriter, r *http.Request, payload
 		"model": model, "image": payload["image"], "prompt": payload["prompt"], "size": size,
 		"layer_decomposition": true, "output_format": "png", "response_format": "url", "watermark": false,
 	}
-	status, raw, err := PostModel(r.Context(), http.MethodPost, base+"/images/generations", apiKey, body, 300*time.Second)
+	status, raw, err := gateway.PostModel(r.Context(), http.MethodPost, base+"/images/generations", apiKey, body, 300*time.Second)
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "图层拆分失败；请核对平台任务记录后再重试"})
 		return
@@ -79,7 +79,7 @@ func layerTarget(cfg config.Config, r *http.Request, payload map[string]any) (st
 	}
 	base := ImageDefaultBase()
 	if clientBase != "" {
-		base = system.NormalizeGatewayBaseURL(clientBase)
+		base = gateway.NormalizeGatewayBaseURL(clientBase)
 	}
 	model := strings.TrimSpace(os.Getenv("LAYER_GATEWAY_MODEL"))
 	if model == "" {

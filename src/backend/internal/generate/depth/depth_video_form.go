@@ -47,10 +47,6 @@ func depthVideoForm(cfg config.Config, w http.ResponseWriter, r *http.Request) {
 		writeDepthVideoTooLarge(w)
 		return
 	}
-	if status, message := depthVideoPreAccept(cfg, file.data); status != 0 {
-		httpx.WriteJSON(w, status, map[string]any{"success": false, "error": message})
-		return
-	}
 	operation := strings.TrimSpace(r.Header.Get("x-idempotency-key"))
 	if operation == "" {
 		operation = strings.TrimSpace(file.fields["clientTaskId"])

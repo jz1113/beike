@@ -1,11 +1,12 @@
 package assets
 
 import (
-	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 )
 
 func assetPerformanceHandler(cfg config.Config) http.HandlerFunc {
@@ -15,7 +16,7 @@ func assetPerformanceHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "资产类型不正确", "code": "bad_request"})
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "服务器内部错误", "code": "internal_error"})
 			return

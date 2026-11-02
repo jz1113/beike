@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestBusinessHTTPBodyProtocolReachesNativeCall(t *testing.T) {
@@ -19,10 +20,10 @@ func TestBusinessHTTPBodyProtocolReachesNativeCall(t *testing.T) {
 		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"{\"productFingerprint\":\"台灯\",\"prompts\":[{\"shot_no\":1,\"prompt\":\"桌面近景\"}],\"title\":\"台灯实用体验分享\",\"content\":\"提供桌面局部照明。\"}"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":2}}`))
 	}))
 	defer server.Close()
-	priorModel, priorCanvas := ModelHTTP, canvasHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
+	priorModel, priorCanvas := gateway.ModelHTTP, canvasHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
 	canvasHTTP = func() *http.Client { return server.Client() }
-	defer func() { ModelHTTP, canvasHTTP = priorModel, priorCanvas }()
+	defer func() { gateway.ModelHTTP, canvasHTTP = priorModel, priorCanvas }()
 	cfg := config.Config{NodeEnv: "development"}
 	cases := []struct {
 		name    string

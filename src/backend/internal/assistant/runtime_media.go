@@ -1,6 +1,7 @@
 package assistant
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"beike.local/cloud/src/backend/internal/library"
 	"beike.local/cloud/src/backend/internal/platform/storage"
@@ -69,7 +71,7 @@ func (box *toolBox) inspectVideo(args map[string]any) string {
 	body, _ := json.Marshal(map[string]any{
 		"success": true, "message": "已读取视频规格", "duration": probe.Duration,
 		"width": probe.Width, "height": probe.Height, "fps": probe.FPS,
-		"frameCount": frames, "aspectRatio": ratio, "filename": name,
+		"hasAudio": probe.HasAudio, "frameCount": frames, "aspectRatio": ratio, "filename": name,
 	})
 	return string(body)
 }
@@ -110,33 +112,49 @@ func (box *toolBox) extractFrames(video string, start, end float64, count int, s
 	if !ok {
 		return toolJSON(false, "ffmpeg 不可用")
 	}
+	probe, err := system.ProbeVideo(box.cfg.Root, path)
+	if err != nil || probe.Duration <= 0 {
+		return toolJSON(false, "无法读取视频时长")
+	}
+	if storyboard || end > probe.Duration {
+		end = probe.Duration
+	}
+	if start < 0 || start >= end {
+		return toolJSON(false, "抽帧时间范围超出视频时长")
+	}
 	dir, err := os.MkdirTemp("", "beike-frames-")
 	if err != nil {
 		return toolJSON(false, err.Error())
 	}
 	defer os.RemoveAll(dir)
 	pattern := filepath.Join(dir, "frame-%02d.jpg")
-	filter := fmt.Sprintf("fps=%d/%g", count, maxFloat(end-start, 1))
+	interval := (end - start) / float64(count)
+	filter := fmt.Sprintf("fps=%.9f:start_time=0,scale=w='min(1280,iw)':h='min(1280,ih)':force_original_aspect_ratio=decrease", 1/interval)
 	args := []string{"-y"}
 	if start > 0 {
 		args = append(args, "-ss", fmt.Sprint(start))
 	}
-	if end > start {
-		args = append(args, "-to", fmt.Sprint(end))
+	args = append(args, "-i", path, "-t", fmt.Sprint(end-start), "-an", "-vf", filter, "-frames:v", strconv.Itoa(count), pattern)
+	ctx := box.ctx
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	args = append(args, "-i", path, "-vf", filter, "-frames:v", strconv.Itoa(count), pattern)
-	if err := exec.Command(binary, args...).Run(); err != nil {
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	if err := exec.CommandContext(ctx, binary, args...).Run(); err != nil {
 		return toolJSON(false, "抽帧失败")
 	}
 	var images []string
 	var urls []string
+	var times []float64
+	extractionID := randomID()
 	for i := 1; i <= count; i++ {
 		file := filepath.Join(dir, fmt.Sprintf("frame-%02d.jpg", i))
 		raw, err := os.ReadFile(file)
 		if err != nil {
 			continue
 		}
-		rel := storage.WorkspaceKey(fmt.Sprintf("assistant-attachments/frame-%d.jpg", i), box.workspace)
+		rel := storage.WorkspaceKey(fmt.Sprintf("assistant-attachments/%s-frame-%d.jpg", extractionID, i), box.workspace)
 		dest := storage.SafeWithin(storage.ResolveRoot(), rel)
 		if dest == "" {
 			continue
@@ -146,11 +164,15 @@ func (box *toolBox) extractFrames(video string, start, end float64, count int, s
 			continue
 		}
 		urls = append(urls, "/storage/"+rel)
-		if len(images) < 20 && len(strings.Join(images, "")) < 5_000_000 {
+		times = append(times, start+float64(i-1)*interval)
+		if len(images) < 24 && len(strings.Join(images, ""))+base64.StdEncoding.EncodedLen(len(raw)) < 8_000_000 {
 			images = append(images, "data:image/jpeg;base64,"+base64.StdEncoding.EncodeToString(raw))
 		}
 	}
-	body := map[string]any{"success": true, "message": "已抽取画面", "frameUrls": urls, "_visualImages": images}
+	if len(urls) == 0 || len(images) == 0 {
+		return toolJSON(false, "未能读取视频画面，请确认视频可播放后重试")
+	}
+	body := map[string]any{"success": true, "message": "已抽取画面（时间为采样位置，非精确切镜点）", "frameUrls": urls, "sampleTimes": times, "duration": probe.Duration, "_visualImages": images}
 	if storyboard {
 		body["contactSheetUrl"] = firstOrEmpty(urls)
 		body["sampleFrames"] = urls
@@ -167,8 +189,11 @@ func (box *toolBox) localVideo(reference string) (string, string, error) {
 		return "", "", fmt.Errorf("缺少 video_url")
 	}
 	if strings.HasPrefix(reference, "/storage/") {
-		rel := strings.TrimPrefix(reference, "/storage/")
-		path := storage.SafeWithin(storage.ResolveRoot(), rel)
+		rel := strings.TrimPrefix(strings.SplitN(strings.SplitN(reference, "?", 2)[0], "#", 2)[0], "/storage/")
+		if !storage.WorkspaceRel(rel, box.workspace, true) {
+			return "", "", fmt.Errorf("视频不在当前工作区中")
+		}
+		path := storage.StoredFile(rel)
 		if path == "" {
 			return "", "", fmt.Errorf("视频不在工作区存储中")
 		}
@@ -194,19 +219,17 @@ func floatArg(args map[string]any, keys ...string) float64 {
 		switch value := args[key].(type) {
 		case float64:
 			return value
+		case int:
+			return float64(value)
+		case json.Number:
+			parsed, _ := value.Float64()
+			return parsed
 		case string:
 			parsed, _ := strconv.ParseFloat(value, 64)
 			return parsed
 		}
 	}
 	return 0
-}
-
-func maxFloat(value, floor float64) float64 {
-	if value < floor {
-		return floor
-	}
-	return value
 }
 
 func firstOrEmpty(values []string) string {
@@ -229,7 +252,7 @@ func visualFollowup(raw string) any {
 	total := 0
 	for _, item := range images {
 		text, _ := item.(string)
-		if text == "" || len(content) >= 20 || total+len(text) > 5_000_000 {
+		if text == "" || len(content) >= 24 || total+len(text) > 8_000_000 {
 			continue
 		}
 		total += len(text)

@@ -8,20 +8,23 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, taskID string) {
-	if body, status, ok := savedTerminal(cfg, r, taskID, "视频任务失败"); ok {
+	if !authorizeTaskPoll(cfg, w, r, "video", taskID) {
+		return
+	}
+	if body, status, ok := savedTerminal(cfg, r, "video", taskID, "视频任务失败"); ok {
 		httpx.WriteJSON(w, status, body)
 		return
 	}
 	base, apiKey := pollCredentials(cfg, r)
-	root := strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")
+	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
 	urls := videoPollURLs(root, taskID, r.URL.Query().Get("model"), r.Header.Get("x-custom-protocol"))
 	for _, endpoint := range urls {
-		status, raw, err := PostModel(r.Context(), http.MethodGet, endpoint, apiKey, nil, 5*time.Second)
+		status, raw, err := gateway.PostModel(r.Context(), http.MethodGet, endpoint, apiKey, nil, 5*time.Second)
 		if err != nil || status < 200 || status >= 300 {
 			continue
 		}
@@ -33,11 +36,11 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 			continue
 		}
 		parsed := readVideoPoll(data)
-		settleUnknownVideoTerminal(cfg, r, taskID, parsed, EncodeUsage(NormalizeUsage(data)))
-		httpx.WriteJSON(w, http.StatusOK, polledTaskBody(r.Context(), cfg, taskID, parsed, data))
+		settleUnknownVideoTerminal(cfg, r, taskID, parsed, gateway.EncodeUsage(gateway.NormalizeUsage(data)))
+		httpx.WriteJSON(w, http.StatusOK, polledTaskBody(r.Context(), cfg, scopeOf(r, "video"), taskID, parsed, data))
 		return
 	}
-	writeProbeMiss(cfg, w, r, taskID, "视频任务失败", "暂时无法查询云端视频任务状态")
+	writeProbeMiss(cfg, w, r, "video", taskID, "视频任务失败", "暂时无法查询云端视频任务状态")
 }
 
 func videoPollURLs(base, taskID, model, protocol string) []string {
@@ -66,9 +69,9 @@ func videoPollSkipped(data map[string]any) bool {
 func videoErrorMessage(data map[string]any) string {
 	switch err := data["error"].(type) {
 	case string:
-		return strings.TrimSpace(err)
+		return gateway.PresentUpstreamError(err)
 	case map[string]any:
-		return firstString(err, "message")
+		return gateway.PresentUpstreamError(firstString(err, "message"))
 	default:
 		return ""
 	}
@@ -88,7 +91,7 @@ func readVideoPoll(data map[string]any) pollParsed {
 	if message := videoErrorMessage(data); message != "" {
 		raw := strings.ToUpper(firstString(data, "task_status", "status", "state"))
 		if raw == "" || isFailure(raw) {
-			return pollParsed{status: "FAILURE", reason: message, progress: "0%"}
+			return pollParsed{status: "FAILURE", reason: gateway.PresentVideoError(message), progress: "0%"}
 		}
 	}
 	task := data
@@ -130,6 +133,7 @@ func readVideoPoll(data map[string]any) pollParsed {
 		if reason == "" {
 			reason = "视频生成失败"
 		}
+		reason = gateway.PresentVideoError(reason)
 		result = ""
 	} else if result != "" {
 		state = "SUCCESS"

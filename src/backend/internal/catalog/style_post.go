@@ -1,7 +1,6 @@
 package catalog
 
 import (
-	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,6 +9,8 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 )
 
 func styleRecipesPostHandler(cfg config.Config) http.HandlerFunc {
@@ -32,7 +33,7 @@ func styleRecipesPostHandler(cfg config.Config) http.HandlerFunc {
 }
 
 func seedOfficialStyles(cfg config.Config, w http.ResponseWriter, r *http.Request) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeStyleFailure(w)
 		return
@@ -62,7 +63,7 @@ func restoreStyleRecipe(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "code": "invalid_id", "error": "缺少官方架构 id"})
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeStyleFailure(w)
 		return
@@ -93,7 +94,7 @@ func createStyleRecipe(cfg config.Config, w http.ResponseWriter, r *http.Request
 		httpx.WriteJSON(w, status, map[string]any{"error": message})
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeStyleFailure(w)
 		return

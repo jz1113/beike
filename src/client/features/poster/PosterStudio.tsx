@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { CoverTemplateLibrary } from './components/CoverTemplateLibrary';
+
+import { useState } from 'react';
 import type { CoverMemorySample } from '@shared/contracts/coverMemory';
 import { WandSparkles } from 'lucide-react';
 import { PosterPreviewDialog } from './components/PosterPreviewDialog';
@@ -26,25 +28,33 @@ interface Props {
 
 export default function PosterStudio({ onBack, onOpenSettings }: Props) {
   const studio = usePosterProduction();
-  const [isGalleryMode, setIsGalleryMode] = useState(false);
+  const [view, setView] = useState<'generate' | 'templates'>('generate');
+  const [templateVersion, setTemplateVersion] = useState(0);
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [onlyFailedResults, setOnlyFailedResults] = useState(false);
   const [isNewBatchConfirming, setIsNewBatchConfirming] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [isFeedOpen, setIsFeedOpen] = useState(false);
   const [isRulesOpen, setIsRulesOpen] = useState(false);
-  const memory = useCoverMemory(true);
+  const memory = useCoverMemory(isMemoryOpen);
   const vision = useCoverVisionModels();
-  const feed = useCoverSampleFeed(() => memory.reload());
-  const refreshMemory = memory.refresh;
-  useEffect(() => { if (!studio.isRunning) void refreshMemory(); }, [studio.isRunning, refreshMemory]);
+  const feed = useCoverSampleFeed(async () => { setTemplateVersion(value => value + 1); });
+
   const adoptedCount = memory.memory.entries.filter((entry) => entry.status === 'adopted').length;
   const pendingMemoryCount = memory.memory.entries.filter((entry) => entry.status === 'pending').length;
   const isBusy = !studio.isReady || studio.isRunning || studio.isExporting || studio.isRestoring || studio.isImporting;
   const pendingCount = studio.items.filter((item) => item.status === 'idle' || item.status === 'interrupted').length;
-  const startBatch = () => {
-    setIsGalleryMode(true);
-    void studio.runBatch();
+  const startBatch = () => { setView('generate'); void studio.runBatch(); };
+  const retryItem = (item: PosterItem, index: number) => { void studio.runItem(item, index); };
+  const useTemplate = (id: string, title: string) => {
+    if (studio.isRunning || studio.isRestoring || studio.isImporting || studio.isExporting) return;
+    studio.selectTemplate(id);
+    setTemplateTitle(title);
+    setView('generate');
   };
+  const samples = memory.memory.samples.flatMap(sample => memory.memory.entries.some(entry => entry.sampleId === sample.id && entry.status === 'adopted' && entry.source === 'sample')
+    ? [{ id: sample.id, title: sample.title || '封面样张', grouped: sample.imageUrls.length > 1 }] : []);
   const acceptFeedFiles = async (files: File[]) => {
     setIsFeedOpen(true);
     await feed.addFiles(files);
@@ -52,8 +62,10 @@ export default function PosterStudio({ onBack, onOpenSettings }: Props) {
   const submitFeed = async () => {
     const finished = await feed.start(vision.selectionId, vision.effort);
     if (finished) {
+      feed.clearJobs();
       setIsFeedOpen(false);
-      setIsMemoryOpen(true);
+      setView('templates');
+      setTemplateVersion(value => value + 1);
     }
   };
   const retryFailedSample = async (sample: CoverMemorySample) => {
@@ -99,7 +111,7 @@ export default function PosterStudio({ onBack, onOpenSettings }: Props) {
     studio.setPasteText('');
     studio.setImportMode('file');
     studio.setIsDraggingFile(false);
-    setIsGalleryMode(false);
+    setView('generate');
     setIsNewBatchConfirming(false);
   };
 
@@ -131,14 +143,12 @@ export default function PosterStudio({ onBack, onOpenSettings }: Props) {
           historyCount={studio.historyBatches.length}
           isNewBatchConfirming={isNewBatchConfirming}
           isFeeding={feed.busy}
-          adoptedCount={adoptedCount}
-          pendingMemoryCount={pendingMemoryCount}
           onOpenSettings={studio.openProductionSettings}
           onOpenRules={() => setIsRulesOpen(true)}
-          onOpenMemory={() => { setIsMemoryOpen(true); void memory.refresh(); }}
+          onOpenMemory={() => setView('templates')}
           onOpenFeed={() => setIsFeedOpen(true)}
           onOpenHistory={() => setIsHistoryOpen(true)}
-          onRetryFailed={() => void studio.runBatch(true)}
+          onRetryFailed={() => { setView('generate'); void studio.runBatch(true); }}
           onExport={() => void studio.exportZip()}
           onStartBatch={startBatch}
           onStop={studio.stopBatch}
@@ -147,7 +157,7 @@ export default function PosterStudio({ onBack, onOpenSettings }: Props) {
           onConfirmNewBatch={() => { void confirmNewBatch(); }}
         />
 
-        <main className={`mx-auto w-full ${isGalleryMode ? 'max-w-none' : 'max-w-[1120px]'} space-y-5 pb-10 pt-1 sm:pt-2`}>
+        <main className={`mx-auto w-full max-w-[1280px] space-y-5 pb-10 pt-1 sm:pt-2`}>
           {!isMemoryOpen && memory.error && (
             <div role="alert" className="rounded-2xl border border-rose-100 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-4 py-3 text-xs text-rose-700 dark:text-rose-300">{memory.error}</div>
           )}
@@ -155,51 +165,31 @@ export default function PosterStudio({ onBack, onOpenSettings }: Props) {
             <div role="status" className="flex items-start gap-2 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-4 py-3 text-xs leading-5 text-slate-700 dark:text-slate-200 [overflow-wrap:anywhere]"><WandSparkles className="mt-0.5 h-4 w-4 shrink-0" />{studio.notice}</div>
           )}
           {studio.isImporting && <p role="status" className="inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400"><WandSparkles className="h-4 w-4 animate-pulse" />正在解析文件并保存生产清单…</p>}
-          {isGalleryMode ? (
-            <PosterCoverGallery
-              items={studio.items}
-              isRunning={isBusy}
-              onEditTitle={studio.editCoverTitle}
-              compact
-              onPreview={openPreview}
-              onDownload={(item, index) => void studio.downloadOne(item, index)}
-              onDownloadOriginalScene={(item, index) => void studio.downloadOriginalScene(item, index)}
-              onRetry={(item, index) => void studio.runItem(item, index)}
-            />
-          ) : (
-            <>
-              <PosterImportPanel
-                fileInputRef={studio.fileInputRef}
-                importMode={studio.importMode}
-                isDraggingFile={studio.isDraggingFile}
-                pasteText={studio.pasteText}
-                isRunning={studio.isRunning}
-                isBusy={isBusy}
-                onImportMode={studio.setImportMode}
-                onImportFile={(event) => void studio.importFile(event)}
-                onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; studio.setIsDraggingFile(true); }}
-                onDragLeave={() => studio.setIsDraggingFile(false)}
-                onDrop={studio.handleFileDrop}
-                onPasteText={studio.setPasteText}
-                onPrimaryAction={() => {
-                  if (studio.importPaste()) setIsGalleryMode(true);
-                }}
-                onStop={studio.stopBatch}
-              />
-
-              {studio.items.length > 0 && (
-                <PosterCoverGallery
-                  items={studio.items}
-                  isRunning={isBusy}
-                  onEditTitle={studio.editCoverTitle}
-                  onPreview={openPreview}
-                  onDownload={(item, index) => void studio.downloadOne(item, index)}
-                  onDownloadOriginalScene={(item, index) => void studio.downloadOriginalScene(item, index)}
-                  onRetry={(item, index) => void studio.runItem(item, index)}
-                />
-              )}
-            </>
-          )}
+          <nav aria-label="封面功能" className="flex flex-wrap gap-3">
+            <button type="button" onClick={() => setView('generate')} aria-pressed={view === 'generate'} className={`rounded-xl border px-5 py-3 text-sm font-bold ${view === 'generate' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'border-slate-200 dark:border-white/15'}`}>生成封面</button>
+            <button type="button" onClick={() => setView('templates')} aria-pressed={view === 'templates'} className={`rounded-xl border px-5 py-3 text-sm font-bold ${view === 'templates' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'border-slate-200 dark:border-white/15'}`}>我的模板库</button>
+          </nav>
+          {view === 'templates' ? <CoverTemplateLibrary refreshKey={templateVersion} selectedId={studio.memorySampleId} onFeed={() => setIsFeedOpen(true)} onUse={useTemplate} onAdvanced={() => setIsMemoryOpen(true)} /> : <>
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white/90 p-4 dark:border-white/10 dark:bg-[#18191c]/95">
+              <span className="text-sm">使用模板：<b>{templateTitle || (studio.memorySampleId && studio.memorySampleId !== 'corrections' ? '已保存的选定模板' : studio.memorySampleId === 'corrections' ? '不使用样张模板' : '自动匹配可用模板')}</b></span>
+              <button type="button" onClick={() => setView('templates')} className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-white/15">去模板库挑选</button>
+              <button type="button" disabled={isBusy} onClick={() => { studio.selectTemplate(''); setTemplateTitle(''); }} className="text-sm text-slate-500">改为自动匹配</button>
+              <p className="w-full text-xs text-slate-500">先投喂喜欢的参考封面，保存为模板；再上传商品图和文案，一键生成。已有设计的重试继续使用原模板。</p>
+            </div>
+            <PosterImportPanel
+              fileInputRef={studio.fileInputRef} importMode={studio.importMode} isDraggingFile={studio.isDraggingFile}
+              pasteText={studio.pasteText} isRunning={studio.isRunning} isBusy={isBusy} onImportMode={studio.setImportMode}
+              onImportFile={async event => { await studio.importFile(event); }}
+              onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; studio.setIsDraggingFile(true); }}
+              onDragLeave={() => studio.setIsDraggingFile(false)} onDrop={studio.handleFileDrop} onPasteText={studio.setPasteText}
+              onPrimaryAction={() => { studio.importPaste(); }} onStop={studio.stopBatch} />
+            {studio.items.length > 0 && <div className="flex flex-wrap items-center gap-3"><span className="text-sm">{studio.items.length} 条商品 · 完成 {studio.completedCount} · 失败 {studio.failedCount}</span><button type="button" disabled={isBusy || !pendingCount} onClick={startBatch} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white dark:bg-white dark:text-slate-900">生成封面（{pendingCount}）</button><label className="text-sm"><input type="checkbox" checked={onlyFailedResults} onChange={event => setOnlyFailedResults(event.target.checked)} /> 只看失败与中断</label></div>}
+            <PosterCoverGallery items={studio.items.filter(item => !onlyFailedResults || ['failed', 'interrupted'].includes(item.status))}
+              isRunning={isBusy} onEditTitle={studio.editCoverTitle} compact onPreview={openPreview}
+              onDownload={item => void studio.downloadOne(item, studio.items.findIndex(row => row.id === item.id))}
+              onDownloadOriginalScene={item => void studio.downloadOriginalScene(item, studio.items.findIndex(row => row.id === item.id))}
+              onRetry={item => retryItem(item, studio.items.findIndex(row => row.id === item.id))} />
+          </>}
 
           {studio.isSettingsOpen && studio.settingsDraft && (
             <PosterSettingsDialog
@@ -209,10 +199,7 @@ export default function PosterStudio({ onBack, onOpenSettings }: Props) {
               isRunning={isBusy}
               onClose={studio.closeProductionSettings}
               onChange={(next) => studio.setSettingsDraft(next)}
-              memorySamples={memory.memory.samples.flatMap((sample) => {
-                const adopted = memory.memory.entries.some((entry) => entry.sampleId === sample.id && entry.status === 'adopted' && entry.source === 'sample');
-                return adopted ? [{ id: sample.id, title: sample.title || '封面样张', grouped: sample.imageUrls.length > 1 }] : [];
-              })}
+              memorySamples={samples}
               onSave={studio.saveProductionSettings}
               onOpenSettings={onOpenSettings}
             />
@@ -245,7 +232,7 @@ export default function PosterStudio({ onBack, onOpenSettings }: Props) {
               onClose={() => setIsHistoryOpen(false)}
               onRestore={async (batch) => {
                 const restored = await studio.restoreHistoryBatch(batch);
-                if (restored) setIsGalleryMode(true);
+                if (restored) setView('generate');
                 return restored;
               }}
               onDelete={(id) => studio.deleteHistoryBatch(id)}

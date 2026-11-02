@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -20,7 +21,7 @@ func analyzeGatewayError(cfg config.Config, r *http.Request, payload map[string]
 		if id != "deepseek-flash" && id != "deepseek-v4-pro" {
 			return http.StatusBadRequest, map[string]any{"success": false, "error": "此 DeepSeek 官方模型尚未适配", "code": "gateway_base_url"}
 		}
-		if clientBase != "" && system.NormalizeGatewayBaseURL(clientBase) != "https://api.deepseek.com" {
+		if clientBase != "" && gateway.NormalizeGatewayBaseURL(clientBase) != "https://api.deepseek.com" {
 			return http.StatusBadRequest, map[string]any{"success": false, "error": "DeepSeek 官方模型只能使用官方接口地址", "code": "gateway_base_url"}
 		}
 		if rawString(payload, "customApiKey") == "" {

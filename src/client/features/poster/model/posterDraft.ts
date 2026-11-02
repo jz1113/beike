@@ -128,6 +128,7 @@ export function normalizePosterProductionSettings(value: unknown): Partial<Poste
     titleHandling: normalizeTitleHandling(parsed.titleHandling),
     imageQuality: parsed.imageQuality === 'high' || parsed.imageQuality === 'medium' || parsed.imageQuality === 'low' ? parsed.imageQuality : undefined,
     concurrency: normalizeConcurrency(parsed.concurrency),
+    supplementaryRequirements: typeof parsed.supplementaryRequirements === 'string' ? parsed.supplementaryRequirements.trim().slice(0, 2000) : '',
     memorySampleId: typeof parsed.memorySampleId === 'string' ? parsed.memorySampleId.trim().slice(0, 128) : '',
   };
 }

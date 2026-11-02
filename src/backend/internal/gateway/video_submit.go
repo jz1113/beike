@@ -5,9 +5,14 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
+	"regexp"
 	"strings"
 	"time"
 )
+
+var errorURLPattern = regexp.MustCompile(`https?://[^\s"'<>|，。；：！？]+`)
 
 type SubmitOutcome string
 
@@ -75,7 +80,7 @@ func SubmitVideo(ctx context.Context, command SubmitCommand) SubmitResult {
 		if status >= 200 && status < 300 && taskID == "" {
 			rawMessage = "响应未返回任务 ID：" + rawMessage
 		}
-		result.Error = presentVideoError(rawMessage)
+		result.Error = PresentVideoError(rawMessage)
 		if status >= 200 && status < 300 || status >= 500 {
 			result.Outcome = Unknown
 			result.TaskID = taskID
@@ -118,17 +123,82 @@ func missingVideoInput(message string) bool {
 	return strings.Contains(lower, "missing required parameter 'input'") || strings.Contains(lower, `missing required parameter "input"`)
 }
 
+func PresentVideoError(message string) string {
+	return presentVideoError(message)
+}
+
 func presentVideoError(message string) string {
-	detail := unwrapVideoError(strings.TrimSpace(message))
+	detail := PresentUpstreamError(message)
 	lower := strings.ToLower(detail)
 	switch {
 	case strings.Contains(lower, "missing required parameter 'input'") || strings.Contains(lower, `missing required parameter "input"`):
 		return "万相官方请求未被接受：" + clipVideoError(detail)
 	case strings.Contains(lower, "mode is not supported") || (strings.Contains(detail, "FieldInvalid") && strings.Contains(lower, "model")):
 		return "该渠道不接受当前型号或参考方式：" + clipVideoError(detail)
+	case strings.Contains(lower, "videourls[") && (strings.Contains(lower, "sensitive") || strings.Contains(detail, "敏感")):
+		return "参考视频未通过安全检测（可能包含敏感画面或真人未报备素材），请更换合规的参考视频后重试：" + clipVideoError(detail)
+	case strings.Contains(lower, "imageurls[") && (strings.Contains(lower, "sensitive") || strings.Contains(detail, "敏感")):
+		return "参考图片未通过安全检测（可能包含敏感内容或违规画面），请更换参考图片后重试：" + clipVideoError(detail)
+	case strings.Contains(lower, "sensitive content") || strings.Contains(detail, "包含敏感内容"):
+		return "输入素材或提示词未通过安全检测，请更换素材或调整描述后重试：" + clipVideoError(detail)
 	default:
 		return clipVideoError(detail)
 	}
+}
+
+func PresentUpstreamError(message string) string {
+	return redactSignedMediaURLs(unwrapVideoError(strings.TrimSpace(message)))
+}
+
+func redactSignedMediaURLs(text string) string {
+	trimmed := strings.TrimSpace(text)
+	if !strings.Contains(trimmed, "http://") && !strings.Contains(trimmed, "https://") {
+		return trimmed
+	}
+	redacted := errorURLPattern.ReplaceAllStringFunc(trimmed, func(raw string) string {
+		clean := strings.TrimRight(raw, ".,;:)]}")
+		suffix := raw[len(clean):]
+		label, signed := summarizeMediaURL(clean)
+		if label == "" {
+			return raw
+		}
+		if clean == trimmed && signed {
+			return label + "处理失败（上游仅返回临时签名链接，请检查素材合规性或对象存储访问权限后重试）"
+		}
+		return label + suffix
+	})
+	return strings.TrimSpace(redacted)
+}
+
+func summarizeMediaURL(raw string) (string, bool) {
+	lower := strings.ToLower(raw)
+	signed := strings.Contains(lower, "x-oss-") || strings.Contains(lower, "x-amz-") || strings.Contains(lower, "signature=") || strings.Contains(lower, "q-sign-") || strings.Contains(lower, "/seedance/refs/")
+	parsed, err := url.Parse(raw)
+	pathPart := raw
+	if err == nil && parsed.Path != "" {
+		pathPart = parsed.Path
+	} else if idx := strings.Index(pathPart, "?"); idx >= 0 {
+		pathPart = pathPart[:idx]
+	}
+	base := path.Base(strings.TrimRight(pathPart, "/"))
+	if decoded, err := url.PathUnescape(base); err == nil && strings.TrimSpace(decoded) != "" {
+		base = strings.TrimSpace(decoded)
+	}
+	ext := strings.ToLower(path.Ext(base))
+	isMediaExt := ext == ".mp4" || ext == ".mov" || ext == ".webm" || ext == ".m4v" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp"
+	if !signed && !isMediaExt && len(raw) < 80 {
+		return "", false
+	}
+	kind := "参考素材"
+	if ext == ".mp4" || ext == ".mov" || ext == ".webm" || ext == ".m4v" {
+		kind = "参考视频"
+	} else if ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp" {
+		kind = "参考图片"
+	}
+	if base != "" && base != "." && base != "/" && len([]rune(base)) <= 40 {
+		return "【" + kind + "：" + base + "】", signed
+	}
+	return "【" + kind + "】", signed
 }
 
 func unwrapVideoError(message string) string {
@@ -148,14 +218,23 @@ func nestedVideoError(text string) string {
 		return ""
 	}
 	for _, key := range []string{"message", "error", "fail_reason"} {
-		value, ok := data[key].(string)
-		if !ok || value == "" {
-			continue
+		switch value := data[key].(type) {
+		case string:
+			if strings.TrimSpace(value) == "" {
+				continue
+			}
+			if inner := nestedVideoError(strings.TrimSpace(value)); inner != "" {
+				return inner
+			}
+			return strings.TrimSpace(value)
+		case map[string]any:
+			if msg, ok := value["message"].(string); ok && strings.TrimSpace(msg) != "" {
+				if inner := nestedVideoError(strings.TrimSpace(msg)); inner != "" {
+					return inner
+				}
+				return strings.TrimSpace(msg)
+			}
 		}
-		if inner := nestedVideoError(strings.TrimSpace(value)); inner != "" {
-			return inner
-		}
-		return value
 	}
 	if reason, ok := data["reason"].(string); ok && reason != "" {
 		return reason
@@ -183,6 +262,11 @@ func upstreamMessage(data map[string]any, status int) string {
 	}
 	if text, ok := data["error"].(string); ok && text != "" {
 		return text
+	}
+	if nested, ok := data["error"].(map[string]any); ok {
+		if message, ok := nested["message"].(string); ok && strings.TrimSpace(message) != "" {
+			return message
+		}
 	}
 	return "HTTP " + itoa(status)
 }

@@ -70,6 +70,7 @@ export interface PosterProductionSettings {
   concurrency: number;
   /** Empty means the server picks one adopted sample when design starts. */
   memorySampleId: string;
+  supplementaryRequirements?: string;
 }
 
 /**

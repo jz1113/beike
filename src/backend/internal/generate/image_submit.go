@@ -56,6 +56,14 @@ func imagePoll(cfg config.Config, w http.ResponseWriter, r *http.Request) {
 			httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "QUERY_FAILED", "retryable": true, "error": "尚未找到原任务记录，请稍后核对；不会自动重新提交"})
 			return
 		}
+		if row.status == "SUBMISSION_UNKNOWN" {
+			body := map[string]any{"success": false, "status": "QUERY_FAILED", "submissionUnknown": true, "retryable": false, "error": row.reason}
+			if !imageTaskStillSubmitting(row.taskID) {
+				body["taskId"] = row.taskID
+			}
+			httpx.WriteJSON(w, http.StatusOK, body)
+			return
+		}
 		if strings.EqualFold(row.status, "FAILURE") {
 			reason := row.reason
 			if reason == "" {

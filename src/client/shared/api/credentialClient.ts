@@ -88,6 +88,3 @@ export async function credentialHas(key: CredentialKey): Promise<boolean> {
   }
   return Boolean(readLocal(key).trim());
 }
-
-/** Web 模式无 Keychain 可迁，保留空实现以免改动启动调用点 */
-export async function migrateLegacyCredentialsOnce(): Promise<void> {}

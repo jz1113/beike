@@ -14,7 +14,7 @@ import (
 func TestDeconstructRequestImageRules(t *testing.T) {
 	t.Setenv("AI_DRAWING_API_KEY", "")
 	t.Setenv("AI_API_KEY", "")
-	handler := deconstructRequestHandler(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
+	handler := deconstructRequestHandler(config.Config{NodeEnv: "development"})
 	empty := httptest.NewRecorder()
 	handler.ServeHTTP(empty, httptest.NewRequest(http.MethodPost, "/api/catalog/assets/deconstruct", strings.NewReader(`{}`)))
 	if empty.Code != http.StatusBadRequest || !strings.Contains(empty.Body.String(), "请至少提供 1 张参考风格或买家秀图片") {
@@ -39,7 +39,7 @@ func TestDeconstructRequestImageRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = db.Close()
-	withDB := deconstructRequestHandler(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development", DatabaseURL: "file:" + dbPath})
+	withDB := deconstructRequestHandler(config.Config{NodeEnv: "development", DatabaseURL: "file:" + dbPath})
 	missingCategory := httptest.NewRecorder()
 	withDB.ServeHTTP(missingCategory, httptest.NewRequest(http.MethodPost, "/api/catalog/assets/deconstruct", strings.NewReader(`{"targetCategory":"shoes","imageUrls":["a"]}`)))
 	if missingCategory.Code != http.StatusBadRequest || !strings.Contains(missingCategory.Body.String(), "所选商品大类不存在") {

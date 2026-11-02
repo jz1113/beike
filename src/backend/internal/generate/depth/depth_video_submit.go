@@ -30,10 +30,6 @@ func depthVideoSubmit(cfg config.Config, w http.ResponseWriter, r *http.Request)
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": message})
 		return
 	}
-	if status, message := depthVideoJSONProbe(cfg, body); status != 0 {
-		httpx.WriteJSON(w, status, map[string]any{"success": false, "error": message})
-		return
-	}
 	var payload map[string]any
 	_ = json.Unmarshal(body, &payload)
 	operation := strings.TrimSpace(r.Header.Get("x-idempotency-key"))

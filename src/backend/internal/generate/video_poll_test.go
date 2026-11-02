@@ -1,6 +1,9 @@
 package generate
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestReadVideoPollRequiresResultURL(t *testing.T) {
 	missing := readVideoPoll(map[string]any{"status": "SUCCESS"})
@@ -22,5 +25,9 @@ func TestReadVideoPollRequiresResultURL(t *testing.T) {
 	failed := readVideoPoll(map[string]any{"status": "failed", "error": map[string]any{"message": "上游拒绝"}})
 	if failed.status != "FAILURE" || failed.reason != "上游拒绝" {
 		t.Fatalf("grok error: %+v", failed)
+	}
+	nestedJSON := readVideoPoll(map[string]any{"status": "FAILURE", "fail_reason": `{"code":"1501","message":"Input material may contain sensitive content: videoUrls[0]. Please replace the material and try again | 用户输入的素材可能包含敏感内容：videoUrls[0]，请更换素材后重试"}`})
+	if nestedJSON.status != "FAILURE" || !strings.Contains(nestedJSON.reason, "参考视频未通过安全检测") || strings.Contains(nestedJSON.reason, `"code"`) {
+		t.Fatalf("nested json fail_reason: %+v", nestedJSON)
 	}
 }

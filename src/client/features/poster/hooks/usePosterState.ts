@@ -33,6 +33,9 @@ export function usePosterState() {
   const [imageQuality, setImageQuality] = useState<ImageQuality>('high');
   const [concurrency, setConcurrency] = useState<number>(POSTER_CONCURRENCY_OPTIONS[0]);
   const [memorySampleId, setMemorySampleId] = useState('');
+  const [supplementaryRequirements, setSupplementaryRequirements] = useState('');
+  const requirementsRef = useRef(supplementaryRequirements);
+  requirementsRef.current = supplementaryRequirements;
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<PosterProductionSettings | null>(null);
   const [previewState, setPreviewState] = useState<{ itemId: string; index: number } | null>(null);
@@ -86,6 +89,7 @@ export function usePosterState() {
     imageQuality: imageQualityRef.current,
     concurrency,
     memorySampleId: memorySampleIdRef.current,
+    supplementaryRequirements: requirementsRef.current,
   });
 
   const workspaceChanged = useCallback(() => workspaceSecretRef.current !== getWorkspaceSecret(), []);
@@ -101,9 +105,9 @@ export function usePosterState() {
     return true;
   }, [setNoticeIfAlive, workspaceChanged]);
 
-  const productionModelError = useCallback((settings: PosterProductionSettings) => {
-    if (!availableTitleModelsRef.current.some((model) => model.id === settings.titleModel)) return '标题与封面设计模型未启用，请在系统设置中启用模型并更新生产设置。';
-    if (!availableImageModelsRef.current.some((model) => model.id === settings.imageModel)) return '当前生图模型未启用，请更新生产设置后再生成。';
+  const productionModelError = useCallback((settings: PosterProductionSettings, phase: 'all' | 'design' | 'render' = 'all') => {
+    if (phase !== 'render' && !availableTitleModelsRef.current.some((model) => model.id === settings.titleModel)) return '标题与封面设计模型未启用，请在系统设置中启用模型并更新生产设置。';
+    if (phase !== 'design' && !availableImageModelsRef.current.some((model) => model.id === settings.imageModel)) return '当前生图模型未启用，请更新生产设置后再生成。';
     return undefined;
   }, []);
 
@@ -155,6 +159,7 @@ export function usePosterState() {
     setImageQuality,
     concurrency,
     setConcurrency,
+    supplementaryRequirements, setSupplementaryRequirements,
     memorySampleId,
     setMemorySampleId,
     isSettingsOpen,

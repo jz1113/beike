@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestAudioValidationAndSubmission(t *testing.T) {
-	handler := Audio(config.Config{NodeEnv: "production", Upstream: "http://127.0.0.1:1"})
+	handler := Audio(config.Config{NodeEnv: "production"})
 
 	emptyReq := httptest.NewRequest(http.MethodPost, "/api/generate/audio", strings.NewReader(`{"prompt":"  "}`))
 	emptyResp := httptest.NewRecorder()
@@ -34,10 +35,10 @@ func TestAudioValidationAndSubmission(t *testing.T) {
 		_, _ = w.Write([]byte("ID3fake-audio"))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
-	handler = Audio(config.Config{NodeEnv: "production", Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + imageTaskDatabase(t)})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler = Audio(config.Config{NodeEnv: "production", DatabaseURL: "file:" + imageTaskDatabase(t)})
 	validReq := httptest.NewRequest(http.MethodPost, "/api/generate/audio", strings.NewReader(`{"prompt":"欢迎使用贝壳云图音频生成","model":"speech-2.8-hd","format":"mp3","customBaseUrl":"`+server.URL+`","customApiKey":"secret"}`))
 	validResp := httptest.NewRecorder()
 	handler.ServeHTTP(validResp, validReq)

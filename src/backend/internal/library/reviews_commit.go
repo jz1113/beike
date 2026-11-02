@@ -1,7 +1,6 @@
 package library
 
 import (
-	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
@@ -10,12 +9,14 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 )
 
 var durableImageURL = regexp.MustCompile(`^https?://|^/[^/]`)
 
 func commitDeconstructReview(cfg config.Config, w http.ResponseWriter, r *http.Request, id, action string) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeReviewFailure(w, "审核失败")
 		return

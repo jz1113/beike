@@ -10,13 +10,14 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestNormalizeGatewayBaseURL(t *testing.T) {
-	if got := normalizeGatewayBaseURL(" https://ai.example/v1/// "); got != "https://ai.example" {
+	if got := gateway.NormalizeGatewayBaseURL(" https://ai.example/v1/// "); got != "https://ai.example" {
 		t.Fatalf("normalized %q", got)
 	}
-	if got := normalizeGatewayBaseURL("https://ai.example/V1"); got != "https://ai.example" {
+	if got := gateway.NormalizeGatewayBaseURL("https://ai.example/V1"); got != "https://ai.example" {
 		t.Fatalf("normalized %q", got)
 	}
 }

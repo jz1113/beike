@@ -1,7 +1,6 @@
 package catalog
 
 import (
-	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,6 +8,8 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
 	"beike.local/cloud/src/backend/internal/platform/media"
 )
 
@@ -25,7 +26,7 @@ func productsHandler(cfg config.Config) http.HandlerFunc {
 		if pageSize > 100 {
 			pageSize = 100
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "products": []any{}, "error": "读取商品失败"})
 			return
@@ -66,7 +67,7 @@ func productsCreateHandler(cfg config.Config) http.HandlerFunc {
 				saved = []string{pic}
 			}
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 			return
@@ -112,7 +113,7 @@ func productsUpdateHandler(cfg config.Config) http.HandlerFunc {
 			encoded := string(body)
 			detailURLs = &encoded
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
 			return

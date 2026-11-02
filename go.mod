@@ -4,6 +4,10 @@ go 1.26.0
 
 require modernc.org/sqlite v1.60.1
 
+require github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.6.1
+
+require golang.org/x/time v0.4.0 // indirect
+
 require (
 	github.com/aws/aws-sdk-go-v2 v1.36.3 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.10 // indirect

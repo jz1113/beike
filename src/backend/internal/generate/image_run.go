@@ -10,7 +10,6 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/gateway"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 type imageAdapted struct {
@@ -93,7 +92,7 @@ func imageFamily(model string) string {
 }
 
 func imageSubmitURLs(base string, edits bool, family, model string) []string {
-	root := strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")
+	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
 	if model == "openai/gpt-image-2" {
 		path := "/v1/images/generations"
 		if edits {
@@ -124,7 +123,7 @@ func dispatchImage(r *http.Request, urls []string, apiKey string, payload map[st
 		if isImageEditEndpoint(endpoint) {
 			status, raw, err = postImageEdit(r.Context(), endpoint, apiKey, payload, workspace, production, timeout)
 		} else {
-			status, raw, err = PostModel(r.Context(), http.MethodPost, endpoint, apiKey, payload, timeout)
+			status, raw, err = gateway.PostModel(r.Context(), http.MethodPost, endpoint, apiKey, payload, timeout)
 		}
 		if err != nil {
 			return 0, nil, err
@@ -285,59 +284,36 @@ func imageSubmitCredentials(cfg config.Config, r *http.Request, payload map[stri
 	}
 	base := ImageDefaultBase()
 	if clientBase != "" {
-		base = system.NormalizeGatewayBaseURL(clientBase)
+		base = gateway.NormalizeGatewayBaseURL(clientBase)
 	}
 	return base, imageAPIKey(cfg, r, payload, clientBase)
 }
 
-type imageClaim struct {
-	recordID, reusedTaskID, reusedURL string
-}
-
-func claimImageSubmission(cfg config.Config, r *http.Request, payload map[string]json.RawMessage, model, prompt, quality, size, idempotencyKey string) (imageClaim, int, string) {
-	db, err := openTaskDB(cfg)
-	if err != nil {
-		return imageClaim{}, http.StatusInternalServerError, "任务持久化失败: " + err.Error()
-	}
-	defer db.Close()
-	key := strings.TrimSpace(idempotencyKey)
-	if id, taskID, result, ok := reuseImageTask(r.Context(), db, workspaceOf(r), key); ok {
-		return imageClaim{recordID: id, reusedTaskID: taskID, reusedURL: result}, 0, ""
-	}
-	placeholder, err := randomTaskID()
-	if err != nil {
-		return imageClaim{}, http.StatusInternalServerError, "任务持久化失败: " + err.Error()
-	}
-	recordID, err := insertImageTask(r.Context(), db, workspaceOf(r), imageTaskDraft{
-		ProductID: rawString(payload, "productId"), Prompt: prompt, TaskID: "pending_" + placeholder, Model: model,
-		Size: size, Quality: quality, Status: "IN_PROGRESS", MediaType: "image", IdempotencyKey: key,
-	})
-	if err != nil {
-		return imageClaim{}, http.StatusInternalServerError, "任务持久化失败: " + err.Error()
-	}
-	return imageClaim{recordID: recordID}, 0, ""
-}
-
 func finishImageSubmission(cfg config.Config, r *http.Request, recordID string, adapted imageAdapted, taskID, direct, size string) error {
+	state := "IN_PROGRESS"
+	if direct != "" {
+		state = "SUCCESS"
+	}
+	return settleImageReceipt(cfg, r, recordID, imageTaskDraft{
+		TaskID: taskID, Status: state, ResultURL: direct, Model: adapted.modelID, Prompt: adapted.prompt, Size: size,
+	})
+}
+
+func settleImageReceipt(cfg config.Config, r *http.Request, recordID string, patch imageTaskDraft) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
+	defer cancel()
 	db, err := openTaskDB(cfg)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-	state := "IN_PROGRESS"
-	if direct != "" {
-		state = "SUCCESS"
-	}
-	return settleImageSubmission(r.Context(), db, recordID, imageTaskDraft{
-		TaskID: taskID, Status: state, ResultURL: direct, Model: adapted.modelID, Prompt: adapted.prompt, Size: size,
-	})
+	return settleImageSubmission(ctx, db, recordID, patch)
 }
 
 func failImageSubmission(cfg config.Config, r *http.Request, recordID, reason string) {
-	db, err := openTaskDB(cfg)
-	if err != nil {
-		return
-	}
-	defer db.Close()
-	_ = settleImageSubmission(r.Context(), db, recordID, imageTaskDraft{Status: "FAILURE", FailReason: reason})
+	_ = settleImageReceipt(cfg, r, recordID, imageTaskDraft{Status: "FAILURE", FailReason: reason})
+}
+
+func unknownImageSubmission(cfg config.Config, r *http.Request, recordID, taskID, reason string) {
+	_ = settleImageReceipt(cfg, r, recordID, imageTaskDraft{Status: "SUBMISSION_UNKNOWN", TaskID: taskID, FailReason: reason})
 }

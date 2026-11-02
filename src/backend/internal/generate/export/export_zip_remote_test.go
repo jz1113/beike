@@ -30,7 +30,7 @@ func TestMatrixWritesDisallowedHost(t *testing.T) {
 	png := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 	payload := `{"offlineMatrix":true,"batchTitle":"批次","products":[{"skuId":"sku1","promptAssetGroupName":"组","copywritingTitle":"封面","images":["data:image/png;base64,` + png + `","https://example.com/a.jpg"]}]}`
 	response := httptest.NewRecorder()
-	ExportZip(config.Config{Root: filepath.Join("..", "..", "..", "..", ".."), Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
+	ExportZip(config.Config{Root: filepath.Join("..", "..", "..", "..", "..")}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("partial %d %s", response.Code, response.Body.String())
 	}

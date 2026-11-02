@@ -7,6 +7,7 @@ import {
   resolveModalityModelRoute,
   type StoredModalityModelItem,
 } from '@shared/domain/models/modalityStorage';
+import { protocolForBaseUrl, providerTextProtocol } from '@shared/domain/models/modalityProtocol';
 import { configuredTextProtocol, resolveTextProtocol, type ResolvedTextProtocol, type TextProtocol } from '@shared/domain/models/textProtocol';
 import { selectedTextModel } from '@shared/domain/models/textModelRoute';
 import {
@@ -103,17 +104,27 @@ function workflowCredentials(routeId: string): { baseUrl: string; apiKey: string
     ? readStoredApiProviders().find((item) => item.id === stored.providerId)
     : undefined;
   const modelId = selectedTextModel(routeId).modelId || stored?.id || routeId;
+  const baseUrl = stored?.customBaseUrl?.trim() || provider?.baseUrl?.trim() || '';
+  // A workflow model can be a vendor model ID exposed by an OpenAI-compatible
+  // channel. Keep the model-level override authoritative, then inherit the
+  // channel transport and finally infer it from the configured base URL.
+  const configuredModelProtocol = stored ? configuredTextProtocol(stored) : undefined;
+  const modelProtocol = configuredModelProtocol === 'auto' ? undefined : configuredModelProtocol;
+  const textProtocol = stored ? modelProtocol
+    || providerTextProtocol(provider?.providerType || provider?.provider)
+    || protocolForBaseUrl(baseUrl, readStoredApiProviders())
+    : protocolForBaseUrl(baseUrl, readStoredApiProviders());
   return {
-    baseUrl: stored?.customBaseUrl?.trim() || provider?.baseUrl?.trim() || '',
+    baseUrl,
     apiKey: stored?.customApiKey?.trim() || provider?.apiKey?.trim() || '',
-    textProtocol: stored ? configuredTextProtocol(stored) : undefined,
+    textProtocol,
     modelId,
   };
 }
 
 function workflowOptions(): KeywordReviewModelOption[] {
   const configured = getEnabledMultimodalModelsFromSettings()
-    .filter((model) => model.channel !== 'openai' && model.channel !== 'deepseek');
+    .filter((model) => model.channel !== 'deepseek');
   if (configured.length > 0) {
     return configured.map((model) => {
       const owned = workflowCredentials(model.id);

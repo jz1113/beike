@@ -35,6 +35,8 @@ func videoSpecFor(model string) (videoSpec, bool) {
 		return videoSpecs["veo3.1"], true
 	case strings.Contains(id, "kling"):
 		return videoSpecs["kling-video-v3"], true
+	case viduQ4Preview(id):
+		return videoSpecs["viduq4-preview"], true
 	case strings.Contains(id, "vidu"):
 		return videoSpecs["viduq3"], true
 	case strings.Contains(id, "minimax") || strings.Contains(id, "hailuo") || strings.Contains(id, "video-01"):
@@ -152,9 +154,9 @@ var videoSpecs = map[string]videoSpec{
 	"MiniMax-H3":                      {ints(4, 15), []string{"720P", "1080P"}, videoRatios},
 	"wan3.0-video":                    {ints(2, 30), []string{"480P", "720P", "1080P"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive"}},
 	"grok-imagine-video-1.5":          {ints(1, 15), []string{"480P", "720P", "1080P"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3", "21:9", "5:2"}},
-	"viduq3":                          {ints(3, 16), []string{"540P", "720P", "1080P", "2K", "4K"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
-	"viduq3-mix":                      {ints(3, 16), []string{"540P", "720P", "1080P", "2K", "4K"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
-	"viduq3-turbo":                    {ints(3, 16), []string{"540P", "720P", "1080P", "2K", "4K"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
-	"viduq3-pro":                      {ints(3, 16), []string{"540P", "720P", "1080P", "2K", "4K"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
+	"viduq3":                          {ints(3, 16), []string{"540P", "720P", "1080P"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
+	"viduq3-mix":                      {ints(3, 15), []string{"720P", "1080P"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
+	"viduq3-turbo":                    {ints(1, 16), []string{"540P", "720P", "1080P"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
+	"viduq3-pro":                      {ints(1, 16), []string{"540P", "720P", "1080P"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
 	"viduq4-preview":                  {ints(3, 16), []string{"540P", "720P", "1080P", "2K", "4K"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
 }

@@ -1,0 +1,46 @@
+.sales-material-prompt-content { display: flex; min-height: 0; min-width: 0; overflow: hidden; }
+.sales-prompts-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; }
+.sales-prompts-heading { display: flex; flex-shrink: 0; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.sales-prompts-heading > button { flex-shrink: 0; }
+.sales-prompts-body { display: flex; min-height: 0; min-width: 0; flex: 1; flex-direction: column; gap: 12px; padding: 20px 20px 0; background: var(--sales-canvas); }
+.sales-prompts-nav { gap: 12px; }
+.sales-prompts-nav-group { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.sales-prompts-nav-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px 3px; color: var(--sales-muted); font-size: 11px; }
+.sales-prompts-nav-heading small { font-size: inherit; font-variant-numeric: tabular-nums; }
+.sales-prompts-nav .sales-cat-sub-item { gap: 4px; }
+.sales-studio .sales-material-workspace .sales-prompts-nav .sales-cat-sub-item { font-size: 12px; }
+.sales-studio .sales-material-workspace .sales-prompts-nav .sales-cat-sub-item > .sales-prompts-dirty-dot { width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: var(--sales-warn); }
+.sales-prompts-editor { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; overflow-y: auto; scrollbar-width: thin; }
+.sales-prompts-editor-head { display: flex; flex-shrink: 0; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.sales-prompts-editor-head > button { flex-shrink: 0; }
+.sales-prompts-editor-head h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; color: var(--sales-ink); font-size: 16px; font-weight: 600; }
+.sales-prompts-editor-head p { margin-top: 6px; color: var(--sales-muted); font-size: 12px; line-height: 1.7; }
+.sales-prompts-badge { border: 1px solid var(--sales-line); border-radius: 4px; padding: 1px 6px; color: var(--sales-muted); font-size: 11px; font-weight: 400; }
+.sales-prompts-badge.is-dirty { border-color: currentColor; color: var(--sales-warn); }
+.sales-prompts-help { flex-shrink: 0; margin: 14px 0 10px; color: var(--sales-muted); font-size: 12px; line-height: 1.7; }
+.sales-prompts-textarea { flex: 1 0 220px; min-height: 220px; width: 100%; resize: none; border: 1px solid var(--sales-line); border-radius: 6px; background: var(--sales-surface); padding: 18px 20px; color: var(--sales-ink); font-family: inherit; font-size: 14px; line-height: 1.9; tab-size: 2; scrollbar-width: thin; }
+.sales-prompts-textarea:disabled { opacity: .65; }
+.sales-prompts-character-count { flex-shrink: 0; margin-top: 6px; color: var(--sales-muted); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+.sales-prompts-reference { flex-shrink: 0; max-height: 28%; overflow-y: auto; margin-top: 8px; scrollbar-width: thin; }
+.sales-prompts-reference summary { width: fit-content; cursor: pointer; border-radius: 4px; padding: 6px 1px; color: var(--sales-muted); font-size: 12px; }
+.sales-prompts-reference pre { margin: 5px 0 10px; border: 1px solid var(--sales-line); border-radius: 6px; background: var(--sales-surface); padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; font-size: 13px; line-height: 1.8; }
+.sales-prompts-footer { display: flex; min-height: 64px; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0 -20px; border-top: 1px solid var(--sales-line); padding: 12px 20px; background: var(--sales-surface); }
+.sales-prompts-footer > div { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.sales-prompts-footer > span { color: var(--sales-muted); font-size: 12px; }
+.sales-prompts-footer > span.is-dirty { color: var(--sales-warn); }
+.sales-prompts-error { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 10px; border-radius: 6px; background: rgb(244 63 94 / 8%); padding: 10px 12px; color: #c46150; font-size: 12px; line-height: 1.6; }
+.dark .sales-prompts-error { color: #efa999; }
+.sales-prompts-error > button { flex-shrink: 0; }
+.sales-prompts-notice { flex-shrink: 0; border-radius: 6px; background: var(--sales-accent-bg); padding: 8px 12px; color: var(--sales-accent); font-size: 12px; line-height: 1.6; }
+.sales-prompts-empty { display: flex; min-height: 220px; flex: 1; align-items: center; justify-content: center; gap: 10px; color: var(--sales-muted); font-size: 14px; }
+@media (max-width: 760px) {
+  .sales-material-prompt-content { min-height: 600px; flex: 1 0 auto; overflow: visible; }
+  .sales-prompts-heading { flex-wrap: wrap; }
+  .sales-prompts-body { padding: 16px 16px 0; }
+  .sales-prompts-editor { overflow: visible; }
+  .sales-prompts-textarea { min-height: 360px; flex: 1 0 360px; padding: 12px; }
+  .sales-prompts-reference { max-height: 220px; }
+  .sales-prompts-footer { position: sticky; bottom: -1px; z-index: 1; margin: 0 -16px; padding: 12px 16px; }
+  .sales-prompts-footer > span { width: 100%; }
+  .sales-prompts-error { flex-wrap: wrap; }
+}

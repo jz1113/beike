@@ -10,6 +10,7 @@ import (
 
 func TestDeclinedToolStaysDeclinedAndConstrainsReply(t *testing.T) {
 	t.Setenv("AZHUO_DATA_DIR", t.TempDir())
+	t.Cleanup(FlushTelemetry)
 	var sent []map[string]any
 	loop := &agentLoop{
 		mu:       &sync.Mutex{},

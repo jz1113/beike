@@ -10,7 +10,7 @@ import (
 )
 
 func TestDeconstructJobPostValidation(t *testing.T) {
-	handler := deconstructJobsPostHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := deconstructJobsPostHandler(config.Config{})
 	empty := httptest.NewRecorder()
 	handler.ServeHTTP(empty, httptest.NewRequest(http.MethodPost, "/api/catalog/assets/deconstruct/jobs", nil))
 	if empty.Code != http.StatusRequestEntityTooLarge || !strings.Contains(empty.Body.String(), "job_body_too_large") {

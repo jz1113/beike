@@ -7,6 +7,7 @@ interface VideoDurationRulerSliderProps {
   modelId?: string;
   min?: number;
   max?: number;
+  allowedDurations?: number[];
   onChange: (value: number) => void;
   className?: string;
 }
@@ -24,6 +25,7 @@ export function VideoDurationRulerSlider({
   modelId,
   min: minProp,
   max: maxProp,
+  allowedDurations,
   onChange,
   className = '',
 }: VideoDurationRulerSliderProps) {
@@ -33,11 +35,12 @@ export function VideoDurationRulerSlider({
 
   const allowed = useMemo(() => {
     const bounds = getVideoDurationBounds(modelId);
-    const filtered = bounds.allowed.filter((item) => (
+    const available = allowedDurations?.length ? allowedDurations : bounds.allowed;
+    const filtered = available.filter((item) => (
       (minProp === undefined || item >= minProp) && (maxProp === undefined || item <= maxProp)
     ));
-    return filtered.length ? filtered : bounds.allowed;
-  }, [modelId, minProp, maxProp]);
+    return filtered.length ? filtered : available;
+  }, [modelId, minProp, maxProp, allowedDurations]);
 
   const min = allowed[0];
   const max = allowed[allowed.length - 1];

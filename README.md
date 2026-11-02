@@ -1,6 +1,6 @@
 # 贝壳云图
 
-面向电商视觉创作的全栈工作台，包含电商视频、电商图文、封面、词包、采集、无限画布和 AI 助手。数字人与 PPT 功能重建中，首页保留入口占位。
+面向电商视觉创作的全栈工作台，包含电商视频、电商图文、封面、词包、采集、无限画布和 AI 助手。电商视频重建中，支持商品采集、同屏选图、拖放识别与免费本地文字提取；数字人与 PPT 功能重建中，首页保留入口占位。
 
 项目使用一个根 package.json、一份 pnpm-lock.yaml 和一个 Go module。所有安装、启动、检查与构建命令都在仓库根目录执行。
 
@@ -48,6 +48,8 @@
 
 详细目录归属、功能导航与依赖方向见 [目录与分层](docs/layout.md)。组件分类目录直接存放实现文件；功能内部按 `components / hooks / api / model` 的实际需要组织。
 
+电商视频图片文字识别首次使用需执行 `pnpm setup:ocr`，安装位置及服务配置见[电商视频商品准备](docs/video-sales.md)。
+
 常用功能目录：`poster` 封面、`keywords` 词包、`sales` 电商视频。前后端沿用同一组名称，模型协议适配统一放在后端 `gateway`。
 
 根目录保留工具链需要发现的依赖清单、锁文件、TypeScript 入口和 `jsrepo.config.mts`，以及说明、工程约定和 Windows / macOS 双击入口。`jsrepo.config.mts` 用于通过 jsrepo 引入背景组件，保留在工具默认发现位置。环境模板、Vite 配置位于 `tools/configs`，HTML 位于 `src/client/index.html`；统一命令会显式选择配置。`.agents`、`.cursor`、`.github` 与 `.vscode` 分别保存技能、规则、CI 和编辑器配置。
@@ -65,6 +67,8 @@ pnpm dev                     # 同时启动前端和 Go API
 ```
 
 浏览器打开 `http://127.0.0.1:5173`。单独启动前端使用 `pnpm dev:ui`；`dev:web` / `start:web` 分别是 `dev` / `start` 的别名。
+
+开发启动与 `pnpm build:api` 优先使用本机 Go 依赖缓存，仍由 Go 检查源码变更并增量构建；缓存或校验记录缺失时按原有网络配置重试。启动终端显示构建、服务就绪与总耗时，便于区分编译、依赖下载和服务初始化。
 
 Windows 双击根目录的 [启动贝壳云图.bat](启动贝壳云图.bat)，它调用 `tools/launchers` 中的 PowerShell 实现。macOS 双击根目录的 [启动贝壳云图.command](启动贝壳云图.command)。两个平台各保留一个双击入口。首次缺依赖时按锁文件安装，然后启动服务并打开浏览器。按启动终端中的 Ctrl+C 停止本次服务。
 

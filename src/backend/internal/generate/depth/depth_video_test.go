@@ -28,7 +28,7 @@ func TestDepthVideoPollMissingRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = db.Close()
-	handler := DepthVideo(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + dbPath})
+	handler := DepthVideo(config.Config{DatabaseURL: "file:" + dbPath})
 	missingID := httptest.NewRecorder()
 	handler.ServeHTTP(missingID, httptest.NewRequest(http.MethodGet, "/api/generate/depth-video", nil))
 	if missingID.Code != http.StatusBadRequest || !strings.Contains(missingID.Body.String(), "缺少 taskId 参数") {
@@ -47,7 +47,7 @@ func TestDepthVideoPollMissingRecord(t *testing.T) {
 }
 
 func TestDepthVideoSubmitValidatesJSON(t *testing.T) {
-	cfg := config.Config{Upstream: "http://127.0.0.1:1"}
+	cfg := config.Config{}
 	empty := httptest.NewRecorder()
 	depthVideoSubmit(cfg, empty, httptest.NewRequest(http.MethodPost, "/api/generate/depth-video", strings.NewReader(`{}`)))
 	if empty.Code != http.StatusBadRequest || !strings.Contains(empty.Body.String(), "请提供 videoDataUrl 或 videoUrl") {
@@ -74,7 +74,7 @@ func TestDepthVideoSubmitValidatesJSON(t *testing.T) {
 }
 
 func TestDepthVideoFormChecksFile(t *testing.T) {
-	cfg := config.Config{Upstream: "http://127.0.0.1:1"}
+	cfg := config.Config{}
 	missing := httptest.NewRecorder()
 	depthVideoSubmit(cfg, missing, depthVideoRequest(t, "note", "a.txt", "text/plain", []byte("hello")))
 	if missing.Code != http.StatusBadRequest || !strings.Contains(missing.Body.String(), "缺少视频文件 video") {
@@ -115,7 +115,7 @@ func depthVideoRequest(t *testing.T, field, name, contentType string, payload []
 }
 
 func TestDepthVideoRejectsMissingFFmpeg(t *testing.T) {
-	handler := DepthVideo(config.Config{Root: t.TempDir(), Upstream: "http://127.0.0.1:1"})
+	handler := DepthVideo(config.Config{Root: t.TempDir()})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/depth-video", nil))
 	if response.Code != http.StatusServiceUnavailable {

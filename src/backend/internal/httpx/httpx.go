@@ -3,14 +3,9 @@ package httpx
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
-
-	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 type workspaceIDKey struct{}
@@ -40,12 +35,4 @@ func QueryInt(r *http.Request, name string, fallback int) int {
 		return fallback
 	}
 	return parsed
-}
-
-func OpenDB(cfg config.Config) (*sql.DB, error) {
-	path := cfg.SQLiteFile()
-	if path == "" {
-		return nil, errors.New("missing database")
-	}
-	return database.OpenWrite(path)
 }

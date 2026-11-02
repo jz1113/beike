@@ -14,6 +14,7 @@ import (
 	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
 )
 
@@ -93,7 +94,7 @@ func learnCategorySkill(cfg config.Config, w http.ResponseWriter, r *http.Reques
 	if background, _ := payload["background"].(bool); background {
 		protocol := gateway.TextProtocol(r.Context(), model)
 		go func() {
-			workerDB, openErr := httpx.OpenDB(cfg)
+			workerDB, openErr := database.OpenRequired(cfg.SQLiteFile())
 			if openErr != nil {
 				finishCategorySkillRun(cfg, workspace, folder, token, "后台分析无法打开数据库，请稍后重试")
 				return
@@ -132,7 +133,7 @@ type categorySkillRun struct {
 }
 
 func finishCategorySkillRun(cfg config.Config, workspace, folder, token, message string) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return
 	}

@@ -1,3 +1,5 @@
+import { resolveRefMediaFile, resolveRefMediaKind } from './refMediaRegistry';
+import { isVideoMediaUrl } from './mediaHelper';
 import type { GenerationTask } from '@client/store/appStoreTypes';
 import { readAgentAttachment, type AgentFileKind } from '@client/shared/prompt-bar/agentAttachments';
 
@@ -36,17 +38,14 @@ export function parseAgentAttachments(task: GenerationTask): ParsedAttachment[] 
           kind: 'file',
         });
       }
-    } else if (url.startsWith('data:image/') || url.match(/\.(png|jpe?g|webp|gif|svg)$/i) || (!url.includes('.mp4') && !url.includes('.mov'))) {
-      list.push({
-        url,
-        name: '参考图片',
-        kind: 'image',
-      });
     } else {
+      const file = resolveRefMediaFile(url);
+      const video = resolveRefMediaKind(url) === 'video' || isVideoMediaUrl(url);
       list.push({
         url,
-        name: '多媒体参考',
-        kind: 'video',
+        name: file?.name || (video ? '参考视频' : '参考图片'),
+        kind: video ? 'video' : 'image',
+        size: file?.size,
       });
     }
   }

@@ -91,6 +91,37 @@ describe('keyword review models', () => {
     });
   });
 
+  it('inherits the configured channel protocol for workflow models', () => {
+    memory.set('custom_models', JSON.stringify([{
+      id: 'claude-channel-model',
+      routeId: 'claude-channel-route',
+      name: 'Claude',
+      channel: 'openai',
+      providerId: 'provider-anthropic',
+      isMultimodal: true,
+      isCustom: true,
+      enabled: true,
+    }]));
+    memory.set(API_PROVIDERS_STORAGE_KEY, JSON.stringify([{
+      id: 'provider-anthropic',
+      name: '兼容网关',
+      baseUrl: 'https://gateway.example.test',
+      apiKey: 'channel-key',
+      providerType: 'openai',
+    }]));
+
+    const option = loadKeywordReviewModels().find((item) => item.model === 'claude-channel-model');
+    expect(option).toBeDefined();
+    expect(resolveKeywordReviewRoute(option!)).toMatchObject({
+      provider: 'gateway',
+      model: 'claude-channel-model',
+      baseUrl: 'https://gateway.example.test',
+      apiKey: 'channel-key',
+      textProtocol: 'openai',
+      keySource: 'channel',
+    });
+  });
+
   it('uses the synced official DeepSeek route instead of adding a second one', () => {
     memory.set(getModalityStorageKey('chat'), JSON.stringify([
       { id: 'ds', name: 'DeepSeek Flash', modality: 'chat', modelId: 'deepseek-flash', channelId: 'ds', textProtocol: 'openai' },

@@ -19,7 +19,7 @@ import (
 func TestLocalUploadStoresDataURL(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("AZHUO_CACHE_DIR", root)
-	handler := storageUploadHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := storageUploadHandler(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/assets/storage/upload", bytes.NewBufferString(`{"dataUrl":"data:image/png;base64,aGVsbG8="}`)))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `/storage/local/azhuo/generated/images/`) {
@@ -53,7 +53,7 @@ func TestStorageTestReportsIncompleteConfig(t *testing.T) {
 }
 
 func TestStorageMigrateStopsWithoutCredentials(t *testing.T) {
-	handler := storageMigrateHandler(config.Config{NodeEnv: "development", Upstream: "http://127.0.0.1:1"})
+	handler := storageMigrateHandler(config.Config{NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/assets/storage/migrate", bytes.NewBufferString(`{}`)))
 	if response.Code != http.StatusBadRequest || !bytes.Contains(response.Body.Bytes(), []byte("未配置有效的对象存储凭证")) {
@@ -66,7 +66,7 @@ func TestRemoteUploadFallsBackLocally(t *testing.T) {
 	previous := storage.Objects
 	storage.Objects = failObjectStore{}
 	t.Cleanup(func() { storage.Objects = previous })
-	handler := storageUploadHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := storageUploadHandler(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/assets/storage/upload", bytes.NewBufferString(`{"customConfig":{"persistResults":true,"accessKeyId":"k","secretAccessKey":"s","bucketName":"b"},"dataUrl":"data:image/png;base64,aGVsbG8="}`)))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `/storage/local/azhuo/generated/images/`) {

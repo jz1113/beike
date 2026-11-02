@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
+	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
@@ -25,13 +25,10 @@ const maxProxyBytes = 25 << 20
 var videoURLPattern = regexp.MustCompile(`(?i)\.(mp4|mov|webm|avi|m4v)(\?|!|$)`)
 var videoHostPattern = regexp.MustCompile(`(?i)video|snssdk\.com|bytecdn\.cn|yximgs|kwaicdn|kwimgs|kwai\.|kuaishou|douyinvod`)
 
-type proxyCacheEntry struct {
-	body        []byte
-	contentType string
-	etag        string
-}
+var proxyCache = media.NewProxyCache(128<<20, 256, 15*time.Minute, 8)
 
-var proxyCache sync.Map
+// PurgeExpiredProxyCache releases idle content from the API maintenance loop.
+func PurgeExpiredProxyCache() { proxyCache.PurgeExpired() }
 
 func ProxyImage(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +112,7 @@ func ProxyImage(cfg config.Config) http.Handler {
 		}
 		sum := sha256.Sum256(body)
 		etag := `W/"` + hex.EncodeToString(sum[:8]) + `"`
-		proxyCache.Store(cacheKey, proxyCacheEntry{body: body, contentType: contentType, etag: etag})
+		proxyCache.Store(cacheKey, media.ProxyCacheEntry{Body: body, ContentType: contentType, ETag: etag})
 		writeProxyBytes(w, contentType, etag, body)
 	})
 }

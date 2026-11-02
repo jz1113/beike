@@ -4,6 +4,7 @@ import { TextRequestRoutingFields } from './textRouting';
 export const ImageTaskStatusSchema = z.enum([
   'PENDING',
   'IN_PROGRESS',
+  'SUBMISSION_UNKNOWN',
   'SUCCESS',
   'FAILURE',
 ]);
@@ -158,6 +159,7 @@ export const HeadlineDesignRequestSchema = z.object({
   batchId: z.string().trim().max(128).optional(),
   itemId: z.string().trim().max(128).optional(),
   itemTitle: z.string().trim().max(200).optional(),
+  supplementaryRequirements: z.string().trim().max(2000, '补充要求最多 2000 字').optional(),
   previousDesign: z.string().trim().max(2000, '上一张设计摘要最多 2000 字').optional(),
   ...HeadlineCredentials,
 });

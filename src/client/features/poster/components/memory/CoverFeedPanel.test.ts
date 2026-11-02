@@ -70,7 +70,7 @@ describe('cover feed model picker', () => {
     const { html, picker } = render({ selectionId: 'removed' });
     expect(html).toContain('选择反推模型');
     expect(html).not.toContain('暂无可用的视觉模型');
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>投喂并反推<\/button>/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>反推并保存模板<\/button>/);
     picker.onSelectModel('channel-b-model');
     expect(base.onSelectModel).toHaveBeenCalledExactlyOnceWith('channel-b-model');
   });
@@ -78,7 +78,7 @@ describe('cover feed model picker', () => {
   it('disables the trigger, picker and submission while analysis is busy', () => {
     const { html, picker } = render({ busy: true });
     expect(html).toMatch(/aria-expanded="false" disabled=""/);
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>投喂并反推<\/button>/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>反推并保存模板<\/button>/);
     expect(picker.isOpen).toBe(false);
     picker.onSelectModel('channel-a-model');
     expect(base.onSelectModel).not.toHaveBeenCalled();
@@ -109,6 +109,6 @@ describe('cover feed model picker', () => {
     expect(picker.models).toEqual([]);
     expect(html).toContain('暂无可用的视觉模型');
     expect(html).toContain('去设置同步模型');
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>投喂并反推<\/button>/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>反推并保存模板<\/button>/);
   });
 });

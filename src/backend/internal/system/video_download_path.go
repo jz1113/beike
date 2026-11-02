@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+var selectVideoDirectory = pickVideoDirectory
+
 func cleanVideoDirectory(raw string) (string, error) {
 	cleaned := filepath.Clean(strings.TrimSpace(raw))
 	if cleaned == "" || cleaned == "." || !filepath.IsAbs(cleaned) {
@@ -19,13 +21,23 @@ func cleanVideoDirectory(raw string) (string, error) {
 	if err != nil || !info.IsDir() {
 		return "", errors.New("保存文件夹不存在")
 	}
-	return cleaned, nil
+	return filepath.EvalSymlinks(cleaned)
 }
 
 func safeVideoDestination(dir, name string) (string, error) {
 	name = strings.TrimSpace(name)
-	if name == "" || len(name) > 240 || name != filepath.Base(name) || strings.ContainsAny(name, `/\`) || strings.HasPrefix(name, ".") {
+	if name == "" || len(name) > 240 || name != filepath.Base(name) || strings.ContainsAny(name, `/\:<>"|?*`) || strings.HasPrefix(name, ".") {
 		return "", errors.New("文件名不合法")
+	}
+	for _, character := range name {
+		if character < 32 {
+			return "", errors.New("文件名不合法")
+		}
+	}
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".mp4", ".mov", ".webm", ".mkv", ".ogv":
+	default:
+		return "", errors.New("只允许保存视频文件")
 	}
 	stem := strings.TrimSuffix(name, filepath.Ext(name))
 	if reservedVideoName(stem) {
@@ -40,6 +52,11 @@ func safeVideoDestination(dir, name string) (string, error) {
 }
 
 func reservedVideoName(stem string) bool {
+	// Windows recognizes device names before the first dot, even when another
+	// extension follows. Keep these paths invalid on every host platform.
+	stem, _, _ = strings.Cut(stem, ".")
+	stem = strings.TrimRight(stem, " ")
+	stem = strings.NewReplacer("¹", "1", "²", "2", "³", "3").Replace(stem)
 	switch strings.ToLower(stem) {
 	case "con", "prn", "aux", "nul":
 		return true

@@ -16,8 +16,6 @@ interface Props {
   historyCount: number;
   isNewBatchConfirming: boolean;
   isFeeding: boolean;
-  adoptedCount: number;
-  pendingMemoryCount: number;
   onOpenSettings: () => void;
   onOpenRules: () => void;
   onOpenMemory: () => void;
@@ -34,22 +32,22 @@ interface Props {
 
 export function PosterToolbar({
   onBack, failedCount, completedCount, pendingCount, isRunning, isExporting,
-  isRestoring, isImporting, isReady, hasItems, historyCount, isNewBatchConfirming, isFeeding, adoptedCount, pendingMemoryCount, onOpenSettings, onOpenRules, onOpenMemory, onOpenFeed, onOpenHistory, onRetryFailed, onExport, onStartBatch, onStop,
+  isRestoring, isImporting, isReady, hasItems, historyCount, isNewBatchConfirming, isFeeding, onOpenSettings, onOpenRules, onOpenMemory, onOpenFeed, onOpenHistory, onRetryFailed, onExport, onStartBatch, onStop,
   onRequestNewBatch, onCancelNewBatch, onConfirmNewBatch,
 }: Props) {
   const isBusy = !isReady || isRunning || isExporting || isRestoring || isImporting;
   const dockButtonClass = '!border-slate-200 !bg-white !text-slate-950 shadow-sm hover:!border-slate-300 hover:!bg-slate-50 dark:!border-white/10 dark:!bg-[#1B1B1E] dark:!text-white dark:hover:!bg-[#26262B] dark:hover:!border-white/20';
-  const memoryLabel = pendingMemoryCount > 0 ? `封面记忆 · 已采纳 ${adoptedCount} · 待确认 ${pendingMemoryCount}` : `封面记忆 · 已采纳 ${adoptedCount}`;
+  const memoryLabel = '我的模板库';
   const generationControl: DockItemData = isRunning
     ? { icon: <Square className="h-4 w-4 fill-current" />, label: '停止生成', onClick: onStop, className: dockButtonClass }
     : failedCount > 0 && pendingCount === 0
       ? { icon: <RotateCcw className="h-4 w-4" />, label: `重试失败（${failedCount} 条）`, onClick: onRetryFailed, className: dockButtonClass, disabled: isBusy }
-      : { icon: <Play className="h-4 w-4 fill-current" />, label: pendingCount > 0 ? `开始批量生成（${pendingCount} 条）` : '没有待生成任务', onClick: onStartBatch, className: dockButtonClass, disabled: isBusy || pendingCount === 0 };
+      : { icon: <Play className="h-4 w-4 fill-current" />, label: pendingCount > 0 ? `开始生成（${pendingCount} 条）` : '没有待生成任务', onClick: onStartBatch, className: dockButtonClass, disabled: isBusy || pendingCount === 0 };
   const dockItems: DockItemData[] = [
     { icon: <Plus className="h-4 w-4" />, label: '新建批次', onClick: onRequestNewBatch, className: dockButtonClass, disabled: isBusy || !hasItems },
     generationControl,
     { icon: isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />, label: isRunning ? '生成结束后打包下载' : completedCount > 0 ? `打包下载（${completedCount} 张）` : '暂无可下载成品', onClick: onExport, className: dockButtonClass, disabled: isBusy || completedCount === 0 },
-    { icon: <History className="h-4 w-4" />, label: historyCount > 0 ? `历史批次（${historyCount}）` : '历史批次', onClick: onOpenHistory, className: dockButtonClass },
+    { icon: <History className="h-4 w-4" />, label: historyCount > 0 ? `历史批次（${historyCount}）` : '历史批次', onClick: onOpenHistory, className: dockButtonClass, disabled: isBusy },
     { icon: <Settings2 className="h-4 w-4" />, label: '生产设置', onClick: onOpenSettings, className: dockButtonClass },
   ];
 
@@ -67,7 +65,7 @@ export function PosterToolbar({
           封面规则
         </button>
         <button type="button" onClick={onOpenFeed} disabled={isFeeding} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-3 text-sm font-bold text-slate-800 dark:text-slate-100 shadow-sm transition-colors hover:border-slate-300 dark:hover:border-white/20 disabled:cursor-wait disabled:opacity-70" aria-label={isFeeding ? '反推中' : '投喂样张'} title="把封面样张交给小怪兽，逐张反推自己的特点">{isFeeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}<span className="hidden sm:inline">{isFeeding ? '反推中' : '投喂样张'}</span></button>
-        <button type="button" onClick={onOpenMemory} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-3 text-sm font-bold text-slate-800 dark:text-slate-100 shadow-sm transition-colors hover:border-slate-300 dark:hover:border-white/20" aria-label={memoryLabel} title="查看已采纳的封面记忆"><BrainCircuit className="h-4 w-4" /><span className="hidden sm:inline">{memoryLabel}</span></button>
+        <button type="button" onClick={onOpenMemory} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#1B1B1E]/90 px-3 text-sm font-bold text-slate-800 dark:text-slate-100 shadow-sm transition-colors hover:border-slate-300 dark:hover:border-white/20" aria-label={memoryLabel} title="按原图查找、管理和选用提示词模板"><BrainCircuit className="h-4 w-4" /><span className="hidden sm:inline">{memoryLabel}</span></button>
         <div className="ml-auto max-w-full">
         {isNewBatchConfirming ? (
           <div className="flex items-center gap-2 rounded-2xl border border-rose-300/30 bg-[#121116] p-2 shadow-[0_12px_28px_-18px_rgba(15,23,42,0.85)]">

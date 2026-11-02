@@ -6,7 +6,6 @@ import {
   Copy01Icon,
   FileAudioIcon,
   File01Icon,
-  Film01Icon,
   Presentation01Icon,
   StopIcon,
   Tick02Icon,
@@ -19,11 +18,14 @@ import { apiFetch } from '@client/shared/api/apiClient';
 import ThoughtLine from '@client/shared/ui/ThoughtLine';
 import MarkdownBody from '@client/shared/ui/markdown/MarkdownBody';
 import { getApprovedModel } from '@shared/domain/models/modelCatalog';
+import { findConfiguredModalityModel } from '@shared/domain/models/modalityStorage';
+import { selectedTextModel } from '@shared/domain/models/textModelRoute';
 import type { ApprovalRequestItem, AssistantItem } from '@shared/domain/assistant/types';
 import { stopAgentTask } from '../engine/submitAgentTask';
 import { parseAgentAttachments, visibleAgentPrompt, type ParsedAttachment } from '@client/shared/media/agentArtifact';
 import { presentAgentTurn } from '../model/agentToolActivity';
 import AgentToolActivity from './AgentToolActivity';
+import AgentVideoAttachment from './AgentVideoAttachment';
 
 const EMPTY_ITEMS: AssistantItem[] = [];
 const EMPTY_TASKS: GenerationTask[] = [];
@@ -46,9 +48,14 @@ function relativeTime(createdAt: number | undefined, now: number): string {
 }
 
 function usedModelName(task: GenerationTask): string {
-  const id = task.agentTurn?.modelUsed || task.model || '';
-  if (!id) return '';
-  return getApprovedModel(id)?.shortName || id;
+  for (const id of [task.agentTurn?.modelUsed, task.model, task.modelRouteKey]) {
+    if (!id) continue;
+    const configured = findConfiguredModalityModel(id);
+    const modelId = configured?.modelId || selectedTextModel(id).modelId;
+    if (!modelId || modelId.startsWith('chat_sync_')) continue;
+    return configured?.name?.trim() || getApprovedModel(modelId)?.shortName || modelId;
+  }
+  return '';
 }
 
 function AttachmentPill({ item }: { item: ParsedAttachment }) {
@@ -61,12 +68,7 @@ function AttachmentPill({ item }: { item: ParsedAttachment }) {
     );
   }
   if (item.kind === 'video') {
-    return (
-      <div className="flex h-20 w-28 flex-col items-center justify-center rounded-xl border border-black/10 bg-slate-900 text-white shadow-2xs dark:bg-white dark:text-slate-950">
-        <HugeiconsIcon icon={Film01Icon} size={22} className="text-cyan-400" />
-        <span className="mt-1 max-w-[90%] truncate text-[10px] text-slate-300">{item.name}</span>
-      </div>
-    );
+    return <AgentVideoAttachment key={item.url} item={item} />;
   }
   const icon = item.kind === 'audio' ? FileAudioIcon : item.kind === 'ppt' ? Presentation01Icon : File01Icon;
   return (
@@ -130,8 +132,9 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
   const renderCode = (code: string, lang: string, incomplete: boolean) => <GenerationPromptCodeBlock code={code} lang={lang} incomplete={incomplete} source={source} disabled={writing || task.status !== 'SUCCESS'} />;
 
   return (
-    <div className="w-full max-w-3xl space-y-6 py-2 select-text">
-      <div className="flex flex-col items-end gap-2.5">
+    <div className="mx-auto w-full max-w-3xl space-y-6 py-2 select-text">
+      <div className="flex flex-col items-end gap-2.5" aria-label="用户消息">
+        <span className="text-xs text-slate-500 dark:text-slate-400">你</span>
         {attachments.length > 0 && (
           <div className="flex max-w-[85%] flex-wrap justify-end gap-2">
             {attachments.map((item, idx) => (
@@ -146,7 +149,8 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
         )}
       </div>
 
-      <div className="space-y-3 pr-4">
+      <div className="min-w-0 space-y-3 py-2" aria-label="Agent 回复">
+        <span className="block text-xs font-medium text-slate-500 dark:text-slate-400">Agent</span>
         {writing && items.length === 0 && (
           <ThoughtLine label={statusText || '正在思考…'} working collapseOnSettle={false} collapsible={false} fontSize={13.5} className="text-slate-600 dark:text-slate-300" />
         )}
@@ -201,7 +205,7 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
         {task.agentTurn?.generationNotice && <p role="status" className="text-xs leading-6 text-slate-500">{task.agentTurn.generationNotice}</p>}
         {failure ? <p className="text-sm leading-6 text-rose-600 dark:text-rose-400">{failure}</p> : null}
 
-        <div className="flex items-center gap-2.5 pt-0.5 text-xs text-slate-400 dark:text-slate-500">
+        <div className="flex min-w-0 items-center gap-2.5 pt-1 text-xs text-slate-400 dark:text-slate-500">
           {writing ? (
             <button
               type="button"
@@ -243,8 +247,8 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
               </button>
             </>
           )}
-          {stamp ? <span>{stamp}</span> : null}
-          {modelName ? <span className="truncate">{modelName}</span> : null}
+          {stamp ? <span className="shrink-0">{stamp}</span> : null}
+          {modelName ? <span className="min-w-0 truncate" title={modelName}>{modelName}</span> : null}
         </div>
       </div>
     </div>

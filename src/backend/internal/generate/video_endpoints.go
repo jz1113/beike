@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"beike.local/cloud/src/backend/internal/system"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 var videoQueries sync.Map
@@ -109,7 +109,7 @@ func dashscopeVideoRoute(base, protocol string) bool {
 	case "dashscope", "qwen", "qianwen":
 		return true
 	}
-	return system.IsDashScopeGateway(base)
+	return gateway.IsDashScopeGateway(base)
 }
 
 // routeWanEndpoints picks one native DashScope URL for Qianwen hosts, and passthrough
@@ -118,10 +118,10 @@ func routeWanEndpoints(base, protocol string) (submit, query []string) {
 	const submitPath = "/api/v1/services/aigc/video-generation/video-synthesis"
 	const queryPath = "/api/v1/tasks/{taskId}"
 	if dashscopeVideoRoute(base, protocol) {
-		root := system.DashScopeRoot(base)
+		root := gateway.DashScopeRoot(base)
 		return []string{root + submitPath}, []string{root + queryPath}
 	}
-	root := strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")
+	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
 	parsed, _ := url.Parse(root)
 	if parsed != nil && (parsed.Hostname() == "ai.comfly.org" || parsed.Hostname() == "comfly.org") {
 		return []string{root + "/qwen" + submitPath}, []string{root + "/qwen" + queryPath}
@@ -138,7 +138,7 @@ func routeWanEndpoints(base, protocol string) (submit, query []string) {
 }
 
 func expandVideoURLs(base string, templates []string, taskID string) []string {
-	root := strings.TrimRight(system.NormalizeGatewayBaseURL(base), "/")
+	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
 	out := make([]string, 0, len(templates))
 	for _, template := range templates {
 		endpoint := strings.ReplaceAll(template, "{base}", root)

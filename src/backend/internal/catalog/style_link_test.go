@@ -10,7 +10,7 @@ import (
 )
 
 func TestParseLinkRejectsBadBody(t *testing.T) {
-	handler := parseLinkHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := parseLinkHandler(config.Config{})
 	array := httptest.NewRecorder()
 	handler.ServeHTTP(array, httptest.NewRequest(http.MethodPost, "/api/catalog/styles/parse-link", strings.NewReader(`[]`)))
 	if array.Code != http.StatusBadRequest || !strings.Contains(array.Body.String(), "请求体必须为 JSON 对象") {
@@ -24,7 +24,7 @@ func TestParseLinkRejectsBadBody(t *testing.T) {
 }
 
 func TestParseLinkRejectsWanbangForSocial(t *testing.T) {
-	handler := parseLinkHandler(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "production"})
+	handler := parseLinkHandler(config.Config{NodeEnv: "production"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/catalog/styles/parse-link", strings.NewReader(`{"url":"https://www.xiaohongshu.com/discovery/item/abc","preferredScraper":"wanbang"}`)))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "万邦只解析电商商品链接") {
@@ -33,7 +33,7 @@ func TestParseLinkRejectsWanbangForSocial(t *testing.T) {
 }
 
 func TestStyleExtractDeepSeekGate(t *testing.T) {
-	handler := extractStyleHandler(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
+	handler := extractStyleHandler(config.Config{NodeEnv: "development"})
 	unknown := httptest.NewRecorder()
 	handler.ServeHTTP(unknown, httptest.NewRequest(http.MethodPost, "/api/catalog/styles/extract", strings.NewReader(`{"model":"deepseek-official:unknown","imageUrls":["https://example.com/a.jpg"]}`)))
 	if unknown.Code != http.StatusBadRequest || !strings.Contains(unknown.Body.String(), "此 DeepSeek 官方模型尚未适配") {
@@ -49,7 +49,7 @@ func TestStyleExtractDeepSeekGate(t *testing.T) {
 func TestExtractStyleRequiresImageAndKey(t *testing.T) {
 	t.Setenv("AI_DRAWING_API_KEY", "")
 	t.Setenv("AI_API_KEY", "")
-	handler := extractStyleHandler(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
+	handler := extractStyleHandler(config.Config{NodeEnv: "development"})
 	missing := httptest.NewRecorder()
 	handler.ServeHTTP(missing, httptest.NewRequest(http.MethodPost, "/api/catalog/styles/extract", strings.NewReader(`{}`)))
 	if missing.Code != http.StatusBadRequest || !strings.Contains(missing.Body.String(), "请至少提供 1 张参考风格图片") {
@@ -70,7 +70,7 @@ func TestExtractStyleReturnsRecipe(t *testing.T) {
 	previous := styleHTTP
 	styleHTTP = func() *http.Client { return server.Client() }
 	t.Cleanup(func() { styleHTTP = previous })
-	handler := extractStyleHandler(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development"})
+	handler := extractStyleHandler(config.Config{NodeEnv: "development"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/catalog/styles/extract", strings.NewReader(`{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "窗边桌搭") || !strings.Contains(response.Body.String(), `"success":true`) {

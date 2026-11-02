@@ -19,8 +19,15 @@ type adoptedTrait struct {
 }
 
 func adoptedCoverSelection(ctx context.Context, db coverMemoryReader, workspace, requested string, hint ...string) ([]string, []string, string, error) {
-	rows, err := db.QueryContext(ctx, `SELECT "id","branch","rule","source","sampleId","createdAt" FROM "CoverMemoryEntry"
-		WHERE "workspaceId"=? AND "status"='adopted' ORDER BY "createdAt" DESC, "id" DESC`, workspace)
+	query := `SELECT "id","branch","rule","source","sampleId","createdAt" FROM "CoverMemoryEntry" WHERE "workspaceId"=? AND "status"='adopted'`
+	args := []any{workspace}
+	if requested == "corrections" {
+		query += ` AND ("source"='correction' OR "branch"='correction')`
+	} else if requested != "" && requested != "auto" && requested != "ungrouped" {
+		query += ` AND ("source"='correction' OR "branch"='correction' OR "sampleId"=?)`
+		args = append(args, requested)
+	}
+	rows, err := db.QueryContext(ctx, query+` ORDER BY "createdAt" DESC,"id" DESC`, args...)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -76,6 +83,16 @@ func adoptedCoverSelection(ctx context.Context, db coverMemoryReader, workspace,
 		}
 		lines = append(lines, "- ["+label+"] "+entry.rule)
 		ids = append(ids, entry.id)
+	}
+	if chosen != "" && chosen != "ungrouped" {
+		var raw string
+		err := db.QueryRowContext(ctx, `SELECT "deconstruction" FROM "CoverMemorySample" WHERE "workspaceId"=? AND "id"=?`, workspace, chosen).Scan(&raw)
+		if err != nil && err != sql.ErrNoRows {
+			return nil, nil, "", err
+		}
+		if prompt, legacy := coverTemplatePrompt(raw); prompt != "" && !legacy {
+			lines = append(lines, "完整模板（优先于该样张的旧拆解条目，但服从用户补充要求和全局纠正；将变量替换为当前商品和文案，最终不得留下占位符）：\n"+prompt)
+		}
 	}
 	if len([]rune(strings.Join(lines, "\n"))) > 16000 {
 		return nil, nil, "", errors.New("已采纳规则超过设计容量，请合并或停用重复规则后再生成")

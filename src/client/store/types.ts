@@ -310,7 +310,7 @@ export interface AssistantSlice {
   addAssistantMessage: (sessionId: string, message: AssistantMessage) => void;
   updateAssistantMessage: (sessionId: string, messageId: string, updates: Partial<AssistantMessage>) => void;
   persistAssistantNow: () => void;
-  hydrateAssistantSessions: () => Promise<void>;
+  hydrateAssistantSessions: (signal?: AbortSignal) => Promise<void>;
   setAssistantAttachments: (attachments: MediaAttachment[]) => void;
   addAssistantAttachment: (att: MediaAttachment) => void;
   removeAssistantAttachment: (index: number) => void;

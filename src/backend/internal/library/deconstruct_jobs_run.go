@@ -1,7 +1,6 @@
 package library
 
 import (
-	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -15,6 +14,8 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 )
 
 type liveDeconstructJob struct {
@@ -66,7 +67,7 @@ func submitDeconstructJobs(cfg config.Config, w http.ResponseWriter, r *http.Req
 	}
 	rawConfig, _ := json.Marshal(scrubJob(configBody, apiKey))
 	hash := dbworkshop.JobInputHash(items, configBody, baseURL)
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeJobError(w, http.StatusInternalServerError, "后台反推提交失败", "internal_error")
 		return
@@ -105,7 +106,7 @@ func stopDeconstructJobs(cfg config.Config, w http.ResponseWriter, r *http.Reque
 		live.stopping = true
 	}
 	deconstructJobsMu.Unlock()
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeJobError(w, http.StatusInternalServerError, "后台反推提交失败", "internal_error")
 		return
@@ -162,7 +163,7 @@ func runDeconstructJob(cfg config.Config, workspace, key string, live *liveDecon
 		}()
 	}
 	group.Wait()
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return
 	}
@@ -171,7 +172,7 @@ func runDeconstructJob(cfg config.Config, workspace, key string, live *liveDecon
 }
 
 func deconstructWorker(cfg config.Config, workspace string, live *liveDeconstructJob, jobID string, configBody map[string]any, baseURL, apiKey string) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return
 	}
@@ -296,7 +297,7 @@ type jobImageError string
 func (e jobImageError) Error() string { return string(e) }
 
 func RecoverDeconstructJobs(cfg config.Config) (int, error) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return 0, err
 	}

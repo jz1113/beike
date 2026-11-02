@@ -41,13 +41,15 @@ export async function pollGenerationTask(
   taskId: string,
   mediaType: 'image' | 'video' = 'image',
   modelId?: string,
+  options?: { modelSelection?: string; signal?: AbortSignal },
 ) {
   const endpoint = mediaType === 'video' ? '/api/generate/video' : '/api/generate/image';
   const model = modelId ? `&model=${encodeURIComponent(modelId)}` : '';
   const res = await apiFetch(`${endpoint}?taskId=${encodeURIComponent(taskId)}${model}`, {
+    ...(options?.signal ? { signal: options.signal } : {}),
     headers: {
       ...storageConfigHeaders(),
-      ...getGatewayClientHeaders(modelId),
+      ...getGatewayClientHeaders(options?.modelSelection || modelId),
     },
   });
   if (!res.ok) {

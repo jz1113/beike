@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -35,7 +36,7 @@ func imageGatewayError(cfg config.Config, r *http.Request, payload map[string]js
 	}
 	base := ImageDefaultBase()
 	if clientBase != "" {
-		base = system.NormalizeGatewayBaseURL(clientBase)
+		base = gateway.NormalizeGatewayBaseURL(clientBase)
 	}
 	if model == "gpt-image-2" && imageHostIs(base, "gapnet.ai") {
 		return http.StatusBadRequest, map[string]any{"success": false, "error": "模型与接口不匹配：gpt-image-2 请使用 Comfly，Gapnet 请使用 openai/gpt-image-2", "code": "internal_error"}
@@ -52,7 +53,7 @@ func imageAPIKey(cfg config.Config, r *http.Request, payload map[string]json.Raw
 		key = strings.TrimSpace(r.Header.Get("x-custom-api-key"))
 	}
 	defaults := ImageDefaultBase()
-	thirdParty := clientBase != "" && system.NormalizeGatewayBaseURL(clientBase) != system.NormalizeGatewayBaseURL(defaults)
+	thirdParty := clientBase != "" && gateway.NormalizeGatewayBaseURL(clientBase) != gateway.NormalizeGatewayBaseURL(defaults)
 	if key == "" && !thirdParty && !cfg.Production() {
 		key = strings.TrimSpace(os.Getenv("AI_DRAWING_API_KEY"))
 		if key == "" {

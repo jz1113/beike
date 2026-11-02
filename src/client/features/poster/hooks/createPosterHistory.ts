@@ -14,7 +14,7 @@ export function createPosterHistory(context: Pick<PosterState,
     | 'exportingRef' | 'importingRef' | 'ensureWorkspaceReady' | 'setIsRestoring' | 'setItemsIfAlive'
     | 'setPreviewState' | 'setImageModel' | 'setTitleModel'
     | 'setTitleHandling' | 'setImageQuality' | 'setConcurrency'
-    | 'setMemorySampleId' | 'abortRef' | 'abortAllItems'
+    | 'setMemorySampleId' | 'setSupplementaryRequirements' | 'abortRef' | 'abortAllItems'
   >) {
   const {
     activeBatchIdRef, activeBatchCreatedAtRef, activeBatchRevisionRef, persistedMediaKeysRef,
@@ -23,7 +23,7 @@ export function createPosterHistory(context: Pick<PosterState,
     setHistoryBatches, runningRef, restoringRef, exportingRef, importingRef,
     ensureWorkspaceReady, setIsRestoring, setItemsIfAlive, setPreviewState, setImageModel,
     setTitleModel, setTitleHandling, setImageQuality,
-    setConcurrency, setMemorySampleId, abortRef,
+    setConcurrency, setMemorySampleId, setSupplementaryRequirements, abortRef,
     abortAllItems,
   } = context;
   const ensureActiveBatch = () => {
@@ -191,6 +191,7 @@ export function createPosterHistory(context: Pick<PosterState,
       setImageQuality(settings.imageQuality);
       setConcurrency(normalizeConcurrency(settings.concurrency));
       setMemorySampleId(settings.memorySampleId || '');
+      setSupplementaryRequirements(settings.supplementaryRequirements || '');
       setNoticeIfAlive(`已恢复历史批次及生产设置，共 ${restored.length} 条；中断生图会先核对原任务。`);
       return true;
     } finally {

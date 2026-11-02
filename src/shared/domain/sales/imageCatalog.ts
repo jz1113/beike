@@ -1,4 +1,5 @@
-import type { VideoSalesCategory, VideoSalesShot } from './types';
+import type { SalesProductImageView, VideoSalesCategory } from './types';
+import { SALES_PRODUCT_IMAGE_VIEWS } from './types';
 
 export type SalesImageRole = 'main' | 'sku' | 'detail';
 
@@ -6,13 +7,28 @@ export interface SalesImageRef {
   index: number;
   url: string;
   role: SalesImageRole;
+  view?: SalesProductImageView;
   unavailable?: boolean;
 }
 
-export interface ImageAssignment {
-  shotId: number;
-  imageIndex: number;
-  reason?: string;
+export function isSalesProductImageView(value: unknown): value is SalesProductImageView {
+  return typeof value === 'string' && (SALES_PRODUCT_IMAGE_VIEWS as readonly string[]).includes(value);
+}
+
+export function setSalesImageView(
+  images: SalesImageRef[],
+  url: string,
+  view?: SalesProductImageView,
+): SalesImageRef[] {
+  return images.map((image) => {
+    if (image.url !== url) return image;
+    if (!view) {
+      const next = { ...image };
+      delete next.view;
+      return next;
+    }
+    return { ...image, view };
+  });
 }
 
 export function buildSalesImageCatalog(input: {
@@ -37,11 +53,11 @@ export function buildSalesImageCatalog(input: {
 }
 
 export function inferSalesCategory(text: string): VideoSalesCategory {
-  if (/美妆|护肤|彩妆|口红|面膜|精华|防晒/.test(text)) return 'beauty';
-  if (/食品|零食|茶|咖啡|饮料|牛奶|糖/.test(text)) return 'food';
-  if (/家居|家纺|纸巾|清洁|收纳|厨|日用/.test(text)) return 'home';
-  if (/服饰|鞋|包|衣|裤|裙/.test(text)) return 'fashion';
-  if (/数码|手机|耳机|电脑|充电|3c|电子/i.test(text)) return 'tech';
+  if (/服饰|服装|女装|男装|童装|内衣|针织|开衫|毛衣|卫衣|外套|夹克|风衣|大衣|羽绒|冲锋衣|衬衫|T恤|裤|牛仔|裙|连衣裙|半身裙|穿搭|鞋|靴|包|配饰|帽|围巾/.test(text)) return 'fashion';
+  if (/美妆|护肤|彩妆|口红|唇釉|粉底|气垫|眼影|面膜|精华|面霜|乳液|防晒|洁面|卸妆|香水|洗发|护发|沐浴/.test(text)) return 'beauty';
+  if (/食品|零食|茶|咖啡|冲饮|饮料|牛奶|酸奶|坚果|糕点|饼干|糖|巧克力|生鲜|水果|肉|粮油|调味/.test(text)) return 'food';
+  if (/数码|手机|耳机|音箱|电脑|平板|键盘|鼠标|相机|充电|数据线|家电|吹风机|吸尘器|3c|电子/i.test(text)) return 'tech';
+  if (/家居|家纺|床品|四件套|被|枕|纸巾|湿巾|清洁|洗洁|洗衣|收纳|厨|锅|碗|杯|日用|百货|家具|灯/.test(text)) return 'home';
   return 'other';
 }
 
@@ -79,23 +95,11 @@ export function cleanSalesProductProps(props: Record<string, string>, brand?: st
   return cleaned.sort((a, b) => propPriority(a[0]) - propPriority(b[0]));
 }
 
-export function omitSalesPriceClauses(text: string): string {
-  return text
-    .split(/[；;\n]/)
-    .map((part) => part.trim())
-    .filter((part) => part && !salesPricePropertyKey.test(part.split(/[:：]/, 1)[0]?.trim() || ''))
-    .join('；');
-}
-
 export function sellingPointsFromProps(props: Record<string, string>): string {
   return cleanSalesProductProps(props, props['品牌'])
     .slice(0, 8)
     .map(([key, value]) => `${key}：${value}`)
     .join('；');
-}
-
-export function usableSalesImages(images: SalesImageRef[]): SalesImageRef[] {
-  return images.filter((image) => image.url.trim() && !image.unavailable);
 }
 
 export function appendSalesImages(images: SalesImageRef[], urls: string[], role: SalesImageRole = 'main'): SalesImageRef[] {
@@ -113,25 +117,4 @@ export function appendSalesImages(images: SalesImageRef[], urls: string[], role:
 
 export function markSalesImageUnavailable(images: SalesImageRef[], index: number): SalesImageRef[] {
   return images.map((image) => (image.index === index ? { ...image, unavailable: true } : image));
-}
-
-export function applyStrictImageAssignments(shots: VideoSalesShot[], assignments: ImageAssignment[], images: SalesImageRef[]): VideoSalesShot[] {
-  const valid = new Set(images.map((image) => image.index));
-  const byShot = new Map(assignments.map((item) => [item.shotId, item]));
-  return shots.map((shot) => {
-    const found = byShot.get(shot.shotId);
-    if (!found || !valid.has(found.imageIndex)) throw new Error(`镜头 ${shot.shotId} 没有可用参考图`);
-    const reason = found.reason?.trim() || '';
-    if (!reason) throw new Error(`镜头 ${shot.shotId} 没有选择理由`);
-    return {
-      ...shot,
-      imageIndex: found.imageIndex,
-      selectionReason: reason,
-      promptStale: false,
-      assetUrl: undefined,
-      status: 'pending',
-      taskId: undefined,
-      failReason: undefined,
-    };
-  });
 }

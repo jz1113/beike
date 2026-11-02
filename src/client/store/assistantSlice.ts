@@ -55,6 +55,7 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
   let lastStreamPersistLen = 0;
   let lastStreamMessageId = '';
   let hydrationPromise: Promise<void> | null = null;
+  let hydrationSignal: AbortSignal | undefined;
 
   const getInitialAssistantModel = (): string => {
     if (typeof window === 'undefined') return 'gemini-3.7-flash';
@@ -223,9 +224,17 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
       persistAssistantSessions(state.assistantSessions, state.currentAssistantSessionId, { immediate: true });
     },
 
-    hydrateAssistantSessions: async () => {
-      if (typeof window === 'undefined') return;
-      if (hydrationPromise) return hydrationPromise;
+    hydrateAssistantSessions: async (signal) => {
+      if (typeof window === 'undefined' || signal?.aborted) return;
+      if (hydrationPromise) {
+        const previousSignal = hydrationSignal;
+        await hydrationPromise;
+        // A fresh bootstrap must recover after an older, disposed recovery
+        // finishes, rather than adopting its intentionally ignored result.
+        if (!signal?.aborted && previousSignal?.aborted) return get().hydrateAssistantSessions(signal);
+        return;
+      }
+      hydrationSignal = signal;
       hydrationPromise = (async () => {
         loadAssistantTombstones();
         const baseline = new Map(get().assistantSessions.map((s) => [s.id, s]));
@@ -234,6 +243,7 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
           remoteSessions = normalizeAssistantSessions(await fetchAssistantSessionsRemote());
         } catch {}
 
+        if (signal?.aborted) return;
         // Read live state after the request: sending, renaming, switching and deleting
         // are allowed while remote history loads and must win over that older snapshot.
         const state = get();
@@ -269,6 +279,7 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
         await hydrationPromise;
       } finally {
         hydrationPromise = null;
+        hydrationSignal = undefined;
       }
     },
 

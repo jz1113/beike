@@ -1,3 +1,4 @@
+import { editedPosterInput, type PosterInputEdit } from '../model/posterWorkflow';
 import { useEffect, useMemo } from 'react';
 import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
 import { loadSystemConfiguredModels } from '@client/shared/models/configuredModels';
@@ -22,7 +23,7 @@ export function usePosterProduction() {
     isExporting, notice, availableImageModels, setAvailableImageModels, availableTitleModels,
     setAvailableTitleModels, imageModel, setImageModel, titleModel, setTitleModel, titleHandling,
     setTitleHandling, imageQuality, setImageQuality, concurrency, setConcurrency, memorySampleId,
-    setMemorySampleId, isSettingsOpen, setIsSettingsOpen, settingsDraft, setSettingsDraft,
+    supplementaryRequirements, setSupplementaryRequirements, setMemorySampleId, isSettingsOpen, setIsSettingsOpen, settingsDraft, setSettingsDraft,
     previewState, setPreviewState, historyBatches, setHistoryBatches, itemsRef,
     availableTitleModelsRef, availableImageModelsRef, activeBatchIdRef, mediaWritesRef,
     recoveredResultUrlsRef, workspaceSecretRef, workspaceScopeRef, setItemsIfAlive,
@@ -91,13 +92,14 @@ export function usePosterProduction() {
         setImageQuality(saved.imageQuality || 'high');
         setConcurrency(normalizeConcurrency(saved.concurrency));
         setMemorySampleId(saved.memorySampleId || '');
+        setSupplementaryRequirements(saved.supplementaryRequirements || '');
         setIsReady(true);
       } catch (error) {
         if (!cancelled) setNoticeIfAlive(error instanceof Error ? error.message : '工作区初始化失败，请刷新页面重试。');
       }
     })();
     return () => { cancelled = true; };
-  }, [restoreInputDraft, availableImageModelsRef, availableTitleModelsRef, setAvailableImageModels, setAvailableTitleModels, setConcurrency, setHistoryBatches, setImageModel, setImageQuality, setIsReady, setMemorySampleId, setNoticeIfAlive, setTitleHandling, setTitleModel, workspaceScopeRef, workspaceSecretRef]);
+  }, [restoreInputDraft, availableImageModelsRef, availableTitleModelsRef, setAvailableImageModels, setAvailableTitleModels, setConcurrency, setHistoryBatches, setImageModel, setImageQuality, setIsReady, setSupplementaryRequirements, setMemorySampleId, setNoticeIfAlive, setTitleHandling, setTitleModel, workspaceScopeRef, workspaceSecretRef]);
 
   useEffect(() => {
     const onWorkspaceChange = (event: StorageEvent) => {
@@ -143,10 +145,10 @@ export function usePosterProduction() {
     return () => window.clearTimeout(timer);
     // The snapshot must be refreshed for every item and production-setting change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, imageModel, titleModel, titleHandling, imageQuality, concurrency, memorySampleId]);
+  }, [items, imageModel, titleModel, titleHandling, imageQuality, concurrency, memorySampleId, supplementaryRequirements]);
 
   const openProductionSettings = () => {
-    setSettingsDraft({ imageModel, titleModel, titleHandling, imageQuality, concurrency, memorySampleId });
+    setSettingsDraft({ imageModel, titleModel, titleHandling, imageQuality, concurrency, memorySampleId, supplementaryRequirements });
     setIsSettingsOpen(true);
   };
 
@@ -166,6 +168,7 @@ export function usePosterProduction() {
     setImageQuality(next.imageQuality);
     setConcurrency(next.concurrency);
     setMemorySampleId(next.memorySampleId || '');
+    setSupplementaryRequirements(next.supplementaryRequirements || '');
     const persisted = persistPosterProductionSettings(next);
     if (persisted) {
       setNoticeIfAlive(`生产设置已保存：${next.titleHandling === 'original' ? '保留原标题' : 'AI 优化标题'}，并行任务 ${next.concurrency} 条。`);
@@ -173,6 +176,13 @@ export function usePosterProduction() {
       setNoticeIfAlive('设置已应用到当前任务，但浏览器无法保存本地配置。');
     }
     closeProductionSettings();
+  };
+
+  const selectTemplate = (id: string) => {
+    if (runningRef.current || restoringRef.current || exportingRef.current || importingRef.current || !ensureWorkspaceReady()) return;
+    setMemorySampleId(id);
+    persistPosterProductionSettings({ ...state.currentSettings(), memorySampleId: id });
+    setNoticeIfAlive(id ? '已选用模板，接下来上传商品图和文案即可生成。已有设计重试保持原方案。' : '已改为自动匹配可用模板。');
   };
 
   const completedCount = useMemo(() => items.filter((item) => item.status === 'complete').length, [items]);
@@ -243,8 +253,8 @@ export function usePosterProduction() {
       return false;
     }
     const title = normalizeCoverTitle(value);
-    if (title.length < 7 || title.length > 12) {
-      setNoticeIfAlive('手动封面标题请保持 7–12 字；不会自动截断词语。');
+    if (title.length < 4 || title.length > 18) {
+      setNoticeIfAlive('手动封面标题请保持 4–18 字；不会自动截断词语。');
       return false;
     }
     if (title === item.coverTitle) {
@@ -254,13 +264,25 @@ export function usePosterProduction() {
     }
     updateItem(id, {
       coverTitle: title, isTitleEdited: true, status: 'idle', error: undefined,
-      memorySampleId: undefined, memoryEntryIds: undefined, memoryUsageId: undefined, memoryRevisionId: undefined, memoryWarning: undefined,
+      memoryEntryIds: undefined, memoryUsageId: undefined, memoryRevisionId: undefined, memoryWarning: undefined,
       resultUrl: undefined, prompt: undefined, promptVersion: undefined, designPlan: undefined,
       imageTaskId: undefined, imageSubmissionKey: undefined, generatedSceneUrl: undefined,
       generationRecoveryRequired: false,
     });
     setNoticeIfAlive('封面标题已更新，生成时会保留手动标题。');
     return true;
+  };
+
+  const editInput = (id: string, edit: PosterInputEdit): boolean => {
+    if (runningRef.current || restoringRef.current || exportingRef.current || importingRef.current || !ensureWorkspaceReady()) return false;
+    const item = itemsRef.current.find(row => row.id === id);
+    if (!item) return false;
+    try {
+      const next = editedPosterInput(item, edit);
+      if (next !== item) { updateItem(id, next); void persistActiveBatch(); }
+      setNoticeIfAlive('素材已保存。修改后的条目需重新准备方案，其他方案保留。');
+      return true;
+    } catch (error) { setNoticeIfAlive(error instanceof Error ? error.message : '素材保存失败'); return false; }
   };
 
   const isAborted = () => abortRef.current.aborted || workspaceChanged();
@@ -274,7 +296,7 @@ export function usePosterProduction() {
   };
 
   const { runItem, runBatch } = createPosterGeneration({ ...state, ...history, updateItem, signalForItem, isAborted });
-  const { exportZip, downloadOne, downloadOriginalScene } = createPosterDownloads(state);
+  const { exportZip, exportPlans, downloadOne, downloadOriginalScene } = createPosterDownloads(state);
 
   return {
     fileInputRef,
@@ -289,6 +311,6 @@ export function usePosterProduction() {
     completedCount, failedCount, historyBatches, activeBatchId: activeBatchIdRef.current,
     openProductionSettings, closeProductionSettings, saveProductionSettings,
     importFile, handleFileDrop, importPaste, clearItems, restoreHistoryBatch, deleteHistoryBatch,
-    updateItem, editCoverTitle, runItem, runBatch, stopBatch, exportZip, downloadOne, downloadOriginalScene,
+    selectTemplate, updateItem, editInput, editCoverTitle, runItem, runBatch, stopBatch, exportZip, exportPlans, downloadOne, downloadOriginalScene,
   };
 }

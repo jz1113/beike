@@ -3,47 +3,22 @@ import { useAppStore, type GenerationTask } from '@client/store';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { readSseEvents } from '@client/shared/api/sseStream';
-import { applyItemEvent, deriveTurnView } from '@client/shared/agent/turnItems';
+import { applyItemEvent, deriveTurnView, finishInterruptedItems } from '@client/shared/agent/turnItems';
 import type { AssistantItem } from '@shared/domain/assistant/types';
-import { parseAgentAttachments, visibleAgentPrompt, type ParsedAttachment } from '@client/shared/media/agentArtifact';
+import { visibleAgentPrompt } from '@client/shared/media/agentArtifact';
 import type { TaskUpdater } from './generationTaskTypes';
 import type { AgentTurnTaskData } from '@client/store/appStoreTypes';
 import { resolveAgentSystemPrompt } from '@client/shared/prompt-bar/agentDefinitions';
 import { composeSkillCatalog, composeSkillRuntime } from '@shared/domain/assistant/skills';
 import { loadPromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 import { generationBatchContext, generationPromptSources } from '@client/shared/agent/generationBatchSources';
+import { persistAssistantMedia } from '@client/shared/api/persistAssistantMedia';
+import { shouldAnalyzeVideoDirectly } from '@shared/domain/assistant/mediaAnalysis';
+import { agentMessageAttachments, priorAgentMessages } from '../model/agentConversation';
 import { executeGenerationBatchAction } from '@client/shared/agent/dispatchGenerationBatch';
+import { readAgentTurnSnapshot, recoverAgentTurn, restoreAgentTurnItems } from './recoverAgentTurn';
 
-const HISTORY_TURNS = 10;
 const liveStops = new Map<string, AbortController>();
-
-function formatAttachmentsForBackend(attachments: ParsedAttachment[]) {
-  return attachments.map((att) => ({
-    name: att.name,
-    type: att.kind === 'image' ? 'image' : att.kind === 'video' ? 'video' : 'document',
-    url: att.url.startsWith('agent-file:') ? '' : att.url,
-    extractedText: att.textSnippet || undefined,
-  }));
-}
-
-function priorMessages(task: GenerationTask) {
-  const prior = useAppStore.getState().generationTasks
-    .filter((item) =>
-      item.id !== task.id
-      && (item.mediaType === 'agent' || item.id.startsWith('agent-task-'))
-      && (!task.sessionId || item.sessionId === task.sessionId)
-      && (item.createdAt || 0) <= (task.createdAt || 0),
-    )
-    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
-  for (const item of prior) {
-    const user = visibleAgentPrompt(item.prompt || '');
-    const reply = item.agentTurn?.reply?.trim() || '';
-    if (user) messages.push({ role: 'user', content: user });
-    if (reply) messages.push({ role: 'assistant', content: reply });
-  }
-  return messages.slice(-HISTORY_TURNS * 2);
-}
 
 export function interruptAgentTurn(turnId?: string) {
   if (!turnId) return;
@@ -71,7 +46,7 @@ export async function submitAgentTask(
   signal?: AbortSignal,
 ) {
   const store = useAppStore.getState();
-  const rawModel = task.model || store.assistantModel || 'gemini-3.7-flash';
+  const rawModel = task.modelRouteKey || task.model || store.assistantModel || 'gemini-3.7-flash';
   const model = rawModel === 'deepseek-flash' ? 'deepseek-v4-flash' : rawModel;
   const turnId = task.agentTurn?.turnId || `turn-agent-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const threadId = task.sessionId || task.agentTurn?.threadId || `session-${task.batchId || 'agent'}`;
@@ -102,40 +77,40 @@ export async function submitAgentTask(
   });
 
   const currentPrompt = visibleAgentPrompt(task.prompt || '') || task.prompt || '';
-  const attachments = parseAgentAttachments(task);
-  const skillRuntime = composeSkillRuntime(store.getActiveAssistantSkill());
-  const prefs = loadPromptPreferences();
-  const { modelId: upstream, textProtocol } = selectedTextModel(model);
-  const routeOptions = getMultimodalClientOverrides(model);
-  const requestBody: Record<string, unknown> = {
-    turnId,
-    threadId,
-    model: model.startsWith('deepseek-official:') ? model : upstream,
-    textProtocol: textProtocol && textProtocol !== 'auto' ? textProtocol : selectedTextProtocol(model),
-    messages: [
-      ...priorMessages(task),
-      {
-        role: 'user',
-        content: currentPrompt || '你好',
-        attachments: formatAttachmentsForBackend(attachments),
-      },
-    ],
-    systemPrompt: [resolveAgentSystemPrompt(), skillRuntime?.systemPrompt || ''].filter(Boolean).join('\n\n'),
-    generationMode: 'auto',
-    clientContext: { currentView: 'generate', generationBatches: generationBatchContext(generationPromptSources(store, 'agent', threadId, task.id)) },
-    reasoningEffort: prefs.reasoning?.reasoningEffort || 'medium',
-    ...routeOptions,
-  };
-  if (skillRuntime) {
-    requestBody.skillId = skillRuntime.skillId;
-    if (skillRuntime.allowedTools?.length) requestBody.allowedTools = skillRuntime.allowedTools;
-    if (skillRuntime.resources.length) requestBody.skillResources = skillRuntime.resources;
-  }
-  const skillCatalog = composeSkillCatalog(store.getAllAssistantSkills());
-  if (skillCatalog.length) requestBody.skillCatalog = skillCatalog;
-
   let response: Response;
   try {
+    const attachments = await persistAssistantMedia(agentMessageAttachments(task), local.signal);
+    if (attachments.length) updateGenerationTask(task.id, { referenceImages: attachments.map((item, index) => item.url || task.referenceImages?.[index] || '') });
+    const skillRuntime = composeSkillRuntime(store.getActiveAssistantSkill());
+    const prefs = loadPromptPreferences();
+    const { modelId: upstream, textProtocol } = selectedTextModel(model);
+    const routeOptions = getMultimodalClientOverrides(model);
+    const messages = [
+      ...priorAgentMessages([...new Map([...store.sessions.flatMap((session) => session.tasks), ...store.generationTasks].map((item) => [item.id, item])).values()], task),
+      { role: 'user', content: currentPrompt || (attachments.length ? '请分析上传的素材。' : '你好'), attachments },
+    ];
+    const directVideo = shouldAnalyzeVideoDirectly(messages, skillRuntime?.skillId);
+    const requestBody: Record<string, unknown> = {
+      turnId,
+      threadId,
+      model: model.startsWith('deepseek-official:') ? model : upstream,
+      textProtocol: textProtocol && textProtocol !== 'auto' ? textProtocol : selectedTextProtocol(model),
+      messages,
+      enableAgentTools: !directVideo,
+      systemPrompt: [resolveAgentSystemPrompt(), skillRuntime?.systemPrompt || ''].filter(Boolean).join('\n\n'),
+      generationMode: 'auto',
+      clientContext: { currentView: 'generate', generationBatches: generationBatchContext(generationPromptSources(store, 'agent', threadId, task.id)) },
+      reasoningEffort: prefs.reasoning?.reasoningEffort || 'medium',
+      ...routeOptions,
+    };
+    if (skillRuntime) {
+      requestBody.skillId = skillRuntime.skillId;
+      if (skillRuntime.allowedTools?.length) requestBody.allowedTools = skillRuntime.allowedTools;
+      if (skillRuntime.resources.length) requestBody.skillResources = skillRuntime.resources;
+    }
+    const skillCatalog = composeSkillCatalog(store.getAllAssistantSkills());
+    if (!directVideo && skillCatalog.length) requestBody.skillCatalog = skillCatalog;
+
     response = await apiFetch('/api/assistant/turn/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -144,6 +119,7 @@ export async function submitAgentTask(
     });
   } catch (err: unknown) {
     liveStops.delete(task.id);
+    signal?.removeEventListener('abort', stop);
     if (local.signal.aborted) {
       interruptAgentTurn(turnId);
       return;
@@ -159,6 +135,7 @@ export async function submitAgentTask(
 
   if (!response.ok || !response.body) {
     liveStops.delete(task.id);
+    signal?.removeEventListener('abort', stop);
     let errMsg = `请求失败 HTTP ${response.status}`;
     try {
       const errJson = await response.json();
@@ -175,7 +152,7 @@ export async function submitAgentTask(
   let items: AssistantItem[] = [];
   const executedBatchActions = new Set<string>();
   let lastUpdateTime = 0;
-  let failed = false;
+  let receivedTerminal = false;
 
   const flushUpdate = (force = false) => {
     const now = Date.now();
@@ -189,6 +166,18 @@ export async function submitAgentTask(
     updateGenerationTask(task.id, {
       agentTurn: { ...agentTurn, items: [...items] },
       progress: view.content ? '70%' : view.toolActivity.length ? '50%' : '35%',
+    });
+  };
+
+  const completeTask = () => {
+    const view = deriveTurnView(items);
+    agentTurn.statusText = undefined;
+    updateGenerationTask(task.id, {
+      status: view.content.trim() ? 'SUCCESS' : 'FAILURE',
+      progress: view.content.trim() ? '100%' : undefined,
+      submissionRecoveryRequired: false,
+      failReason: view.content.trim() ? undefined : '模型没有返回内容，请重试。',
+      agentTurn: { ...agentTurn, items: [...items], reply: view.content, thinking: view.thinking, toolActivity: view.toolActivity },
     });
   };
 
@@ -220,8 +209,23 @@ export async function submitAgentTask(
         case 'meta':
           if (event.modelUsed) agentTurn.modelUsed = event.modelUsed;
           break;
+        case 'turn/snapshot': {
+          const snapshot = readAgentTurnSnapshot(event.snapshot, agentTurn.turnId || turnId, threadId);
+          if (!snapshot) throw new Error('对话快照与当前任务不匹配');
+          items = restoreAgentTurnItems(items, snapshot);
+          if (snapshot.modelUsed) agentTurn.modelUsed = snapshot.modelUsed;
+          receivedTerminal = snapshot.status === 'completed';
+          flushUpdate(true);
+          break;
+        }
+        case 'turn/completed':
+        case 'done':
+          receivedTerminal = true;
+          break;
+        case 'turn/interrupted':
+          throw new Error('本轮已中断，已生成内容已保留。');
         case 'error':
-          failed = true;
+          items = finishInterruptedItems(items, false);
           updateGenerationTask(task.id, {
             status: 'FAILURE',
             submissionRecoveryRequired: false,
@@ -232,48 +236,48 @@ export async function submitAgentTask(
         default:
           break;
       }
+      if (receivedTerminal) break;
     }
 
     if (local.signal.aborted) {
       interruptAgentTurn(agentTurn.turnId || turnId);
       return;
     }
-    if (failed) return;
-
-    const view = deriveTurnView(items);
-    if (!view.content.trim()) {
-      updateGenerationTask(task.id, {
-        status: 'FAILURE',
-        submissionRecoveryRequired: false,
-        failReason: '模型没有返回内容，请重试。',
-        agentTurn: { ...agentTurn, items: [...items], reply: '', thinking: view.thinking, toolActivity: view.toolActivity },
-      });
-      return;
-    }
-    agentTurn.reply = view.content;
-    agentTurn.thinking = view.thinking;
-    agentTurn.toolActivity = view.toolActivity;
-    agentTurn.items = items;
-    agentTurn.statusText = undefined;
-    updateGenerationTask(task.id, {
-      status: 'SUCCESS',
-      progress: '100%',
-      submissionRecoveryRequired: false,
-      agentTurn: { ...agentTurn, items: [...items] },
-    });
+    if (!receivedTerminal) throw new Error('连接在模型回复完成前关闭');
+    completeTask();
   } catch (streamErr: unknown) {
     if (local.signal.aborted) {
       interruptAgentTurn(agentTurn.turnId || turnId);
       return;
     }
-    const msg = streamErr instanceof Error ? streamErr.message : String(streamErr);
+    agentTurn.statusText = '连接暂时中断，正在恢复本轮结果…';
+    flushUpdate(true);
+    const snapshot = await recoverAgentTurn(agentTurn.turnId || turnId, threadId, local.signal, (saved) => {
+      items = restoreAgentTurnItems(items, saved);
+      if (saved.modelUsed) agentTurn.modelUsed = saved.modelUsed;
+      flushUpdate(true);
+    }).catch(() => null);
+    if (local.signal.aborted) {
+      interruptAgentTurn(agentTurn.turnId || turnId);
+      return;
+    }
+    if (snapshot?.status === 'completed') {
+      completeTask();
+      return;
+    }
+    const msg = snapshot?.error || (snapshot?.status === 'interrupted' ? '本轮已中断，已生成内容已保留。'
+      : streamErr instanceof Error ? streamErr.message : String(streamErr));
+    items = finishInterruptedItems(items, false);
+    const view = deriveTurnView(items);
+    agentTurn.statusText = undefined;
     updateGenerationTask(task.id, {
       status: 'FAILURE',
       submissionRecoveryRequired: false,
       failReason: `读取模型回复中断: ${msg}`,
-      agentTurn: { ...agentTurn, items: [...items] },
+      agentTurn: { ...agentTurn, items: [...items], reply: view.content, thinking: view.thinking, toolActivity: view.toolActivity },
     });
   } finally {
     liveStops.delete(task.id);
+    signal?.removeEventListener('abort', stop);
   }
 }

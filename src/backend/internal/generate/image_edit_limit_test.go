@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestEditReferenceLargerThanEightMegabytesIsCompressed(t *testing.T) {
@@ -23,9 +25,9 @@ func TestEditReferenceLargerThanEightMegabytesIsCompressed(t *testing.T) {
 		_, _ = w.Write(pngBytes)
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 
 	body, contentType, err := buildImageEditBody(t.Context(), map[string]any{
 		"model": "gpt-image-2", "prompt": "背面全身", "size": "1024x1536", "quality": "high",

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/gateway"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 type openaiImageProtocol struct{}
@@ -37,7 +36,7 @@ func (openaiImageProtocol) Submit(req imageRequest) (imageSubmitResult, error) {
 }
 
 func (openaiImageProtocol) Poll(req imagePollRequest) (pollParsed, map[string]any, bool) {
-	root := strings.TrimRight(system.NormalizeGatewayBaseURL(req.Base), "/")
+	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(req.Base), "/")
 	taskID := req.TaskID
 	urls := []string{
 		root + "/v1/images/tasks/" + taskID,
@@ -47,7 +46,7 @@ func (openaiImageProtocol) Poll(req imagePollRequest) (pollParsed, map[string]an
 		root + "/v1/query/image_generation?task_id=" + taskID,
 	}
 	for _, endpoint := range urls {
-		status, raw, err := PostModel(req.context(), http.MethodGet, endpoint, req.APIKey, nil, 3500*time.Millisecond)
+		status, raw, err := gateway.PostModel(req.context(), http.MethodGet, endpoint, req.APIKey, nil, 3500*time.Millisecond)
 		if err != nil || status < 200 || status >= 300 {
 			continue
 		}

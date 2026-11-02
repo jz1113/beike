@@ -4,3 +4,6 @@ import { z } from 'zod';
 export const TextProtocolSchema = z.enum(['auto', 'openai', 'gemini', 'anthropic']);
 export const TextRequestRoutingFields = { textProtocol: TextProtocolSchema.optional() };
 export type TextProtocol = z.infer<typeof TextProtocolSchema>;
+
+export const ReasoningEffortSchema = z.enum(['auto', 'low', 'medium', 'high', 'xhigh', 'max']);
+export const TextReasoningRoutingFields = { reasoningEffort: ReasoningEffortSchema.optional() };

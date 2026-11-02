@@ -5,8 +5,26 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestTurnMessagesExposeVideoReferencesAcrossConversation(t *testing.T) {
+	t.Setenv("AZHUO_CACHE_DIR", t.TempDir())
+	raw := json.RawMessage(`[{"role":"user","content":"分析视频","attachments":[{"type":"video","name":"参考.webm","url":"/storage/local/assistant-attachments/reference.webm"}]},{"role":"assistant","content":"已查看采样画面"},{"role":"user","content":"继续细化最后一个镜头"}]`)
+	messages, _ := turnMessages(httptest.NewRequest("POST", "/", nil), "video-thread", map[string]json.RawMessage{"messages": raw})
+	if len(messages) != 3 {
+		t.Fatalf("history and video instructions: %#v", messages)
+	}
+	content, _ := messages[0]["content"].(string)
+	if !strings.Contains(content, "/storage/local/assistant-attachments/reference.webm") || !strings.Contains(content, "参考.webm") {
+		t.Fatalf("video reference lost: %s", content)
+	}
+	if messages[2]["content"] != "继续细化最后一个镜头" {
+		t.Fatalf("latest prompt changed: %#v", messages[2])
+	}
+
+}
 
 func TestTurnMessagesInlineLatestImagesOnly(t *testing.T) {
 	dir := t.TempDir()

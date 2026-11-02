@@ -1,3 +1,4 @@
+import { formatUserError } from "@shared/domain/models/upstreamErrors";
 import { type GenerationTask } from '@client/store';
 import { getAspectRatioClass, getBatchGridClass } from '../model/generateCanvasLayout';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
@@ -99,9 +100,9 @@ export default function FeedExpandedGrid({
                     <p className="text-xs font-bold text-red-700">生成失败</p>
                     <p
                       className="text-[10px] text-red-500 w-full truncate leading-tight"
-                      title={task.failReason || '模型渲染失败或接口超时'}
+                      title={formatUserError(task.failReason || '模型渲染失败或接口超时')}
                     >
-                      {task.failReason || '模型渲染失败或接口超时'}
+                      {formatUserError(task.failReason || '模型渲染失败或接口超时')}
                     </p>
                   </div>
                   <div className="flex items-center justify-center gap-1.5 pt-1">

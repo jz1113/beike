@@ -8,12 +8,13 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
 )
 
 func CategorySkills(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeSkillError(w, 500, "细分技能库暂时无法读取")
 			return

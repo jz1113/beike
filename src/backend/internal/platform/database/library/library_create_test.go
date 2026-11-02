@@ -64,3 +64,47 @@ func TestCreateLibraryAssetStoresShotOrder(t *testing.T) {
 		t.Fatalf("order %d %v", order, err)
 	}
 }
+
+func TestCreateActionMediaRetainsTypeAndSource(t *testing.T) {
+	db := openLibraryUpdateDB(t)
+	createLibraryTable(t, db, "ActionAsset", actionAssetColumns)
+	for _, kind := range []string{"image", "video", "depth-image", "depth-video"} {
+		item, err := CreateLibraryAsset(context.Background(), db, "local", "action", map[string]any{
+			"title": "动作", "mediaType": kind, "mediaUrl": "/result", "sourceUrl": "/original",
+		})
+		if err != nil || !strings.Contains(string(item), `"mediaType":"`+kind+`"`) || !strings.Contains(string(item), `"mediaUrl":"/result"`) || !strings.Contains(string(item), `"sourceUrl":"/original"`) {
+			t.Fatalf("kind %s: %s %v", kind, item, err)
+		}
+	}
+	for _, data := range []map[string]any{{"mediaType": "audio"}, {"mediaType": "depth-video"}, {"mediaType": "video", "mediaUrl": 3}} {
+		if _, err := CreateLibraryAsset(context.Background(), db, "local", "action", data); err == nil {
+			t.Fatalf("accepted invalid media: %+v", data)
+		}
+	}
+	var count int
+	if err := db.QueryRow(`SELECT count(*) FROM "ActionAsset"`).Scan(&count); err != nil || count != 4 {
+		t.Fatalf("partial writes: %d %v", count, err)
+	}
+}
+
+func TestSaveDepthActionRetryIsScopedAndDoesNotDuplicate(t *testing.T) {
+	db := openLibraryUpdateDB(t)
+	createLibraryTable(t, db, "ActionAsset", actionAssetColumns)
+	data := map[string]any{"clientTaskId": "depth-receipt", "title": "深度动作", "mediaType": "depth-video", "mediaUrl": "/depth.mp4", "sourceUrl": "/original.mp4"}
+	first, err := CreateLibraryAsset(context.Background(), db, "mine", "action", data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := CreateLibraryAsset(context.Background(), db, "mine", "action", data)
+	if err != nil || string(first) != string(again) {
+		t.Fatalf("retry %s %v", again, err)
+	}
+	other, err := CreateLibraryAsset(context.Background(), db, "other", "action", data)
+	if err != nil || string(other) == string(first) {
+		t.Fatalf("workspace %s %v", other, err)
+	}
+	var count int
+	if err := db.QueryRow(`SELECT count(*) FROM "ActionAsset"`).Scan(&count); err != nil || count != 2 {
+		t.Fatalf("count %d %v", count, err)
+	}
+}

@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 type imageTaskDraft struct {
@@ -27,23 +29,7 @@ type imageTaskDraft struct {
 }
 
 func openTaskDB(cfg config.Config) (*sql.DB, error) {
-	return httpx.OpenDB(cfg)
-}
-
-func reuseImageTask(ctx context.Context, db *sql.DB, workspace, key string) (string, string, string, bool) {
-	if key == "" {
-		return "", "", "", false
-	}
-	var id, taskID, result string
-	err := db.QueryRowContext(ctx, `
-		SELECT "id", COALESCE("taskId", ''), "resultUrl" FROM "ImageTask"
-		WHERE "workspaceId" = ? AND "idempotencyKey" = ? AND "status" = 'SUCCESS' AND COALESCE("resultUrl", '') != ''
-			AND COALESCE(NULLIF("mediaType", ''), 'image') = 'image'
-		ORDER BY "createdAt" DESC LIMIT 1`, workspace, key).Scan(&id, &taskID, &result)
-	if err != nil || result == "" {
-		return "", "", "", false
-	}
-	return id, taskID, result, true
+	return database.OpenRequired(cfg.SQLiteFile())
 }
 
 func settleImageSubmission(ctx context.Context, db *sql.DB, recordID string, patch imageTaskDraft) error {
@@ -103,9 +89,9 @@ func productExists(ctx context.Context, db *sql.DB, id string) bool {
 	return err == nil && found != ""
 }
 
-func taskStatus(ctx context.Context, db *sql.DB, taskID string) (status, result, reason, usage string, ok bool, err error) {
+func taskStatus(ctx context.Context, db *sql.DB, scope taskScope, taskID string) (status, result, reason, usage string, ok bool, err error) {
 	var state, url, fail sql.NullString
-	err = db.QueryRowContext(ctx, `SELECT "status", "resultUrl", "failReason" FROM "ImageTask" WHERE "taskId" = ? LIMIT 1`, taskID).
+	err = db.QueryRowContext(ctx, `SELECT "status", "resultUrl", "failReason" FROM "ImageTask" WHERE "workspaceId" = ? AND COALESCE(NULLIF("mediaType", ''), 'image') = ? AND "taskId" = ? LIMIT 1`, scope.workspace, scope.media, taskID).
 		Scan(&state, &url, &fail)
 	if err == sql.ErrNoRows {
 		return "", "", "", "", false, nil
@@ -113,37 +99,37 @@ func taskStatus(ctx context.Context, db *sql.DB, taskID string) (status, result,
 	if err != nil {
 		return "", "", "", "", false, err
 	}
-	return state.String, url.String, fail.String, readTaskUsage(ctx, db, taskID), true, nil
+	return state.String, url.String, fail.String, readTaskUsage(ctx, db, scope, taskID), true, nil
 }
 
-func readTaskUsage(ctx context.Context, db *sql.DB, taskID string) string {
+func readTaskUsage(ctx context.Context, db *sql.DB, scope taskScope, taskID string) string {
 	var usage sql.NullString
-	err := db.QueryRowContext(ctx, `SELECT "usage" FROM "ImageTask" WHERE "taskId" = ? LIMIT 1`, taskID).Scan(&usage)
+	err := db.QueryRowContext(ctx, `SELECT "usage" FROM "ImageTask" WHERE "workspaceId" = ? AND COALESCE(NULLIF("mediaType", ''), 'image') = ? AND "taskId" = ? LIMIT 1`, scope.workspace, scope.media, taskID).Scan(&usage)
 	if err != nil {
 		return ""
 	}
 	return usage.String
 }
 
-func updateTaskTerminal(ctx context.Context, db *sql.DB, taskID, status, result, reason, usageJSON string) {
+func updateTaskTerminal(ctx context.Context, db *sql.DB, scope taskScope, taskID, status, result, reason, usageJSON string) {
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	if usageJSON != "" {
 		_, err := db.ExecContext(ctx, `
 			UPDATE "ImageTask" SET "status" = ?, "resultUrl" = ?, "failReason" = ?, "usage" = ?, "updatedAt" = ?
-			WHERE "taskId" = ? AND "status" IN ('PENDING', 'IN_PROGRESS')`,
-			status, emptyNull(result), emptyNull(reason), usageJSON, now, taskID)
+			WHERE "workspaceId" = ? AND COALESCE(NULLIF("mediaType", ''), 'image') = ? AND "taskId" = ? AND "status" IN ('PENDING', 'IN_PROGRESS', 'SUBMISSION_UNKNOWN')`,
+			status, emptyNull(result), emptyNull(reason), usageJSON, now, scope.workspace, scope.media, taskID)
 		if err == nil {
 			return
 		}
 	}
 	_, _ = db.ExecContext(ctx, `
 		UPDATE "ImageTask" SET "status" = ?, "resultUrl" = ?, "failReason" = ?, "updatedAt" = ?
-		WHERE "taskId" = ? AND "status" IN ('PENDING', 'IN_PROGRESS')`,
-		status, emptyNull(result), emptyNull(reason), now, taskID)
+		WHERE "workspaceId" = ? AND COALESCE(NULLIF("mediaType", ''), 'image') = ? AND "taskId" = ? AND "status" IN ('PENDING', 'IN_PROGRESS', 'SUBMISSION_UNKNOWN')`,
+		status, emptyNull(result), emptyNull(reason), now, scope.workspace, scope.media, taskID)
 }
 
-func rememberTaskUsage(ctx context.Context, cfg config.Config, taskID string, usage map[string]any) {
-	raw := EncodeUsage(usage)
+func rememberTaskUsage(ctx context.Context, cfg config.Config, scope taskScope, taskID string, usage map[string]any) {
+	raw := gateway.EncodeUsage(usage)
 	if raw == "" || taskID == "" {
 		return
 	}
@@ -154,14 +140,14 @@ func rememberTaskUsage(ctx context.Context, cfg config.Config, taskID string, us
 	defer db.Close()
 	_, _ = db.ExecContext(ctx, `
 		UPDATE "ImageTask" SET "usage" = ?
-		WHERE "taskId" = ? AND ("usage" IS NULL OR "usage" = '')`, raw, taskID)
+		WHERE "workspaceId" = ? AND COALESCE(NULLIF("mediaType", ''), 'image') = ? AND "taskId" = ? AND ("usage" IS NULL OR "usage" = '')`, raw, scope.workspace, scope.media, taskID)
 }
 
-func polledTaskBody(ctx context.Context, cfg config.Config, taskID string, parsed pollParsed, upstream map[string]any) map[string]any {
-	usage := NormalizeUsage(upstream)
+func polledTaskBody(ctx context.Context, cfg config.Config, scope taskScope, taskID string, parsed pollParsed, upstream map[string]any) map[string]any {
+	usage := gateway.NormalizeUsage(upstream)
 	if parsed.status == "SUCCESS" || parsed.status == "FAILURE" {
 		if db, err := openTaskDB(cfg); err == nil {
-			updateTaskTerminal(ctx, db, taskID, parsed.status, parsed.result, parsed.reason, EncodeUsage(usage))
+			updateTaskTerminal(ctx, db, scope, taskID, parsed.status, parsed.result, parsed.reason, gateway.EncodeUsage(usage))
 			_ = db.Close()
 		}
 	}
@@ -176,7 +162,7 @@ func polledTaskBody(ctx context.Context, cfg config.Config, taskID string, parse
 }
 
 func putStoredUsage(body map[string]any, raw string) {
-	if usage := DecodeUsage(raw); usage != nil {
+	if usage := gateway.DecodeUsage(raw); usage != nil {
 		body["usage"] = usage
 	}
 }

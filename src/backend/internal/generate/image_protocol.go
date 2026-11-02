@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"beike.local/cloud/src/backend/internal/system"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 type imageRequest struct {
@@ -95,7 +95,7 @@ func resolveImageProtocol(base, explicit string) imageProtocol {
 	case "gemini":
 		return geminiImageProtocol{}
 	}
-	if system.IsDashScopeGateway(base) {
+	if gateway.IsDashScopeGateway(base) {
 		return dashscopeImageProtocol{}
 	}
 	if isGeminiOfficialGateway(base) {

@@ -13,7 +13,7 @@
 | `src/shared/data` | 前后端共用的 JSON 数据与官方种子 |
 | `database` | 可选的已有本地数据库和备份，整目录不提交 |
 | `tools/configs` | 本地环境模板、Vite、TypeScript、Vitest、ESLint、依赖边界与质量基线 |
-| `tools/scripts` | `common` 工具链查找、`web` 构建/启动/产物清理、`quality` 检查、`depth` 推理与环境、`db-maintenance` 数据维护 |
+| `tools/scripts` | `common` 工具链查找、`web` 构建/启动/产物清理、`quality` 检查、`depth` 推理与环境、`atlas` 开源人像与姿态图鉴同步、`db-maintenance` 数据维护 |
 | `tools/launchers` | Windows PowerShell 启动器实现，由根目录 `.bat` 调用 |
 | `tools/deploy` | 服务与反向代理模板、服务器安装入口 |
 | `tools/build` | 自动生成的 API 可执行文件和 `ui` 前端产物 |
@@ -71,6 +71,7 @@ src/client/
 | `workshop` | `stage` / `product` | 各流程阶段 / 商品选择与参考图展示 |
 | `workshop` | `settings` / `delivery` / `history` | 生成配置 / 成图、进度、审核与交付 / 历史批次 |
 | `assistant` | `message` / `panels` / `brand-kit` / `document` / `skill` | 对话消息 / 功能面板 / 品牌 / 文档 / 技能 |
+| `sales` | `atlas` | 开源人像与多视角姿态图鉴抽屉、虚拟化网格、筛选工具栏与高清灯箱 |
 
 资产中心 `AssetCenter`、电商图文组装组件 `BatchWorkshopView`、设置通用的 `SettingsControls / SettingsSidebar / SettingsPreview` 留在各自 components 根目录。只在本功能使用的共用组件无需提升到全局 shared。
 
@@ -81,7 +82,7 @@ src/client/
 ### 浏览器共享能力
 
 - `shared/api` 提供统一鉴权请求和缓存；`shared/api/generation` 放提交、中止、恢复、深度任务与回退顺序。
-- `shared/ui`、`shared/icons`、`shared/hooks` 放跨功能组件、图标和 hook；`shared/ui/markdown` 放 Markdown 渲染，`shared/ui/studio` 放全屏工作台外壳。
+- `shared/ui`、`shared/icons`、`shared/hooks` 放跨功能组件、图标和 hook；`shared/ui/markdown` 放 Markdown 渲染，`shared/ui/studio` 放全屏工作台外壳、侧滑抽屉（`StudioSheet`）、毛玻璃悬浮选单（`StudioPopover`）、可拖拽双栏工作台（`ResizableWorkbench`）与波形音频试听条（`StudioAudioPlayer`）。
 - `shared/media` 放下载、缓存、裁切、缩放与媒体处理；`shared/media/widgets` 放封面、文件夹、点阵和背景组件。
 - `shared/agent` 放助手回合事件、素材映射、编辑草稿、提交回执与并发偏好，供助手和生成页共用。
 - `shared/skills` 统一技能列表、详情与编辑；`shared/prompt-bar` 放跨功能的提示词输入。
@@ -103,10 +104,10 @@ src/client/
 | 封面 | `poster` | `generate/poster` |
 | 词包 | `keywords` | `keywords` |
 | 采集 | `collect` | `catalog`、`platform/collect` |
-| 电商视频 | `sales` | `generate/sales` |
+| 电商视频 | `sales` | `sales`、`catalog`（共用采集） |
 | 技能 | `skills` | `catalog`、`platform/database` |
 
-页面入口统一为 `PosterStudio / KeywordsStudio / SalesStudio`。带货的共享业务规则位于 `src/shared/domain/sales`，模型协议适配位于后端 `gateway`。
+页面入口统一为 `PosterStudio / KeywordsStudio / SalesStudio`。商品采集的目录与选图规则位于 `src/shared/domain/sales`，模型协议适配位于后端 `gateway`。
 
 数字人与 PPT 功能重建中，首页仅保留入口占位，旧视图参数回到首页。旧工作室、专属契约与生成接口已移除；数字人历史数据库迁移、用户数据和模型线路配置保留。`generate/export` 继续服务电商图文等功能的通用 ZIP 导出。
 
@@ -126,7 +127,7 @@ src/client/
 | `internal/catalog` | 类目、商品、风格、技能与采集入口 |
 | `internal/library` / `internal/assets` | 素材库、图组、查重与反推 / 存储、生图任务与素材生命周期 |
 | `internal/generate` | 图像、视频、分析、文案、语音与画布任务编排 |
-| `internal/generate/{depth,poster,export,sales}` | 深度推理、封面设计、文件导出、电商视频子包 |
+| `internal/generate/{depth,poster,export}` | 深度推理、封面设计、文件导出子包 |
 | `internal/workshop` / `internal/keywords` | 电商图文批次与输出审核 / 关键词审核与提交保护 |
 | `internal/assistant` | 回合、记忆、沙箱、工具与运行时；`extract` 抽取文档，`sessions` 读写会话 |
 | `internal/gateway` | 模型协议、提交适配与文本流式处理 |
@@ -136,7 +137,9 @@ src/client/
 
 Go 的同目录文件共同组成一个包，共享未导出类型。领域包内按文件前缀定位职责，例如 `generate/image_*.go`、`generate/video_*.go` 与 `gateway/text_*.go`；拆子包须先具备独立职责和稳定依赖，避免仅为减少文件数扩大导出接口。
 
-当前 gateway 的模态入口是 `video_submit.go`、`audio_submit.go`、`threed_submit.go` 与 `multimodal_submit.go`，公共提交在 `submit.go / adapter.go`，文本协议在 `text_*.go`。图像和视频部分上游协议仍与 generate 任务编排相邻；不存在独立的 `gateway/image` 等目录，也没有单独的 dispatcher.go。接入新模型先复用现有适配入口，厂商文档见 [models.md](models.md)。
+当前生产流程使用 gateway 的 `video_submit.go`、`submit.go` 和 `text_*.go`；`audio_submit.go / threed_submit.go / multimodal_submit.go / adapter.go` 的通用 dispatcher 目前只由本簇测试消费，暂留验证，不作为已接入产品的入口。中性 HTTP 调用、chat 请求和 usage 规范化在 `model_call.go`，网关 URL 规范化在 `urls.go`，各领域直接依赖 gateway；默认模型与领域提交状态机仍由领域负责。图像和视频部分上游协议仍与 generate 任务编排相邻；不存在独立的 `gateway/image` 等目录，也没有单独的 dispatcher.go。接入新模型先复用现有适配入口，厂商文档见 [models.md](models.md)。
+
+`platform/database/connection.go` 管理 SQLite 连接与连接参数；领域用 `OpenRequired(cfg.SQLiteFile())` 明确传路径并负责关闭，`httpx` 不再打开数据库。迁移仍只由启动流程显式执行，不在普通请求中隐式升级 schema。
 
 路由修改后执行 `pnpm openapi:write`，更新共享 OpenAPI 和 `src/client/shared/api/openapi-types.ts`。Go 契约测试及 `pnpm check:openapi` 校验路由覆盖和生成类型。未登记的 `/api` 请求返回不存在。
 
@@ -167,6 +170,7 @@ Agent 运行技能的可维护文件包存放在 `src/shared/domain/assistant/sk
 - `pnpm dev` 启动 Go API 与 Vite，`pnpm dev:ui` 仅启动 Vite。HTML 根是 `src/client`，环境配置目录是仓库根，公开资源来自 `src/client/public`。
 - 所有入口共用 `tools/configs/vite.config.ts`；`pnpm build:ui` 输出到 `tools/build/ui`，`pnpm build:api` 输出到 `tools/build/beike-api`（Windows 为 `.exe`）。`pnpm build` 完成类型检查及前后端构建；`pnpm start` 只启动已有 API 并托管前端，缺少产物时退出并提示构建。部署模板和 `WEB_DIST_DIR` 指向前端产物目录。
 - Go 查找集中在 `tools/scripts/common/go-toolchain.mjs`，双击启动器、开发构建、迁移与质量检查复用同一规则：从 `go.mod` 读取最低版本，使用本地稳定工具链；显式 `GO_BIN` 无效或版本过低时报错，否则从 PATH 和常见安装位置查找。`gofmt` 从选定 SDK 的 GOROOT 定位。生产启动不要求 Go 编译器。
+- API 构建通过 `tools/scripts/web/go-build.mjs` 先以本机模块缓存和只读依赖清单构建，避免可选版本元数据查询拖慢日常启动；缺少依赖或校验记录时按原有 Go 网络配置重试。保留源码增量编译和依赖校验，不修改全局代理配置。开发启动日志显示构建、健康检查与总耗时。
 - `/app_logo.png`、`/inspirations/...` 等公开 URL 保持稳定。组件迁移同步更新静态导入、动态加载、样式路径与质量基线中的文件路径。
 - 首页大图可以配置 `thumbnail` 供列表使用，查看、下载与参考图继续使用 `image` 原图。`pnpm media:thumbnails` 用本机 FFmpeg 重建 `public/inspirations/thumbnails` 中的预览图。
 - 首页作品按预先声明的比例排版，分页追加完整行；图片解码、重试和视频播放不改变已有卡片的位置。隐藏首页时暂停分页和媒体预览。作品预览只展示已记录的模型、日期与规格，不填入推测值；本地发布记录读取时兼容旧字段并校验格式，写入失败时提示错误。
@@ -206,3 +210,15 @@ GitHub CI 额外运行 Gitleaks，配置位于 `tools/configs/gitleaks.toml`，�
 3. 在 `src/backend/internal/app/server.go` 装配路由与中间件，执行 `pnpm openapi:write` 同步契约。
 4. 在 `src/client/features/<功能>` 建立页面和实际需要的 components、hooks、api、model；组件分类直接存放实现。
 5. 在 `src/client/store/appView.ts`、`src/client/app/routes.ts`、`AppSidebar.tsx` 与 `App.tsx` 登记视图和按需加载；更新相关产品文档后运行 `pnpm check`。
+
+生成任务状态、结果和 usage 的读写统一携带工作区和媒体类型；托管模式先核对本地任务归属，再查询缓存或上游。仅本机 `local` 工作区兼容未落盘的旧上游任务 ID，已落盘的他区/其他媒体任务不能走该回退。生图幂等标识通过单条 SQLite 写入原子领取，进行中、未知结果与明确失败均复用原回执，不因重试再次提交；改变参数必须使用新标识。新回执 ID 保存输入指纹，旧成功回执继续可读；请求取消后使用有界独立 context 保存上游回执。
+
+视频下载的模式选择与队列放在 `collect/hooks`，浏览器逐文件下载放在 `collect/api/browserVideoDownloads.ts`；后端 `system/video_download*` 负责本机目录授权、受控写入和任务归属。托管环境仅通过只读视频代理交付浏览器，不能接受客户端服务器路径。路径授权和任务仅在当前服务进程内有效，不作为数据库持久任务。
+
+媒体代理的进程缓存实现位于 `platform/media/cache.go`，由 system 配置和持有：最多 128MiB 内容、256 个键、15 分钟 TTL，LRU 淘汰；同时最多 8 个原图抓取，合并同键请求，失败不缓存。API 的十分钟维护周期回收空闲过期内容。它是可丢弃的代理缓存，不管理用户素材文件。
+
+本机下载任务最多保留 128 个，完成回执最长保留 1 小时，满额优先淘汰旧的已结束回执；运行任务不淘汰，满额时新建返回 429。关闭服务时拒绝新建、取消并等待当前下载收尾；这些内存回执不跨服务重启恢复。内存清理接口实际清除代理缓存并尝试 WAL 检查点，不强制 GC；`runtimeSys` 是 Go 运行时保留内存，历史 `rss` 字段仅保留兼容别名，不代表实测 RSS。`cacheCleared.bytes` 是移出缓存的内容字节，`freedBytes` 是运行时 Sys 的观测差值，两者均不保证操作系统立即回收。
+
+浏览器入口 `main.tsx` 在首次渲染前调用 `store/bootstrap.ts` 的 `bootstrapAppStore`，返回 `ready / dispose`；重复调用复用当前 handle，释放后取消订阅、空闲回调和页面监听，并阻止过期恢复结果写回。HMR 通过 dispose 释放。`store/index.ts` 只组装切片和导出，不再自行启动异步恢复或持久化订阅。切片目前仍同步读取既有浏览器偏好，旧草稿迁移和两份会话缓存保留，不将此次调整解读为全部状态 IO 已抽离。
+
+工作坊单镜执行器 `model/generation/batchTaskExecution.ts` 通过显式 `config.io` 接收压图、提交和交付处理依赖，`useBatchWorkshopRunner` 装配现有实现。执行器负责参考图顺序、参数、检查点与回执回调，不能在测试或恢复中隐式发起另一份提交；网格执行和其他历史 model IO 尚未统一，不套用全局通用执行引擎。

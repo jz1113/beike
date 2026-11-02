@@ -16,6 +16,7 @@ var backupFieldSpecs = map[string]map[string]string{
 		"albumId": "string?", "productCategoryIds": "string", "isUniversal": "bool",
 	},
 	"action": {
+		"mediaType": "string", "mediaUrl": "string", "sourceUrl": "string",
 		"title": "string", "action": "string", "shotType": "string", "spatialType": "string", "camera": "string?",
 		"suitableAnatomy": "string", "tags": "string", "coverUrl": "string?", "sourceImages": "string?",
 		"reversePrompt": "string?", "dimensions": "string?", "sourceImageIndex": "int?", "imageType": "string?",

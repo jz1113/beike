@@ -1,0 +1,59 @@
+.sales-library-select { display: inline-flex; min-width: 0; max-width: 100%; }
+.sales-library-select-trigger {
+  display: inline-flex; min-width: 112px; max-width: 240px; width: 100%; min-height: 36px;
+  align-items: center; gap: 8px; border: 1px solid var(--sales-line); border-radius: 8px;
+  padding: 6px 10px; background: var(--sales-subtle); color: var(--sales-ink);
+  font: inherit; font-size: 13px; line-height: 1.5; text-align: left; cursor: pointer;
+  transition: border-color .15s, background-color .15s;
+}
+.sales-library-select-trigger:disabled { opacity: .5; cursor: not-allowed; }
+.sales-library-select-trigger:not(:disabled):hover { border-color: var(--sales-accent-line); }
+.sales-library-select-trigger:focus-visible { outline: 2px solid var(--sales-accent); outline-offset: 2px; }
+.sales-library-select[data-active] .sales-library-select-trigger,
+.sales-library-select-trigger[aria-expanded="true"] { border-color: var(--sales-accent-line); background: var(--sales-accent-bg); }
+.sales-library-select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sales-library-select-trigger > svg { flex: none; color: var(--sales-muted); transition: transform .15s; }
+.sales-library-select-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.sales-library-select-count {
+  flex: none; min-width: 18px; border-radius: 4px; padding: 0 4px; color: var(--sales-muted);
+  font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; text-align: center;
+}
+.sales-library-select-menu {
+  position: fixed; inset: auto; width: 268px; max-width: calc(100vw - 20px); max-height: min(380px, calc(100dvh - 20px));
+  margin: 0; padding: 5px; overflow: hidden; border: 1px solid var(--sales-line); border-radius: 11px;
+  background: var(--sales-surface); color: var(--sales-ink); box-shadow: 0 12px 32px #0003;
+  font-family: inherit; font-size: 13px; line-height: 1.5;
+}
+.sales-library-select-menu:popover-open { display: flex; flex-direction: column; }
+.sales-library-select-menu::backdrop { background: transparent; }
+.sales-library-select-search {
+  display: flex; flex: none; align-items: center; gap: 8px; padding: 7px 8px 10px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--sales-line); color: var(--sales-muted);
+}
+.sales-library-select-search > svg { flex: none; }
+.sales-library-select-search input {
+  width: 100%; min-width: 0; border: 0; outline: none; padding: 2px 0; background: transparent;
+  color: var(--sales-ink); font: inherit;
+}
+.sales-library-select-search input::placeholder { color: var(--sales-muted); }
+.sales-library-select-search:focus-within { border-bottom-color: var(--sales-accent); }
+.sales-library-select-options {
+  position: relative; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  scrollbar-color: var(--sales-line) transparent;
+}
+.sales-library-select-option {
+  display: flex; min-height: 36px; align-items: center; gap: 8px; border-radius: 6px; padding: 8px;
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+}
+.sales-library-select-option[data-highlighted] { background: var(--sales-subtle); }
+.sales-library-select-option[aria-selected="true"] { color: var(--sales-accent); background: var(--sales-accent-bg); }
+.sales-library-select-option-text { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.sales-library-select-option-text > small { color: var(--sales-muted); font-size: 11px; font-weight: 400; }
+.sales-library-select-check { flex: none; visibility: hidden; color: var(--sales-accent); }
+.sales-library-select-option[aria-selected="true"] .sales-library-select-check { visibility: visible; }
+.sales-library-select-empty { margin: 0; padding: 18px 10px; color: var(--sales-muted); text-align: center; }
+.sales-taxonomy-field > .sales-library-select { width: 100%; }
+.sales-taxonomy-field .sales-library-select-trigger { max-width: none; }
+@media (prefers-reduced-motion: reduce) {
+  .sales-library-select-trigger, .sales-library-select-trigger > svg { transition: none; }
+}

@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestSynthesizeSpeechBinaryJSONAndFailure(t *testing.T) {
@@ -25,9 +27,9 @@ func TestSynthesizeSpeechBinaryJSONAndFailure(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 
 	req := SpeechRequest{Base: server.URL, APIKey: "secret", Model: "speech-01-hd", Text: "你好", Voice: "alloy", Format: "mp3"}
 	mode = "binary"
@@ -61,9 +63,9 @@ func TestSynthesizeSpeechFallsThroughServerError(t *testing.T) {
 		_, _ = w.Write(audio)
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 
 	result, err := SynthesizeSpeech(context.Background(), SpeechRequest{
 		Base: server.URL, APIKey: "secret", Model: "speech-2.8-hd", Text: "你好", Voice: "alloy", Format: "mp3",

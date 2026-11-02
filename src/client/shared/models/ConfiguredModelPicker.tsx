@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import {
   agentTriggerModelName,
   PromptBarModelPickerModal,
 } from '@client/shared/prompt-bar/controls/PromptBarModelPickerModal';
+import { PromptBarReasoningPill } from '@client/shared/prompt-bar/controls/PromptBarReasoningPill';
 import { listModelChannels } from '@client/shared/prompt-bar/controls/modelPickerChannels';
 import type { PreferenceModelItem } from '@client/shared/prompt-bar/hooks/usePromptBarWorkflowModels';
 import { ModelIcon } from '@client/shared/ui/ModelIcons';
@@ -32,6 +33,8 @@ export interface ConfiguredModelPickerProps {
   isUp?: boolean;
   emptyLabel?: string;
   className?: string;
+  variant?: 'default' | 'agent';
+  showReasoning?: boolean;
 }
 
 function splitModelNameAndChannel(rawName: string, explicitProvider?: string) {
@@ -83,6 +86,8 @@ export function ConfiguredModelPicker({
   isUp = false,
   emptyLabel = '未配置模型',
   className = '',
+  variant = 'default',
+  showReasoning = false,
 }: ConfiguredModelPickerProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -99,9 +104,10 @@ export function ConfiguredModelPicker({
   const upstream = selected?.upstreamId || selected?.id || '';
   const label = selected ? agentTriggerModelName(upstream, selected.name) : emptyLabel;
   const isDisabled = disabled || models.length === 0;
+  const isAgent = variant === 'agent';
 
   return (
-    <div className="relative min-w-0">
+    <div className={`relative flex min-w-0 items-center ${showReasoning ? 'gap-1' : ''}`}>
       <button
         ref={triggerRef}
         type="button"
@@ -111,22 +117,37 @@ export function ConfiguredModelPicker({
         aria-label={ariaLabel}
         title={selected ? (selected.provider ? `${label} · ${selected.provider}` : label) : emptyLabel}
         onClick={() => setOpen((current) => !current)}
-        className={`flex h-10 w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-xl border bg-white/95 px-3 text-xs font-semibold text-slate-800 shadow-2xs transition-all disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#1B1C20]/95 dark:text-slate-100 ${
-          open && !isDisabled
-            ? 'border-indigo-400 ring-2 ring-indigo-500/15 dark:border-indigo-400/60'
-            : 'border-slate-200/90 hover:border-indigo-300 dark:border-white/10 dark:hover:border-indigo-400/40'
-        } ${className}`}
+        className={isAgent
+          ? `flex h-8 max-w-[220px] min-w-0 cursor-pointer items-center gap-1 rounded-lg px-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            open && !isDisabled
+              ? 'bg-slate-100 text-slate-900 dark:bg-white/10 dark:text-white'
+              : 'text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-white/10'
+          } ${className}`
+          : `flex h-10 w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-xl border bg-white/95 px-3 text-xs font-semibold text-slate-800 shadow-2xs transition-all disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#1B1C20]/95 dark:text-slate-100 ${
+            open && !isDisabled
+              ? 'border-indigo-400 ring-2 ring-indigo-500/15 dark:border-indigo-400/60'
+              : 'border-slate-200/90 hover:border-indigo-300 dark:border-white/10 dark:hover:border-indigo-400/40'
+          } ${className}`}
       >
-        <span className="flex min-w-0 items-center gap-2">
-          {selected && <ModelIcon modelId={upstream} className="h-4 w-4 shrink-0" />}
-          <span className="truncate">{label}</span>
-          {selected?.provider && channels.length > 1 && (
-            <span className="hidden shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 sm:inline dark:bg-white/[0.07] dark:text-slate-400">
-              {selected.provider}
+        {isAgent ? (
+          <>
+            <span className="truncate">{label}</span>
+            {open && !isDisabled ? <ChevronUp className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />}
+          </>
+        ) : (
+          <>
+            <span className="flex min-w-0 items-center gap-2">
+              {selected && <ModelIcon modelId={upstream} className="h-4 w-4 shrink-0" />}
+              <span className="truncate">{label}</span>
+              {selected?.provider && channels.length > 1 && (
+                <span className="hidden shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 sm:inline dark:bg-white/[0.07] dark:text-slate-400">
+                  {selected.provider}
+                </span>
+              )}
             </span>
-          )}
-        </span>
-        <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open && !isDisabled ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open && !isDisabled ? 'rotate-180' : ''}`} />
+          </>
+        )}
       </button>
       <PromptBarModelPickerModal
         isOpen={open && !isDisabled}
@@ -141,6 +162,13 @@ export function ConfiguredModelPicker({
           setOpen(false);
         }}
       />
+      {showReasoning && modalityKind === 'chat' && (
+        <PromptBarReasoningPill
+          assistantModel={selected?.id || upstream || value}
+          isUp={isUp}
+          disabled={isDisabled}
+        />
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -107,7 +108,7 @@ func deconstructCategoryValue(payload map[string]any) string {
 }
 
 func resolveMajorCategory(cfg config.Config, r *http.Request, category string) (string, error) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return "", err
 	}
@@ -186,7 +187,7 @@ func digitalBuiltinFolder(majorID, selected, folderID string) bool {
 }
 
 func subcategoryFolder(cfg config.Config, r *http.Request, folderID string) (string, bool, bool, error) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return "", false, false, err
 	}

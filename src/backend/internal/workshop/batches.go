@@ -1,7 +1,6 @@
 package workshop
 
 import (
-	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -13,13 +12,15 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 )
 
 var batchIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
 
 func Batches(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 			return
@@ -49,7 +50,7 @@ func Batches(cfg config.Config) http.Handler {
 
 func ActiveBatch(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 			return
@@ -72,7 +73,7 @@ func Batch(cfg config.Config) http.Handler {
 			writeFail(w, http.StatusBadRequest, "批次标识不正确", "bad_request")
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 			return
@@ -124,7 +125,7 @@ func ArchiveBatch(cfg config.Config) http.Handler {
 }
 
 func replaceBatch(cfg config.Config, r *http.Request, run func(*sql.DB) (dbworkshop.WorkshopBatchRow, error)) (dbworkshop.WorkshopBatchRow, int, string, string) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return dbworkshop.WorkshopBatchRow{}, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error"
 	}
@@ -162,7 +163,7 @@ func CreateBatch(cfg config.Config) http.Handler {
 			return
 		}
 		named = name != ""
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 			return
@@ -217,7 +218,7 @@ func SaveBatch(cfg config.Config) http.Handler {
 			writeFail(w, http.StatusBadRequest, "批次内容格式不正确", "bad_request")
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 			return
@@ -285,7 +286,7 @@ func RenameBatch(cfg config.Config) http.Handler {
 			writeFail(w, http.StatusBadRequest, "批次名称不能为空，且不能超过 120 个字符", "bad_request")
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 			return
@@ -314,7 +315,7 @@ func ClearBatchHistory(cfg config.Config) http.Handler {
 
 func historyHandler(cfg config.Config, clear bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 			return

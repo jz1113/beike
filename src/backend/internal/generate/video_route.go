@@ -100,6 +100,7 @@ func videoBodyError(payload map[string]json.RawMessage) string {
 		func() string { return optionalString(payload, "customApiKey", 4096, false) },
 		func() string { return optionalString(payload, "clientTaskId", 256, false) },
 		func() string { return optionalString(payload, "idempotencyKey", 256, false) },
+		func() string { return optionalObject(payload, "storageConfig") },
 	}
 	for _, step := range steps {
 		if message := step(); message != "" {
@@ -225,4 +226,15 @@ func rawKind(raw json.RawMessage) string {
 	default:
 		return "number"
 	}
+}
+
+func optionalObject(payload map[string]json.RawMessage, key string) string {
+	raw, ok := payload[key]
+	if !ok || rawKind(raw) == "null" {
+		return ""
+	}
+	if rawKind(raw) != "object" {
+		return "Expected object, received " + rawKind(raw)
+	}
+	return ""
 }

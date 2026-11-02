@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 type claimResult struct {
@@ -39,7 +39,7 @@ func canonicalJSON(value any) string {
 }
 
 func claimTurn(ctx context.Context, cfg config.Config, workspace, turnID, threadID, fingerprint, model string) (claimResult, error) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return claimResult{}, err
 	}
@@ -98,7 +98,7 @@ func threadGone(ctx context.Context, db *sql.DB, threadID string) (bool, error) 
 }
 
 func saveTurnState(ctx context.Context, cfg config.Config, workspace, turnID, status, model string, usageIn, usageOut int, snapshot map[string]any) error {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func saveTurnState(ctx context.Context, cfg config.Config, workspace, turnID, st
 }
 
 func upsertTurnItem(ctx context.Context, cfg config.Config, workspace, turnID string, item map[string]any) error {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func nullString(value string) any {
 }
 
 func listThreadTurnRows(ctx context.Context, cfg config.Config, workspace, threadID, status string) ([]map[string]any, error) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return nil, err
 	}

@@ -1,3 +1,5 @@
+import { submitImageGenTaskResult, compressProductImageIfNeeded } from '@client/shared/api/generation/generationApi';
+import { finishWorkshopSingleOutput } from '../model/generation/workshopSingleOutput';
 import { useWorkshopSkillApplied } from './useWorkshopSkillApplied';
 import { workshopAnalysisBlockReason } from '../model/analysis/workshopAnalysisPreflight';
 import { useWorkshopAnalysis } from './useWorkshopAnalysis';
@@ -185,6 +187,7 @@ export function useBatchWorkshopRunner() {
 
   // 任务执行配置
   const taskExecutionConfig: TaskExecutionConfig = {
+    io: { compressReference: compressProductImageIfNeeded, submitImage: submitImageGenTaskResult, finishOutput: finishWorkshopSingleOutput },
     selectedQuality,
     selectedAspect,
     gridOutputSize,

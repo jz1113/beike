@@ -10,6 +10,15 @@ import (
 
 func TestChecksumsMatchNodeLedger(t *testing.T) {
 	want := map[string]string{
+		"20261102_01_sales_asset_view_jobs":                    "5291ef17d11a41be8bd79b0bee78940ce62bd10e4e459d07bcabe7478a7ef81e",
+		"20261101_04_sales_products":                           "4302ee43d4b71f31bb17a7a359fcff9863688987cbe66e46f7e274404a8e2db3",
+		"20261101_03_sales_script_media":                       "0e259cdd77c813e2ea1c50f16a9abd0f040f9edf90fb3f2bdfed2639637b8bd5",
+		"20261101_02_sales_grid_prompts":                       "131b7abc0ca82ae007394d63123ae458fd0951b3f1bf1df68bc24da434c8a2ba",
+		"20261101_01_sales_prompts":                            "f41659e85ca8793570d57619e12a27dfdefa08649ad8105c67fd0fa0250e07eb",
+		"20261031_02_action_media":                             "00a2eabcd2a10b5c3f2c5c47b16f63af8c21fd49c190e4ea31eefcf857deb130",
+		"20261031_01_sales_script_taxonomy":                    "1da66df040f272eebfcf9d22b527f27d525c109f627940b784f99d6f78c353b3",
+		"20261030_02_sales_reference_scripts":                  "86ffde137634f32639abbed2b3bc28491dd1b2cd0cf4874b9cc827c61fffc6cf",
+		"20261030_01_cover_template_indexes":                   "eb070422916d1f8d4cd17eec747ab272f9d0ec997dae4241795591c0b6268860",
 		"20261026_01_cover_learning":                           "bd3c97e8cabc8b50cd383bb9adeb5206c49898d468886c113f965e7c550c585d",
 		"20261023_03_reference_folder_repair":                  "94e470dda4794de5fc6fc5063179dbd7c9fc6bfabacded305c3942828cc5505f",
 		"20261023_02_workshop_repair":                          "0b8bbd17d7b1855a7da951442a9a9efcae6422db39d4479ca49ce85398386645",

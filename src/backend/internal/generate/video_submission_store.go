@@ -48,7 +48,7 @@ func videoSubmissionFingerprint(base string, payload map[string]json.RawMessage,
 	request := map[string]any{}
 	for key, raw := range payload {
 		switch key {
-		case "clientTaskId", "idempotencyKey", "customApiKey", "customBaseUrl":
+		case "clientTaskId", "idempotencyKey", "customApiKey", "customBaseUrl", "storageConfig":
 			continue
 		}
 		var value any

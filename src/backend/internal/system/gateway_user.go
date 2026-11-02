@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
@@ -25,7 +26,7 @@ func gatewayUserHandler() http.HandlerFunc {
 		if payload == nil {
 			payload = map[string]any{}
 		}
-		base := normalizeGatewayBaseURL(firstTextValue(payload["baseUrl"], r.Header.Get("x-custom-base-url"), os.Getenv("AI_DRAWING_BASE_URL"), "https://ai.comfly.org"))
+		base := gateway.NormalizeGatewayBaseURL(firstTextValue(payload["baseUrl"], r.Header.Get("x-custom-base-url"), os.Getenv("AI_DRAWING_BASE_URL"), "https://ai.comfly.org"))
 		if base == "" {
 			base = "https://ai.comfly.org"
 		}

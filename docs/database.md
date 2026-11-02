@@ -47,3 +47,5 @@ pnpm db:migrate /绝对路径/目标.db          # 写操作：初始化或升�
 `pnpm seed:export [数据库路径]` 先生成一致性快照，再从同一个快照读取架构与资产，写入 `src/shared/data/officialMasterRecipes.json` 和 `promptAssets.json`。前端官方架构与 Go 运行时回填读取同一份 `officialMasterRecipes.json`；导出保留数据库记录 ID，移除工作区与时间戳等运行字段。原始架构行保存在 `promptAssets.json` 的 `data.styleRecipes` 中，不再单独生成第二份 `styleRecipes.json`。导出会更新仓库官方种子，执行前应确认数据来源。
 
 快照保存在 `.local/deploy-backup/azhuo-<时间>-<随机标识>.db`，命令输出本次实际路径，不覆盖已有的 `azhuo.db` 或其他历史备份。导出与备份使用 `SQLITE_BACKUP_PYTHON` 指定的 Python，默认 `python3`。
+
+官方架构种子文件缺失时保留现有官方记录并记录告警；非法 JSON 阻止种子同步。合法显式空目录只同步官方架构，不删除任何工作区的 `recipe_hidden` 偏好事件。启动和迁移共用此规则，不通过资源缺失推断用户希望清空数据。

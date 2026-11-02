@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/network"
 	"beike.local/cloud/src/backend/internal/system"
@@ -34,7 +35,7 @@ func keywordBalance(r *http.Request, fetch balanceFetch) (int, map[string]any) {
 	if message != "" {
 		return http.StatusBadRequest, map[string]any{"success": false, "error": message}
 	}
-	baseURL = system.NormalizeGatewayBaseURL(baseURL)
+	baseURL = gateway.NormalizeGatewayBaseURL(baseURL)
 	if baseURL != keywordDeepSeekBaseURL {
 		return http.StatusBadRequest, map[string]any{"success": false, "error": "词包审核只接受 DeepSeek 官方接口，请到设置里填写 DeepSeek API Key"}
 	}

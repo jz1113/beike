@@ -1,14 +1,15 @@
 package library
 
 import (
-	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
-	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"net/http"
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 )
 
 func classifyLibraryAssets(cfg config.Config, w http.ResponseWriter, r *http.Request, body []byte) {
@@ -17,7 +18,7 @@ func classifyLibraryAssets(cfg config.Config, w http.ResponseWriter, r *http.Req
 		writeLibraryMutationError(w, message)
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeLibraryMutationError(w, "分类操作失败")
 		return
@@ -37,7 +38,7 @@ func moveLibraryPromptGroups(cfg config.Config, w http.ResponseWriter, r *http.R
 		writeLibraryMutationError(w, message)
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeLibraryMutationError(w, "分类操作失败")
 		return
@@ -103,7 +104,7 @@ func archiveLibraryFolders(cfg config.Config, w http.ResponseWriter, r *http.Req
 		writeLibraryMutationError(w, message)
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeLibraryMutationError(w, "分类操作失败")
 		return

@@ -7,6 +7,7 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func depthVideoPoll(cfg config.Config, w http.ResponseWriter, r *http.Request) {
@@ -77,7 +78,7 @@ type depthVideoRow struct {
 }
 
 func depthVideoRecord(cfg config.Config, r *http.Request, taskID string) (depthVideoRow, bool, error) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return depthVideoRow{}, false, err
 	}

@@ -31,11 +31,11 @@ func resolveDepthQuality(value string) string {
 func depthQualityProfile(quality string) depthProfile {
 	switch resolveDepthQuality(quality) {
 	case "fast":
-		return depthProfile{modelID: "depth-anything/Depth-Anything-V2-Small-hf", maxWidthPx: 960, videoCrf: 23, preset: "medium"}
+		return depthProfile{modelID: "depth-anything/Depth-Anything-V2-Small-hf", maxWidthPx: 960, videoCrf: 23, preset: "veryfast"}
 	case "high":
 		return depthProfile{modelID: "depth-anything/Depth-Anything-V2-Large-hf", maxWidthPx: 2560, videoCrf: 15, preset: "slow"}
 	default:
-		return depthProfile{modelID: "depth-anything/Depth-Anything-V2-Base-hf", maxWidthPx: 1280, videoCrf: 20, preset: "medium"}
+		return depthProfile{modelID: "depth-anything/Depth-Anything-V2-Small-hf", maxWidthPx: 960, videoCrf: 21, preset: "veryfast"}
 	}
 }
 

@@ -1,0 +1,3 @@
+ALTER TABLE "ActionAsset" ADD COLUMN "mediaType" TEXT NOT NULL DEFAULT 'image';
+ALTER TABLE "ActionAsset" ADD COLUMN "mediaUrl" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ActionAsset" ADD COLUMN "sourceUrl" TEXT NOT NULL DEFAULT '';

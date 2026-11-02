@@ -286,14 +286,14 @@ export async function submitDepthVideo(
   return { taskId: data.taskId, recordId: data.recordId };
 }
 
-export async function pollDepthVideoTask(taskId: string): Promise<{
+export async function pollDepthVideoTask(taskId: string, signal?: AbortSignal): Promise<{
   status: 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
   resultUrl?: string;
   progress?: string;
   stage?: string;
   failReason?: string;
 }> {
-  const res = await apiFetch(`/api/generate/depth-video?taskId=${encodeURIComponent(taskId)}`);
+  const res = await apiFetch(`/api/generate/depth-video?taskId=${encodeURIComponent(taskId)}`, { signal });
   const data = await res.json();
   if (!data?.success) {
     throw new Error(data?.error || '查询深度动作捕捉任务失败');

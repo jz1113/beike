@@ -82,7 +82,7 @@ func postSpeech(ctx context.Context, endpoint, apiKey string, payload any) (int,
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+apiKey)
-	response, err := ModelHTTP().Do(request)
+	response, err := gateway.ModelHTTP().Do(request)
 	if err != nil {
 		return 0, nil, "", errors.New("音频网关请求失败")
 	}
@@ -96,7 +96,7 @@ func decodeSpeechJSON(raw []byte) (SpeechResult, error) {
 	if json.Unmarshal(raw, &data) != nil {
 		return SpeechResult{}, errors.New("音频接口返回无法识别")
 	}
-	usage := NormalizeUsage(data)
+	usage := gateway.NormalizeUsage(data)
 	if nested, ok := data["data"].(map[string]any); ok {
 		if result, ok := speechFromMap(nested); ok {
 			result.Usage = usage

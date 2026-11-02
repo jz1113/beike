@@ -10,7 +10,7 @@ import (
 )
 
 func TestStyleCreateRequiresName(t *testing.T) {
-	handler := styleRecipesPostHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := styleRecipesPostHandler(config.Config{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/catalog/styles", bytes.NewBufferString(`{"name":""}`))
 	handler.ServeHTTP(response, request)

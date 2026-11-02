@@ -9,7 +9,6 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]json.RawMessage) {
@@ -59,12 +58,20 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "taskKey": key, "recordId": claim.recordID, "submissionOutcome": "rejected", "submissionRejected": true, "error": message, "missingConfig": "apiKey", "retryable": false})
 		return
 	}
+	if adapted.family == "seedance" {
+		if err := prepareSeedanceMedia(r.Context(), base, apiKey, adapted.payload, workspaceOf(r), cfg.Production(), r, payload); err != nil {
+			message := err.Error()
+			_ = settleVideoSubmission(cfg, r, claim.recordID, imageTaskDraft{Status: "FAILURE", FailReason: message})
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "taskKey": key, "recordId": claim.recordID, "submissionOutcome": "rejected", "submissionRejected": true, "retryable": false, "error": message})
+			return
+		}
+	}
 	encoded, _ := json.Marshal(adapted.payload)
 	started := time.Now()
 	result := gateway.SubmitVideo(r.Context(), gateway.SubmitCommand{
 		Endpoints: expandVideoURLs(base, adapted.endpoints, ""), APIKey: apiKey, PayloadJSON: string(encoded), Headers: adapted.headers,
 		ReadTaskID:          func(data map[string]any) string { return readVideoTaskID(data, adapted.family) },
-		Client:              ModelHTTP(),
+		Client:              gateway.ModelHTTP(),
 		RetryOnMissingInput: adapted.family == "wan",
 	})
 	if result.Outcome != gateway.Accepted {
@@ -363,7 +370,7 @@ func videoCredentials(cfg config.Config, r *http.Request, payload map[string]jso
 	}
 	base := ImageDefaultBase()
 	if clientBase != "" {
-		base = system.NormalizeGatewayBaseURL(clientBase)
+		base = gateway.NormalizeGatewayBaseURL(clientBase)
 	}
 	return base, imageAPIKey(cfg, r, payload, clientBase)
 }

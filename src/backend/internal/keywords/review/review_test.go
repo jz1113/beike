@@ -88,6 +88,25 @@ func TestReviewLeavesThinkingEnabledForOtherGatewayModels(t *testing.T) {
 	}
 }
 
+func TestReviewInfersOpenAIProtocolFromCompatibleBaseURL(t *testing.T) {
+	var path string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"stop","message":{"content":"{\"results\":[[\"1\",\"动物\",\"制作\",\"猫砂属于宠物用品\",\"\"]]}"}}]}`))
+	}))
+	defer server.Close()
+	result, err := Review(context.Background(), server.Client(), Input{
+		BaseURL: server.URL + "/v1/chat/completions", APIKey: "secret", Model: "claude-5.5-haiku", Provider: "gateway",
+		Rows: []Row{{ID: "row-1", Query: "猫砂"}},
+	})
+	if err != nil || len(result.Results) != 1 {
+		t.Fatalf("result %#v err %v", result, err)
+	}
+	if path != "/v1/chat/completions" {
+		t.Fatalf("path %s", path)
+	}
+}
+
 func TestReviewSalvagesTruncatedRows(t *testing.T) {
 	content := `{"results":[["1","动物","制作","猫砂属于宠物用品",""],["2","美食","制作","菜谱属于美食",""],["3","美`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

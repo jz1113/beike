@@ -24,10 +24,10 @@ describe('video generation modes follow official capabilities', () => {
     ['viduq3', ['omni']],
     ['viduq3-mix', ['omni']],
     ['viduq3-turbo', full],
-    ['viduq3-pro', full],
-    ['viduq4-preview', full],
-    ['vidu-q4-preview', full],
-    ['viduq4', full],
+    ['viduq3-pro', framed],
+    ['viduq4-preview', ['omni', 'first_frame']],
+    ['vidu-q4-preview', ['omni', 'first_frame']],
+    ['viduq4', ['omni', 'first_frame']],
     ['veo3.1', full],
     ['veo3.1-fast', full],
     ['omni_flash-10s', seedance],
@@ -99,7 +99,7 @@ describe('video payloads keep frame roles exclusive', () => {
     } as const;
     for (const [refMode, path] of Object.entries(paths)) {
       const images = refMode === 'text' ? [] : refMode === 'first_frame' ? [first] : [first, last];
-      const request = buildVideoRequest({ ...base, model: 'viduq3-pro', refMode, images, duration: 5 });
+      const request = buildVideoRequest({ ...base, model: 'viduq3-turbo', refMode, images, duration: 5 });
       expect(request.endpoints('https://gateway.example').submit[0]).toContain(`/${path}`);
       expect(request.payload.image).toBeUndefined();
       expect(request.payload.resolution).toBe('720p');
@@ -112,6 +112,8 @@ describe('video payloads keep frame roles exclusive', () => {
         expect(request.payload.aspect_ratio).toBe('16:9');
       }
     }
+    const proFallback = buildVideoRequest({ ...base, model: 'viduq3-pro', refMode: 'omni', images: [first], duration: 5 });
+    expect(proFallback.endpoints('https://gateway.example').submit[0]).toContain('/img2video');
   });
 
   it('does not turn MiniMax reference images or first-last frames into the other mode', () => {
@@ -163,5 +165,8 @@ describe('video payloads keep frame roles exclusive', () => {
     expect(videoInputError({ model: 'omni_flash-10s', refMode: 'text', duration: 10, resolution: '720P', aspectRatio: '1:1' })).toMatch(/比例/);
     expect(videoInputError({ model: 'grok-imagine-video-1.5', refMode: 'omni', images: Array.from({ length: 15 }, () => first), duration: 5, resolution: '720P', aspectRatio: '16:9' })).toMatch(/14 张/);
     expect(videoInputError({ model: 'MiniMax-H3', refMode: 'omni', images: [first], videos: [clip, clip, clip, clip], duration: 5, resolution: '720P', aspectRatio: '16:9' })).toMatch(/3 个参考视频/);
+    expect(videoInputError({ model: 'viduq3-pro', refMode: 'omni', images: [first, last], duration: 5, resolution: '720P', aspectRatio: '16:9' })).toMatch(/尚未接入/);
+    expect(videoInputError({ model: 'viduq3-turbo', refMode: 'omni', images: Array.from({ length: 8 }, () => first), duration: 5, resolution: '720P', aspectRatio: '16:9' })).toMatch(/7 张/);
+    expect(videoInputError({ model: 'viduq4-preview', refMode: 'text', duration: 5, resolution: '720P', aspectRatio: '16:9' })).toMatch(/尚未接入/);
   });
 });

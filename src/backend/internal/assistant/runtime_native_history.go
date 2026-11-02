@@ -9,7 +9,7 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/gateway"
-	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 // Only a completed, tool-free final native message is eligible for restoration.
@@ -44,7 +44,7 @@ func saveNativeContinuation(ctx context.Context, cfg config.Config, workspace, t
 	if err != nil || len(raw) > 2<<20 {
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return
 	}
@@ -58,7 +58,7 @@ func restoreNativeContinuations(ctx context.Context, cfg config.Config, workspac
 	if protocol == "openai" {
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return
 	}

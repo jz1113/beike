@@ -120,6 +120,7 @@ const fields: Record<string, Record<string, [string, boolean]>> = {
     ]
   },
   "action": {
+    "productCategoryIds": ["string", false],
     "title": [
       "string",
       false

@@ -1,7 +1,6 @@
 package workshop
 
 import (
-	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,6 +8,8 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 )
 
 func Review(cfg config.Config) http.Handler {
@@ -28,7 +29,7 @@ func Review(cfg config.Config) http.Handler {
 			writeFail(w, http.StatusBadRequest, "审核提交失败", "bad_request")
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeFail(w, http.StatusNotFound, "当前没有活跃批次", "not_found")
 			return

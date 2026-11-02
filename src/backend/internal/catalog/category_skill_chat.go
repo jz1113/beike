@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/gateway"
-	"beike.local/cloud/src/backend/internal/generate"
 )
 
 func categorySkillChat(ctx context.Context, base, key, model string, payload map[string]any, content []any) (string, int, map[string]any, error) {
@@ -22,5 +21,5 @@ func categorySkillChat(ctx context.Context, base, key, model string, payload map
 	}
 	choice, _ := choices[0].(map[string]any)
 	message, _ := choice["message"].(map[string]any)
-	return styleString(message, "content"), status, generate.NormalizeUsage(data), nil
+	return styleString(message, "content"), status, gateway.NormalizeUsage(data), nil
 }

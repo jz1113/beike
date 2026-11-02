@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 var socialBodyFields = []string{
@@ -95,7 +95,7 @@ func deepseekStyleError(r *http.Request, payload map[string]any) string {
 	if base == "" {
 		base = strings.TrimSpace(r.Header.Get("x-custom-base-url"))
 	}
-	if base != "" && system.NormalizeGatewayBaseURL(base) != "https://api.deepseek.com" {
+	if base != "" && gateway.NormalizeGatewayBaseURL(base) != "https://api.deepseek.com" {
 		return "DeepSeek 官方模型只能使用官方接口地址"
 	}
 	return ""

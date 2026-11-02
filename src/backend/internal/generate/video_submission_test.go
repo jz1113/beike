@@ -14,15 +14,16 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func videoSubmissionTestConfig(t *testing.T, server *httptest.Server) config.Config {
 	t.Helper()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 	path := filepath.Join(t.TempDir(), "video-receipts.db")
 	db, err := database.OpenWrite(path)
 	if err != nil {
@@ -115,7 +116,7 @@ func TestVideoSubmissionConcurrentClaimAndConflict(t *testing.T) {
 		t.Fatalf("receipt count=%d", count)
 	}
 	// Finishing the task must not destroy the immutable request fingerprint.
-	updateTaskTerminal(context.Background(), db, "video-original", "SUCCESS", "https://cdn.example/video.mp4", "", "")
+	updateTaskTerminal(context.Background(), db, taskScope{"local", "video"}, "video-original", "SUCCESS", "https://cdn.example/video.mp4", "", "")
 	conflict = videoSubmissionTestPost(handler, server.URL, "concurrent", "changed after success", "local")
 	if conflict.Code != http.StatusConflict || calls.Load() != 1 {
 		t.Fatalf("terminal conflict: %d %s", conflict.Code, conflict.Body.String())

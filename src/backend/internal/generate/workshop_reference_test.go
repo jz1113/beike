@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/database"
 	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
@@ -69,9 +70,9 @@ func TestWorkshopAnalysisIgnoresLegacyReferenceLocks(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": string(text)}}}})
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	defer func() { ModelHTTP = previous }()
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	defer func() { gateway.ModelHTTP = previous }()
 	payload := map[string]any{"mode": "storyboard_generate", "shotCount": 4, "productTitle": "台灯", "imageUrls": []string{"https://example.com/product.jpg"}, "lockedAssets": map[string]any{"fullPromptId": group["id"]}, "customApiKey": "test-key", "customBaseUrl": server.URL, "groupSelectionMode": "auto"}
 	post := func(workspace string) *httptest.ResponseRecorder {
 		raw, _ := json.Marshal(payload)

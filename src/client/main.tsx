@@ -2,6 +2,8 @@ import { configureDomainRuntime } from '@shared/domain/core/runtime';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './app/App';
+import { useAppStore } from './store';
+import { bootstrapAppStore } from './store/bootstrap';
 import { AppProviders } from '@client/app/providers';
 import AppErrorBoundary from '@client/shared/ui/AppErrorBoundary';
 import './styles/globals.css';
@@ -27,6 +29,10 @@ configureDomainRuntime({
   fetch: window.fetch.bind(window),
   emitEvent: (name, detail) => window.dispatchEvent(new CustomEvent(name, { detail })),
 });
+
+const storeBootstrap = bootstrapAppStore(useAppStore);
+if (import.meta.hot) import.meta.hot.dispose(() => storeBootstrap.dispose());
+if (import.meta.env.DEV) (window as { useAppStore?: typeof useAppStore }).useAppStore = useAppStore;
 
 const appTree = (
   <AppErrorBoundary>

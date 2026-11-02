@@ -203,6 +203,8 @@ export async function restoreDrawingArchive() {
 }
 
 export const isDrawingHistoryReady = () => !hasDrawingArchive();
-if (typeof window !== 'undefined') {
-  window.addEventListener('pagehide', () => { if (saveDrawingTimer) flushDrawingStateToStorage(); });
+export function attachDrawingPageLifecycle(): () => void {
+  const flush = () => { if (saveDrawingTimer) flushDrawingStateToStorage(); };
+  window.addEventListener('pagehide', flush);
+  return () => { flush(); window.removeEventListener('pagehide', flush); };
 }

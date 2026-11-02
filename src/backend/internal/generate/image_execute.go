@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
 )
 
@@ -58,8 +59,8 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 	if statusCode != 0 {
 		return statusCode, map[string]any{"success": false, "error": message}
 	}
-	if claim.reusedURL != "" {
-		return http.StatusOK, map[string]any{"success": true, "taskId": claim.reusedTaskID, "status": "SUCCESS", "resultUrl": claim.reusedURL, "reused": true}
+	if claim.reused {
+		return reusedImageSubmission(claim)
 	}
 	result, err := protocol.Submit(imageRequest{
 		HTTP: r, Base: base, APIKey: apiKey, Model: model, Prompt: prompt, Size: size, AspectRatio: aspectRatio, Quality: quality, ImageQuality: imageQuality,
@@ -75,8 +76,8 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 			return http.StatusBadRequest, map[string]any{"success": false, "submissionRejected": true, "submissionOutcome": "rejected", "error": prepare.Error()}
 		}
 		transportErr := imageSubmitTransportError(err)
-		failImageSubmission(cfg, r, claim.recordID, transportErr)
-		return http.StatusInternalServerError, map[string]any{"success": false, "error": transportErr}
+		unknownImageSubmission(cfg, r, claim.recordID, "", transportErr)
+		return http.StatusInternalServerError, map[string]any{"success": false, "submissionUnknown": true, "submissionOutcome": "unknown", "taskKey": claim.key, "error": transportErr}
 	}
 	taskID, direct := result.TaskID, result.Direct
 	if taskID != "" {
@@ -84,8 +85,12 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 	}
 	if status < 200 || status >= 300 || (taskID == "" && direct == "") {
 		upstreamErr := imageUpstreamError(data, status)
-		failImageSubmission(cfg, r, claim.recordID, upstreamErr)
-		rejected := status >= 400 && status < 500
+		rejected := status >= 400 && status < 500 && status != http.StatusRequestTimeout
+		if rejected {
+			failImageSubmission(cfg, r, claim.recordID, upstreamErr)
+		} else {
+			unknownImageSubmission(cfg, r, claim.recordID, taskID, upstreamErr)
+		}
 		outStatus := http.StatusBadGateway
 		outcome := "unknown"
 		if rejected {
@@ -97,8 +102,14 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 			"submissionOutcome": outcome,
 			"error":             upstreamErr,
 		}
+		body["taskKey"] = claim.key
 		if rejected {
 			body["submissionRejected"] = true
+		} else {
+			body["submissionUnknown"] = true
+			if taskID != "" {
+				body["taskId"] = taskID
+			}
 		}
 		return outStatus, body
 	}
@@ -113,7 +124,7 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 		return http.StatusInternalServerError, map[string]any{"success": false, "error": "任务持久化失败: " + err.Error(), "taskId": taskID}
 	}
 	body := map[string]any{
-		"success": true, "taskId": taskID, "recordId": claim.recordID, "model": adapted.modelID,
+		"success": true, "taskId": taskID, "taskKey": claim.key, "recordId": claim.recordID, "model": adapted.modelID,
 		"requestedModel": model, "size": adapted.size, "family": adapted.family,
 		"usedEndpoint": adapted.endpoint, "status": "IN_PROGRESS", "prompt": adapted.prompt,
 		"timing": map[string]any{"parseMs": 0, "convertMs": 0, "gatewayMs": 0, "dbMs": 0, "totalMs": 0, "payloadKB": 0, "imageCount": len(refs), "convertCacheHits": 0},
@@ -123,9 +134,9 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 		body["resultUrl"] = direct
 		body["temporaryUrl"] = strings.HasPrefix(direct, "http://") || strings.HasPrefix(direct, "https://")
 	}
-	if usage := NormalizeUsage(data); usage != nil {
+	if usage := gateway.NormalizeUsage(data); usage != nil {
 		body["usage"] = usage
-		rememberTaskUsage(r.Context(), cfg, taskID, usage)
+		rememberTaskUsage(r.Context(), cfg, scopeOf(r, "image"), taskID, usage)
 	}
 	return http.StatusOK, body
 }

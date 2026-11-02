@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 
 	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func readTurnSnapshot(ctx context.Context, cfg config.Config, workspace, turnID string) (map[string]any, error) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +83,9 @@ func readTurnSnapshot(ctx context.Context, cfg config.Config, workspace, turnID 
 	}
 	if model.Valid {
 		snapshot["modelUsed"] = model.String
+	}
+	if message, ok := stored["error"].(string); ok && message != "" {
+		snapshot["error"] = message
 	}
 	if task != nil {
 		snapshot["task"] = task
@@ -196,7 +199,7 @@ func zeroInt(value sql.NullInt64) int64 {
 }
 
 func listRunRows(ctx context.Context, cfg config.Config, workspace, threadID string, includeCompleted bool, limit int) ([]map[string]any, error) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return nil, err
 	}

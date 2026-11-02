@@ -16,6 +16,7 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -61,7 +62,7 @@ func acceptDepthVideo(cfg config.Config, w http.ResponseWriter, r *http.Request,
 }
 
 func createDepthVideoRecord(cfg config.Config, r *http.Request, quality string) (string, error) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return "", err
 	}
@@ -153,7 +154,7 @@ func runDepthVideoJob(job depthVideoJob) {
 	depthDir := filepath.Join(work, "depth")
 	output := filepath.Join(work, "output.mp4")
 	setDepthRuntime(job.recordID, "extracting", "15%", depthMeta{})
-	count, fps, err := extractDepthFrames(job.cfg.Root, input, frames, profile.maxWidthPx)
+	count, fps, err := extractDepthFrames(job.cfg.Root, input, frames, profile.maxWidthPx, probe.FPS)
 	if err != nil {
 		failDepthVideo(job, err.Error())
 		return
@@ -267,7 +268,7 @@ func failDepthVideo(job depthVideoJob, message string) {
 }
 
 func markDepthVideo(job depthVideoJob, status, resultURL, reason string) {
-	db, err := httpx.OpenDB(job.cfg)
+	db, err := database.OpenRequired(job.cfg.SQLiteFile())
 	if err != nil {
 		return
 	}

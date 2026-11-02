@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -22,7 +23,7 @@ func HeadlineAccessError(cfg config.Config, r *http.Request, payload map[string]
 		if id != "deepseek-flash" && id != "deepseek-v4-pro" {
 			return "此 DeepSeek 官方模型尚未适配"
 		}
-		if clientBase != "" && system.NormalizeGatewayBaseURL(clientBase) != "https://api.deepseek.com" {
+		if clientBase != "" && gateway.NormalizeGatewayBaseURL(clientBase) != "https://api.deepseek.com" {
 			return "DeepSeek 官方模型只能使用官方接口地址"
 		}
 		if strings.TrimSpace(StringField(payload, "customApiKey")) == "" {
@@ -45,7 +46,7 @@ func HeadlineAPIKey(cfg config.Config, r *http.Request, payload map[string]any, 
 		key = strings.TrimSpace(r.Header.Get("x-custom-api-key"))
 	}
 	defaults := ImageDefaultBase()
-	thirdParty := clientBase != "" && system.NormalizeGatewayBaseURL(clientBase) != system.NormalizeGatewayBaseURL(defaults)
+	thirdParty := clientBase != "" && gateway.NormalizeGatewayBaseURL(clientBase) != gateway.NormalizeGatewayBaseURL(defaults)
 	if key == "" && !thirdParty && !cfg.Production() {
 		key = strings.TrimSpace(os.Getenv("AI_DRAWING_API_KEY"))
 		if key == "" {

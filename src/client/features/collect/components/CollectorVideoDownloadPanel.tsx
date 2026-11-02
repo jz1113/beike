@@ -39,6 +39,7 @@ export default function CollectorVideoDownloadPanel({ showToast, queue }: { show
   const progress = queue.items.length ? Math.round((finished / queue.items.length) * 100) : 0;
   const visibleItems = queue.items.filter((item) => filter === 'all' || item.status === filter);
   const canStart = Boolean(queue.directory) && queue.pendingCount > 0;
+  const browserDownload = queue.downloadMode === 'browser';
 
   return (
     <div className="mx-auto max-w-[980px] space-y-5">
@@ -85,7 +86,7 @@ export default function CollectorVideoDownloadPanel({ showToast, queue }: { show
             {queue.directory ? (
               <div className="min-w-0">
                 <div className="text-xs font-bold text-slate-900 dark:text-white">保存位置：{queue.folderName}</div>
-                <div className="truncate text-[11px] text-slate-500 dark:text-slate-400" title={queue.directory}>{queue.directory}</div>
+                <div className="truncate text-[11px] text-slate-500 dark:text-slate-400" title={queue.directory}>{browserDownload ? '文件将保存到浏览器设置的下载位置' : queue.directory}</div>
               </div>
             ) : (
               <div className="text-xs font-bold text-amber-800 dark:text-amber-200">请先选择本地保存文件夹</div>
@@ -100,7 +101,7 @@ export default function CollectorVideoDownloadPanel({ showToast, queue }: { show
                   : 'bg-blue-600 text-white shadow-md shadow-blue-500/25 hover:bg-blue-700'
               }`}
             >
-              <FolderDown className="h-3.5 w-3.5" />{queue.directory ? '更换文件夹' : '选择保存文件夹'}
+              <FolderDown className="h-3.5 w-3.5" />{browserDownload ? '浏览器下载位置' : queue.directory ? '更换文件夹' : '选择保存文件夹'}
             </button>
           </div>
 
@@ -117,7 +118,7 @@ export default function CollectorVideoDownloadPanel({ showToast, queue }: { show
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center rounded-xl border border-slate-200/80 bg-slate-100/90 px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-                并发 100 路
+                {browserDownload ? '浏览器下载' : '并发 100 路'}
               </span>
               {queue.running ? (
                 <button
@@ -132,7 +133,7 @@ export default function CollectorVideoDownloadPanel({ showToast, queue }: { show
                   type="button"
                   onClick={() => void queue.start(false)}
                   disabled={!canStart}
-                  title={queue.directory ? '开始下载到已选文件夹' : '请先选择保存文件夹'}
+                  title={browserDownload ? '下载至浏览器设置的位置' : queue.directory ? '开始下载到已选文件夹' : '请先选择保存文件夹'}
                   className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold ${
                     canStart
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 hover:bg-blue-700'

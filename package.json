@@ -11,6 +11,8 @@
     "start:web": "node tools/scripts/web/start-web.mjs",
     "setup:depth-env": "node tools/scripts/depth/fix-ffmpeg-perms.mjs && node tools/scripts/depth/verify-env.mjs",
     "setup:depth-model": "node tools/scripts/depth/setup-depth-model.mjs",
+    "setup:ocr": "node tools/scripts/ocr/setup-ocr.mjs",
+    "setup:atlas": "node tools/scripts/atlas/sync-pose-atlas.mjs",
     "build": "pnpm run typecheck && pnpm run build:ui && pnpm run build:api",
     "build:api": "node tools/scripts/web/build-api.mjs",
     "build:ui": "pnpm run check:skills && vite build --config tools/configs/vite.config.ts",

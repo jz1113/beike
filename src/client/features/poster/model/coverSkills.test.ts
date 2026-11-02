@@ -7,7 +7,7 @@ describe('cover skills', () => {
     expect(COVER_SKILLS.map((skill) => skill.title)).toEqual(['封面', '样张反推']);
     expect(COVER_SKILLS.map((skill) => skill.flow)).toEqual([
       ['商品图', '标题', '封面'],
-      ['参考封面', '待确认记忆', '采纳后可引用'],
+      ['参考封面', '独立模板', '选用后生成'],
     ]);
     for (const skill of COVER_SKILLS) {
       expect(skill.summary.length).toBeGreaterThan(0);
@@ -23,9 +23,9 @@ describe('cover skills', () => {
       ...skill.sections.flatMap((section) => [section.heading, ...section.body]),
     ]).join('\n');
     expect(text).toContain('纠正优先');
-    expect(text).toContain('待确认');
+    expect(text).toContain('独立模板');
     expect(text).toContain('硬约束');
-    expect(text).toContain('1 到 10 张');
+    expect(text).toContain('1 到 100 张');
     expect(text).not.toContain('只支持 3:4');
     expect(coverSkillMemoryStatus(0, 0)).toEqual({
       summary: '已采纳 0 条 · 待确认 0 条',

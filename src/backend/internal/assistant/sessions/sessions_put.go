@@ -10,6 +10,7 @@ import (
 	"beike.local/cloud/src/backend/internal/assistant"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 const sessionBodyLimit = 64 << 20
@@ -47,7 +48,7 @@ func SaveSessions(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusOK, response)
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "会话操作失败，请稍后重试"})
 			return
@@ -81,7 +82,7 @@ func onlyEmptyDefault(sessions []any) bool {
 }
 
 func workspaceHasMessages(r *http.Request, cfg config.Config) bool {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return false
 	}

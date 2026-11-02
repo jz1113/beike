@@ -36,7 +36,7 @@ func TestDeconstructRequestCompletesInGo(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = db.Close()
-	cfg := config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development", DatabaseURL: "file:" + dbPath}
+	cfg := config.Config{NodeEnv: "development", DatabaseURL: "file:" + dbPath}
 	body := `{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"customApiKey":"secret","customBaseUrl":"` + vision.URL + `","model":"gpt-5.6-luna","reviewBeforeSave":true,"clientTaskId":"task-1"}`
 	response := httptest.NewRecorder()
 	deconstructRequestHandler(cfg).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/catalog/assets/deconstruct", strings.NewReader(body)))
@@ -73,7 +73,7 @@ func TestDeconstructJobSubmitDoesNotProxy(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = db.Close()
-	cfg := config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development", DatabaseURL: "file:" + dbPath}
+	cfg := config.Config{NodeEnv: "development", DatabaseURL: "file:" + dbPath}
 	body := `{"jobId":"job-1","overrides":{"textProtocol":"anthropic"},"items":[{"id":"a","name":"套组","images":["https://127.0.0.1:1/a.jpg"]}]}`
 	response := httptest.NewRecorder()
 	deconstructJobsPostHandler(cfg).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/catalog/assets/deconstruct/jobs", strings.NewReader(body)))

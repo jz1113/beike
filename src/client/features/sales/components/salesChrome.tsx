@@ -1,182 +1,25 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
-import { AlertCircle, BookOpen, Check, ChevronDown, FolderOpen, Loader2, Plus, RefreshCw, ShoppingBag, Video } from 'lucide-react';
-import { StudioBrandChip } from '@client/shared/ui/studio/StudioBrandChip';
-import type { VideoSalesCategory, VideoSalesScript } from '@shared/domain/sales';
-import type { SalesWorkflowStep } from '../model/salesWorkspaceView';
-import { salesCreationRule } from '../model/fashionSalesSkill';
+/**
+ * 电商视频（Sales Studio）v5 中性工具美学原子类名
+ * 采用克制灰阶、1px 细线分栏、5-6px 紧凑圆角与墨黑/纯白高对比主按钮，杜绝 AI 蓝紫渐变与毛玻璃套框。
+ */
 
-/** 带货工作台的中性表面与小面积重点色，兼容浅色和深色。 */
-export const salesFocusClass = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/70 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#18191c]';
-export const salesPanelClass = 'rounded-[20px] border border-slate-200/80 bg-white dark:border-white/10 dark:bg-[#141417]';
-export const salesCardClass = 'rounded-2xl border border-slate-200/80 bg-slate-50/50 dark:border-white/10 dark:bg-white/[0.025]';
-export const salesTileClass = 'rounded-2xl border border-slate-200/80 bg-white dark:border-white/10 dark:bg-white/[0.02]';
-export const salesGroupClass = 'space-y-3.5';
-export const salesSectionTitleClass = 'text-[13px] font-semibold text-slate-800 dark:text-slate-100';
-export const salesLabelClass = 'block text-xs font-medium text-slate-600 dark:text-slate-300';
-export const salesInputClass = 'mt-1.5 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500/70 focus:ring-2 focus:ring-amber-500/10 disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-300/50';
-export const salesNoteClass = 'text-xs leading-6 text-slate-500 dark:text-slate-400';
-export const salesDividerClass = 'border-t border-slate-100 pt-5 dark:border-white/[0.08]';
-export const salesTabTrackClass = 'inline-flex rounded-xl bg-slate-100 p-1 dark:bg-black/20';
-export const salesGhostButtonClass = `inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.025] dark:text-slate-200 dark:hover:bg-white/[0.07] ${salesFocusClass}`;
+export const salesFocusClass =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900/60 focus-visible:ring-offset-1 dark:focus-visible:ring-stone-100/70 dark:focus-visible:ring-offset-[#181818]';
 
-/** 不确定时长的细进度条，用于提示词合成、视频生成等等待。 */
-export function SalesIndeterminateBar({ label }: { label: string }) {
-  return <div role="progressbar" aria-label={label} className="relative h-1 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10">
-    <span className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-amber-500/80 motion-safe:animate-[sales-indeterminate_1.4s_ease-in-out_infinite] dark:bg-amber-300/80" />
-    <style>{'@keyframes sales-indeterminate{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}'}</style>
-  </div>;
-}
+export const salesLabelClass =
+  'block text-xs font-semibold tracking-tight text-[#1C1917] dark:text-[#ECECEC]';
 
-export function SalesAlert({ tone = 'warn', children }: { tone?: 'warn' | 'error'; children: ReactNode }) {
-  const color = tone === 'error' ? 'border-rose-500/20 bg-rose-500/[0.06] text-rose-600 dark:text-rose-300' : 'border-amber-500/20 bg-amber-500/[0.07] text-amber-700 dark:text-amber-200';
-  return <div role={tone === 'error' ? 'alert' : 'status'} className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs leading-6 ${color}`}><AlertCircle className="mt-1 h-3.5 w-3.5 shrink-0" aria-hidden /><div className="min-w-0">{children}</div></div>;
-}
+export const salesInputClass =
+  'sales-input mt-1 w-full min-w-0 rounded-[5px] border border-[#E5E5E3] bg-white px-2.5 py-1.5 text-[12.5px] text-[#1C1917] outline-none transition placeholder:text-[#8A8680] focus:border-[#1C1917] disabled:opacity-50 dark:border-[#2A2A2A] dark:bg-[#141414] dark:text-[#ECECEC] dark:placeholder:text-[#71717A] dark:focus:border-[#ECECEC]';
 
-/** 步骤内吸顶子标题，与素材补齐保持一致。 */
-export function SalesStickyHeader({ label, title, meta, actions, children }: { label: string; title: string; meta?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
-  return <section aria-label={label} className="sticky top-0 z-10 -mx-4 -mt-4 space-y-2 border-b border-slate-100 bg-white/90 px-4 py-3 backdrop-blur sm:-mx-5 sm:-mt-5 sm:px-5 dark:border-white/[0.08] dark:bg-[#18191c]/90">
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <div className="flex min-w-0 flex-1 items-center gap-2"><h2 className="text-sm font-semibold">{title}</h2>{meta}</div>
-      {actions}
-    </div>
-    {children}
-  </section>;
-}
+export const salesPrimaryButtonClass =
+  `sales-collect-primary inline-flex items-center justify-center gap-1.5 rounded-[5px] bg-[#1C1917] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2E2A27] disabled:pointer-events-none disabled:opacity-40 dark:bg-[#F0F0EE] dark:text-[#111111] dark:hover:bg-white ${salesFocusClass}`;
 
-export function SalesStatusPill({ tone, children }: { tone: 'done' | 'busy' | 'warn' | 'error' | 'idle'; children: ReactNode }) {
-  const color = { done: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300', busy: 'bg-amber-500/10 text-amber-700 dark:text-amber-200', warn: 'bg-amber-500/10 text-amber-700 dark:text-amber-200', error: 'bg-rose-500/10 text-rose-600 dark:text-rose-300', idle: 'bg-black/5 text-slate-500 dark:bg-white/10 dark:text-slate-400' }[tone];
-  return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${color}`}>{tone === 'busy' && <Loader2 className="h-3 w-3 animate-spin" aria-hidden />}{tone === 'done' && <Check className="h-3 w-3" aria-hidden />}{children}</span>;
-}
+export const salesGhostButtonClass =
+  `sales-button-secondary inline-flex items-center justify-center gap-1.5 rounded-[5px] border border-[#D4D4D1] bg-white px-2.5 py-1.5 text-xs font-medium text-[#1C1917] transition hover:bg-[#EFEFED] disabled:pointer-events-none disabled:opacity-40 dark:border-[#3A3A3A] dark:bg-[#181818] dark:text-[#ECECEC] dark:hover:bg-[#242424] ${salesFocusClass}`;
 
-export function salesTabClass(active: boolean): string {
-  return `rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${salesFocusClass} ${active ? 'bg-white text-slate-900 shadow-sm dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'}`;
-}
+export const salesSurfaceCardClass =
+  'rounded-[6px] border border-[#E5E5E3] bg-white dark:border-[#2A2A2A] dark:bg-[#181818]';
 
-export function SalesCreationRule({ category }: { category: VideoSalesCategory; onOpenRules?: () => void }) {
-  const rule = salesCreationRule(category);
-  return (
-    <div className={`flex items-start justify-between gap-3 p-3 ${salesCardClass}`}>
-      <div className="min-w-0">
-        <p className="text-[11px] text-slate-500 dark:text-slate-400">本次创作规则</p>
-        <p className="mt-1 text-sm font-semibold">{rule.title}</p>
-        <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{rule.detail}</p>
-      </div>
-    </div>
-  );
-}
-
-export function SalesHistorySection({ scripts, selected, disabled, onSelect }: {
-  scripts: VideoSalesScript[]; selected: number; disabled: boolean; onSelect: (index: number) => void;
-}) {
-  if (scripts.length < 2) return null;
-  return <details className="sales-history-menu group/history relative" aria-label="历史方案与任务">
-    <summary className={`flex h-9 cursor-pointer list-none items-center gap-1.5 ${salesGhostButtonClass}`}><FolderOpen className="h-3.5 w-3.5" aria-hidden /><span>方案与历史 ({scripts.length})</span><ChevronDown className="h-3 w-3 transition group-open/history:rotate-180" aria-hidden /></summary>
-    <div className="sales-history-popover absolute right-0 top-full z-40 mt-2 w-80 max-w-[85vw] rounded-xl border border-slate-200 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-[#141417]">
-      <label className="block text-xs text-slate-500">选择历史方案
-        <select aria-label="选择历史方案" disabled={disabled} value={selected} onChange={(event) => onSelect(Number(event.target.value))} className="mt-2 w-full rounded-lg border border-black/10 bg-transparent p-2 text-xs dark:border-white/10">
-          {scripts.map((script, index) => <option key={script.id} value={index}>{index === 0 ? '最新' : '历史'} · {script.title}{script.renderResultUrl ? ' · 已有成片' : script.renderTaskId ? ' · 已有任务回执' : ''}{script.planStale ? ' · 方案已过期' : ''}</option>)}
-        </select>
-      </label>
-      <p className="mt-2 text-[11px] leading-5 text-slate-500">切换可查看对应脚本、成片和任务记录。</p>
-    </div>
-  </details>;
-}
-
-interface Action {
-  label: string;
-  disabled?: boolean;
-  onClick?: () => void;
-  href?: string;
-  download?: string;
-}
-interface SalesActionBarProps {
-  primary: Action;
-  quietReason?: boolean;
-  primaryTitle?: string;
-  secondary?: Action;
-  busy?: boolean;
-  reason?: string | null;
-  note?: string;
-  progress?: string | null;
-  controls?: ReactNode;
-  hideProgress?: boolean;
-}
-
-export function SalesActionBar({ primary, secondary, busy, reason, note, progress, controls, quietReason, primaryTitle, hideProgress }: SalesActionBarProps) {
-  const uid = useId();
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    setElapsed(0);
-    if (!busy) return;
-    const start = Date.now();
-    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
-    return () => window.clearInterval(timer);
-  }, [busy]);
-  const description = reason || note;
-  const actionTitle = busy ? progress || primary.label : primaryTitle || description;
-  const hideStatus = hideProgress || !busy && (quietReason || (controls && !reason));
-  const primaryClass = `sales-primary-action inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition disabled:cursor-not-allowed ${salesFocusClass}`;
-  return <footer aria-label="当前步骤操作" className="shrink-0 bg-transparent px-3 py-2.5 sm:px-5">
-    <div className="@container mx-auto flex w-full justify-center">
-      <div className={`sales-action-dock ${busy ? 'is-busy' : ''} ${controls ? 'has-controls' : ''} flex max-w-full flex-wrap items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm dark:border-white/10 dark:bg-[#18191c]`}>
-        <div className={`${hideStatus ? 'sr-only' : 'sales-dock-status min-w-0'} text-xs leading-5 text-slate-500 dark:text-slate-400`}>
-          <div className={busy ? 'sales-dock-status-heading' : undefined}>
-            <p id={`${uid}-reason`} role="status" aria-live="polite" className={reason && !busy && !quietReason ? 'flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5 font-medium text-amber-800 dark:text-amber-200' : ''}>{reason && !busy && !quietReason && <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />}{busy ? progress || primary.label || '正在处理' : description || '选择商品图后将自动完成后续制作。'}</p>
-            {busy && !hideProgress && <span className="shrink-0 text-[11px] tabular-nums">已等待 {elapsed} 秒</span>}
-          </div>
-          {busy && !hideProgress && <div className="mt-1.5"><SalesIndeterminateBar label={progress || primary.label || '正在处理'} /></div>}
-        </div>
-        {controls && <div className="sales-dock-controls sales-dock-controls-desktop min-w-0">{controls}</div>}
-        {controls && <details className="sales-dock-controls sales-dock-controls-mobile w-full rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]"><summary className="cursor-pointer list-none text-xs font-medium text-slate-700 dark:text-slate-200">创作设置</summary><div className="mt-2">{controls}</div></details>}
-        <div className="sales-dock-actions flex w-full min-w-0 flex-wrap justify-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
-        {secondary && <button type="button" onClick={secondary.onClick} disabled={secondary.disabled} className={`min-h-11 min-w-max shrink-0 whitespace-nowrap px-4 disabled:opacity-40 ${salesGhostButtonClass}`}>{/重新生成/.test(secondary.label) && <RefreshCw className="h-3.5 w-3.5" aria-hidden />}{secondary.label}</button>}
-        <span className="sales-primary-tooltip relative inline-flex max-w-full" title={actionTitle || undefined} tabIndex={primary.disabled ? 0 : undefined}>
-        {primary.href && !primary.disabled ? <a href={primary.href} download={primary.download} title={actionTitle || undefined} aria-describedby={`${uid}-reason`} className={`${primaryClass} min-w-max shrink-0 whitespace-nowrap`}>{primary.label}</a> : <button type="button" onClick={primary.onClick} disabled={primary.disabled} title={actionTitle || undefined} aria-label={busy ? primary.label : undefined} aria-describedby={`${uid}-reason`} aria-busy={Boolean(busy)} className={`${primaryClass} min-w-max shrink-0 whitespace-nowrap`}>{busy && <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />}{busy ? '处理中' : primary.label}</button>}
-        {primary.disabled && actionTitle && <span role="tooltip" className="sales-disabled-tooltip pointer-events-none absolute bottom-full right-0 mb-2 w-max max-w-64 rounded-lg bg-slate-800 px-3 py-2 text-xs font-normal leading-5 text-white shadow-lg dark:bg-slate-200 dark:text-slate-900">{actionTitle}</span>}
-        </span>
-        </div>
-      </div>
-    </div>
-  </footer>;
-}
-
-interface SalesStudioHeaderProps {
-  onBack: () => void;
-  onReset: () => void;
-  resetDisabled: boolean;
-  resetTitle: string;
-  step?: SalesWorkflowStep;
-  availableSteps?: SalesWorkflowStep[];
-  onNavigate?: (step: SalesWorkflowStep) => void;
-  history?: ReactNode;
-  onViewResult?: () => void;
-  onOpenRules: () => void;
-}
-
-const HEADER_STEPS = [
-  ['product', '商品与卖点'], ['plan', '分镜脚本'], ['assets', '素材准备'], ['video', '视频提示词'], ['result', '成片结果'],
-] as const;
-
-export function SalesStudioHeader({ onBack, onReset, resetDisabled, resetTitle, step = 'product', availableSteps = ['product'], onNavigate, history, onViewResult, onOpenRules }: SalesStudioHeaderProps) {
-  return (
-    <header className="sales-studio-header">
-      <StudioBrandChip title="电商视频" icon={<ShoppingBag className="h-4 w-4" />} onBack={onBack} inline />
-      <nav aria-label="电商视频制作步骤" className="sales-stepper">
-        <ol className="flex items-center justify-center gap-1">
-          {HEADER_STEPS.map(([id, label], index) => <li key={id} className="flex min-w-0 items-center gap-1">
-            {index > 0 && <span className="sales-step-connector" aria-hidden />}
-            <button type="button" aria-label={label} title={`第 ${index + 1} 步 · ${label}`} aria-current={step === id ? 'step' : undefined} disabled={!availableSteps.includes(id) && step !== id} onClick={() => onNavigate?.(id)} className={`sales-step ${salesFocusClass}`}>
-              <span className="sales-step-number">{index + 1}</span><span className="sales-step-label">{label}</span>
-            </button>
-          </li>)}
-        </ol>
-      </nav>
-      <div className="sales-header-actions flex items-center justify-end gap-2">
-        {history}
-        {onViewResult && <button type="button" onClick={onViewResult} title="查看生成结果" aria-label="查看生成结果" className={`h-9 ${salesGhostButtonClass}`}><Video className="h-3.5 w-3.5" aria-hidden /><span className="sales-header-action-label">查看生成结果</span></button>}
-        <button type="button" onClick={onOpenRules} title="带货规则" className={`h-9 ${salesGhostButtonClass}`} aria-label="带货规则"><BookOpen className="h-3.5 w-3.5" /><span className="sales-header-action-label">带货规则</span></button>
-        <button type="button" onClick={onReset} disabled={resetDisabled} title={resetTitle} aria-label="更换商品" className={`h-9 shrink-0 disabled:opacity-40 ${salesGhostButtonClass}`}><Plus className="h-3.5 w-3.5" /><span className="sales-header-action-label">更换商品</span></button>
-      </div>
-    </header>
-  );
-}
+export const salesSubtlePanelClass =
+  'rounded-[6px] border border-[#E5E5E3] bg-[#F4F4F3] dark:border-[#2A2A2A] dark:bg-[#141414]';

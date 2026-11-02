@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
@@ -54,7 +55,7 @@ func fetchModelCatalog(ctx context.Context, cfg config.Config, r *http.Request, 
 			rawURL = firstTextValue(r.Header.Get("x-custom-base-url"), os.Getenv("AI_DRAWING_BASE_URL"), "https://ai.comfly.org")
 		}
 	}
-	target := normalizeGatewayBaseURL(rawURL)
+	target := gateway.NormalizeGatewayBaseURL(rawURL)
 	if openAI && !allowCustomBase(cfg) && !safeHTTPSGateway(target) && !(payload["allowInsecureHttp"] == true && publicHTTPGateway(target)) {
 		return http.StatusBadRequest, map[string]any{"success": false, "models": []any{}, "error": "此部署仅允许 HTTPS 地址；如需使用公网 IPv4 的 HTTP 网关，请先在设置中勾选明文传输选项。内网地址和 HTTP 域名不受支持。"}
 	}
@@ -139,9 +140,9 @@ func fetchModelCatalog(ctx context.Context, cfg config.Config, r *http.Request, 
 }
 
 func readGatewayModels(ctx context.Context, client *http.Client, base, key string, openAI bool) ([]any, int, string) {
-	endpoints := []string{ModelsURL(base)}
-	if openAI && !IsDashScopeGateway(base) {
-		root := strings.TrimRight(normalizeGatewayBaseURL(base), "/")
+	endpoints := []string{gateway.ModelsURL(base)}
+	if openAI && !gateway.IsDashScopeGateway(base) {
+		root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
 		endpoints = []string{root + "/v1/models", root + "/models"}
 	}
 	status := 0

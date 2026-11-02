@@ -38,6 +38,25 @@ func TestSafeVideoDestinationByteLimit(t *testing.T) {
 	}
 }
 
+func TestSafeVideoDestinationRejectsWindowsSpecialPaths(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{
+		"video:stream.mp4", "video?.mp4", "video*.mp4", "video<.mp4", "video>.mp4", "video|.mp4", "video\".mp4",
+		"video\x00.mp4", "video\n.mp4", "video\x1f.mp4", "CON.other.mp4", "nul .mp4", "LPT1.extra.mp4", "COM¹.mp4", "LPT².mp4", "COM³.mp4",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := safeVideoDestination(dir, name); err == nil {
+				t.Fatalf("accepted special Windows name %q", name)
+			}
+		})
+	}
+	for _, name := range []string{"商品细节.mp4", "console.mp4", "com10.mp4", "video.final.MP4"} {
+		if _, err := safeVideoDestination(dir, name); err != nil {
+			t.Fatalf("rejected ordinary name %q: %v", name, err)
+		}
+	}
+}
+
 func TestVideoConcurrencyTiers(t *testing.T) {
 	if value, ok := videoConcurrency(0); !ok || value != 100 {
 		t.Fatalf("default %d %v", value, ok)

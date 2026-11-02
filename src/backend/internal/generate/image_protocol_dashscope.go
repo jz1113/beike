@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/platform/media"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 type dashscopeImageProtocol struct{}
@@ -36,7 +36,7 @@ func (dashscopeImageProtocol) Submit(req imageRequest) (imageSubmitResult, error
 	adapted.size = strings.ReplaceAll(size, "*", "x")
 	body := dashscopeImageBody(req, kind, images, size)
 	async := dashscopeUsesAsync(req.Model, kind)
-	endpoint := system.DashScopeRoot(req.Base) + dashscopeImagePath(async)
+	endpoint := gateway.DashScopeRoot(req.Base) + dashscopeImagePath(async)
 	headers := map[string]string{}
 	timeout := 300 * time.Second
 	if async {
@@ -47,7 +47,7 @@ func (dashscopeImageProtocol) Submit(req imageRequest) (imageSubmitResult, error
 		adapted.endpoint = "multimodal-generation"
 	}
 	adapted.payload = body
-	status, raw, err := PostModelHeaders(req.context(), http.MethodPost, endpoint, req.APIKey, body, timeout, headers)
+	status, raw, err := gateway.PostModelHeaders(req.context(), http.MethodPost, endpoint, req.APIKey, body, timeout, headers)
 	if err != nil {
 		return imageSubmitResult{}, err
 	}
@@ -67,8 +67,8 @@ func (dashscopeImageProtocol) Submit(req imageRequest) (imageSubmitResult, error
 }
 
 func (dashscopeImageProtocol) Poll(req imagePollRequest) (pollParsed, map[string]any, bool) {
-	endpoint := system.DashScopeRoot(req.Base) + "/api/v1/tasks/" + url.PathEscape(req.TaskID)
-	status, raw, err := PostModel(req.context(), http.MethodGet, endpoint, req.APIKey, nil, 8*time.Second)
+	endpoint := gateway.DashScopeRoot(req.Base) + "/api/v1/tasks/" + url.PathEscape(req.TaskID)
+	status, raw, err := gateway.PostModel(req.context(), http.MethodGet, endpoint, req.APIKey, nil, 8*time.Second)
 	if err != nil || status < 200 || status >= 300 {
 		return pollParsed{}, nil, false
 	}

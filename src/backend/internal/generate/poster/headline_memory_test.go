@@ -12,7 +12,8 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/generate"
+	"beike.local/cloud/src/backend/internal/gateway"
+
 	"beike.local/cloud/src/backend/internal/platform/database"
 
 	_ "modernc.org/sqlite"
@@ -141,13 +142,13 @@ func TestHeadlineDesignInjectsAdoptedMemory(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer server.Close()
-	previous := generate.ModelHTTP
-	generate.ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { generate.ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 
 	response := httptest.NewRecorder()
 	request := `{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"originalTitle":"台灯","coverTitle":"台灯","batchId":"batch_1","itemId":"item_1","itemTitle":"台灯很好用","previousDesign":"上一张是深底黄字","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
-	HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development", DatabaseURL: cfg.DatabaseURL}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(request)))
+	HeadlineDesign(config.Config{NodeEnv: "development", DatabaseURL: cfg.DatabaseURL}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(request)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("design %d %s", response.Code, response.Body.String())
 	}
@@ -203,13 +204,13 @@ func TestHeadlineDeconstructStoresPendingEntries(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer server.Close()
-	previous := generate.ModelHTTP
-	generate.ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { generate.ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 
 	response := httptest.NewRecorder()
 	request := `{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"title":"纸感样张","model":"gemini-3.7-flash","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
-	HeadlineDeconstruct(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development", DatabaseURL: cfg.DatabaseURL}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-deconstruct", strings.NewReader(request)))
+	HeadlineDeconstruct(config.Config{NodeEnv: "development", DatabaseURL: cfg.DatabaseURL}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-deconstruct", strings.NewReader(request)))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "标题压住商品上沿") {
 		t.Fatalf("deconstruct %d %s", response.Code, response.Body.String())
 	}
@@ -273,10 +274,10 @@ func TestDesignUsesOnlyRequestedSample(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer server.Close()
-	previous := generate.ModelHTTP
-	generate.ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { generate.ModelHTTP = previous })
-	handler := HeadlineDesign(config.Config{Upstream: "http://127.0.0.1:1", NodeEnv: "development", DatabaseURL: cfg.DatabaseURL})
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	handler := HeadlineDesign(config.Config{NodeEnv: "development", DatabaseURL: cfg.DatabaseURL})
 	request := `{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"originalTitle":"台灯","coverTitle":"台灯","memorySampleId":"sample_old","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(request)))
@@ -345,9 +346,9 @@ func TestHeadlineDeconstructReasoningEffort(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"content": []any{map[string]any{"type": "text", "text": reply}}, "stop_reason": "end_turn", "usage": map[string]any{"input_tokens": 1, "output_tokens": 2}})
 	}))
 	defer server.Close()
-	previous := generate.ModelHTTP
-	generate.ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { generate.ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 
 	handler := HeadlineDeconstruct(cfg)
 	post := func(effort string) *httptest.ResponseRecorder {

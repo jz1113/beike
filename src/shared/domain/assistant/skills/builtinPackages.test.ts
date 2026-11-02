@@ -8,7 +8,7 @@ import { OPENAI_TOOLS } from '../tools/defs';
 describe('maintained builtin packages', () => {
   const skills = BUILTIN_ASSISTANT_SKILLS.filter(skill => resolveSkillKind(skill) === 'agent');
   it('uses the same full instructions in the reader and runtime, with real tools', () => {
-    expect(skills).toHaveLength(13);
+    expect(skills).toHaveLength(12);
     const toolNames = new Set(OPENAI_TOOLS.map(tool => tool.function.name));
     for (const skill of skills) {
       expect(parseSkillFileContent(skill.markdownDoc!, 'SKILL.md').skill.prompt, skill.id).toBe(skill.prompt);

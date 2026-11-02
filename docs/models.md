@@ -82,11 +82,11 @@
 | `MiniMax-H3` | video | minimax | [MiniMax 视频生成](https://platform.minimaxi.com/document/video_api_intro) |
 | `wan3.0-video` | video | alibaba | [通义万相视频生成](https://help.aliyun.com/zh/model-studio/wan-video) |
 | `grok-imagine-video-1.5` | video | xai | [xAI Videos](https://docs.x.ai/developers/rest-api-reference/inference/videos) |
-| `viduq3` | video | vidu | [Vidu Q4 参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video.md) |
-| `viduq3-mix` | video | vidu | [Vidu Q4 参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video.md) |
-| `viduq3-turbo` | video | vidu | [Vidu Q4 图生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video) |
-| `viduq3-pro` | video | vidu | [Vidu Q4 图生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video) |
-| `viduq4-preview` | video | vidu | [Vidu Q4 图生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video)、[参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video.md) |
+| `viduq3` | video | vidu | [Vidu Q3 参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q3/reference-to-video) |
+| `viduq3-mix` | video | vidu | [Vidu Q3 参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q3/reference-to-video) |
+| `viduq3-turbo` | video | vidu | [Vidu Q3 图生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q3/image-to-video)、[参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q3/reference-to-video) |
+| `viduq3-pro` | video | vidu | [Vidu Q3 图生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q3/image-to-video)、[首尾帧](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q3/start-end-to-video)、[文生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q3/text-to-video) |
+| `viduq4-preview` | video | vidu | [Vidu Q4 图生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video)、[参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video) |
 | `multimodal-chat` | multimodal | chat | [OpenAI Chat Completions](https://platform.openai.com/docs/api-reference/chat) · [Anthropic Messages](https://docs.anthropic.com/en/api/messages) · [Gemini generateContent](https://ai.google.dev/api/generate-content) · [DeepSeek API](https://api-docs.deepseek.com/) · [Moonshot Kimi](https://platform.moonshot.cn/docs/api/chat) |
 
 ## 网关文档标识

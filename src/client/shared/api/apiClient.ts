@@ -137,5 +137,8 @@ export function readClientStorageConfig(): ClientStorageConfig {
 }
 
 export function storageConfigHeaders(): Record<string, string> {
-  return { 'x-storage-config': JSON.stringify(readClientStorageConfig()) };
+  // HTTP headers must stay in the byte range; JSON escapes preserve Unicode prefixes.
+  const config = JSON.stringify(readClientStorageConfig()).replace(/[\u007f-\uffff]/g,
+    (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`);
+  return { 'x-storage-config': config };
 }

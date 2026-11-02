@@ -1,3 +1,4 @@
+import { posterQueue, type PosterRunMode } from '../model/posterWorkflow';
 import { requiresGenerationRecovery } from '@client/shared/api/generation/generationRecovery';
 import { directCoverDesign, generateFinalCover, rewriteCoverTitle } from '../api/posterApi';
 import { buildDesignPlan, previousDesignSummary, normalizeCoverTitle, makeId, preservedOriginalTitle, posterInputError, shouldRewriteCoverTitle } from '../model/posterTypes';
@@ -18,7 +19,7 @@ export function createPosterGeneration(context: Pick<PosterState,
     availableTitleModelsRef, ensureActiveBatch, persistActiveBatch, itemAbortControllers,
     metadataBarrierRef, activeBatchIdRef, activeBatchIsCurrent, withOwnedBatchLock,
   } = context;
-  const runItemInternal = async (requestedItem: PosterItem, index: number, fromBatch = false, settings = currentSettings()) => {
+  const runItemInternal = async (requestedItem: PosterItem, index: number, fromBatch = false, settings = currentSettings(), mode: PosterRunMode = 'all') => {
     if (!aliveRef.current || restoringRef.current || exportingRef.current || importingRef.current || !ensureWorkspaceReady()) return;
     if (activeItemsRef.current.has(requestedItem.id) || !fromBatch && runningRef.current) return;
     if (fromBatch && isAborted()) return;
@@ -26,7 +27,8 @@ export function createPosterGeneration(context: Pick<PosterState,
     if (!item) return;
     if (item.status === 'complete' && item.resultUrl) return;
     const recoveringImage = Boolean(item.imageTaskId || item.generatedSceneUrl || item.generationRecoveryRequired);
-    const inputError = !recoveringImage && (item.importError || posterInputError(item) || productionModelError(settings));
+    if (mode !== 'all' && !posterQueue([item], mode).length) return;
+    const inputError = !recoveringImage && (item.importError || posterInputError(item) || productionModelError(settings, mode));
     if (inputError) {
       updateItem(item.id, { status: 'failed', error: inputError });
       setNoticeIfAlive(inputError);
@@ -75,8 +77,8 @@ export function createPosterGeneration(context: Pick<PosterState,
         };
       const coverTitle = titleResult.value;
       if (itemAborted()) throw new Error('已取消大字报任务');
-      if (!recoveringImage && (shouldRewriteTitle || item.isTitleEdited) && (coverTitle.length < 7 || coverTitle.length > 12)) {
-        throw new Error('封面标题请保持 7–12 字；不会自动截断词语');
+      if (!recoveringImage && (shouldRewriteTitle || item.isTitleEdited) && (coverTitle.length < 4 || coverTitle.length > 18)) {
+        throw new Error('封面标题请保持 4–18 字；不会自动截断词语');
       }
       updateItem(item.id, { status: 'prompting', coverTitle, modelFallbackNote: titleResult.fallbackNote });
 
@@ -89,6 +91,7 @@ export function createPosterGeneration(context: Pick<PosterState,
           '封面设计', 'prompting', titleResult.modelId,
           (modelId) => directCoverDesign(item, coverTitle, modelId, {
             batchId,
+            supplementaryRequirements: settings.supplementaryRequirements,
             previousDesign: previousDesignSummary(previous?.designPlan),
             memorySampleId: item.memorySampleId || settings.memorySampleId || 'auto',
             memoryUsageId: item.memoryUsageId,
@@ -99,7 +102,7 @@ export function createPosterGeneration(context: Pick<PosterState,
         designPlan = buildDesignPlan(coverTitle, directorResult.value.design);
         prompt = designPlan.generationDirection;
         updateItem(item.id, {
-          status: 'prompting', coverTitle, prompt, designPlan, promptVersion: 'integrated-cover-v5',
+          status: 'prompting', coverTitle, prompt, designPlan, promptVersion: 'reference-cover-v6',
           memorySampleId: directorResult.value.memorySampleId,
           memoryEntryIds: directorResult.value.memoryEntryIds,
           memoryUsageId: directorResult.value.memoryUsageId,
@@ -107,6 +110,11 @@ export function createPosterGeneration(context: Pick<PosterState,
           memoryWarning: directorResult.value.memoryWarning,
           modelFallbackNote: directorResult.fallbackNote || titleResult.fallbackNote,
         });
+      }
+      if (mode === 'design') {
+        updateItem(item.id, { status: 'idle', error: undefined });
+        if (!await persistActiveBatch()) throw new Error('方案已完成但保存失败，请保留页面并释放存储后再试。');
+        return;
       }
       const submissionKey = item.imageSubmissionKey || (!recoveringImage ? `headline:${ensureActiveBatch()}:${item.id}:${makeId()}` : undefined);
       updateItem(item.id, { status: 'rendering', imageSubmissionKey: submissionKey, generationRecoveryRequired: true });
@@ -187,17 +195,15 @@ export function createPosterGeneration(context: Pick<PosterState,
     await withBatchGenerationLock(() => runItemInternal(item, index), !item.imageTaskId && !item.generatedSceneUrl && !item.generationRecoveryRequired);
   };
 
-  const runBatchInternal = async (onlyFailed = false) => {
+  const runBatchInternal = async (onlyFailed = false, mode: PosterRunMode = 'all') => {
     if (!aliveRef.current || runningRef.current || restoringRef.current || exportingRef.current || importingRef.current || !ensureWorkspaceReady()) return;
     const settings = currentSettings();
-    const queue = itemsRef.current.filter((item) => onlyFailed
-      ? item.status === 'failed' && (!item.importError || item.imageTaskId || item.generatedSceneUrl || item.generationRecoveryRequired)
-      : item.status === 'idle' || item.status === 'interrupted');
+    const queue = posterQueue(itemsRef.current, mode, onlyFailed);
     if (queue.length === 0) {
       setNoticeIfAlive(onlyFailed ? '没有可重试的失败记录。' : '没有待生成任务；请先导入图片链接、原标题和文字竖/文字横。');
       return;
     }
-    const modelError = productionModelError(settings);
+    const modelError = productionModelError(settings, mode);
     if (modelError && queue.every((item) => !item.imageTaskId && !item.generatedSceneUrl && !item.generationRecoveryRequired)) {
       setNoticeIfAlive(modelError);
       return;
@@ -207,25 +213,24 @@ export function createPosterGeneration(context: Pick<PosterState,
     const indices = new Map(itemsRef.current.map((item, index) => [item.id, index]));
     const pending = queue.map((item) => ({ item, index: indices.get(item.id)! }));
     let cursor = 0;
-    setNoticeIfAlive(`正在处理 ${queue.length} 条任务：每条依次进行标题改写、封面提示词设计、一次生图直接完成商品、场景与艺术字排版。`);
+    setNoticeIfAlive(mode === 'design' ? `正在为 ${queue.length} 条素材准备标题和方案，完成后可预览，不会提交生图。` : `正在处理 ${queue.length} 条封面；已提交的任务会先核对原结果。`);
     try {
       await Promise.all(Array.from({ length: Math.min(settings.concurrency, pending.length) }, async () => {
         while (cursor < pending.length && !isAborted()) {
           const next = pending[cursor++];
-          if (next) await runItemInternal(next.item, next.index, true, settings);
+          if (next) await runItemInternal(next.item, next.index, true, settings, mode);
         }
       }));
-      setNoticeIfAlive(isAborted() ? '已停止等待；继续生成会先核对已提交的原生图任务。' : '本轮任务已结束。可检查标题与提示词，并下载成功成品。');
+      setNoticeIfAlive(isAborted() ? '已停止等待；继续生成会先核对已提交的原生图任务。' : mode === 'design' ? '方案准备结束，请逐条查看标题与提示词，再确认生成封面。' : '本轮任务已结束。可筛选失败项处理，或下载成功成品。');
     } finally {
       setIsRunningIfAlive(false);
     }
   };
 
-  const runBatch = async (onlyFailed = false) => {
+  const runBatch = async (onlyFailed = false, mode: PosterRunMode = 'all') => {
     if (runningRef.current || restoringRef.current || exportingRef.current || importingRef.current) return;
-    const hasNewGeneration = itemsRef.current.some((item) => (onlyFailed ? item.status === 'failed' && !item.importError : ['idle', 'interrupted'].includes(item.status))
-      && !item.imageTaskId && !item.generatedSceneUrl && !item.generationRecoveryRequired);
-    await withBatchGenerationLock(() => runBatchInternal(onlyFailed), hasNewGeneration);
+    const hasNewGeneration = posterQueue(itemsRef.current, mode, onlyFailed).some((item) => !item.imageTaskId && !item.generatedSceneUrl && !item.generationRecoveryRequired);
+    await withBatchGenerationLock(() => runBatchInternal(onlyFailed, mode), hasNewGeneration);
   };
 
 

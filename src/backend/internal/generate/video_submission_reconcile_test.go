@@ -74,7 +74,7 @@ func TestVideoUnknownSubmissionReconcilesTerminalWithoutResubmit(t *testing.T) {
 			if err != nil || changed != 0 {
 				t.Fatalf("unrelated receipts changed: %d %v", changed, err)
 			}
-			if item.withUsage && readTaskUsage(context.Background(), db, "known-uncertain") == "" {
+			if item.withUsage && readTaskUsage(context.Background(), db, taskScope{"local", "video"}, "known-uncertain") == "" {
 				t.Fatal("terminal usage was not saved")
 			}
 			keyed := videoSubmissionTestGet(handler, "reconcile", "local")

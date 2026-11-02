@@ -10,7 +10,7 @@ import (
 )
 
 func TestProductDeleteRequiresIDAndProxiesRemoteStorage(t *testing.T) {
-	handler := productsDeleteHandler(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := productsDeleteHandler(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/api/catalog/products", nil))
 	if response.Code != http.StatusBadRequest {

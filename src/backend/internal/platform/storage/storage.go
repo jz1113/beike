@@ -107,6 +107,9 @@ func newS3Client(config ObjectConfig) *s3.Client {
 }
 
 func (defaultObjectStore) Put(ctx context.Context, config ObjectConfig, key, contentType string, body []byte) error {
+	if config.Provider == "oss" {
+		return putOSS(ctx, config, key, contentType, body)
+	}
 	if config.Provider == "cloudinary" {
 		return putCloudinary(ctx, config, key, contentType, body)
 	}
@@ -124,6 +127,9 @@ func (defaultObjectStore) Put(ctx context.Context, config ObjectConfig, key, con
 }
 
 func (defaultObjectStore) Delete(ctx context.Context, config ObjectConfig, key string) error {
+	if config.Provider == "oss" {
+		return deleteOSS(ctx, config, key)
+	}
 	if config.Provider == "cloudinary" {
 		return deleteCloudinary(ctx, config, key)
 	}

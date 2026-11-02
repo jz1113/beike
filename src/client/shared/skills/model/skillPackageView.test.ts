@@ -14,7 +14,7 @@ function flattenFiles(nodes: SkillFileNode[], prefix = ''): [string, string][] {
 
 describe('skill package reader and portable files', () => {
   it('keeps the canonical main and nested files through ZIP import', async () => {
-    const skill = BUILTIN_ASSISTANT_SKILLS.find(item => item.id === 'fashion-video-sales')!;
+    const skill = BUILTIN_ASSISTANT_SKILLS.find(item => item.id === 'seedance-2-5-prompt-copilot')!;
     const files = skillPackageFiles(skill);
     const zip = new JSZip();
     for (const file of files) zip.file(`${skill.id}/${file.path}`, file.content);

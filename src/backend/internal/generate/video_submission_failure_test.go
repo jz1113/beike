@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func TestVideoSubmissionUnknownIsNeverReplayed(t *testing.T) {
@@ -109,7 +111,7 @@ func TestVideoSubmissionAcceptedReceiptSurvivesCallerCancellation(t *testing.T) 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	transport := server.Client().Transport
-	ModelHTTP = func() *http.Client {
+	gateway.ModelHTTP = func() *http.Client {
 		return &http.Client{Transport: videoReceiptRoundTripper(func(r *http.Request) (*http.Response, error) {
 			response, err := transport.RoundTrip(r)
 			if err == nil {

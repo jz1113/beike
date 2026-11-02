@@ -11,6 +11,7 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/collect"
+	"beike.local/cloud/src/backend/internal/platform/database"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
@@ -36,7 +37,7 @@ func collectHandler(cfg config.Config) http.HandlerFunc {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "platform: String must contain at most 64 character(s)"})
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "采集遇到未知异常"})
 			return

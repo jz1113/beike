@@ -1,3 +1,4 @@
+import { formatUserError } from "@shared/domain/models/upstreamErrors";
 import type { GenerationTask } from '@client/store';
 import { getAspectRatioClass } from '../model/generateCanvasLayout';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
@@ -77,9 +78,9 @@ export default function FeedSingleCard({
               <p className="text-xs font-bold text-red-700">生成失败</p>
               <p
                 className="text-[11px] text-red-500 w-full max-w-full break-words [overflow-wrap:anywhere] leading-relaxed text-left"
-                title={primaryTask.failReason || '接口响应异常'}
+                title={formatUserError(primaryTask.failReason || '接口响应异常')}
               >
-                {primaryTask.failReason || '接口响应异常'}
+                {formatUserError(primaryTask.failReason || '接口响应异常')}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 pt-1">

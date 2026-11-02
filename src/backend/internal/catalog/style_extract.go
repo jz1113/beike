@@ -13,7 +13,6 @@ import (
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/network"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 var styleHTTP = func() *http.Client { return network.SafeClient() }
@@ -91,7 +90,7 @@ func styleCredentials(cfg config.Config, r *http.Request, payload map[string]any
 			key = strings.TrimSpace(os.Getenv("AI_API_KEY"))
 		}
 	}
-	return system.NormalizeGatewayBaseURL(base), key, model
+	return gateway.NormalizeGatewayBaseURL(base), key, model
 }
 
 func styleChat(ctx context.Context, base, key, model string, content []any) (string, int, map[string]any, error) {
@@ -116,7 +115,7 @@ func styleChat(ctx context.Context, base, key, model string, content []any) (str
 	choice, _ := choices[0].(map[string]any)
 	message, _ := choice["message"].(map[string]any)
 	text, _ := message["content"].(string)
-	return strings.TrimSpace(text), status, generate.NormalizeUsage(data), nil
+	return strings.TrimSpace(text), status, gateway.NormalizeUsage(data), nil
 }
 
 func stylePrompt(hint string, count int) string {

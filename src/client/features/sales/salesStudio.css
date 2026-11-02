@@ -1,0 +1,455 @@
+.sales-studio {
+  --sales-canvas: #f4f4f3;
+  --sales-surface: #ffffff;
+  --sales-subtle: #efefed;
+  --sales-line: #e5e5e3;
+  --sales-line-strong: #d4d4d1;
+  --sales-muted: #5c5955;
+  --sales-muted-soft: #8a8680;
+  --sales-ink: #1c1917;
+  --sales-cta-bg: #1c1917;
+  --sales-cta-ink: #ffffff;
+  --sales-cta-hover: #2e2a27;
+  --sales-accent: #1c1917;
+  --sales-accent-bg: rgba(28, 25, 23, 0.06);
+  --sales-accent-line: #1c1917;
+  --sales-ocr-accent: #2563eb;
+  --sales-warn: #d9480f;
+  --sales-warn-bg: #fff4e6;
+  --sales-ok: #15803d;
+  --sales-space: 0px;
+  --sales-radius: 6px;
+  background-color: var(--sales-canvas);
+  color: var(--sales-ink);
+  color-scheme: light;
+}
+
+.dark .sales-studio {
+  --sales-canvas: #111111;
+  --sales-surface: #181818;
+  --sales-subtle: #222222;
+  --sales-line: #2a2a2a;
+  --sales-line-strong: #3a3a3a;
+  --sales-muted: #a1a1aa;
+  --sales-muted-soft: #71717a;
+  --sales-ink: #ececec;
+  --sales-cta-bg: #f0f0ee;
+  --sales-cta-ink: #111111;
+  --sales-cta-hover: #ffffff;
+  --sales-accent: #f0f0ee;
+  --sales-accent-bg: rgba(255, 255, 255, 0.08);
+  --sales-accent-line: #ececec;
+  --sales-ocr-accent: #60a5fa;
+  --sales-warn: #f76707;
+  --sales-warn-bg: rgba(247, 103, 7, 0.14);
+  --sales-ok: #22c55e;
+  color-scheme: dark;
+}
+
+/* 48px 极简工具顶栏 */
+.sales-studio-topbar {
+  position: relative;
+  z-index: 25;
+  display: flex;
+  height: 48px;
+  min-height: 48px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid var(--sales-line);
+  background: var(--sales-surface);
+  padding: 0 14px;
+}
+
+.sales-topbar-left {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  gap: 10px;
+}
+
+.sales-topbar-divider {
+  width: 1px;
+  height: 16px;
+  flex-shrink: 0;
+  background: var(--sales-line);
+}
+
+.sales-topbar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sales-topbar-left > h1,
+.sales-topbar-right {
+  flex-shrink: 0;
+}
+
+.sales-topbar-left > h1 {
+  margin: 0;
+}
+
+.sales-topbar-left > h1 button {
+  height: 32px;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.sales-topbar-right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.sales-topbar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--sales-muted);
+}
+
+.sales-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.sales-status-pill.is-running {
+  color: var(--sales-ink);
+  font-weight: 500;
+}
+
+.sales-status-pill.is-error {
+  color: #dc2626;
+}
+
+.sales-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--sales-muted-soft);
+}
+
+.sales-status-dot.is-ok {
+  background: var(--sales-ok);
+}
+
+.sales-status-dot.is-saving {
+  background: var(--sales-warn);
+}
+
+.sales-status-dot.is-error {
+  background: #dc2626;
+}
+
+.sales-status-retry {
+  margin-left: 4px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sales-workspace-host {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 0;
+  outline: none;
+}
+
+.sales-studio-alert {
+  margin: 0;
+  border-bottom: 1px solid var(--sales-line);
+  border-radius: 0;
+  padding: 8px 14px;
+}
+
+.sales-studio :is(.sales-gallery-scroll, .sales-library-scroll, .sales-cat-sidebar) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sales-line-strong) transparent;
+  scrollbar-gutter: stable;
+}
+
+.sales-studio .sales-input {
+  border: 1px solid var(--sales-line);
+  border-radius: 5px;
+  background: var(--sales-surface);
+  color: var(--sales-ink);
+  font-size: 12.5px;
+  line-height: 1.5;
+  transition: border-color 120ms, background-color 120ms;
+}
+
+.sales-studio .sales-input:focus {
+  border-color: var(--sales-ink);
+  outline: none;
+}
+
+.sales-studio .sales-button-secondary {
+  min-height: 30px;
+  border: 1px solid var(--sales-line-strong);
+  border-radius: 5px;
+  background: var(--sales-surface);
+  color: var(--sales-ink);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: none;
+  transition: background-color 120ms, border-color 120ms;
+}
+
+.sales-studio .sales-button-secondary:hover:not(:disabled) {
+  background: var(--sales-subtle);
+}
+
+.sales-studio .sales-collect-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: var(--sales-cta-bg);
+  color: var(--sales-cta-ink);
+  padding: 0 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  box-shadow: none;
+  transition: background-color 120ms, opacity 120ms;
+}
+
+.sales-studio .sales-collect-primary:hover:not(:disabled) {
+  background: var(--sales-cta-hover);
+}
+
+.sales-studio .sales-collect-primary:disabled {
+  opacity: 0.42;
+}
+
+/* 统一 56px 底部操作栏与向上展开菜单 */
+.sales-actionbar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  height: 56px;
+  min-height: 56px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--sales-line);
+  background: var(--sales-surface);
+  padding: 0 16px;
+}
+
+.sales-actionbar-left {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+
+.sales-actionbar-right {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.sales-actionbar-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sales-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sales-dropup {
+  position: relative;
+  display: inline-flex;
+}
+
+.sales-dropup-btn {
+  display: inline-flex;
+  height: 32px;
+  max-width: 240px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--sales-line-strong);
+  border-radius: 5px;
+  background: var(--sales-surface);
+  padding: 0 9px;
+  font-size: 12px;
+  color: var(--sales-ink);
+  transition: background-color 120ms, border-color 120ms;
+}
+
+.sales-dropup-btn:hover:not(:disabled),
+.sales-dropup.is-open .sales-dropup-btn {
+  background: var(--sales-subtle);
+  border-color: var(--sales-ink);
+}
+
+.sales-dropup-btn:disabled {
+  opacity: 0.45;
+}
+
+.sales-dropup-key {
+  flex-shrink: 0;
+  color: var(--sales-muted);
+  font-size: 11.5px;
+}
+
+.sales-dropup-thumb {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  object-fit: cover;
+}
+
+.sales-dropup-val {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.sales-dropup-caret {
+  flex-shrink: 0;
+  color: var(--sales-muted);
+  transition: transform 120ms;
+}
+
+.sales-dropup-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 60;
+  max-height: min(420px, 68vh);
+  overflow-y: auto;
+  border: 1px solid var(--sales-line-strong);
+  border-radius: 6px;
+  background: var(--sales-surface);
+  padding: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+}
+
+.dark .sales-dropup-menu {
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+}
+
+.sales-dropup-menu.is-right {
+  left: auto;
+  right: 0;
+}
+
+/* 资产库容器通用灰阶框线 */
+.sales-library-shell,
+.sales-prod-card {
+  border-radius: 0;
+  background: var(--sales-surface);
+  box-shadow: none;
+}
+
+.sales-library-shell {
+  grid-template-columns: 188px minmax(0, 1fr);
+}
+
+.sales-cat-sidebar {
+  gap: 12px;
+  background: var(--sales-surface);
+  border-right: 1px solid var(--sales-line);
+  padding: 12px 10px;
+}
+
+.sales-library-top {
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--sales-line);
+}
+
+.sales-library-scroll {
+  padding: 16px 20px;
+  background: var(--sales-canvas);
+}
+
+.sales-empty-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  background: var(--sales-subtle);
+  color: var(--sales-muted);
+}
+
+.sales-script-card,
+.sales-material-card {
+  background: var(--sales-surface);
+  border-radius: 6px;
+  box-shadow: none;
+  transition: border-color 140ms ease;
+}
+
+.sales-script-card:hover,
+.sales-material-card:hover {
+  border-color: var(--sales-ink);
+  box-shadow: none;
+}
+
+.sales-material-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(188px, 100%), 1fr));
+  gap: 14px;
+}
+
+.sales-material-grid.density-sm {
+  grid-template-columns: repeat(auto-fill, minmax(min(148px, 100%), 1fr));
+  gap: 10px;
+}
+
+.sales-material-grid.density-lg {
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 960px) {
+  .sales-actionbar {
+    height: auto;
+    min-height: 52px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+  }
+  .sales-actionbar-left {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 760px) {
+  .sales-studio-topbar {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 6px 12px;
+  }
+  .sales-library-shell {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .sales-cat-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--sales-line);
+  }
+}

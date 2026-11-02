@@ -25,8 +25,24 @@ var safeTransport = &http.Transport{
 	ExpectContinueTimeout: 1 * time.Second,
 }
 
+// Keep a separate pool so a retry cannot reuse the slow IPv4 connection.
+var safeIPv6FirstTransport = func() *http.Transport {
+	transport := safeTransport.Clone()
+	transport.DialContext = func(ctx context.Context, networkName, address string) (net.Conn, error) {
+		dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+		return dialPublicWithPreference(ctx, dialer, networkName, address, true)
+	}
+	return transport
+}()
+
 func SafeClient() *http.Client {
 	return &http.Client{Transport: safeTransport, CheckRedirect: safeRedirect}
+}
+
+// SafeClientIPv6First retries public downloads through IPv6 when an IPv4 route
+// is slow. Hosts without working IPv6 still fall back to public IPv4 addresses.
+func SafeClientIPv6First() *http.Client {
+	return &http.Client{Transport: safeIPv6FirstTransport, CheckRedirect: safeRedirect}
 }
 
 func dialPublicContext(ctx context.Context, networkName, address string) (net.Conn, error) {
@@ -45,6 +61,10 @@ func safeRedirect(request *http.Request, via []*http.Request) error {
 }
 
 func dialPublic(ctx context.Context, dialer *net.Dialer, networkName, address string) (net.Conn, error) {
+	return dialPublicWithPreference(ctx, dialer, networkName, address, false)
+}
+
+func dialPublicWithPreference(ctx context.Context, dialer *net.Dialer, networkName, address string, ipv6First bool) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -62,7 +82,7 @@ func dialPublic(ctx context.Context, dialer *net.Dialer, networkName, address st
 	if err != nil || len(records) == 0 {
 		return nil, errors.New("DNS lookup failed for host")
 	}
-	targets, err := dialableIPs(records)
+	targets, err := dialableIPsWithPreference(records, ipv6First)
 	if err != nil {
 		return nil, err
 	}
@@ -83,12 +103,19 @@ func dialPublic(ctx context.Context, dialer *net.Dialer, networkName, address st
 // Public addresses are dialed IPv4 first. One unreachable record must not hide
 // another that works, and any private address still rejects the whole name.
 func dialableIPs(records []net.IPAddr) ([]net.IP, error) {
+	return dialableIPsWithPreference(records, false)
+}
+
+func dialableIPsWithPreference(records []net.IPAddr, ipv6First bool) ([]net.IP, error) {
 	if len(records) == 0 {
 		return nil, errors.New("DNS lookup failed for host")
 	}
 	v4 := make([]net.IP, 0, len(records))
 	v6 := make([]net.IP, 0)
 	for _, record := range records {
+		if record.IP.To16() == nil {
+			return nil, errors.New("DNS lookup returned invalid IP")
+		}
 		if PrivateIP(record.IP.String()) {
 			return nil, errors.New("Resolved to private IP")
 		}
@@ -97,6 +124,9 @@ func dialableIPs(records []net.IPAddr) ([]net.IP, error) {
 			continue
 		}
 		v6 = append(v6, record.IP)
+	}
+	if ipv6First {
+		return append(v6, v4...), nil
 	}
 	return append(v4, v6...), nil
 }

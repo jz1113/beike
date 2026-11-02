@@ -14,7 +14,6 @@ import (
 	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/network"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 const deepseekOfficialBase = "https://api.deepseek.com"
@@ -64,7 +63,7 @@ func canvasCredentials(cfg config.Config, r *http.Request, payload map[string]an
 		if id != "deepseek-flash" && id != "deepseek-v4-pro" {
 			return "", "", "", http.StatusBadRequest, "此 DeepSeek 官方模型尚未适配"
 		}
-		if clientBase != "" && system.NormalizeGatewayBaseURL(clientBase) != deepseekOfficialBase {
+		if clientBase != "" && gateway.NormalizeGatewayBaseURL(clientBase) != deepseekOfficialBase {
 			return "", "", "", http.StatusBadRequest, "DeepSeek 官方模型只能使用官方接口地址"
 		}
 		if key == "" {
@@ -75,13 +74,13 @@ func canvasCredentials(cfg config.Config, r *http.Request, payload map[string]an
 	defaults := defaultCanvasBase()
 	base := defaults
 	if clientBase != "" {
-		base = system.NormalizeGatewayBaseURL(clientBase)
+		base = gateway.NormalizeGatewayBaseURL(clientBase)
 	}
 	upstream := model
 	if strings.HasPrefix(model, "openai-responses:") {
 		upstream = strings.TrimPrefix(model, "openai-responses:")
 	}
-	thirdParty := clientBase != "" && system.NormalizeGatewayBaseURL(clientBase) != system.NormalizeGatewayBaseURL(defaults)
+	thirdParty := clientBase != "" && gateway.NormalizeGatewayBaseURL(clientBase) != gateway.NormalizeGatewayBaseURL(defaults)
 	if key == "" && !thirdParty && !cfg.Production() {
 		key = strings.TrimSpace(os.Getenv("AI_DRAWING_API_KEY"))
 		if key == "" {
@@ -151,7 +150,7 @@ func canvasTextFromChat(raw []byte) (string, map[string]any, string) {
 	if text == "" {
 		return "", nil, "模型没有返回文字"
 	}
-	return text, NormalizeUsage(data), ""
+	return text, gateway.NormalizeUsage(data), ""
 }
 
 func completeCanvasResponses(ctx context.Context, base, key, model, prompt string) (string, int, string, map[string]any) {
@@ -198,7 +197,7 @@ func canvasTextFromResponses(raw []byte) (string, map[string]any, string) {
 	if data["status"] == "incomplete" {
 		return "", nil, "OpenAI 输出不完整，请增加输出 token 上限"
 	}
-	usage := NormalizeUsage(data)
+	usage := gateway.NormalizeUsage(data)
 	if text, ok := data["output_text"].(string); ok && strings.TrimSpace(text) != "" {
 		return strings.TrimSpace(text), usage, ""
 	}

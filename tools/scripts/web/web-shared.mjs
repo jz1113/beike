@@ -12,7 +12,7 @@ import { get } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { recordWebProcess } from './web-processes.mjs';
-import { resolveGo } from '../common/go-toolchain.mjs';
+import { buildGoApi } from './go-build.mjs';
 
 export const APP_IDENTIFIER = 'com.azhuo.workbench';
 export const VITE_PORT = 5173;
@@ -163,7 +163,7 @@ export async function waitFor(fn, label, timeoutMs = 60000, child = null) {
       return false;
     }
     if (await fn()) {
-      console.log(`✓ ${label}`);
+      console.log(`✓ ${label}（${((Date.now() - start) / 1000).toFixed(1)} 秒）`);
       return true;
     }
     await new Promise((r) => setTimeout(r, 300));
@@ -199,12 +199,7 @@ export function buildGateway(workspaceRoot) {
   if (skills.status !== 0) throw new Error('技能规则与运行资源不同步，请先执行 pnpm skills:build');
   const out = gatewayBinary(workspaceRoot);
   mkdirSync(dirname(out), { recursive: true });
-  const result = spawnSync(resolveGo(), ['build', '-o', out, './src/backend/cmd/api'], {
-    cwd: workspaceRoot,
-    stdio: 'inherit',
-    env: { ...process.env, GOTOOLCHAIN: 'local' },
-  });
-  if (result.status !== 0) throw new Error('Go API 构建失败');
+  buildGoApi(workspaceRoot, out);
   return out;
 }
 

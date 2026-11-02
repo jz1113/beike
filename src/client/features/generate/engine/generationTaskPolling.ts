@@ -1,3 +1,4 @@
+import { formatUserError } from "@shared/domain/models/upstreamErrors";
 import { useAppStore, type GenerationTask } from '@client/store';
 import { apiFetch, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { getGatewayClientHeaders } from '@client/shared/api/gatewayClient';
@@ -184,7 +185,7 @@ export async function pollTasksOnce(
           update(t.id, {
             status: 'FAILURE',
             progress: '0%',
-            failReason: data?.failReason || data?.error || (depthVideo ? '深度动作捕捉生成失败' : '模型渲染失败'),
+            failReason: formatUserError(String(data?.failReason || data?.error || (depthVideo ? '深度动作捕捉生成失败' : '模型渲染失败'))),
             submissionRecoveryRequired: false,
             ...recoveredLink,
           });

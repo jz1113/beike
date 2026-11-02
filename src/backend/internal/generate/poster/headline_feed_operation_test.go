@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"beike.local/cloud/src/backend/internal/generate"
+	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 const learningImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
@@ -78,9 +78,9 @@ func TestFeedCancellationAndReplayNeverRepeatModel(t *testing.T) {
 		_, _ = w.Write(raw)
 	}))
 	defer func() { once.Do(func() { close(release) }); server.Close() }()
-	previous := generate.ModelHTTP
-	generate.ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { generate.ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 	payload := fmt.Sprintf(`{"imageUrls":[%q],"model":"model","title":"手表","requestKey":"same-request-key","textProtocol":"openai","customApiKey":"test-key","customBaseUrl":%q}`, learningImage, server.URL)
 	handler := HeadlineDeconstruct(cfg)
 	ctx, cancel := context.WithCancel(t.Context())

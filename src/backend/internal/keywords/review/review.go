@@ -97,10 +97,12 @@ func Review(ctx context.Context, client *http.Client, input Input) (Result, erro
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return Result{}, err
 	}
-	protocol := gateway.TextProtocol(ctx, input.Model)
-	if input.TextProtocol != "" {
-		protocol = gateway.ResolveTextProtocol(input.Model, input.TextProtocol)
-	}
+	// Prefer an explicit model/channel protocol, but use the configured base
+	// URL before falling back to model-id inference. A Claude/Gemini model is
+	// frequently exposed through an OpenAI-compatible relay, and inferring the
+	// native protocol from the model ID would send that request to the wrong
+	// endpoint.
+	protocol := gateway.ResolveTextProtocolForBase(input.Model, input.TextProtocol, input.BaseURL)
 	request := gateway.TextRequest{
 		BaseURL: input.BaseURL, APIKey: input.APIKey, Protocol: protocol, Payload: payload,
 		Client: client, Timeout: 630 * time.Second,

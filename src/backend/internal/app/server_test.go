@@ -11,7 +11,7 @@ import (
 )
 
 func TestHealthOmitsMediaSessionWithoutToken(t *testing.T) {
-	handler := New(config.Config{AccessToken: "secret", Upstream: "http://127.0.0.1:1"})
+	handler := New(config.Config{AccessToken: "secret"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if response.Code != http.StatusOK {
@@ -30,7 +30,7 @@ func TestHealthOmitsMediaSessionWithoutToken(t *testing.T) {
 }
 
 func TestSystemConfigPostRequiresToken(t *testing.T) {
-	handler := New(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := New(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/system/config", nil))
 	if response.Code != http.StatusServiceUnavailable {
@@ -74,7 +74,7 @@ func TestPetRoutesAreRegistered(t *testing.T) {
 }
 
 func TestUnknownAPIIsJSON(t *testing.T) {
-	handler := New(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := New(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/not-registered", nil))
 	if response.Code != http.StatusNotFound {
@@ -98,6 +98,9 @@ func TestRetiredStudioRoutesAreNotServed(t *testing.T) {
 		"DELETE /api/avatar/tasks/example", "POST /api/avatar/render",
 		"POST /api/generate/ppt-outline", "POST /api/generate/ppt-detail",
 		"POST /api/generate/ppt-slide", "POST /api/generate/ppt-narration",
+		"POST /api/generate/video-sales/analyze", "POST /api/generate/video-sales/script",
+		"POST /api/generate/video-sales/select-images", "POST /api/generate/video-sales/finalize-prompts",
+		"POST /api/generate/video-sales/compose", "POST /api/generate/video-sales/transcode",
 	} {
 		t.Run(pattern, func(t *testing.T) {
 			method, path, _ := strings.Cut(pattern, " ")

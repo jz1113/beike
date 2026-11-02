@@ -34,10 +34,9 @@ describe('unified skill library', () => {
   });
 
   it('exposes all encapsulated builtin Agent skills grouped into Codex categories', () => {
-    expect(BUILTIN_ASSISTANT_SKILLS.length).toBeGreaterThanOrEqual(13);
+    expect(BUILTIN_ASSISTANT_SKILLS.length).toBeGreaterThanOrEqual(12);
     const ids = BUILTIN_ASSISTANT_SKILLS.map((skill) => skill.id);
     expect(ids).toContain('prompt-reverse-engineer');
-    expect(ids).toContain('fashion-video-sales');
     expect(ids).toContain('headline-poster-generator');
     expect(ids).toContain('video-teardown');
     expect(ids).toContain('product-social-collector');

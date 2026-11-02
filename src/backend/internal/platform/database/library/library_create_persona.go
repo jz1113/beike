@@ -26,16 +26,28 @@ func insertPersonaAsset(ctx context.Context, tx *sql.Tx, workspace, id, now stri
 	if err != nil {
 		return err
 	}
+	sources, err := jsonListOrString(data["sourceImages"], []any{})
+	if err != nil {
+		return err
+	}
+	dimensions, err := textOrDefault(data["dimensions"], "")
+	if err != nil {
+		return err
+	}
 	albumID, categories, universal, err := personaOrganization(ctx, tx, workspace, data)
 	if err != nil {
 		return err
 	}
+	var dimVal any
+	if dimensions != "" {
+		dimVal = dimensions
+	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO "PersonaAsset" (
-			"id", "workspaceId", "name", "description", "tags", "avatarUrl", "provenance",
+			"id", "workspaceId", "name", "description", "tags", "avatarUrl", "sourceImages", "dimensions", "provenance",
 			"usageCount", "isFavorite", "createdAt", "updatedAt", "albumId", "productCategoryIds", "isUniversal"
-		) VALUES (?, ?, ?, ?, ?, ?, 'manual', 0, 0, ?, ?, ?, ?, ?)`,
-		id, workspace, name, description, tags, avatar, now, now, albumID, categories, universal)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual', 0, 0, ?, ?, ?, ?, ?)`,
+		id, workspace, name, description, tags, avatar, sources, dimVal, now, now, albumID, categories, universal)
 	return err
 }
 

@@ -6,6 +6,7 @@ import { resolveGptImageSizeForModel } from '@shared/domain/models/model-adapter
 import { isGeminiImageModel, resolveGeminiPixelSize } from '@shared/domain/models/model-adapters/image/geminiImageSizes';
 import { upstreamModalityModelId, modalityPickerSelections } from '@shared/domain/models/modalityStorage';
 import { getEnabledImageModelsFromSettings, getEnabledVideoModelsFromSettings, readWorkflowModelsFromStorage } from '@shared/domain/models/workflowModels';
+import { resolveVideoMode } from '@shared/domain/media/videoCapabilities';
 import { prepareAssistantImagePrompt, prepareBatchVideoPrompt } from './batchReferences';
 
 export interface BatchPromptDraft extends GenerationPromptEntry { referenceIndexes?: number[] }
@@ -63,8 +64,10 @@ export function buildGenerationPromptBatch(entries: BatchPromptDraft[], media: M
       const videoPrepared = video ? prepareBatchVideoPrompt(entry.prompt, media, entry.referenceIndexes) : undefined;
       const prepared = videoPrepared || prepareAssistantImagePrompt(entry.prompt, imageMedia);
       const imageRefs = videoPrepared?.imageUrls || prepared.urls;
-      const mode = video ? settings.videoRefMode : 'omni';
       const resolvedModel = upstreamModalityModelId(video ? 'video' : 'image', model) || model;
+      const mode = video
+        ? resolveVideoMode(resolvedModel, settings.videoRefMode, imageRefs.length, prepared.urls.length - imageRefs.length)
+        : 'omni';
       const aspect = entry.aspect || (video ? settings.videoAspect : settings.imageAspect);
       const input: PromptBarSubmitInput = {
         quickGenMode: video ? 'video' : 'image', quickPrompt: prepared.prompt.replace(/--ar\s+\d+:\d+/g, '').trim(),

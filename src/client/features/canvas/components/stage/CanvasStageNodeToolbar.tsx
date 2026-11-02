@@ -8,6 +8,8 @@ import { downloadMediaOrOpen } from '@client/shared/media/downloadMedia';
 import { Check, Download, Edit2, Image as ImageIcon, Maximize2, MessageSquare, Video as VideoIcon, Camera, Sparkles, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { calculateDisplayResolution } from '../../model/canvasNodeHelpers';
 import { extractVideoFrame } from '../../model/canvasVideoFrame';
+import { useSeedancePrecheck } from '@client/shared/api/generation/seedancePrecheck';
+import { SeedanceComplianceBadge } from '@client/shared/ui/SeedanceComplianceBadge';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import type { CanvasStageNodeProps } from './canvasStageNodeTypes';
 
@@ -27,6 +29,8 @@ export function CanvasStageNodeToolbar({
 
   const isVideo = node.type === 'video' || node.generationKind === 'video';
   const videoUrl = node.videoUrl;
+  const precheckMap = useSeedancePrecheck(isVideo && videoUrl ? [{ url: videoUrl, mediaType: 'video' }] : [], Boolean(isVideo && videoUrl && isSelected));
+  const videoPrecheck = videoUrl ? precheckMap.get(videoUrl) : undefined;
 
   const handleExtractFrame = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -146,7 +150,8 @@ export function CanvasStageNodeToolbar({
               )}
             </div>
           )}
-          <div className="text-[11px] font-mono text-slate-400 dark:text-slate-500 tracking-tight flex items-center gap-1">
+          <div className="text-[11px] font-mono text-slate-400 dark:text-slate-500 tracking-tight flex items-center gap-1.5">
+            {isVideo && videoUrl && isSelected && <SeedanceComplianceBadge entry={videoPrecheck} mediaType="video" compact />}
             <span>{node.type !== 'drawing' || node.imageUrl || node.videoUrl ? calculateDisplayResolution(node) : ''}</span>
           </div>
         </div>

@@ -146,7 +146,7 @@ func postGeminiGenerateContent(ctx context.Context, endpoint, apiKey string, pay
 			request.Header.Set("Authorization", "Bearer "+apiKey)
 		}
 	}
-	response, err := ModelHTTP().Do(request)
+	response, err := gateway.ModelHTTP().Do(request)
 	if err != nil {
 		return 0, nil, err
 	}

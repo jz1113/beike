@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
@@ -178,7 +179,7 @@ func TestOfficialVideoFamiliesUseTheirRequestBodies(t *testing.T) {
 }
 
 func TestVideoBodyMatchesContract(t *testing.T) {
-	handler := Video(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := Video(config.Config{})
 	cases := []struct {
 		body    string
 		message string
@@ -201,7 +202,7 @@ func TestVideoBodyMatchesContract(t *testing.T) {
 }
 
 func TestVideoRejectsUnknownModel(t *testing.T) {
-	handler := Video(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := Video(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/video", strings.NewReader(`{"prompt":"海边","model":"   "}`)))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "String must contain at least 1 character(s)") {
@@ -210,7 +211,7 @@ func TestVideoRejectsUnknownModel(t *testing.T) {
 }
 
 func TestVideoInputModeRules(t *testing.T) {
-	handler := Video(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := Video(config.Config{})
 	text := httptest.NewRecorder()
 	handler.ServeHTTP(text, httptest.NewRequest(http.MethodPost, "/api/generate/video", strings.NewReader(`{"prompt":"海边","model":"veo3.1","ref_mode":"text","images":["https://example.com/a.jpg"]}`)))
 	if text.Code != http.StatusBadRequest || !strings.Contains(text.Body.String(), "文生视频不使用参考素材") {
@@ -224,7 +225,7 @@ func TestVideoInputModeRules(t *testing.T) {
 }
 
 func TestVideoDurationFollowsModel(t *testing.T) {
-	handler := Video(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := Video(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/video", strings.NewReader(`{"prompt":"海边","model":"veo3.1","duration":5}`)))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "不支持所选时长") {
@@ -238,7 +239,7 @@ func TestVideoDurationFollowsModel(t *testing.T) {
 }
 
 func TestVideoPollRequiresTask(t *testing.T) {
-	handler := Video(config.Config{Upstream: "http://127.0.0.1:1"})
+	handler := Video(config.Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/generate/video?taskKey=%20", nil))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "任务标识无效") {
@@ -255,9 +256,9 @@ func TestVideoSubmitAndPollUseGateway(t *testing.T) {
 		_, _ = w.Write([]byte(`{"status":"SUCCESS","video_url":"https://cdn.example.com/a.mp4"}`))
 	}))
 	defer server.Close()
-	previous := ModelHTTP
-	ModelHTTP = func() *http.Client { return server.Client() }
-	t.Cleanup(func() { ModelHTTP = previous })
+	previous := gateway.ModelHTTP
+	gateway.ModelHTTP = func() *http.Client { return server.Client() }
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
 	dbPath := filepath.Join(t.TempDir(), "videos.db")
 	db, err := database.OpenWrite(dbPath)
 	if err != nil {
@@ -271,7 +272,7 @@ func TestVideoSubmitAndPollUseGateway(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = db.Close()
-	handler := Video(config.Config{Upstream: "http://127.0.0.1:1", DatabaseURL: "file:" + dbPath, NodeEnv: "development"})
+	handler := Video(config.Config{DatabaseURL: "file:" + dbPath, NodeEnv: "development"})
 	created := httptest.NewRecorder()
 	handler.ServeHTTP(created, httptest.NewRequest(http.MethodPost, "/api/generate/video", strings.NewReader(`{"prompt":"海边","model":"veo3.1","duration":8,"customApiKey":"secret","customBaseUrl":"`+server.URL+`"}`)))
 	if created.Code != http.StatusOK || !strings.Contains(created.Body.String(), `"taskId":"vid-1"`) || !strings.Contains(created.Body.String(), `"status":"IN_PROGRESS"`) {

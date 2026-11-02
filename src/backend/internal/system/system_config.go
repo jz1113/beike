@@ -5,21 +5,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
+
 	"sync"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
 )
-
-func normalizeGatewayBaseURL(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	trimmed = strings.TrimRight(trimmed, "/")
-	if len(trimmed) >= 3 && strings.EqualFold(trimmed[len(trimmed)-3:], "/v1") {
-		trimmed = trimmed[:len(trimmed)-3]
-	}
-	return trimmed
-}
 
 func envOr(key, fallback string) string {
 	value, ok := os.LookupEnv(key)
@@ -68,7 +60,7 @@ func systemConfigHandler(cfg config.Config) http.HandlerFunc {
 		}
 		expose := !cfg.Production()
 		baseURL := envOr("AI_DRAWING_BASE_URL", "https://ai.comfly.org")
-		normalized := normalizeGatewayBaseURL(baseURL)
+		normalized := gateway.NormalizeGatewayBaseURL(baseURL)
 		if normalized == "" {
 			normalized = baseURL
 		}

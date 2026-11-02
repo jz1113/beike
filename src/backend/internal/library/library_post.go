@@ -1,8 +1,6 @@
 package library
 
 import (
-	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
-	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,6 +8,9 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbcatalog "beike.local/cloud/src/backend/internal/platform/database/catalog"
+	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 )
 
 func libraryPostHandler(cfg config.Config) http.HandlerFunc {
@@ -65,7 +66,7 @@ func saveLibraryReorder(cfg config.Config, w http.ResponseWriter, r *http.Reques
 		writeLibraryMutationError(w, message)
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeLibraryMutationError(w, "分类操作失败")
 		return
@@ -85,7 +86,7 @@ func saveLibraryCategory(cfg config.Config, w http.ResponseWriter, r *http.Reque
 		writeLibraryMutationError(w, message)
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeLibraryMutationError(w, "分类操作失败")
 		return
@@ -111,7 +112,7 @@ func classifyLibraryAlbums(cfg config.Config, w http.ResponseWriter, r *http.Req
 		writeLibraryMutationError(w, message)
 		return
 	}
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		writeLibraryMutationError(w, "分类操作失败")
 		return

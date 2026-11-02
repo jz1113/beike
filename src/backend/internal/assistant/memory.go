@@ -15,6 +15,7 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 var memoryLocks sync.Map
@@ -82,7 +83,7 @@ func Memory(cfg config.Config) http.Handler {
 }
 
 func threadDeleted(cfg config.Config, r *http.Request, threadID string) (bool, error) {
-	db, err := httpx.OpenDB(cfg)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
 	if err != nil {
 		return false, err
 	}

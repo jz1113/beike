@@ -65,6 +65,15 @@ func mustMigrations() []migration {
 		{version: "20261023_02_workshop_repair", checksum: label("workshop-learning-and-shot-repair-v1"), apply: applyWorkshopRepair},
 		{version: "20261023_03_reference_folder_repair", checksum: label("reference-primary-subject-folder-repair-v1"), apply: applyReferenceFolderRepair},
 		{version: "20261026_01_cover_learning", checksum: file("cover_learning.sql"), apply: script("cover_learning.sql", false)},
+		{version: "20261030_01_cover_template_indexes", checksum: file("cover_template_indexes.sql"), apply: script("cover_template_indexes.sql", false)},
+		{version: "20261030_02_sales_reference_scripts", checksum: file("sales_reference_scripts.sql"), apply: script("sales_reference_scripts.sql", false)},
+		{version: "20261031_01_sales_script_taxonomy", checksum: file("sales_script_taxonomy.sql"), apply: script("sales_script_taxonomy.sql", false)},
+		{version: "20261031_02_action_media", checksum: file("action_media.sql"), apply: script("action_media.sql", false)},
+		{version: "20261101_01_sales_prompts", checksum: file("sales_prompts.sql"), apply: script("sales_prompts.sql", false)},
+		{version: "20261101_02_sales_grid_prompts", checksum: file("sales_grid_prompts.sql"), apply: script("sales_grid_prompts.sql", false)},
+		{version: "20261101_03_sales_script_media", checksum: file("sales_script_media.sql"), apply: script("sales_script_media.sql", false)},
+		{version: "20261101_04_sales_products", checksum: file("sales_products.sql"), apply: script("sales_products.sql", false)},
+		{version: "20261102_01_sales_asset_view_jobs", checksum: file("sales_asset_view_jobs.sql"), apply: script("sales_asset_view_jobs.sql", false)},
 	}
 }
 

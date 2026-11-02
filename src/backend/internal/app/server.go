@@ -17,10 +17,10 @@ import (
 	"beike.local/cloud/src/backend/internal/generate/depth"
 	"beike.local/cloud/src/backend/internal/generate/export"
 	"beike.local/cloud/src/backend/internal/generate/poster"
-	"beike.local/cloud/src/backend/internal/generate/sales"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/keywords"
 	"beike.local/cloud/src/backend/internal/library"
+	"beike.local/cloud/src/backend/internal/sales"
 	"beike.local/cloud/src/backend/internal/system"
 	"beike.local/cloud/src/backend/internal/workshop"
 )
@@ -96,6 +96,45 @@ func nativeRoutes(cfg config.Config) []route {
 		{"PUT /api/catalog/products", true, catalog.UpdateProduct(cfg)},
 		{"DELETE /api/catalog/products", true, catalog.DeleteProduct(cfg)},
 		{"POST /api/catalog/collect", true, catalog.Collect(cfg)},
+		{"POST /api/sales/ocr", true, sales.OCR(cfg)},
+		{"POST /api/sales/summary", true, sales.Summary(cfg)},
+		{"POST /api/sales/asset-view-grid", true, sales.AssetViewGrid(cfg)},
+		{"POST /api/sales/asset-view-jobs", true, sales.AssetViewJobs(cfg)},
+		{"GET /api/sales/asset-view-jobs", true, sales.AssetViewJobs(cfg)},
+		{"POST /api/sales/script-analysis", true, sales.ScriptAnalysis(cfg)},
+		{"GET /api/sales/script-analysis/prompt", true, sales.ScriptAnalysisPrompt(cfg)},
+		{"GET /api/sales/prompts", true, sales.Prompts(cfg)},
+		{"PUT /api/sales/prompts/{id}", true, sales.PromptByID(cfg)},
+		{"POST /api/sales/script-normalize", true, sales.ScriptNormalize(cfg)},
+		{"POST /api/sales/script-video", true, sales.ScriptVideoUpload(cfg)},
+		{"GET /api/sales/scripts", true, sales.Scripts(cfg)},
+		{"POST /api/sales/scripts", true, sales.Scripts(cfg)},
+		{"PATCH /api/sales/scripts/{id}", true, sales.ScriptByID(cfg)},
+		{"DELETE /api/sales/scripts/{id}", true, sales.ScriptByID(cfg)},
+		{"GET /api/sales/script-taxonomy", true, sales.ScriptTaxonomy(cfg)},
+		{"POST /api/sales/script-taxonomy", true, sales.ScriptTaxonomy(cfg)},
+		{"PATCH /api/sales/script-taxonomy/{id}", true, sales.ScriptTaxonomyByID(cfg)},
+		{"DELETE /api/sales/script-taxonomy/{id}", true, sales.ScriptTaxonomyByID(cfg)},
+		{"GET /api/sales/studio-assets", true, sales.StudioAssets(cfg)},
+		{"GET /api/sales/atlas/catalog", true, sales.AtlasCatalog(cfg)},
+		{"POST /api/sales/atlas/import", true, sales.AtlasImport(cfg)},
+		{"GET /api/sales/atlas/media", false, sales.AtlasMedia(cfg)},
+		{"GET /api/sales/studio-bgms/builtin", true, sales.StudioBuiltinBgms()},
+		{"POST /api/sales/studio-bgms/import", true, sales.StudioBgmImport(cfg)},
+		{"POST /api/sales/studio-sounds", true, sales.StudioSounds(cfg)},
+		{"PATCH /api/sales/studio-sounds/{id}", true, sales.StudioSoundByID(cfg)},
+		{"DELETE /api/sales/studio-sounds/{id}", true, sales.StudioSoundByID(cfg)},
+		{"GET /api/sales/presets", true, sales.Presets(cfg)},
+		{"POST /api/sales/presets", true, sales.Presets(cfg)},
+		{"DELETE /api/sales/presets/{id}", true, sales.PresetByID(cfg)},
+		{"GET /api/sales/products", true, sales.Products(cfg)},
+		{"POST /api/sales/products", true, sales.Products(cfg)},
+		{"GET /api/sales/products/{id}", true, sales.ProductByID(cfg)},
+		{"PATCH /api/sales/products/{id}", true, sales.ProductByID(cfg)},
+		{"DELETE /api/sales/products/{id}", true, sales.ProductByID(cfg)},
+		{"POST /api/sales/plan-adapt", true, sales.PlanAdapt(cfg)},
+		{"GET /api/sales/bgm/{id}", false, sales.BuiltinBgmAudio()},
+		{"POST /api/sales/audio-mix", true, sales.AudioMix(cfg)},
 		{"POST /api/catalog/assets/seed", true, catalog.DisabledSeed()},
 		{"POST /api/assets/storage/upload", true, assets.Upload(cfg)},
 		{"POST /api/assets/storage/test", true, assets.TestStorage(cfg)},
@@ -139,6 +178,8 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/generate/headline-title", true, poster.HeadlineTitle(cfg)},
 		{"POST /api/generate/headline-design", true, poster.HeadlineDesign(cfg)},
 		{"POST /api/generate/headline-deconstruct", true, poster.HeadlineDeconstruct(cfg)},
+		{"GET /api/generate/headline-templates", true, poster.HeadlineTemplates(cfg)},
+		{"PATCH /api/generate/headline-templates/{id}", true, poster.HeadlineTemplates(cfg)},
 		{"GET /api/generate/headline-memory", true, poster.HeadlineMemory(cfg)},
 		{"PATCH /api/generate/headline-memory/entries/{id}", true, poster.HeadlineMemoryEntry(cfg)},
 		{"POST /api/generate/headline-memory/corrections", true, poster.HeadlineMemoryCorrection(cfg)},
@@ -154,6 +195,7 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/generate/video", true, generate.Video(cfg)},
 		{"GET /api/generate/video", true, generate.Video(cfg)},
 		{"POST /api/generate/video/bind", true, generate.VideoBind(cfg)},
+		{"POST /api/generate/seedance/precheck", true, generate.SeedancePrecheck(cfg)},
 		{"POST /api/generate/audio", true, generate.Audio(cfg)},
 		{"GET /api/generate/audio", true, generate.Audio(cfg)},
 		{"POST /api/generate/depth-image", true, depth.DepthImage(cfg)},
@@ -161,11 +203,6 @@ func nativeRoutes(cfg config.Config) []route {
 		{"GET /api/generate/depth-video", true, depth.DepthVideo(cfg)},
 		{"GET /api/generate/depth-image", true, depth.DepthImage(cfg)},
 		{"POST /api/generate/export-zip", true, export.ExportZip(cfg)},
-		{"POST /api/generate/video-sales/analyze", true, sales.Analyze(cfg)},
-		{"POST /api/generate/video-sales/script", true, sales.Script(cfg)},
-		{"POST /api/generate/video-sales/select-images", true, sales.Select(cfg)},
-		{"POST /api/generate/video-sales/finalize-prompts", true, sales.Finalize(cfg)},
-		{"POST /api/generate/video-sales/compose", true, sales.Compose(cfg)},
 		{"POST /api/workshop/tasks/{taskId}/review", true, workshop.Review(cfg)},
 	}
 }

@@ -36,6 +36,18 @@ func CreateLibraryAsset(ctx context.Context, db *sql.DB, workspace, assetType st
 	if err != nil {
 		return nil, err
 	}
+	if assetType == "action" {
+		stableID, existing, err := actionSubmission(ctx, tx, workspace, data)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return existing, nil
+		}
+		if stableID != "" {
+			id = stableID
+		}
+	}
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	switch assetType {
 	case "scene":
@@ -66,6 +78,10 @@ func CreateLibraryAsset(ctx context.Context, db *sql.DB, workspace, assetType st
 }
 
 func insertSceneAsset(ctx context.Context, tx *sql.Tx, workspace, id, now string, data map[string]any) error {
+	dimensions, err := textOrDefault(data["dimensions"], "")
+	if err != nil {
+		return err
+	}
 	title, err := textOrDefault(data["title"], "新生活场景")
 	if err != nil {
 		return err
@@ -79,6 +95,10 @@ func insertSceneAsset(ctx context.Context, tx *sql.Tx, workspace, id, now string
 		return err
 	}
 	category, err := textOrDefault(data["category"], "general")
+	if err != nil {
+		return err
+	}
+	spatialType, err := textOrDefault(data["spatialType"], "indoor_room")
 	if err != nil {
 		return err
 	}
@@ -101,10 +121,10 @@ func insertSceneAsset(ctx context.Context, tx *sql.Tx, workspace, id, now string
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO "SceneAsset" (
 			"id", "workspaceId", "title", "description", "lighting", "category", "spatialType",
-			"suitableCategories", "tags", "coverUrl", "sourceImages", "provenance", "usageCount",
+			"suitableCategories", "tags", "coverUrl", "sourceImages", "dimensions", "provenance", "usageCount",
 			"isFavorite", "createdAt", "updatedAt", "productCategoryIds", "isUniversal"
-		) VALUES (?, ?, ?, ?, ?, ?, 'indoor_room', ?, ?, ?, ?, 'manual', 0, 0, ?, ?, '[]', 0)`,
-		id, workspace, title, description, lighting, category, categories, tags, cover, sources, now, now)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', 0, 0, ?, ?, '[]', 0)`,
+		id, workspace, title, description, lighting, category, spatialType, categories, tags, cover, sources, dimensions, now, now)
 	return err
 }
 
@@ -156,6 +176,10 @@ func insertOutfitAsset(ctx context.Context, tx *sql.Tx, workspace, id, now strin
 }
 
 func insertActionAsset(ctx context.Context, tx *sql.Tx, workspace, id, now string, data map[string]any) error {
+	mediaType, mediaURL, sourceURL, err := actionMediaValues(data)
+	if err != nil {
+		return err
+	}
 	sceneID, err := actionSceneID(data)
 	if err != nil {
 		return err
@@ -197,13 +221,17 @@ func insertActionAsset(ctx context.Context, tx *sql.Tx, workspace, id, now strin
 	if err != nil {
 		return err
 	}
+	productCategoryIds, err := jsonListOrString(data["productCategoryIds"], []any{})
+	if err != nil {
+		return err
+	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO "ActionAsset" (
 			"id", "workspaceId", "title", "action", "shotType", "spatialType", "camera",
 			"suitableAnatomy", "tags", "coverUrl", "provenance", "sceneId", "shotOrder",
-			"usageCount", "isFavorite", "createdAt", "updatedAt", "productCategoryIds", "isUniversal"
-		) VALUES (?, ?, ?, ?, ?, 'general', ?, ?, ?, ?, 'manual', ?, ?, 0, 0, ?, ?, '[]', 0)`,
-		id, workspace, title, action, shotType, camera, anatomy, tags, cover, sceneID, order, now, now)
+			"usageCount", "isFavorite", "createdAt", "updatedAt", "productCategoryIds", "isUniversal", "mediaType", "mediaUrl", "sourceUrl"
+		) VALUES (?, ?, ?, ?, ?, 'general', ?, ?, ?, ?, 'manual', ?, ?, 0, 0, ?, ?, ?, 0, ?, ?, ?)`,
+		id, workspace, title, action, shotType, camera, anatomy, tags, cover, sceneID, order, now, now, productCategoryIds, mediaType, mediaURL, sourceURL)
 	return err
 }
 

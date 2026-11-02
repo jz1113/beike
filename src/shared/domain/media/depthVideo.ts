@@ -91,12 +91,12 @@ export interface DepthQualityProfile {
 export const DEPTH_QUALITY_PROFILES: Record<DepthQuality, DepthQualityProfile> = {
   fast: {
     modelId: 'depth-anything/Depth-Anything-V2-Small-hf',
-    inferenceSizePx: 518,
+    inferenceSizePx: 350,
     inferenceSizePxCuda: 518,
-    inferenceSizePxMps: 518,
+    inferenceSizePxMps: 350,
     maxWidthPx: 960,
     videoCrf: 23,
-    videoPreset: 'medium',
+    videoPreset: 'veryfast',
     postProcess: {
       bilateralD: 5,
       bilateralSigma: 12,
@@ -110,13 +110,13 @@ export const DEPTH_QUALITY_PROFILES: Record<DepthQuality, DepthQualityProfile> =
     },
   },
   standard: {
-    modelId: 'depth-anything/Depth-Anything-V2-Base-hf',
-    inferenceSizePx: 518,
+    modelId: 'depth-anything/Depth-Anything-V2-Small-hf',
+    inferenceSizePx: 350,
     inferenceSizePxCuda: 518,
-    inferenceSizePxMps: 518,
-    maxWidthPx: 1280,
-    videoCrf: 20,
-    videoPreset: 'medium',
+    inferenceSizePxMps: 350,
+    maxWidthPx: 960,
+    videoCrf: 21,
+    videoPreset: 'veryfast',
     postProcess: {
       bilateralD: 5,
       bilateralSigma: 12,
@@ -131,9 +131,9 @@ export const DEPTH_QUALITY_PROFILES: Record<DepthQuality, DepthQualityProfile> =
   },
   high: {
     modelId: 'depth-anything/Depth-Anything-V2-Large-hf',
-    inferenceSizePx: 768,
+    inferenceSizePx: 518,
     inferenceSizePxCuda: 1024,
-    inferenceSizePxMps: 768,
+    inferenceSizePxMps: 518,
     maxWidthPx: 2560,
     videoCrf: 15,
     videoPreset: 'slow',

@@ -1,0 +1,40 @@
+.sales-material-dialog.sales-asset-dialog {
+  width: min(920px, calc(100% - 32px));
+  max-height: 92dvh;
+  overflow: hidden;
+  padding: 0;
+  border-radius: 18px;
+}
+.sales-asset-dialog > form { display: flex; flex-direction: column; max-height: calc(90dvh - 2px); }
+.sales-asset-header, .sales-asset-footer {
+  display: flex; flex-shrink: 0; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 16px 22px;
+}
+.sales-asset-header { border-bottom: 1px solid var(--sales-line); }
+.sales-asset-header h2 { min-width: 0; font-size: 16px; font-weight: 600; }
+.sales-asset-header > button { flex-shrink: 0; }
+.sales-asset-content {
+  display: flex; flex-direction: column; gap: 16px; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain; padding: 20px 22px;
+}
+.sales-asset-content > * { flex-shrink: 0; min-width: 0; }
+.sales-asset-dialog .sales-asset-content > label,
+.sales-asset-dialog .sales-asset-fields :is(label, .sales-dialog-field) { margin: 0; min-width: 0; }
+.sales-asset-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.sales-asset-field-wide { grid-column: 1 / -1; }
+.sales-asset-dialog :is(input.sales-input, select.sales-input, textarea.sales-input) { margin-top: 6px; }
+.sales-asset-required { color: #ef6464; }
+.sales-asset-footer { border-top: 1px solid var(--sales-line); }
+.sales-asset-footer > div { display: flex; gap: 10px; margin-left: auto; }
+@media (max-width: 540px) {
+  .sales-asset-content { padding: 16px; }
+  .sales-asset-fields { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .sales-asset-header, .sales-asset-footer { padding: 14px 16px; }
+  .sales-asset-footer, .sales-asset-footer > div { flex-wrap: wrap; }
+  .sales-asset-footer > div { justify-content: flex-end; }
+}
+.sales-asset-heading { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.sales-asset-draft-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; color: var(--sales-muted); font-size: 11px; line-height: 1.5; }
+.sales-asset-draft-status button { padding: 0; border: 0; background: transparent; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.sales-asset-draft-status button:hover:not(:disabled) { color: var(--sales-ink); }
+.sales-asset-draft-status button:disabled { opacity: .45; }

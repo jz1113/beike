@@ -14,7 +14,7 @@ function setup() {
   };
   const itemsRef = { current: [item] };
   const deps: BatchCoordinatorDeps = {
-    config: { selectedQuality: 'high', selectedAspect: '3:4', selectedImageGenModel: 'test-model', selectedShotCount: 1, isAborted: () => false },
+    config: { io: { compressReference: vi.fn(), submitImage: vi.fn(), finishOutput: vi.fn() }, selectedQuality: 'high', selectedAspect: '3:4', selectedImageGenModel: 'test-model', selectedShotCount: 1, isAborted: () => false },
     generationStrategy: 'single_shot', imageGenConcurrency: 2, itemsRef,
     setItems: update => { itemsRef.current = typeof update === 'function' ? update(itemsRef.current) : update; },
     runControlRef: { current: { status: 'running' } }, batchId: 'batch', storyboardRevision: 0,

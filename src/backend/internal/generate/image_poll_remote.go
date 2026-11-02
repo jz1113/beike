@@ -9,11 +9,13 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/system"
 )
 
 func pollImageTask(cfg config.Config, w http.ResponseWriter, r *http.Request, taskID string) {
-	if body, status, ok := savedTerminal(cfg, r, taskID, "生图任务失败"); ok {
+	if !authorizeTaskPoll(cfg, w, r, "image", taskID) {
+		return
+	}
+	if body, status, ok := savedTerminal(cfg, r, "image", taskID, "生图任务失败"); ok {
 		httpx.WriteJSON(w, status, body)
 		return
 	}
@@ -24,10 +26,10 @@ func pollImageTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 		HTTP: r, Base: base, APIKey: apiKey, TaskID: taskID, Model: r.URL.Query().Get("model"), Template: template,
 	})
 	if !ok {
-		writeProbeMiss(cfg, w, r, taskID, "生图任务失败", "暂时无法查询云端任务状态")
+		writeProbeMiss(cfg, w, r, "image", taskID, "生图任务失败", "暂时无法查询云端任务状态")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, polledTaskBody(r.Context(), cfg, taskID, parsed, data))
+	httpx.WriteJSON(w, http.StatusOK, polledTaskBody(r.Context(), cfg, scopeOf(r, "image"), taskID, parsed, data))
 }
 
 type pollParsed struct {
@@ -55,13 +57,13 @@ func parseImagePoll(data map[string]any) (pollParsed, bool) {
 	}
 }
 
-func savedTerminal(cfg config.Config, r *http.Request, taskID, failedFallback string) (map[string]any, int, bool) {
+func savedTerminal(cfg config.Config, r *http.Request, media, taskID, failedFallback string) (map[string]any, int, bool) {
 	db, err := openTaskDB(cfg)
 	if err != nil {
 		return nil, 0, false
 	}
 	defer db.Close()
-	status, result, reason, usage, ok, queryErr := taskStatus(r.Context(), db, taskID)
+	status, result, reason, usage, ok, queryErr := taskStatus(r.Context(), db, scopeOf(r, media), taskID)
 	if queryErr != nil || !ok {
 		return nil, 0, false
 	}
@@ -84,14 +86,14 @@ func savedTerminal(cfg config.Config, r *http.Request, taskID, failedFallback st
 	return body, http.StatusOK, true
 }
 
-func writeProbeMiss(cfg config.Config, w http.ResponseWriter, r *http.Request, taskID, failedFallback, queryError string) {
+func writeProbeMiss(cfg config.Config, w http.ResponseWriter, r *http.Request, media, taskID, failedFallback, queryError string) {
 	db, err := openTaskDB(cfg)
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "taskId": taskID, "error": "查询任务状态失败，请稍后重试"})
 		return
 	}
 	defer db.Close()
-	status, result, reason, usage, ok, queryErr := taskStatus(r.Context(), db, taskID)
+	status, result, reason, usage, ok, queryErr := taskStatus(r.Context(), db, scopeOf(r, media), taskID)
 	if queryErr != nil {
 		httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "taskId": taskID, "error": "查询任务状态失败，请稍后重试"})
 		return
@@ -122,7 +124,7 @@ func pollCredentials(cfg config.Config, r *http.Request) (string, string) {
 	clientBase := strings.TrimSpace(r.Header.Get("x-custom-base-url"))
 	base := ImageDefaultBase()
 	if clientBase != "" {
-		base = system.NormalizeGatewayBaseURL(clientBase)
+		base = gateway.NormalizeGatewayBaseURL(clientBase)
 	}
 	payload := map[string]json.RawMessage{}
 	return base, imageAPIKey(cfg, r, payload, clientBase)

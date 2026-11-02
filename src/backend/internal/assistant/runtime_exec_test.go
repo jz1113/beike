@@ -40,7 +40,7 @@ func TestTurnExecutesToolsAndPersists(t *testing.T) {
 		}
 	}
 	_ = db.Close()
-	cfg := config.Config{DatabaseURL: "file:" + dbPath, Upstream: "http://127.0.0.1:1"}
+	cfg := config.Config{DatabaseURL: "file:" + dbPath}
 	body := `{"threadId":"thread-1","textProtocol":"openai","customBaseUrl":"` + upstream.URL + `","customApiKey":"test-key","messages":[{"role":"user","content":"请整理这段说明"}]}`
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/assistant/turn/start", strings.NewReader(body))
@@ -81,7 +81,7 @@ func TestTurnExecutesToolsAndPersists(t *testing.T) {
 }
 
 func TestApprovalAndInterruptStayLocal(t *testing.T) {
-	cfg := config.Config{Upstream: "http://127.0.0.1:1"}
+	cfg := config.Config{}
 	approve := httptest.NewRecorder()
 	ApproveTurn(cfg).ServeHTTP(approve, httptest.NewRequest(http.MethodPost, "/api/assistant/turn/approve", strings.NewReader(`{"turnId":"t","approvalId":"a","decision":"accept"}`)))
 	if approve.Code != http.StatusNotFound || !strings.Contains(approve.Body.String(), "审批请求不存在或已过期") {
@@ -99,7 +99,7 @@ func TestMediaDecodesLocallyWhenNotJPEG(t *testing.T) {
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/assistant/media", strings.NewReader("not-an-image"))
 	request.Header.Set("Content-Type", "image/webp")
-	Media(config.Config{Upstream: "http://127.0.0.1:1"}).ServeHTTP(response, request)
+	Media(config.Config{}).ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "附件保存失败") || strings.Contains(response.Body.String(), "上游") {
 		t.Fatalf("media %d %s", response.Code, response.Body.String())
 	}

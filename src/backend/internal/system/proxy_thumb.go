@@ -37,28 +37,21 @@ func serveCachedProxy(w http.ResponseWriter, r *http.Request, key string) bool {
 	if !ok {
 		return false
 	}
-	entry := cached.(proxyCacheEntry)
-	if r.Header.Get("If-None-Match") == entry.etag {
-		w.Header().Set("ETag", entry.etag)
+	entry := cached
+	if r.Header.Get("If-None-Match") == entry.ETag {
+		w.Header().Set("ETag", entry.ETag)
 		w.Header().Set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800")
 		w.WriteHeader(http.StatusNotModified)
 		return true
 	}
-	writeProxyBytes(w, entry.contentType, entry.etag, entry.body)
+	writeProxyBytes(w, entry.ContentType, entry.ETag, entry.Body)
 	return true
 }
 
 func cachedOrFetch(r *http.Request, imageURL string) ([]byte, string, bool) {
-	if cached, ok := proxyCache.Load(imageURL); ok {
-		entry := cached.(proxyCacheEntry)
-		return entry.body, entry.contentType, true
-	}
-	body, contentType, ok := fetchProxy(r, imageURL, false)
-	if !ok {
-		return nil, "", false
-	}
-	proxyCache.Store(imageURL, proxyCacheEntry{body: body, contentType: contentType, etag: ""})
-	return body, contentType, true
+	return proxyCache.Fetch(r.Context(), imageURL, func() ([]byte, string, bool) {
+		return fetchProxy(r, imageURL, false)
+	})
 }
 
 func resizeProxyThumb(body []byte, width int) ([]byte, string, bool) {

@@ -13,6 +13,10 @@ import (
 
 const wanbangBodyLimit = 8 << 20
 
+// Product detail collection can take longer than a normal API read. Keep each
+// attempt bounded while allowing the caller to cancel or impose a shorter limit.
+const wanbangRequestTimeout = 60 * time.Second
+
 type wanbangStatusError struct{ status int }
 
 func (err wanbangStatusError) Error() string { return "万邦网关请求失败" }
@@ -46,7 +50,7 @@ func fetchWanbang(ctx context.Context, client *http.Client, rawURL string) (map[
 }
 
 func requestWanbang(ctx context.Context, client *http.Client, rawURL string) (map[string]any, bool, error) {
-	requestCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	requestCtx, cancel := context.WithTimeout(ctx, wanbangRequestTimeout)
 	defer cancel()
 	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, rawURL, nil)
 	if err != nil {

@@ -1,13 +1,14 @@
 package workshop
 
 import (
-	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"encoding/json"
 	"io"
 	"net/http"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 )
 
 func BatchEvent(cfg config.Config) http.Handler {
@@ -33,7 +34,7 @@ func BatchEvent(cfg config.Config) http.Handler {
 			writeFail(w, http.StatusBadRequest, "批次事件格式不正确", "bad_request")
 			return
 		}
-		db, err := httpx.OpenDB(cfg)
+		db, err := database.OpenRequired(cfg.SQLiteFile())
 		if err != nil {
 			writeFail(w, http.StatusInternalServerError, "批次操作失败，请检查本地服务后重试", "internal_error")
 			return
