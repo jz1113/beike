@@ -129260,6 +129260,7 @@ function nN({
   on();
   const o = B$n(),
     a = r.filter((l) => (l.id !== "haiyi" || i) && (l.id !== "custom" || o));
+  if (a.length === 1 && a[0].id === "platform") return null;
   return c.jsxs("div", {
     className: "px-0.5 pt-0.5 pb-1.5",
     "data-gen-model-channel-bar": "true",
@@ -667485,13 +667486,6 @@ const o1r = ({
             menuWidth: y,
             maxHeight: 420,
             scrollKey: _ == null ? void 0 : _.id,
-            header: c.jsx(nN, {
-              isDark: t,
-              selected: m,
-              onSelect: p,
-              channels: vui,
-              showHaiyi: b,
-            }),
             children:
               h.length === 0
                 ? c.jsx("div", {
@@ -741061,10 +741055,6 @@ const kIo = g.memo(function ({
           scrollToSelectedKey: o,
           scrollFamilyIds: G$n,
           orderedOptionKeys: p,
-          header:
-            y && b
-              ? c.jsx(nN, { isDark: n, selected: y, onSelect: b, showHaiyi: v })
-              : void 0,
           children:
             l.length === 0
               ? c.jsx("div", {

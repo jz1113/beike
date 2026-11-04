@@ -10,6 +10,7 @@ import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
 import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
 import { resolveVideoMode, videoDurationOptions, videoRatioLocked, videoResolutionOptions } from '@shared/domain/media/videoCapabilities';
 import { listApprovedModels } from '@shared/domain/models/modelCatalog';
+import { sortStudioModels } from './studioModelSorting';
 
 export function studioChannels() {
   const state = useAppStore.getState();
@@ -17,16 +18,17 @@ export function studioChannels() {
   const chatSettings = getEnabledMultimodalModelsFromSettings(readWorkflowModelsFromStorage(), 'assistant');
   const chat = modalityPickerSelections('chat') ?? ((chatSettings.length || !fallback
     ? chatSettings : listApprovedModels('multimodal')).map(m => ({id:m.id,name:m.name,modelId:m.id})));
-  const chats = chat.map(m => ({id:'beike:chat:'+m.id, name:m.name || m.id, kind:'chat' as const, route:m.id, modelId:m.modelId, preferred:m.id === state.assistantModel}));
+  const chats = sortStudioModels(chat).map(m => ({id:'beike:chat:'+m.id, name:m.name || m.id, kind:'chat' as const, route:m.id, modelId:m.modelId, preferred:m.id === state.assistantModel}));
   const media = (['image', 'video'] as const).flatMap(kind => {
     const configured = availableBatchModels(kind);
     const options = configured.length || !fallback || modalityPickerSelections(kind) ? configured
       : listApprovedModels(kind).map(m => ({id:m.id,modelId:m.id,name:m.name}));
-    return options.map(model => ({id:`beike:${kind}:${model.id}`,name:model.name,kind,route:model.id,
+    return sortStudioModels(options).map(model => ({id:`beike:${kind}:${model.id}`,name:model.name,kind,route:model.id,
       modelId:model.modelId,preferred:model.id === (kind === 'image' ? state.quickModel : state.quickVideoModel)}));
   });
-  const voices = (modalityPickerSelections('voice') ?? readEffectiveModalityModels('voice').models.map(m => ({...m,id:m.modelId})))
-    .map(m => ({id:'beike:voice:'+m.id, route:m.id, modelId:m.modelId, name:m.name || m.id, kind:'voice' as const, preferred:false}));
+  const voiceOptions = modalityPickerSelections('voice') ?? readEffectiveModalityModels('voice').models.map(m => ({...m,id:m.modelId}));
+  const voices = sortStudioModels(voiceOptions.map(m => ({id:'beike:voice:'+m.id, route:m.id,
+    modelId:m.modelId, name:m.name || m.id, kind:'voice' as const, preferred:false})));
   return [...media, ...chats, ...voices];
 }
 

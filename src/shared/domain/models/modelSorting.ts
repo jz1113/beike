@@ -146,6 +146,8 @@ export function inferVendorId(modelId: string, providerHint?: string): string {
   }
 
   const cleanId = trimmedId.replace(/^(?:net-|fal-ai\/|openai\/)/i, '');
+  if (/^speech-\d/i.test(cleanId)) return 'minimax';
+  if (/^tts-\d/i.test(cleanId)) return 'openai';
   const haystack = `${providerHint || ''} ${cleanId}`.toLowerCase();
 
   // 2. 匹配关键字

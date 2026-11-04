@@ -17,6 +17,10 @@ describe('modelSorting', () => {
       expect(inferVendorId('qwen3.8-max')).toBe('alibaba');
       expect(inferVendorId('kling-video-v3')).toBe('kuaishou');
       expect(inferVendorId('vidu-video-2.0')).toBe('vidu');
+      expect(inferVendorId('speech-2.8-hd')).toBe('minimax');
+      expect(inferVendorId('speech-02-turbo')).toBe('minimax');
+      expect(inferVendorId('tts-1-hd')).toBe('openai');
+      expect(inferVendorId('fish-speech-1.5')).not.toBe('minimax');
     });
 
     it('returns human-friendly vendor display names', () => {
