@@ -7,6 +7,8 @@ import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import type { AssetCanvasProject } from '../model/canvasAssets';
 import type { AssetTaskBatch } from '../model/assetBatch';
 import { taskBelongsToProject, type ProjectFolderItem } from '../model/materialProjects';
+import { loadCustomAssets } from '../model/customAssetStore';
+import { collectProtectedAssetMedia } from '../model/protectedAssetMedia';
 
 type Task = AssetTaskBatch['tasks'][number];
 interface Params {
@@ -40,7 +42,7 @@ export function useAssetActions({ mergedTasks, selectedTaskIds, failedTasks, set
       const regularTargets = targets.filter(task => !task.canvasProjectId);
       let warning: string | undefined;
       if (regularTargets.length) {
-        const protectUrls = canvasProjects.flatMap(project => [project.thumbnail, ...project.nodes.flatMap(node => [node.imageUrl, node.videoUrl, node.audioUrl, node.referenceImageUrl, ...(node.drawing?.references || [])])]).filter((url): url is string => Boolean(url));
+        const protectUrls = collectProtectedAssetMedia(canvasProjects, loadCustomAssets());
         const result = await permanentDeleteGeneration(regularTargets, { protectUrls });
         if (!result.ok) throw new Error(`${result.partial ? '部分记录已删除，剩余记录仍保留。' : ''}${result.error || '服务端删除失败，请重试'}`);
         warning = result.warning;
@@ -83,7 +85,7 @@ export function useAssetActions({ mergedTasks, selectedTaskIds, failedTasks, set
         confirmText: '删除', cancelText: '取消',
       });
       if (!confirmed) return false;
-      const protectUrls = canvasProjects.flatMap((canvas) => [canvas.thumbnail, ...canvas.nodes.flatMap((node) => [node.imageUrl, node.videoUrl, node.audioUrl, node.referenceImageUrl, ...(node.drawing?.references || [])])]).filter((url): url is string => Boolean(url));
+      const protectUrls = collectProtectedAssetMedia(canvasProjects, loadCustomAssets());
       const warnings = new Set<string>();
       for (const project of projects) {
         if (project.type === 'canvas') {

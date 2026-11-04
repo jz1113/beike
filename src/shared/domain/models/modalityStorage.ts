@@ -10,6 +10,7 @@ export const MODALITY_STORAGE_KEY_PREFIX = 'beike_modality_models_v1_';
 export const DISMISSED_DEFAULTS_KEY_PREFIX = 'beike_modality_dismissed_defaults_v1_';
 
 export const API_PROVIDERS_STORAGE_KEY = 'beike_api_providers_v2';
+export const API_REMOVED_PROVIDERS_KEY = 'beike_api_removed_providers_v2';
 export const MODALITY_GLOBAL_CHANNEL_ID = '';
 
 export interface StoredApiProviderCredentials {
@@ -167,7 +168,9 @@ function withShippedDefaults(kind: ModalityStorageKind, cleaned: StoredModalityM
   }
   const ids = new Set(cleaned.map((item) => item.id));
   const dismissed = new Set(readDismissedDefaultIds(kind));
-  const missing = defaults.filter((item) => !ids.has(item.id) && !dismissed.has(item.id));
+  // 已有同模型时沿用其渠道与前台选择 ID，不额外补一条全局线路。
+  const presentModels = new Set(cleaned.map(item => item.modelId.trim()));
+  const missing = defaults.filter(item => !ids.has(item.id) && !dismissed.has(item.id) && !presentModels.has(item.modelId));
   if (missing.length === 0) return { models: cleaned, merged: false };
   return { models: [...cleaned, ...missing], merged: true };
 }
@@ -231,6 +234,19 @@ export interface ModalityPickerSelection {
   provider?: string;
 }
 
+/** 全局渠道和启用的服务商才对创作界面提供线路。 */
+export function selectableModalityModels(models: StoredModalityModelItem[], providers: StoredApiProviderCredentials[]) {
+  const enabled = new Set(providers.filter(provider => provider.enabled !== false).map(provider => provider.id));
+  // 首次启动时，内置的 Comfly 可能尚未写进浏览器存储。
+  if (!providers.some(provider => provider.id === 'comfly_gateway')) {
+    try {
+      const removed = JSON.parse(readStorageItem(API_REMOVED_PROVIDERS_KEY) || '[]');
+      if (Array.isArray(removed) && !removed.includes('comfly_gateway')) enabled.add('comfly_gateway');
+    } catch { /* 无法确认渠道状态时不加入候选。 */ }
+  }
+  return models.filter(item => !item.channelId || enabled.has(item.channelId));
+}
+
 /** 已同步模态的前台选项。存储键不存在时返回 null，调用方保留 custom_models。 */
 export function modalityPickerSelections(kind: ModalityStorageKind): ModalityPickerSelection[] | null {
   const read = readEffectiveModalityModels(kind);
@@ -241,7 +257,8 @@ export function modalityPickerSelections(kind: ModalityStorageKind): ModalityPic
     const modelId = item.modelId.trim();
     counts.set(modelId, (counts.get(modelId) || 0) + 1);
   }
-  return read.models.map((item) => {
+  // 保留全部条目参与上面的 ID 计数，停用其中一条线路不会改变另一条的选择 ID。
+  return selectableModalityModels(read.models, providers).map((item) => {
     const modelId = item.modelId.trim();
     const duplicated = (counts.get(modelId) || 0) > 1;
     const channel = item.channelId ? providers.find((provider) => provider.id === item.channelId)?.name || '' : '';

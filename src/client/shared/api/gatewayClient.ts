@@ -1,7 +1,7 @@
 import { selectedTextModel, selectedTextProtocol } from '@shared/domain/models/textModelRoute';
 import type { TextProtocol } from '@shared/domain/models/textProtocol';
 import { DEEPSEEK_BASE_URL, isDeepSeekRoute, deepSeekModel } from '@shared/domain/models/deepseek';
-import { API_PROVIDERS_STORAGE_KEY, credentialsForModalityItem, findConfiguredModalityModel } from '@shared/domain/models/modalityStorage';
+import { API_PROVIDERS_STORAGE_KEY, credentialsForModalityItem, findConfiguredModalityModel, readEffectiveModalityModels, resolveModalityModelRoute, type StoredModalityModelItem } from '@shared/domain/models/modalityStorage';
 import { isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';
 import { isDashScopeBase, isNativeDashscopeImageModel } from '@shared/domain/media/imageCapabilities';
 
@@ -87,17 +87,43 @@ function readStoredProvider(providerId: string): ModelCredentials | null {
   }
 }
 
+/** Match the same configured entry as selectedTextModel before consulting legacy routes. */
+function configuredChatModel(selection: string): StoredModalityModelItem | null {
+  const chat = readEffectiveModalityModels('chat');
+  if (!chat.configured) return null;
+  const selected = findConfiguredModalityModel(selection);
+  return selected && chat.models.some((item) => item.id === selected.id && item.modelId === selected.modelId) ? selected : null;
+}
+
+function configuredModalityCredentials(item: StoredModalityModelItem): ModelCredentials {
+  const creds = credentialsForModalityItem(item);
+  const provider = readStoredProvider(item.channelId || '');
+  return {
+    baseUrl: creds.baseUrl || provider?.baseUrl,
+    apiKey: creds.apiKey || provider?.apiKey,
+    protocol: provider?.protocol,
+    requestTemplate: provider?.requestTemplate,
+  };
+}
+
 /** 根据模型 ID 获取其绑定的专属服务商凭证 */
 export function getModelCredentials(modelId?: string): ModelCredentials {
-  if (!modelId || typeof window === 'undefined') return {};
+  if (!modelId) return {};
+  if (typeof window === 'undefined') {
+    const modality = findConfiguredModalityModel(modelId);
+    return modality ? configuredModalityCredentials(modality) : {};
+  }
+  const chat = configuredChatModel(modelId);
+  // A synced global-channel choice also wins over stale legacy credentials;
+  // its actual global credentials still come from the runtime-aware overrides.
+  if (chat) return configuredModalityCredentials(chat);
   try {
     const rawModels = localStorage.getItem('custom_models');
     if (rawModels) {
       const models = JSON.parse(rawModels);
       if (Array.isArray(models)) {
-        const target = models.find((m: { id?: string; routeId?: string; customBaseUrl?: string; customApiKey?: string; providerId?: string; channel?: string }) =>
-          m.id === modelId || m.routeId === modelId
-        );
+        const target = models.find((m: { routeId?: string }) => m.routeId === modelId)
+          || models.find((m: { id?: string }) => m.id === modelId);
         if (target) {
           const provider = readStoredProvider(target.providerId || target.channel || '');
           if (target.customBaseUrl || target.customApiKey || provider) {
@@ -118,14 +144,7 @@ export function getModelCredentials(modelId?: string): ModelCredentials {
   if (modality) {
     const creds = credentialsForModalityItem(modality);
     const provider = readStoredProvider(modality.channelId || '');
-    if (creds.baseUrl || creds.apiKey || provider) {
-      return {
-        baseUrl: creds.baseUrl || provider?.baseUrl,
-        apiKey: creds.apiKey || provider?.apiKey,
-        protocol: provider?.protocol,
-        requestTemplate: provider?.requestTemplate,
-      };
-    }
+    if (creds.baseUrl || creds.apiKey || provider) return configuredModalityCredentials(modality);
   }
   return dashscopeCredentialsForUnboundModel(modelId) || {};
 }
@@ -169,7 +188,8 @@ export function getMultimodalClientOverrides(modelId: string): {
 } {
   // 1. 优先检查模型是否配置了专属服务商凭证
   const modelCreds = getModelCredentials(modelId);
-  const textProtocol = selectedTextProtocol(modelId);
+  const chat = configuredChatModel(modelId);
+  const textProtocol = chat ? resolveModalityModelRoute('chat', chat.id).textProtocol : selectedTextProtocol(modelId);
   const template = selectedTextModel(modelId).apiTemplate;
   if (modelCreds.baseUrl || modelCreds.apiKey) {
     return {
@@ -205,6 +225,11 @@ export function getMultimodalClientOverrides(modelId: string): {
     textProtocol: 'openai',
     ...(allowInsecureHttp ? { allowInsecureHttp: true } : {}),
   };
+}
+
+/** Read the selected route address without exposing credentials to capability consumers. */
+export function getGatewayClientBaseUrl(modelId?: string): string | undefined {
+  return getModelCredentials(modelId).baseUrl || getGatewayClientOverrides().customBaseUrl;
 }
 
 export function getGatewayClientHeaders(modelId?: string): Record<string, string> {

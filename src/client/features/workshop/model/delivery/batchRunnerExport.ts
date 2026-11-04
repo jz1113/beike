@@ -8,14 +8,13 @@ import { isDeliverableWorkshopResult } from '../generation/workshopReadiness';
 import { blobExtFromMime } from '../collection/batchRunnerIo';
 import { buildMatrixExportRows } from './batchMatrixExport';
 import { canNativeOfflineExport, tryNativeOfflineZip } from './batchExport';
-import { exportFourShots, exportGeneratedTitle, exportProductId, exportPromptGroupName } from './batchExport';
+import { exportImageTasks, exportGeneratedTitle, exportProductId, exportPromptGroupName } from './batchExport';
 
 export type { MatrixExportRow } from './batchMatrixExport';
 export { buildMatrixExportRows, ensurePermanentImageUrl } from './batchMatrixExport';
 
 export interface BatchExportDeps {
   setIsExportingZip: (v: boolean) => void;
-  setExportingSingleItemId: (id: string | null) => void;
   setToastMsg: (msg: string | null) => void;
   showToast: (msg: string) => void;
 }
@@ -55,11 +54,7 @@ async function writeZipExcel(
   if (excelRows.length === 0) return;
   const XLSX = await import('xlsx');
   const worksheet = XLSX.utils.json_to_sheet(excelRows);
-  worksheet['!cols'] = [
-    { wch: 35 }, { wch: 22 }, { wch: 24 },
-    { wch: 64 }, { wch: 64 }, { wch: 64 }, { wch: 64 },
-    { wch: 42 }, { wch: 80 }, { wch: 28 },
-  ];
+  worksheet['!cols'] = Object.keys(excelRows[0]).map(key => ({ wch: key.startsWith('生成图片链接') ? 64 : key === '文案' ? 80 : 32 }));
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, '生成成果清单');
   zip.file('生成成果清单.xlsx', XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }));
@@ -90,8 +85,8 @@ async function exportClientZip(items: BatchProductItem[], deps: BatchExportDeps)
     );
     const productFolder = zip.folder(folderName);
     if (!productFolder) continue;
-    for (const task of exportFourShots(item)) pending.push({ url: task.resultUrl!, folder: productFolder, shotNo: task.shot_no, itemId: item.id });
-    for (const task of (item.tasks || []).filter(task => task.shot_no >= 1 && task.shot_no <= 4 && task.resultStatus !== 'superseded' && task.status === 'FAILURE')) {
+    for (const task of exportImageTasks(item)) pending.push({ url: task.resultUrl!, folder: productFolder, shotNo: task.shot_no, itemId: item.id });
+    for (const task of (item.tasks || []).filter(task => task.shot_no >= 1 && task.shot_no <= 8 && task.resultStatus !== 'superseded' && task.status === 'FAILURE')) {
       productFolder.file(`图${task.shot_no}.error.txt`, `该镜头未生成成功\n${task.error || '没有可下载的生成结果'}`);
       imageFail++;
     }
@@ -124,7 +119,7 @@ async function exportClientZip(items: BatchProductItem[], deps: BatchExportDeps)
 }
 
 export async function exportBatchZip(items: BatchProductItem[], deps: BatchExportDeps) {
-  const ready = productsWithTasks(items).filter(item => exportFourShots(item).length > 0);
+  const ready = productsWithTasks(items).filter(item => exportImageTasks(item).length > 0);
   if (ready.length === 0) {
     deps.showToast('当前没有已成功生成的图片可供打包导出');
     return;
@@ -166,11 +161,7 @@ export async function exportBatchExcel(items: BatchProductItem[], deps: BatchExp
     }
     const XLSX = await import('xlsx');
     const worksheet = XLSX.utils.json_to_sheet(excelRows);
-    worksheet['!cols'] = [
-      { wch: 35 }, { wch: 22 }, { wch: 24 },
-      { wch: 64 }, { wch: 64 }, { wch: 64 }, { wch: 64 },
-      { wch: 42 }, { wch: 80 }, { wch: 28 },
-    ];
+    worksheet['!cols'] = Object.keys(excelRows[0]).map(key => ({ wch: key.startsWith('生成图片链接') ? 64 : key === '文案' ? 80 : 32 }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, '生成成果清单');
     const excelBlob = new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], {
@@ -183,53 +174,6 @@ export async function exportBatchExcel(items: BatchProductItem[], deps: BatchExp
     deps.showToast(`导出表格失败: ${err instanceof Error ? err.message : '未知异常'}`);
   } finally {
     deps.setIsExportingZip(false);
-  }
-}
-
-export async function exportSingleProductZip(item: BatchProductItem, deps: BatchExportDeps) {
-  const successTasks = exportFourShots(item);
-  if (successTasks.length === 0) {
-    deps.showToast('该商品暂无已成功的生成图片可供导出');
-    return;
-  }
-  deps.setExportingSingleItemId(item.id);
-  deps.showToast(`正在极速打包【${item.title || item.itemId}】...`);
-  try {
-    const productName = workshopProductFolderName(exportPromptGroupName(item), exportProductId(item), exportGeneratedTitle(item));
-    if (canNativeOfflineExport([item])) {
-      try {
-        const result = await tryNativeOfflineZip([item], `${productName}.zip`, deps.setToastMsg, true);
-        deps.showToast(zipResultMessage(result, `【${item.title || item.itemId}】图片包`));
-        return;
-      } catch (nativeErr) {
-        console.warn('[exportSingleProductZip] native offline export failed, falling back', nativeErr);
-      }
-    }
-    const { default: JSZip } = await import('jszip');
-    const zip = new JSZip();
-    let imageOk = 0;
-    let imageFail = 0;
-    await Promise.all(successTasks.map(async task => {
-      try {
-        const blob = await fetchGeneratedImage(task.resultUrl!);
-        zip.file(`图${task.shot_no}.${blobExtFromMime(blob.type || '')}`, blob, { binary: true });
-        imageOk++;
-      } catch (err) {
-        zip.file(`图${task.shot_no}.error.txt`, `图片下载失败\n原始URL: ${task.resultUrl}\n错误: ${err instanceof Error ? err.message : String(err)}`);
-        imageFail++;
-      }
-    }));
-    if (imageOk === 0) throw new Error('所有图片获取失败，请检查文件是否仍可访问');
-    if (imageFail > 0) zip.file('export-summary.json', JSON.stringify({ total: successTasks.length, succeeded: imageOk, failed: imageFail, partial: true }, null, 2));
-    const copywriting = formatWorkshopCopywriting(item.copywriting?.content);
-    if (copywriting) zip.file('文案.txt', copywriting);
-    const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
-    const savedVia = await saveToDownloadDir(`${productName}.zip`, zipBlob);
-    deps.showToast(zipResultMessage({ total: successTasks.length, succeeded: imageOk, failed: imageFail, partial: imageFail > 0, savedVia }, `【${item.title || item.itemId}】图片包`));
-  } catch (err: unknown) {
-    deps.showToast(`单款打包失败: ${err instanceof Error ? err.message : '未知错误'}`);
-  } finally {
-    deps.setExportingSingleItemId(null);
   }
 }
 

@@ -5,7 +5,6 @@ import { BatchHistoryPanel } from '../history/BatchHistoryPanel';
 import { BatchNameDialog } from '../history/BatchNameDialog';
 import { batchHistoryTitle } from '../../model/workspace/batchHistory';
 import type { BatchDeleteResult } from '../../api/batchManagement';
-import { Layers3, Pencil } from 'lucide-react';
 import { useWorkshopDockActions } from './WorkshopDockActionsContext';
 
 interface Props {
@@ -72,6 +71,7 @@ export function BatchWorkspaceBatchControls({
     setActions({
       onCreate: () => handlersRef.current.requestNew(),
       onHistory: () => handlersRef.current.openHistory(),
+      onRename: () => setNameMode('rename'),
       disabled: true, createDisabled: true,
     });
     return () => setActions(null);
@@ -83,10 +83,6 @@ export function BatchWorkspaceBatchControls({
 
   return (
     <>
-      {activeBatch && <div className="batch-workspace-identity">
-        <Layers3 size={15} /><span className="batch-workspace-label">当前批次</span>
-        <button type="button" disabled={!ready || isRunning} onClick={() => setNameMode('rename')} className="batch-workspace-name" title="编辑当前批次名称"><span>{batchHistoryTitle(activeBatch)}</span><Pencil size={12} /></button>
-      </div>}
       {isHistoryOpen && (
         <BatchHistoryPanel
           activeBatch={activeBatch}

@@ -35,7 +35,8 @@ func Video(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": message})
 			return
 		}
-		if message := videoInputError(payload, videoRequestedModel(payload)); message != "" {
+		base, _ := videoCredentials(cfg, r, payload)
+		if message := videoInputError(payload, videoRequestedModel(payload), base); message != "" {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": message})
 			return
 		}
@@ -83,6 +84,8 @@ func videoBodyError(payload map[string]json.RawMessage) string {
 		func() string { return optionalString(payload, "resolution", 32, false) },
 		func() string { return stringList(payload, "images", 30) },
 		func() string { return stringList(payload, "videos", 10) },
+		func() string { return stringList(payload, "audios", 10) },
+		func() string { return grokVoiceBodyError(payload) },
 		func() string { return optionalBool(payload, "watermark") },
 		func() string { return optionalString(payload, "productId", 256, false) },
 		func() string { return optionalString(payload, "referenceImageUrl", 0, false) },
@@ -92,6 +95,8 @@ func videoBodyError(payload map[string]json.RawMessage) string {
 		func() string { return optionalString(payload, "camera_motion", 200, false) },
 		func() string { return optionalString(payload, "camera_control", 200, false) },
 		func() string { return optionalBool(payload, "audio") },
+		func() string { return optionalBool(payload, "preserve_prompt") },
+		func() string { return optionalBool(payload, "context_ir_enabled") },
 		func() string { return optionalNumber(payload, "fps", true, false) },
 		func() string { return optionalNumber(payload, "seed", false, true) },
 		func() string { return optionalString(payload, "character", 2000, false) },

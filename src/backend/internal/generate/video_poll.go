@@ -29,10 +29,7 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 			continue
 		}
 		var data map[string]any
-		if json.Unmarshal(raw, &data) != nil || videoPollSkipped(data) {
-			continue
-		}
-		if !videoPollReady(data) && videoErrorMessage(data) == "" {
+		if json.Unmarshal(raw, &data) != nil || !videoPollReady(data) {
 			continue
 		}
 		parsed := readVideoPoll(data)
@@ -45,25 +42,30 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 
 func videoPollURLs(base, taskID, model, protocol string) []string {
 	var urls []string
-	if template := videoQueryTemplate(base, taskID); template != "" {
+	if template := videoQueryTemplate(base, taskID); template != "" && !(minimaxH3(model) && minimaxMetasoHost(base)) {
 		urls = append(urls, strings.ReplaceAll(template, "{taskId}", url.QueryEscape(taskID)))
 	}
 	var queries []string
-	if videoFamily(model) == "wan" {
+	if minimaxH3(model) {
+		_, queries = minimaxH3Route(base)
+	} else if videoFamily(model) == "wan" {
 		_, queries = routeWanEndpoints(base, protocol)
+	} else if videoFamily(model) == "grok-video" {
+		_, queries = routeGrokEndpoints(base, "")
 	} else {
 		_, queries, _ = videoEndpointSet(videoFamily(model), model, "", nil)
 	}
 	urls = append(urls, expandVideoURLs(base, queries, url.QueryEscape(taskID))...)
-	if videoFamily(model) != "wan" {
+	if (model == "wan3.0-video" || model == "wan3.0-video-prime") && minimaxComflyHost(base) {
+		urls = append(urls, base+"/v1/videos/"+url.PathEscape(taskID))
+	}
+	if omniFlash(model) {
+		return uniqueStrings(urls)
+	}
+	if videoFamily(model) != "wan" && !(videoFamily(model) == "grok-video" && grokOfficialHost(base)) && !(minimaxH3(model) && (minimaxOfficialHost(base) || minimaxComflyHost(base) || minimaxMetasoHost(base))) {
 		urls = append(urls, base+"/v1/videos/"+taskID, base+"/v2/videos/generations/"+taskID, base+"/seedance/v3/contents/generations/tasks/"+taskID)
 	}
 	return uniqueStrings(urls)
-}
-
-func videoPollSkipped(data map[string]any) bool {
-	_, object := data["error"].(map[string]any)
-	return data["error"] != nil && !object
 }
 
 func videoErrorMessage(data map[string]any) string {
@@ -78,39 +80,32 @@ func videoErrorMessage(data map[string]any) string {
 }
 
 func videoPollReady(data map[string]any) bool {
-	if data["status"] != nil || data["state"] != nil || data["video_url"] != nil || data["url"] != nil || data["output"] != nil || data["content"] != nil || data["creations"] != nil {
-		return true
+	task := videoPollTaskData(data)
+	// A query error alone says nothing about the original generation task.
+	return firstString(task, "task_status", "status", "state") != "" ||
+		firstString(data, "task_status", "status", "state") != "" || extractVideoResult(data, task) != ""
+}
+
+func videoPollTaskData(data map[string]any) map[string]any {
+	for _, key := range []string{"task", "data", "output"} {
+		if nested, ok := data[key].(map[string]any); ok {
+			return nested
+		}
 	}
-	if nested, ok := data["data"].(map[string]any); ok {
-		return nested["status"] != nil || nested["task_status"] != nil || nested["output"] != nil
-	}
-	return false
+	return data
 }
 
 func readVideoPoll(data map[string]any) pollParsed {
-	if message := videoErrorMessage(data); message != "" {
-		raw := strings.ToUpper(firstString(data, "task_status", "status", "state"))
-		if raw == "" || isFailure(raw) {
-			return pollParsed{status: "FAILURE", reason: gateway.PresentVideoError(message), progress: "0%"}
-		}
-	}
-	task := data
-	if nested, ok := data["task"].(map[string]any); ok {
-		task = nested
-	} else if nested, ok := data["data"].(map[string]any); ok {
-		task = nested
-	} else if nested, ok := data["output"].(map[string]any); ok {
-		task = nested
-	}
+	task := videoPollTaskData(data)
 	raw := strings.ToUpper(firstString(task, "task_status", "status", "state"))
 	if raw == "" {
-		raw = strings.ToUpper(firstString(data, "task_status", "status"))
-	}
-	if raw == "" {
-		raw = "PENDING"
+		raw = strings.ToUpper(firstString(data, "task_status", "status", "state"))
 	}
 	done := raw == "SUCCESS" || raw == "SUCCEEDED" || raw == "COMPLETED" || raw == "FINISHED" || raw == "DONE" || raw == "SUCCEED"
-	progress := "45%"
+	progress := progressText(task)
+	if progress == "" {
+		progress = progressText(data)
+	}
 	if done {
 		progress = "100%"
 	}
@@ -128,12 +123,17 @@ func readVideoPoll(data map[string]any) pollParsed {
 			reason = firstString(task, "err_code")
 		}
 		if reason == "" {
+			reason = videoErrorMessage(task)
+		}
+		if reason == "" {
 			reason = videoErrorMessage(data)
 		}
 		if reason == "" {
 			reason = "视频生成失败"
 		}
 		reason = gateway.PresentVideoError(reason)
+		result = ""
+	} else if isOngoing(raw) {
 		result = ""
 	} else if result != "" {
 		state = "SUCCESS"

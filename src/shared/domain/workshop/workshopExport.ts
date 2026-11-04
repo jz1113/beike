@@ -4,7 +4,7 @@ export const WORKSHOP_EXPORT_HEADERS = [
   '标题', '文案', '对应生成的提示词资产分组组名',
 ] as const;
 
-export type WorkshopExportRow = Record<(typeof WORKSHOP_EXPORT_HEADERS)[number], string>;
+export type WorkshopExportRow = Record<(typeof WORKSHOP_EXPORT_HEADERS)[number], string> & Partial<Record<`生成图片链接${5 | 6 | 7 | 8}`, string>>;
 
 function safeFilePart(value: string, maxBytes: number): string {
   const clean = value

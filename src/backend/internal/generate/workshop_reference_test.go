@@ -66,7 +66,7 @@ func TestWorkshopAnalysisIgnoresLegacyReferenceLocks(t *testing.T) {
 		for i := 1; i <= 4; i++ {
 			generated = append(generated, map[string]any{"shot_no": i, "prompt": fmt.Sprintf("创作成稿%d", i), "has_human": true, "shot_type": "model_shot", "sourceReferenceImageUrl": "https://example.com/4.jpg", "sourcePrompt": "旧参考词"})
 		}
-		text, _ := json.Marshal(map[string]any{"productFingerprint": "台灯", "prompts": generated})
+		text, _ := json.Marshal(map[string]any{"productFingerprint": map[string]any{"轮廓": "圆弧灯罩"}, "prompts": generated})
 		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": string(text)}}}})
 	}))
 	defer server.Close()
@@ -85,6 +85,10 @@ func TestWorkshopAnalysisIgnoresLegacyReferenceLocks(t *testing.T) {
 	rec := post("local")
 	if rec.Code != 200 {
 		t.Fatalf("analysis %d %s", rec.Code, rec.Body.String())
+	}
+	var savedStyle, savedFingerprint string
+	if err := db.QueryRow(`SELECT styleName,productFingerprint FROM PromptRecord WHERE workspaceId='local' AND productTitle='台灯' ORDER BY createdAt DESC LIMIT 1`).Scan(&savedStyle, &savedFingerprint); err != nil || !strings.Contains(savedStyle, "category-creative-v2") || !strings.Contains(savedFingerprint, "圆弧灯罩") {
+		t.Fatalf("analysis history lost the skill or product evidence: %q %q, %v", savedStyle, savedFingerprint, err)
 	}
 	var result map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &result)

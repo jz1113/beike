@@ -119,19 +119,3 @@ func (c Config) MediaReviewRoot() string {
 	}
 	return filepath.Join(c.Root, ".local", "media-review")
 }
-
-// AtlasCatalogDir 定位本机已同步的 RuiC-PoseAtlas 图鉴目录（优先应用数据目录，兼容工作区 .local/atlas-catalog）。
-func (c Config) AtlasCatalogDir() string {
-	localFallback := filepath.Join(c.Root, ".local", "atlas-catalog")
-	if dir := strings.TrimSpace(os.Getenv("AZHUO_DATA_DIR")); dir != "" {
-		primary := filepath.Join(dir, "atlas-catalog")
-		if _, err := os.Stat(filepath.Join(primary, "poses.json")); err == nil {
-			return primary
-		}
-		if _, err := os.Stat(filepath.Join(localFallback, "poses.json")); err == nil {
-			return localFallback
-		}
-		return primary
-	}
-	return localFallback
-}

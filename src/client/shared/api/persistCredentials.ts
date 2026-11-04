@@ -92,16 +92,6 @@ export function persistWanbangConfig(key: string, secret: string, enabled?: bool
     enabled === undefined ? {} : { wanbang_enabled: String(enabled) });
 }
 
-export function persistExternalScraperConfig(id: string, secret: string, enabled?: boolean): Promise<void> {
-  return persistLocalConfig([['external_scraper_id', id.trim()], ['external_scraper_secret', secret.trim()]],
-    enabled === undefined ? {} : { apia_enabled: String(enabled) });
-}
-
-export function persistQiyunConfig(appId: string, appKey: string, enabled?: boolean): Promise<void> {
-  return persistLocalConfig([['qiyun_app_id', appId.trim()], ['qiyun_app_key', appKey.trim()]],
-    enabled === undefined ? {} : { qiyun_enabled: String(enabled) });
-}
-
 export function persistStorageConfig(config: {
   enabled: boolean;
   provider: StorageConfig['provider'];

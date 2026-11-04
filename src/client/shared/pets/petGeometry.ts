@@ -23,12 +23,12 @@ function readStoredPoint(storage: Pick<Storage, 'getItem'>, key: string): PetPoi
   } catch { return null; }
 }
 
-export function readPetPosition(storage: Pick<Storage, 'getItem'>): PetPoint | null {
-  return readStoredPoint(storage, PET_POSITION_KEY) ?? readStoredPoint(storage, LEGACY_PET_POSITION_KEY);
+export function readPetPosition(storage: Pick<Storage, 'getItem'>, key = PET_POSITION_KEY): PetPoint | null {
+  return readStoredPoint(storage, key) ?? (key === PET_POSITION_KEY ? readStoredPoint(storage, LEGACY_PET_POSITION_KEY) : null);
 }
 
-export function writePetPosition(storage: Pick<Storage, 'setItem'>, point: PetPoint) {
-  try { storage.setItem(PET_POSITION_KEY, JSON.stringify(point)); } catch { /* Private browsing may block storage. */ }
+export function writePetPosition(storage: Pick<Storage, 'setItem'>, point: PetPoint, key = PET_POSITION_KEY) {
+  try { storage.setItem(key, JSON.stringify(point)); } catch { /* Private browsing may block storage. */ }
 }
 
 export interface PetFloatBox { width: number; height: number }

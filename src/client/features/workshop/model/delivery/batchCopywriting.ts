@@ -41,14 +41,8 @@ async function requestCopywriting(item: BatchProductItem, ctx: CopywritingContex
   const existingTitles = ctx.getItems()
     .filter(product => product.id !== item.id && product.copywriting?.title)
     .map(product => product.copywriting!.title);
-  const generatedImages = (item.tasks || [])
-    .filter(isDeliverableWorkshopResult)
-    .map(task => task.resultUrl!);
-  const effectiveImages = generatedImages.length > 0
-    ? generatedImages.slice(0, 2)
-    : item.selectedProductImages.length > 0
-      ? item.selectedProductImages.slice(0, 2)
-      : [item.coverImage];
+  const retained = item.tasks.filter(isDeliverableWorkshopResult);
+  const shotNumbers = new Set(retained.map(task => task.shot_no));
 
   try {
     const copyModel = isOpenAIModelRouteId(ctx.selectedVisionModel)
@@ -62,9 +56,10 @@ async function requestCopywriting(item: BatchProductItem, ctx: CopywritingContex
         model: copyModel || undefined,
         productTitle: item.title,
         productCategory: item.category,
+        productProps: item.props,
         productRole: item.productRole || 'held_object',
-        imageUrls: effectiveImages,
-        shotPrompts: (item.prompts || []).map(prompt => `${prompt.title}: ${prompt.scene}`),
+        imageUrls: retained.slice(0, 2).map(task => task.resultUrl!),
+        shotPrompts: item.prompts.filter(prompt => shotNumbers.has(prompt.shot_no)).map(prompt => `${prompt.title}: ${prompt.scene}`),
         style: 'authentic',
         existingTitles,
       }),

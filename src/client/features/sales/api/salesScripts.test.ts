@@ -3,7 +3,7 @@ import { apiRequest } from '@client/shared/api/apiRequest';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { readAssistantReasoningEffort } from '@client/shared/hooks/useAssistantReasoning';
 import {
-  analyzeReferenceVideo, fetchScriptAnalysisPrompt, listSalesScripts, normalizePastedScript,
+  analyzeReferenceVideo, fetchSalesScript, fetchScriptAnalysisPrompt, listSalesScripts,
   patchSalesScript, saveSalesScript, uploadScriptVideo,
 } from './salesScripts';
 
@@ -27,6 +27,18 @@ const sampleScript = {
 };
 
 describe('sales reference script API', () => {
+  it('reads an exact saved receipt without rewriting later user edits and distinguishes missing records from service failures', async () => {
+    const signal = new AbortController().signal;
+    vi.mocked(apiRequest).mockResolvedValueOnce(new Response(JSON.stringify({ success: true, item: { id: 'script_saved', title: '已改名', status: 'verified', script: sampleScript } })));
+    await expect(fetchSalesScript('script_saved', signal)).resolves.toMatchObject({ id: 'script_saved', title: '已改名', status: 'verified' });
+    expect(apiRequest).toHaveBeenCalledWith('GET', '/api/sales/scripts', { search: 'id=script_saved', signal, cache: 'no-store' });
+    vi.mocked(apiRequest).mockResolvedValueOnce(new Response(JSON.stringify({ success: false, error: '参考脚本不存在' }), { status: 404 }));
+    await expect(fetchSalesScript('missing')).resolves.toBeNull();
+    vi.mocked(apiRequest).mockResolvedValueOnce(new Response('{}', { status: 404 }));
+    await expect(fetchSalesScript('saved')).rejects.toThrow('重新启动贝壳服务');
+    vi.mocked(apiRequest).mockResolvedValueOnce(new Response(JSON.stringify({ error: '暂不可用' }), { status: 500 }));
+    await expect(fetchSalesScript('saved')).rejects.toThrow('暂不可用');
+  });
   it('bypasses browser cache when reading the active analysis prompt', async () => {
     vi.mocked(apiRequest).mockResolvedValue(new Response(JSON.stringify({ success: true, prompt: '保存后的规则', promptVersion: 'reference-script:latest' })));
     const signal = new AbortController().signal;
@@ -60,15 +72,6 @@ describe('sales reference script API', () => {
       customApiKey: 'g-key',
       reasoningEffort: 'high',
     });
-  });
-
-  it('normalizes pasted JSON without model credentials when selection is omitted', async () => {
-    vi.mocked(apiRequest).mockResolvedValue(new Response(JSON.stringify({
-      success: true, script: sampleScript, model: '', promptVersion: 'pasted-json',
-    })));
-    const draft = await normalizePastedScript(JSON.stringify(sampleScript), { videoUrl: '/storage/local/ref.mp4' }, new AbortController().signal);
-    expect(draft.promptVersion).toBe('pasted-json');
-    expect(getMultimodalClientOverrides).not.toHaveBeenCalled();
   });
 
   it('lists, saves, and patches stored reference scripts while explaining outdated servers', async () => {

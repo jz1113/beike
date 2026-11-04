@@ -16,7 +16,6 @@ export function WorkshopContentSettings(props: WorkshopSettingsModalProps) {
   const selectedId = automatic ? 'auto' : selected?.id || '';
   return <section className="space-y-3 py-4" aria-label="创作技能">
     <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">创作技能</h3><span className="text-[11px] text-slate-500">{automatic ? '按商品细分匹配' : '当前批次指定'}</span></div>
-    <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">根据商品图与创作技能设计分镜。人物、穿搭、场景由技能和商品决定；参考素材用于学习技能，生产无需采集或指定参考素材。</p>
     {(manualRecipes.length > 0 || !automatic) && <label className={labelClass}>当前技能
       <select aria-label="电商图文技能" value={selectedId} disabled={skillLoadState === 'loading'} onChange={event => props.setSelectedArchId(event.target.value)} className={selectClass}>
         {!selectedId && <option value="" disabled>所选技能已失效，请重新选择</option>}
@@ -31,7 +30,7 @@ export function WorkshopContentSettings(props: WorkshopSettingsModalProps) {
         </p>
         <div className="flex gap-3 text-xs font-medium">
           <button type="button" onClick={props.onReloadSkills} disabled={skillLoadState === 'loading' || !props.onReloadSkills} className="text-slate-500 hover:text-indigo-600 disabled:opacity-50 dark:text-slate-400 dark:hover:text-indigo-300">刷新技能</button>
-          <button type="button" onClick={() => props.onOpenAssets?.()} disabled={!props.onOpenAssets} className="text-slate-700 disabled:opacity-50 dark:text-slate-200">管理创作技能 ↗</button>
+          <button type="button" onClick={() => props.onOpenSkills?.()} disabled={!props.onOpenSkills} className="text-slate-700 disabled:opacity-50 dark:text-slate-200">管理创作技能 ↗</button>
         </div>
       </div>
     </div>

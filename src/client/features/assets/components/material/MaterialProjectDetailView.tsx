@@ -77,14 +77,16 @@ export default function MaterialProjectDetailView({
       {/* 顶部控制栏 (对应图5) */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2 pb-4">
         {/* 左侧：返回箭头 + 项目名 + 来源分类胶囊 */}
-        <div className="flex items-center gap-4 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0 max-w-full flex-wrap">
           <button
             type="button"
+            autoFocus
+            aria-label={`返回项目列表：${project.title}`}
             onClick={onBack}
-            className="flex items-center gap-2 text-sm font-bold text-slate-800 hover:text-slate-950 transition-colors dark:hover:text-white dark:text-slate-100"
+            className="flex min-w-0 max-w-full items-center gap-2 text-sm font-bold text-slate-800 hover:text-slate-950 transition-colors dark:hover:text-white dark:text-slate-100"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span>{project.title}</span>
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            <span className="truncate" title={project.title}>{project.title}</span>
           </button>
 
           {/* AI生成 / 我上传的 胶囊 */}
@@ -115,7 +117,7 @@ export default function MaterialProjectDetailView({
         </div>
 
         {/* 右侧：搜索 + 筛选 + 排序 + 展示尺寸 */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0 max-w-full flex-wrap">
           {/* 搜索框 */}
           <div className="relative flex items-center">
             <Search className="w-3.5 h-3.5 absolute left-3 pointer-events-none text-slate-400" />
@@ -123,7 +125,7 @@ export default function MaterialProjectDetailView({
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="搜索资产"
+              aria-label="搜索项目素材" placeholder="搜索资产"
               className="w-36 pl-8 pr-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200/60 text-xs text-slate-800 placeholder-slate-400 outline-none transition-all h-8 dark:text-slate-100 dark:bg-white/10"
             />
           </div>
@@ -131,6 +133,7 @@ export default function MaterialProjectDetailView({
           {/* 筛选 */}
           <div className="relative flex items-center">
             <select
+              aria-label="素材类型"
               value={mediaFilter}
               onChange={(e) => setMediaFilter(e.target.value as typeof mediaFilter)}
               className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/60 text-slate-700 text-xs font-medium outline-none cursor-pointer h-8 dark:text-slate-200 dark:bg-white/10"
@@ -147,6 +150,7 @@ export default function MaterialProjectDetailView({
           {/* 排序 */}
           <div className="relative flex items-center">
             <select
+              aria-label="项目素材排序"
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
               className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/60 text-slate-700 text-xs font-medium outline-none cursor-pointer h-8 dark:text-slate-200 dark:bg-white/10"
@@ -161,6 +165,7 @@ export default function MaterialProjectDetailView({
           {/* 展示尺寸 */}
           <div className="relative flex items-center">
             <select
+              aria-label="缩略图大小"
               value={displaySize}
               onChange={(e) => setDisplaySize(e.target.value as DisplaySize)}
               className="appearance-none pl-3 pr-7 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/60 text-slate-700 text-xs font-medium outline-none cursor-pointer h-8 dark:text-slate-200 dark:bg-white/10"
@@ -191,7 +196,6 @@ export default function MaterialProjectDetailView({
             return (
               <div
                 key={task.id}
-                onClick={() => handleCardClick(task)}
                 className={`group relative flex flex-col cursor-pointer transition-all ${
                   isSelected ? 'scale-[0.99]' : ''
                 }`}
@@ -208,7 +212,8 @@ export default function MaterialProjectDetailView({
                   <button
                     type="button"
                     onClick={(e) => toggleSelect(task.id, e)}
-                    aria-label={isSelected ? '取消勾选' : '勾选'}
+                    aria-pressed={isSelected}
+                    aria-label={`${isSelected ? '取消勾选' : '勾选'}：${title}`}
                     className={`absolute left-2 top-2 z-20 flex h-4 w-4 items-center justify-center rounded-sm transition-all ${
                       isSelected
                         ? 'bg-slate-900 text-white shadow-xs dark:bg-white dark:text-slate-950'
@@ -249,8 +254,11 @@ export default function MaterialProjectDetailView({
                 </div>
 
                 {/* 缩略图下方文件名/标题 */}
-                <p
-                  className="mt-1.5 truncate text-[11px] font-medium text-slate-700 px-0.5 dark:text-slate-200"
+                <button type="button" onClick={() => handleCardClick(task)}
+                  aria-label={`${kind === 'document' ? '打开' : '预览'}：${title}`}
+                  disabled={kind !== 'document' && !task.resultUrl}
+                  className="absolute inset-0 z-10 rounded-xl cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500" />
+                <p className="mt-1.5 truncate text-[11px] font-medium text-slate-700 px-0.5 dark:text-slate-200"
                   title={title}
                 >
                   {title}

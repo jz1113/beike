@@ -29,7 +29,6 @@ export type AssetLibraryToolbarProps = {
   importJsonRef: RefObject<HTMLInputElement | null>;
   onImportJsonBackup: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onExportJsonBackup: () => void;
-  onOpenSkills: () => void;
   onRefresh: () => void;
   isLoading: boolean;
   dynamicTagList: Array<{ tag: string; count: number }>;
@@ -71,7 +70,6 @@ export default function AssetLibraryToolbar({
   importJsonRef,
   onImportJsonBackup,
   onExportJsonBackup,
-  onOpenSkills,
   onRefresh, isLoading,
   dynamicTagList,
   selectedTag,
@@ -112,7 +110,7 @@ export default function AssetLibraryToolbar({
 
   const tabNavigation = (
       <nav className="asset-type-navigation" aria-label="资产类型">
-        {tabBtn('full_prompt', '图组母本')}
+        {tabBtn('full_prompt', '参考图组')}
         {tabBtn('persona', '人物')}
         {tabBtn('outfit', '穿搭')}
         {tabBtn('scene', '场景')}
@@ -127,7 +125,7 @@ export default function AssetLibraryToolbar({
         className="asset-feed-button"
       >
         <FolderOpen className="w-3.5 h-3.5" />
-        <span>投喂参考图</span>
+        <span>导入参考图</span>
       </button>
       <input
         ref={folderInputRef}
@@ -153,7 +151,6 @@ export default function AssetLibraryToolbar({
         onExportJsonBackup={onExportJsonBackup}
         onRefresh={onRefresh}
         isLoading={isLoading}
-        onOpenSkills={activeSubTab === 'full_prompt' ? undefined : onOpenSkills}
       />
     </div>
   );

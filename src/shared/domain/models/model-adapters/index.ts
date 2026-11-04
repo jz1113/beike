@@ -1,3 +1,4 @@
+import { omniFlashVideoAdapter } from './video/omniFlash';
 import type {
   ImageAdapterInput,
   ImageAdapterResult,
@@ -45,6 +46,7 @@ export const IMAGE_ADAPTERS: ImageModelAdapter[] = [
 
 /** 视频适配器注册表（顺序即匹配优先级） */
 export const VIDEO_ADAPTERS: VideoModelAdapter[] = [
+  omniFlashVideoAdapter,
   seedanceVideoAdapter,
   veoVideoAdapter,
   wanVideoAdapter,

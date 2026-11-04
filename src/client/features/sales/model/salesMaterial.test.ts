@@ -3,6 +3,7 @@ import { normalizeScriptTemplate, type SalesMaterialCatalog } from '@shared/doma
 import { salesMaterialCards } from './salesMaterialCatalog';
 import { applyMaterialAction, buildSalesBeatActionReferences, reconcileSalesMaterialBindings } from './salesMaterial';
 import { emptySalesProductionPlan, parseSalesProductionPlan, planForSelectedScript } from './salesProductionDraft';
+import { salesManualPerformanceEdits } from './salesPerformanceEdits';
 
 const script = normalizeScriptTemplate({ title: '两段展示', durationSec: 6, shots: [{ start: 0, end: 6, beats: [
   { start: 0, end: 3, actionTemplate: '正面展示{{商品}}' }, { start: 3, end: 6, actionTemplate: '转身' },
@@ -35,13 +36,20 @@ describe('reusable material action', () => {
     ] };
     const result = applyMaterialAction(script, plan, action, 1);
     expect(result.adaptedBeats?.[0].action).toBe('正面展示{{商品}}');
-    expect(result.adaptedBeats?.[1]).toEqual({ index: 1, subject: '手部', action: action.action, spokenLine: '已核对的台词', subtitle: '已核对' });
+    expect(result.adaptedBeats?.[1]).toEqual({ index: 1, subject: '手部', action: action.action, spokenLine: '已核对的台词', subtitle: '已核对', manualPerformanceFields: ['action'] });
     expect(result.customPrompt).toBe('');
     expect(parseSalesProductionPlan({ ...plan, ...result }).adaptedBeats).toEqual(result.adaptedBeats);
   });
   it('does not overwrite the plan for an invalid beat or empty action', () => {
     expect(applyMaterialAction(script, emptySalesProductionPlan(), action, 99)).toEqual({});
     expect(applyMaterialAction(script, emptySalesProductionPlan(), { ...action, action: '' }, 0)).toEqual({});
+  });
+  it('preserves an explicitly selected action across later automatic copy rewrites', () => {
+    const plan = { ...emptySalesProductionPlan(), adaptedSourceKey: 'automatic-source', adaptedPromptVersion: 'old-auto', adaptedBeats: [
+      { index: 0, subject: '当前人物', action: '旧自动动作', expression: '旧自动表情', spokenLine: '已核对台词', subtitle: '' },
+    ] };
+    const saved = parseSalesProductionPlan({ ...plan, ...applyMaterialAction(script, plan, action, 0) });
+    expect(salesManualPerformanceEdits(saved, saved.adaptedBeats[0])).toEqual({ action: action.action });
   });
 });
 
@@ -63,7 +71,7 @@ it('clears removed material selections while preserving uploads, edits and gener
     adaptedBeats: [{ index: 0, subject: '商品', action: '展示', spokenLine: '保留台词', subtitle: '' }] };
   const catalog = { personas: [], scenes: [], actions: [], voices: [], bgms: [] };
   const next = reconcileSalesMaterialBindings(plan, catalog);
-  expect(next).toEqual({ ...plan, personaId: '', sceneId: '', voiceId: '', bgmId: '', customPrompt: '' });
+  expect(next).toEqual({ ...plan, personaId: '', sceneId: '', bgmId: '', customPrompt: '' });
   expect(reconcileSalesMaterialBindings(next, catalog)).toBe(next);
 });
 
@@ -84,6 +92,11 @@ it('retains material selections that still exist in the workspace', () => {
 
 it('retains a missing selected scene so a refresh cannot silently choose a replacement', () => {
   const plan = { ...emptySalesProductionPlan(), sceneId: 'chosen-room' };
+  expect(reconcileSalesMaterialBindings(plan, { personas: [], scenes: [], actions: [], voices: [], bgms: [] })).toBe(plan);
+});
+
+it('retains a missing selected voice so a refresh cannot silently choose a replacement', () => {
+  const plan = { ...emptySalesProductionPlan(), voiceId: 'chosen-voice' };
   expect(reconcileSalesMaterialBindings(plan, { personas: [], scenes: [], actions: [], voices: [], bgms: [] })).toBe(plan);
 });
 

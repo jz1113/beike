@@ -39,7 +39,7 @@ export function checkWorkshopReadiness(items: BatchProductItem[], config: { gene
     if (shots.some(isLegacyReferenceShot)) add('此商品沿用旧参考素材分镜，请按创作技能重新分析；历史成图与原任务保留', 3, 'analyze');
     if (config.generationStrategy === 'grid_first') {
       if (config.selectedShotCount !== 4) add('四宫格策略需要选择 4 镜', 2, 'select');
-      if (!item.gridPrompt?.trim()) add('缺少四宫格整组提示词，请补全或重新分析', 3, 'edit');
+      if (item.analyzedSuccess && shots.length > 0 && !item.gridPrompt?.trim()) add('缺少四宫格整组提示词，请补全或重新分析', 3, 'edit');
     }
     if (shots.some((shot) => !shot.prompt?.trim())) add('存在空白分镜提示词，请补全', 3, 'edit');
   }

@@ -42,7 +42,7 @@ func TestInvalidCachedPerformanceIsReplacedWithoutOverwritingHistory(t *testing.
 	cfg := setupSalesTestConfig(t)
 	var script map[string]any
 	_ = json.Unmarshal([]byte(validScript), &script)
-	first, err := persistAnalyzedScript(cfg, "local", "", "hash", "model", "prompt", script, false)
+	first, err := persistAnalyzedScript(cfg, "local", "", "hash", "model", "prompt", "route", script, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,18 +56,18 @@ func TestInvalidCachedPerformanceIsReplacedWithoutOverwritingHistory(t *testing.
 	if _, err := db.Exec(`UPDATE "SalesReferenceScript" SET "scriptJson"=?,"status"='verified' WHERE "id"=?`, broken, first.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, cached := lookupCachedScriptAnalysis(context.Background(), cfg.SQLiteFile(), "local", "hash", "prompt"); cached != nil {
+	if cached := lookupCachedScriptAnalysis(context.Background(), cfg.SQLiteFile(), "local", "hash", "prompt", "route"); cached != nil {
 		t.Fatal("invalid performance cache was reused")
 	}
-	second, err := persistAnalyzedScript(cfg, "local", "", "hash", "model", "prompt", script, false)
+	second, err := persistAnalyzedScript(cfg, "local", "", "hash", "model", "prompt", "route", script, false)
 	if err != nil || second.ID == first.ID {
 		t.Fatal("replacement did not get its own saved row", second.ID, err)
 	}
 	if _, err := validateScriptObject(second.Script); err != nil {
 		t.Fatal("replacement content is invalid", err)
 	}
-	if id, _, cached := lookupCachedScriptAnalysis(context.Background(), cfg.SQLiteFile(), "local", "hash", "prompt"); id != second.ID || cached == nil {
-		t.Fatal("historical invalid cache hid the valid replacement", id)
+	if cached := lookupCachedScriptAnalysis(context.Background(), cfg.SQLiteFile(), "local", "hash", "prompt", "route"); cached == nil || cached.ID != second.ID {
+		t.Fatal("historical invalid cache hid the valid replacement", cached)
 	}
 	var preserved, status string
 	if err := db.QueryRow(`SELECT "scriptJson","status" FROM "SalesReferenceScript" WHERE "id"=?`, first.ID).Scan(&preserved, &status); err != nil || preserved != broken || status != "verified" {

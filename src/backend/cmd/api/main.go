@@ -20,6 +20,7 @@ import (
 	"beike.local/cloud/src/backend/internal/platform/database"
 	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
 	"beike.local/cloud/src/backend/internal/platform/database/migrate"
+	"beike.local/cloud/src/backend/internal/sales"
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -56,6 +57,7 @@ func main() {
 			}
 			db.Close()
 		}
+		sweepScriptUploads(cfg, time.Now())
 		go maintain(cfg)
 		sweep(cfg)
 		if interrupted, err := library.RecoverDeconstructJobs(cfg); err != nil {
@@ -98,6 +100,7 @@ func maintain(cfg config.Config) {
 		if count, err := database.FailOrphanTasks(cfg.DatabasePath); err == nil && count > 0 {
 			log.Printf("→ [任务自愈] 周期扫描已终止 %d 个未提交的生成任务", count)
 		}
+		sweepScriptUploads(cfg, time.Now().Add(-10*time.Minute))
 		_ = database.Checkpoint(cfg.DatabasePath)
 		sweep(cfg)
 	}
@@ -113,4 +116,12 @@ func sweep(cfg config.Config) {
 	system.PurgeExpiredVideoDownloads(time.Now())
 	system.PurgeExpiredProxyCache()
 	assets.CleanupAssistantMedia(time.Now())
+}
+
+func sweepScriptUploads(cfg config.Config, before time.Time) {
+	if count, err := sales.SweepScriptSources(cfg, before); err != nil {
+		log.Printf("[参考视频] 清理失败：%v", err)
+	} else if count > 0 {
+		log.Printf("[参考视频] 已清理 %d 个分析原片", count)
+	}
 }

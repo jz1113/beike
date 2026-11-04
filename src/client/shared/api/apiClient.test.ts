@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { storageConfigHeaders } from './apiClient';
+import { proxyMediaUrl, storageConfigHeaders } from './apiClient';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -17,4 +17,14 @@ it('sends Chinese storage prefixes as valid HTTP headers without changing the co
   expect(config.apiPrefix).toBe('上传/');
   expect(config.materialsPrefix).toBe('参考素材/🎬/');
   expect(config.bucketName).toBe('reference-bucket');
+});
+
+it('streams remote audio through the media proxy even when a signed URL has no extension', () => {
+  const source = 'https://example.com/signed-media?id=voice';
+  const output = proxyMediaUrl(source, { asAudio: true });
+  const parsed = new URL(output, 'https://app.example.com');
+  expect(parsed.pathname).toBe('/api/system/proxy-image');
+  expect(parsed.searchParams.get('url')).toBe(source);
+  expect(parsed.searchParams.get('as')).toBe('audio');
+  expect(proxyMediaUrl('/storage/sample.wav', { asAudio: true })).toBe('/storage/sample.wav');
 });

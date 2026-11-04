@@ -37,7 +37,7 @@ export const studioVoiceSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   voiceId: z.string().default(''),
-  ttsVoice: z.string().default('zh-female-commercial'),
+  ttsVoice: z.string().default(''),
   gender: z.string().default('female'),
   voiceGroup: z.string().default(''),
   tags: z.array(z.string()).default([]),
@@ -87,6 +87,7 @@ export const salesStudioAssetsResponseSchema = z.object({
 });
 
 export const salesPlanAdaptBeatInputSchema = z.object({
+  preservePerformance: z.boolean().optional(),
   index: z.number().int().min(0),
   shotIndex: z.number().int().min(0),
   start: z.number().min(0),
@@ -95,6 +96,7 @@ export const salesPlanAdaptBeatInputSchema = z.object({
   shotSize: z.string(),
   camera: z.string(),
   refAction: z.string(),
+  productVisible: z.boolean().optional(),
   subject: z.string().max(1000).optional(),
   scene: z.string().max(600).optional(),
   transition: z.string().max(400).optional(),
@@ -104,9 +106,15 @@ export const salesPlanAdaptBeatInputSchema = z.object({
   imageLabel: z.string(),
   buyingPoint: z.string(),
   actionReference: z.string().max(1000).optional(),
+  sourceVoiceText: z.string().max(1000).optional(),
+  sourceLinePattern: z.string().max(600).optional(),
+  sourceSubtitle: z.string().max(400).optional(),
 });
 
 export const salesPlanAdaptBodySchema = z.object({
+  allowProductReframe: z.boolean().optional(),
+  narration: z.object({ sourceCopy: z.string().max(10000), duration: z.number().positive().max(600), targetCps: z.number().min(2).max(4.6) }).optional(),
+  unresolved: z.array(z.string().max(1000)).max(9).optional(),
   productName: z.string().max(2000),
   brand: z.string().max(500).default(''),
   category: z.string().max(120).default('other'),
@@ -121,8 +129,13 @@ export const salesPlanAdaptBodySchema = z.object({
   presentationMode: z.enum(['subtitled_intro', 'clean_visual']).default('subtitled_intro'),
   imitationMode: z.enum(['script_only', 'depth_imitation']).default('script_only'),
   personaSummary: z.string().max(1000).default(''),
+  personaReferenceImageUrl: z.string().trim().min(1).max(8192).optional(),
+  personaPresence: z.enum(['full_presenter', 'silent_model', 'hands_only', 'none']).optional(),
   sceneSummary: z.string().max(1000).default(''),
-  sourceExclusions: z.array(z.string().max(200)).max(40).default([]),
+  sourceExclusions: z.array(z.union([
+    z.string().max(200),
+    z.object({ term: z.string().trim().min(1).max(200), type: z.string().trim().min(1).max(80) }),
+  ])).max(40).default([]),
   beats: z.array(salesPlanAdaptBeatInputSchema).min(1).max(24),
   model: z.string().trim().min(1).max(200),
   ...TextRequestRoutingFields,
@@ -143,6 +156,16 @@ export const salesAdaptedBeatSchema = z.object({
 });
 
 export const salesPlanAdaptResponseSchema = z.object({
+  personaVisualProfile: z.object({
+    imageUrl: z.string().trim().min(1).max(8192),
+    presence: z.enum(['full_presenter', 'silent_model', 'hands_only']),
+    temperament: z.string().max(600),
+    gaze: z.string().max(600),
+    expression: z.string().max(600),
+    posture: z.string().max(600),
+    limitations: z.string().max(600),
+  }).refine(profile => [profile.temperament, profile.gaze, profile.expression, profile.posture].some(value => value.trim()), '人物原图视觉分析为空').optional(),
+  spokenCopyPromptVersion: z.string().optional(),
   success: z.literal(true),
   beats: z.array(salesAdaptedBeatSchema).min(1),
   model: z.string().default(''),
@@ -164,4 +187,13 @@ export const salesAudioMixResponseSchema = z.object({
   videoUrl: z.string().min(1),
   durationSec: z.number().min(0),
   duckedBgm: z.boolean().default(false),
+});
+
+export const salesVideoReviewResponseSchema = z.object({
+  success: z.literal(true),
+  picture: z.enum(['visible', 'dark', 'unreadable']),
+  audio: z.enum(['audible', 'quiet', 'missing', 'unreadable']),
+  width: z.number().int().nonnegative(),
+  height: z.number().int().nonnegative(),
+  durationSec: z.number().nonnegative(),
 });

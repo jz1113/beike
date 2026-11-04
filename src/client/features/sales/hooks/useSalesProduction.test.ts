@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { adaptSalesScriptPlan, fetchSalesStudioAssets, mixSalesFinalVideo, submitAndPollSalesVideo, synthesizeSalesVoiceover, uploadSalesCustomAsset, type SalesStudioAssetCatalog } from '../api/salesProduction';
+import { adaptSalesScriptPlan, fetchSalesStudioAssets, submitAndPollSalesVideo, uploadSalesCustomAsset, type SalesStudioAssetCatalog } from '../api/salesProduction';
 import { normalizeScriptTemplate } from '@shared/domain/sales';
 import { listSalesScripts, type StoredSalesScript } from '../api/salesScripts';
 import { parseSalesProductionPlan, planForSelectedScript } from '../model/salesProductionDraft';
@@ -8,47 +8,16 @@ import { useSalesProduction } from './useSalesProduction';
 import { salesSummarySource } from '../model/salesSummary';
 import { salesPlanAdaptationSourceKey } from '../model/salesPlanSource';
 import { listSalesPrompts } from '../api/salesPrompts';
+import { adaptSalesSpokenCopy } from '../api/salesSpokenCopy';
+import { prepareSalesDepthVideoClip } from '../api/salesVideoClip';
 
 const hooks = vi.hoisted(() => ({ index: 0, slots: [] as unknown[], pending: [] as (() => void)[], cleanups: new Map<number, () => void>() }));
-vi.mock('react', () => {
-  const same = (left: unknown[] | undefined, right: unknown[]) => left?.length === right.length && left.every((value, index) => Object.is(value, right[index]));
-  const memo = (create: () => unknown, deps: unknown[]) => {
-    const index = hooks.index++;
-    const previous = hooks.slots[index] as { deps: unknown[]; value: unknown } | undefined;
-    if (!previous || !same(previous.deps, deps)) hooks.slots[index] = { deps, value: create() };
-    return (hooks.slots[index] as { value: unknown }).value;
-  };
-  return {
-    useCallback: (fn: unknown, deps: unknown[]) => memo(() => fn, deps),
-    useMemo: memo,
-    useEffect: (fn: () => (() => void) | undefined, deps: unknown[]) => {
-      const index = hooks.index++;
-      if (same(hooks.slots[index] as unknown[] | undefined, deps)) return;
-      hooks.slots[index] = deps;
-      hooks.pending.push(() => {
-        hooks.cleanups.get(index)?.();
-        hooks.cleanups.delete(index);
-        const cleanup = fn();
-        if (cleanup) hooks.cleanups.set(index, cleanup);
-      });
-    },
-    useRef: (initial: unknown) => {
-      const index = hooks.index++;
-      if (!(index in hooks.slots)) hooks.slots[index] = { current: initial };
-      return hooks.slots[index];
-    },
-    useState: <T>(initial: T | (() => T)) => {
-      const index = hooks.index++;
-      if (!(index in hooks.slots)) hooks.slots[index] = typeof initial === 'function' ? (initial as () => T)() : initial;
-      return [hooks.slots[index], (next: T | ((previous: T) => T)) => {
-        hooks.slots[index] = typeof next === 'function' ? (next as (previous: T) => T)(hooks.slots[index] as T) : next;
-      }];
-    },
-  };
-});
+vi.mock('react', async () => (await import('./salesProductionTestRuntime')).salesProductionTestHooks(hooks));
 vi.mock('./useSalesProductionModels', () => ({ useSalesProductionModels: () => ({ videoModels: [], voiceModels: [] }) }));
 vi.mock('../api/salesScripts', () => ({ listSalesScripts: vi.fn() }));
-vi.mock('../api/salesPrompts', () => ({ listSalesPrompts: vi.fn() }));
+vi.mock('../api/salesPrompts', async (original) => ({ ...await original<typeof import('../api/salesPrompts')>(), listSalesPrompts: vi.fn() }));
+vi.mock('../api/salesSpokenCopy', () => ({ adaptSalesSpokenCopy: vi.fn() }));
+vi.mock('../api/salesVideoClip', () => ({ prepareSalesDepthVideoClip: vi.fn() }));
 vi.mock('../api/salesProduction', () => ({
   fetchSalesStudioAssets: vi.fn(), uploadSalesCustomAsset: vi.fn(), adaptSalesScriptPlan: vi.fn(),
   mixSalesFinalVideo: vi.fn(), submitAndPollSalesVideo: vi.fn(), synthesizeSalesVoiceover: vi.fn(),
@@ -57,8 +26,10 @@ vi.mock('../api/salesProduction', () => ({
 let state: SalesCollectionState;
 const onChange = (patch: Partial<SalesCollectionState>) => { state = { ...state, ...patch }; };
 const catalog: SalesStudioAssetCatalog = { personas: [], scenes: [], actions: [], voices: [], bgms: [] };
-const currentPrompt = { id: 'plan-adapt', title: '商品分镜改编', description: '', prompt: '当前规则', defaultPrompt: '默认规则', version: 'test', customized: true };
-const file = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+const currentPrompt = { id: 'plan-adapt', title: '商品分镜改编', description: '', prompt: '当前规则', defaultPrompt: '默认规则', version: 'test', customized: true, configured: true };
+const file = new File(['video'], 'source.mp4', { type: 'video/mp4' }); const finalPrompt = { ...currentPrompt, id: 'final-video', title: '最终视频生成', prompt: '自定义生成规则\n{{referenceFacts}}\n{{photographyFacts}}\n{{timelineFacts}}\n{{audioFacts}}', version: 'final-v1' };
+const spokenPrompt = { ...currentPrompt, id: 'spoken-copy', title: '口播时长适配', version: 'spoken-v1' };
+const reviewPrompt = { ...currentPrompt, id: 'spoken-review', title: '口播语义验收', version: 'review-v1' };
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => { resolve = done; });
@@ -77,7 +48,14 @@ beforeEach(() => {
   vi.resetAllMocks(); state = emptySalesCollection();
   vi.mocked(listSalesScripts).mockResolvedValue([]);
   vi.mocked(fetchSalesStudioAssets).mockResolvedValue(catalog);
-  vi.mocked(listSalesPrompts).mockResolvedValue([currentPrompt]);
+  vi.mocked(prepareSalesDepthVideoClip).mockImplementation(async ({ endSec }) => ({ url: '/prepared-depth.mp4', startSec: 0, endSec, durationSec: endSec }));
+  vi.mocked(listSalesPrompts).mockResolvedValue([currentPrompt, finalPrompt, { ...finalPrompt, id: 'final-video-depth', version: 'depth-v1' }, spokenPrompt, reviewPrompt]);
+  vi.mocked(adaptSalesScriptPlan).mockImplementation(async (input) => ({ beats: input.beats.map((beat) => ({
+    index: beat.index, subject: beat.subject || '', action: beat.refAction, expression: beat.expression || '', transition: beat.transition || '', spokenLine: '', subtitle: '',
+  })), model: 'text', promptVersion: 'test' }));
+  vi.mocked(adaptSalesSpokenCopy).mockImplementation(async (input) => ({ success: true, beats: input.beats.map((beat) => ({
+    index: beat.index, spokenLine: beat.spokenLine || '', subtitle: beat.subtitle || '',
+  })), model: 'text', promptVersion: spokenPrompt.version, reviewPromptVersion: reviewPrompt.version }));
 });
 afterEach(unmount);
 
@@ -137,43 +115,6 @@ describe('production work survives library refreshes', () => {
   });
 });
 
-describe('voiceover and final mix consistency', () => {
-  async function prepareVoiceover() {
-    const script = normalizeScriptTemplate({ title: '商品展示', durationSec: 5, voiceMode: 'voiceover',
-      shots: [{ start: 0, end: 5, beats: [{ start: 0, end: 5, action: '展示商品' }] }] })!;
-    vi.mocked(listSalesScripts).mockResolvedValue([{ id: 'script', title: '商品展示', videoUrl: '', videoHash: '',
-      status: 'verified', script, model: '', promptVersion: '', version: 1, useCount: 0, updatedAt: '' }]);
-    state = { ...state, selectedScriptId: 'script', productionPlan: { ...state.productionPlan,
-      scriptId: 'script', voiceModeOverride: 'voiceover', generatedVideoUrl: '/raw.mp4',
-      voiceoverAudioUrl: '/old-voice.mp3', mixedVideoUrl: '/old-final.mp4',
-      adaptedBeats: [{ index: 0, subject: '商品', action: '展示商品', spokenLine: '已核对台词', subtitle: '' }],
-    } };
-    Render(); await settle();
-    return Render();
-  }
-
-  it('blocks mixing after narration changes until a new voiceover is ready', async () => {
-    const prod = await prepareVoiceover();
-    prod.updateAdaptedBeat(0, { spokenLine: '修订后的台词' });
-    expect(state.productionPlan).toMatchObject({ voiceoverAudioUrl: '', mixedVideoUrl: '', generatedVideoUrl: '' });
-    Render().patchPlan({ generatedVideoUrl: '/updated-raw.mp4' });
-    await Render().runMixFinal();
-    expect(mixSalesFinalVideo).not.toHaveBeenCalled();
-    expect(Render().error).toContain('请先为当前分镜台词合成配音');
-  });
-
-  it('replaces audio only on success and requires remixing the new voiceover', async () => {
-    const prod = await prepareVoiceover();
-    vi.mocked(synthesizeSalesVoiceover).mockRejectedValueOnce(new Error('渠道暂不可用'));
-    await prod.runSynthesizeVoice();
-    expect(state.productionPlan).toMatchObject({ voiceoverAudioUrl: '/old-voice.mp3', mixedVideoUrl: '/old-final.mp4' });
-    vi.mocked(synthesizeSalesVoiceover).mockResolvedValueOnce({ audioUrl: '/new-voice.mp3', taskId: 'voice-task' });
-    await Render().runSynthesizeVoice();
-    expect(state.productionPlan).toMatchObject({ voiceoverAudioUrl: '/new-voice.mp3', mixedVideoUrl: '', generatedVideoUrl: '/raw.mp4' });
-  });
-});
-
-
 describe('production script and draft consistency', () => {
   async function prepareScript(status: StoredSalesScript['status'] = 'verified', voiceMode: 'none' | 'speech' = 'speech') {
     const script = normalizeScriptTemplate({ durationSec: 5, voiceMode, shots: [{ beats: [{ start: 0, end: 5, subject: '原片模特', action: '展示商品' }] }] })!;
@@ -197,6 +138,47 @@ describe('production script and draft consistency', () => {
     expect(state.productionPlan.adaptedBeats).toHaveLength(1);
   });
 
+  it.each(['手掌贴在当前商品正面', ''])('keeps edited motion and subject %j through reload and subsequent product copy rewrites', async (subject) => {
+    await prepareScript('verified', 'none');
+    state.productName = '当前商品';
+    const source = Render().activeScript!.script.shots[0].beats[0];
+    source.expression = '原脚本微笑'; source.transition = '原脚本收势';
+    await Render().runPlanAdapt('text');
+    Render().updateAdaptedBeat(0, { action: '抬手后停在肩高', expression: '', transition: '手动放松收势', subject });
+    state.productionPlan = parseSalesProductionPlan(JSON.parse(JSON.stringify(state.productionPlan)));
+    state.productName = '更换后的商品';
+    await Render().runPlanAdapt('text');
+    const request = vi.mocked(adaptSalesScriptPlan).mock.lastCall![0];
+    expect(request.beats[0]).toMatchObject({ refAction: '抬手后停在肩高', expression: '', transition: '手动放松收势', subject });
+    expect(JSON.stringify(request)).not.toContain('manualPerformanceFields');
+    expect(state.productionPlan.adaptedBeats[0]).toMatchObject({ action: '抬手后停在肩高', expression: '',
+      transition: '手动放松收势', subject, manualPerformanceFields: ['action', 'expression', 'transition', 'subject'] });
+    expect(source.subject).toBe('原片模特');
+    expect(Render().assembled!.enginePrompt).toContain('动作描述：抬手后停在肩高');
+
+    Render().updateAdaptedBeat(0, { action: '' });
+    await Render().runPlanAdapt('text');
+    expect(vi.mocked(adaptSalesScriptPlan).mock.lastCall![0].beats[0].refAction).toBe('展示商品');
+    expect(state.productionPlan.adaptedBeats[0]).toMatchObject({ action: '展示商品', expression: '',
+      transition: '手动放松收势', subject, manualPerformanceFields: ['expression', 'transition', 'subject'] });
+  });
+
+  it('does not reintroduce hidden source subject and performance after the current action is edited', async () => {
+    await prepareScript('verified', 'none');
+    state.productName = '单层冲锋衣';
+    const source = Render().activeScript!.script.shots[0].beats[0];
+    Object.assign(source, { subject: '内部配件', expression: '低头看内胆', transition: '手指离开内胆' });
+    await Render().runPlanAdapt('text');
+    Render().updateAdaptedBeat(0, { action: '双手轻揉外层面料后自然放松' });
+    state.productionPlan = parseSalesProductionPlan(JSON.parse(JSON.stringify(state.productionPlan)));
+    await Render().runPlanAdapt('text');
+    expect(vi.mocked(adaptSalesScriptPlan).mock.lastCall![0].beats[0]).toMatchObject({
+      refAction: '双手轻揉外层面料后自然放松', subject: '', expression: '', transition: '',
+    });
+    expect(state.productionPlan.adaptedBeats[0]).toMatchObject({ subject: '', expression: '', transition: '', manualPerformanceFields: ['action'] });
+    expect(source).toMatchObject({ subject: '内部配件', expression: '低头看内胆', transition: '手指离开内胆' });
+  });
+
   it('prevents submission of a previously selected script returned to draft review', async () => {
     const prod = await prepareScript('draft');
     await prod.runGenerateVideo();
@@ -211,8 +193,12 @@ describe('production script and draft consistency', () => {
     await Render().runPlanAdapt('text');
     const request = vi.mocked(adaptSalesScriptPlan).mock.calls[0][0];
     expect(request).toMatchObject({ summary: '用户最新概括', buyingPoints: ['用户最新买点；已纠正面料；用户最新表达'] });
-    expect(request.facts).toContain('用户最新口播');
+    expect(request.facts).not.toContain('用户最新口播');
     expect(request.facts).not.toContain('旧口播');
+    expect(adaptSalesSpokenCopy).toHaveBeenCalledWith(expect.objectContaining({ sourceCopy: '用户最新口播', voiceMode: 'speech', duration: 5,
+      beats: [expect.objectContaining({ index: 0, start: 0, end: 5, action: '展示当前商品', purpose: 'showcase', buyingPoint: '', subject: '商品', shotIndex: 0, shotSize: '中景', camera: '', spokenLine: '新台词', subtitle: '', sourceVoiceText: '', sourceLinePattern: '', sourceSubtitle: '' })] }), 'text', expect.any(AbortSignal));
+    expect(state.productionPlan).toMatchObject({ adaptedPromptVersion: 'v3', spokenCopyPromptVersion: 'spoken-v1', spokenReviewPromptVersion: 'review-v1' });
+    expect(state.productionPlan.spokenCopySourceKey).not.toBe('');
     expect(Render().generationSourceError).toBe('');
     state = { ...state, productSummary: { ...state.productSummary!, editedCopy: '再次编辑口播' } };
     expect(Render().generationSourceError).toContain('商品资料已更新');
@@ -241,7 +227,7 @@ describe('production script and draft consistency', () => {
 
 describe('linked script videos in generation requests', () => {
   async function prepareReference(mode: 'none' | 'depth' | 'source' | 'manual', depthVideoUrl = '/linked-depth.mp4') {
-    const script = normalizeScriptTemplate({ durationSec: 5, format: 'product', voiceMode: 'none', shots: [{ beats: [
+    const script = normalizeScriptTemplate({ durationSec: 5, format: 'product', voiceMode: 'none', sourceExclusions: [{ term: '原开衫、原外套', type: 'product' }, { term: '原片模特', type: 'person_appearance' }], shots: [{ beats: [
       { start: 0, end: 2.5, action: '走近商品' }, { start: 2.5, end: 5, action: '展示商品' },
     ] }] })!;
     vi.mocked(listSalesScripts).mockResolvedValue([{ id: 'linked', title: '商品展示', videoUrl: '/original.mp4', depthVideoUrl, videoHash: '',
@@ -257,7 +243,7 @@ describe('linked script videos in generation requests', () => {
   }
 
   it.each([
-    ['none', []], ['depth', ['/linked-depth.mp4']], ['source', []], ['manual', []],
+    ['none', []], ['depth', ['/prepared-depth.mp4']], ['source', []], ['manual', []],
   ] as const)('submits the selected %s reference once alongside product images', async (mode, videos) => {
     const prod = await prepareReference(mode);
     await prod.runGenerateVideo();
@@ -265,8 +251,10 @@ describe('linked script videos in generation requests', () => {
     const request = vi.mocked(submitAndPollSalesVideo).mock.calls[0][0];
     expect(request.images).toEqual(['/product.jpg']);
     expect(request.videos).toEqual(videos);
-    if (videos.length) expect(request.prompt).toContain('视频1 在 00:02.5 - 00:05 对应片段');
-    else expect(request.prompt).not.toContain('动作参考');
+    if (videos.length) {
+      expect(request.prompt.match(/动作参考：@视频1/g)).toHaveLength(1);
+      expect(request.prompt).toContain('源片对应时间 00:02.5 - 00:05');
+    } else expect(request.prompt).not.toContain('动作参考：');
   });
 
   it('blocks missing linked depth instead of silently submitting an image-only request', async () => {
@@ -288,7 +276,7 @@ describe('linked script videos in generation requests', () => {
     const prod = await prepareReference(mode);
     await prod.runPlanAdapt('text-model');
     const request = vi.mocked(adaptSalesScriptPlan).mock.calls[0][0];
-    expect(request.imitationMode).toBe(mode === 'depth' ? 'depth_imitation' : 'script_only');
+    expect(request).toMatchObject({ imitationMode: mode === 'depth' ? 'depth_imitation' : 'script_only', sourceExclusions: [{ term: '原开衫', type: 'product' }, { term: '原外套', type: 'product' }, { term: '原片模特', type: 'person_appearance' }] });
     if (mode === 'depth') expect(request.beats[1].actionReference).toBe('此脚本关联深度视频的 2.5—5 秒动作');
     else expect(request.beats.every((beat) => !beat.actionReference)).toBe(true);
   });
@@ -308,6 +296,7 @@ describe('linked script videos in generation requests', () => {
 
 describe('optional selling points after product facts change', () => {
   async function prepareStaleSummary() {
+    vi.mocked(fetchSalesStudioAssets).mockResolvedValue({ ...catalog, voices: [{ id: 'voice', name: '当前人声', voiceId: 'voice', ttsVoice: 'voice', gender: 'female', tags: [], sampleAudioUrl: '/voice.mp3', promptText: '', source: 'voice_library' }] });
     const script = normalizeScriptTemplate({ durationSec: 5, format: 'product',
       visualSpec: { oneTake: true, styleSummary: '手机实拍，保留皮肤与织物细节', lighting: '窗边侧光', cameraFeel: '固定机位', pacing: 'slow' },
       shots: [{ beats: [{ start: 0, end: 5, action: '展示商品', subject: '手握商品边缘', scene: '侧光窗边', transition: '松手停留后回落', expression: '视线跟随手部' }] }] })!;
@@ -316,9 +305,9 @@ describe('optional selling points after product facts change', () => {
     state = { ...state, productName: '衬衫', props: { 成分: '棉' }, selectedScriptId: 'script',
       imageCatalog: [{ index: 0, url: '/product.jpg', role: 'main' }],
       colorSelection: { colorLabel: '', confirmedImageUrls: ['/product.jpg'], excludedImageUrls: [] },
-      productionPlan: { ...state.productionPlan, scriptId: 'script',
-        adaptedBeats: [{ index: 0, subject: '棉衬衫', action: '展示棉衬衫', spokenLine: '棉面料', subtitle: '棉' }] } };
-    state.productSummary = { inputKey: salesSummarySource(state).inputKey, generatedAt: new Date().toISOString(), model: 'vision', skillVersion: 'test',
+      productionPlan: { ...state.productionPlan, scriptId: 'script', voiceId: 'voice',
+        adaptedBeats: [{ index: 0, subject: '棉衬衫', action: '展示棉衬衫', spokenLine: '棉面料', subtitle: '棉', manualPerformanceFields: [] }] } };
+    state.productSummary = { inputKey: 'legacy-image-summary-source', generatedAt: new Date().toISOString(), model: 'vision', skillVersion: 'test',
       result: { summary: '旧棉面料卖点', points: [], copy: '', copyPointIndexes: [], conflicts: [], questions: [], cautions: [] } };
     state.props = { 成分: '亚麻' };
     vi.mocked(adaptSalesScriptPlan).mockResolvedValue({ beats: [{ index: 0, subject: '亚麻衬衫', action: '展示亚麻衬衫', expression: '视线跟随当前商品', transition: '松手停留后回落', spokenLine: '亚麻面料', subtitle: '亚麻' }], model: 'text', promptVersion: 'test' });
@@ -368,7 +357,7 @@ describe('optional selling points after product facts change', () => {
 });
 
 describe('chosen and uploaded persona identity', () => {
-  const personas = ['first', 'chosen'].map((id) => ({ id, name: `人物${id}`, description: '', tags: '', avatarUrl: `/${id}-face.jpg`,
+  const personas = ['first', 'chosen'].map((id) => ({ id, name: `人物${id}`, description: '', tags: id === 'chosen' ? '清冷、自信' : '亲和', avatarUrl: `/${id}-face.jpg`,
     fullBodyUrl: `/${id}-body.jpg`, faceUrl: `/${id}-face.jpg`, sourceImages: [], hasReferenceImage: true, source: 'persona_library' }));
   async function preparePersona() {
     const script = normalizeScriptTemplate({ title: '人物展示', durationSec: 5, voiceMode: 'none', shots: [{ beats: [{ start: 0, end: 5, action: '展示商品' }] }] })!;
@@ -420,13 +409,23 @@ describe('chosen and uploaded persona identity', () => {
     expect(Render(1).assembled!.references.some((ref) => ref.kind.startsWith('persona'))).toBe(false);
   });
 
-  it('passes a bound optional presenter into adaptation instead of asking the model to omit them', async () => {
+  it('passes an optional presenter and separate temperament/performance facts through rewriting and final assembly', async () => {
     await preparePersona();
     const scripts = await vi.mocked(listSalesScripts).mock.results[0].value as StoredSalesScript[];
     scripts[0].script.assetSlots.persona.required = false;
+    scripts[0].script.assetSlots.persona.styleTags = ['明快、有表现力'];
     Render(1); await settle();
-    vi.mocked(adaptSalesScriptPlan).mockResolvedValue({ beats: [], model: 'test', promptVersion: 'test' });
+    const personaVisualProfile = { imageUrl: '/chosen-body.jpg', presence: 'silent_model' as const, temperament: '眉眼舒展，清爽',
+      gaze: '目光聚焦镜头', expression: '嘴角轻提', posture: '肩线自然', limitations: '静态图片' };
+    vi.mocked(adaptSalesScriptPlan).mockResolvedValue({ beats: [], model: 'test', promptVersion: 'test', personaVisualProfile });
     await Render(1).runPlanAdapt('text-model');
-    expect(vi.mocked(adaptSalesScriptPlan).mock.calls[0][0].personaSummary).toContain('人物chosen');
+    const { personaSummary } = vi.mocked(adaptSalesScriptPlan).mock.calls[0][0];
+    for (const fact of ['人物风格标签：清冷、自信', '原分镜人物风格（仅表演参考）：明快、有表现力']) {
+      expect(personaSummary).toContain(fact);
+      expect(Render(1).assembled!.enginePrompt).toContain(fact);
+    }
+    expect(vi.mocked(adaptSalesScriptPlan).mock.calls[0][0]).toMatchObject({ personaReferenceImageUrl: '/chosen-body.jpg', personaPresence: 'silent_model' });
+    expect(state.productionPlan.personaVisualProfile).toEqual(personaVisualProfile);
+    expect(Render(1).assembled!.enginePrompt).toContain('原图视线：目光聚焦镜头');
   });
 });

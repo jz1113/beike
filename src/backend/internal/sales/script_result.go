@@ -70,6 +70,7 @@ func parseScriptCompletion(data map[string]any) (map[string]any, error) {
 		return nil, errors.New("模型返回未完成")
 	}
 	object := gateway.DecodeObject(text)
+	groupFlatShotActions(object)
 	if _, err := validateScriptObject(object); err != nil {
 		return nil, err
 	}
@@ -89,8 +90,11 @@ func validateScriptTimeline(script scriptCheck) error {
 		if shot.Start < 0 || shot.End <= shot.Start || shot.End > limit || shot.Start < previous-0.25 {
 			return fmt.Errorf("镜头 %d 的时间无效或与前一镜重叠", i+1)
 		}
-		if len(shot.Beats) == 0 || len(shot.Beats) > 12 {
-			return fmt.Errorf("镜头 %d 缺少动作段或动作段过多", i+1)
+		if len(shot.Beats) == 0 {
+			return fmt.Errorf("镜头 %d 未返回可用动作段（beats），请补充该镜头的动作和起止秒数", i+1)
+		}
+		if len(shot.Beats) > 24 {
+			return fmt.Errorf("镜头 %d 返回了 %d 个动作段，单镜最多支持 24 段", i+1, len(shot.Beats))
 		}
 		beatPrevious := shot.Start
 		for j, beat := range shot.Beats {

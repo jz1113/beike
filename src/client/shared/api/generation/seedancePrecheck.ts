@@ -99,6 +99,7 @@ export async function runSeedancePrecheck(
             ...storageConfigHeaders(),
           },
           body: JSON.stringify({
+            model,
             items: pending,
             customBaseUrl: gatewayHeaders['x-custom-base-url'],
             storageConfig,

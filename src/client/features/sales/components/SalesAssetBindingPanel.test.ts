@@ -81,7 +81,7 @@ describe('production people, scene and sound settings', () => {
     const controls = html.match(/<(?:button\b[^>]*|input\b[^>]*type="file"[^>]*)>/g) || [];
     expect(controls.length).toBeGreaterThan(0);
     expect(html).toContain('清除自定义场景图');
-    expect(html).toContain('去添加音色');
+    expect(html).toContain('浏览声音素材');
     expect(controls.every((control) => /\sdisabled(?:=|\s|>)/.test(control))).toBe(true);
   });
 });

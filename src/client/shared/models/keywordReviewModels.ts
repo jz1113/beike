@@ -186,8 +186,9 @@ export function resolveKeywordReviewRoute(option: KeywordReviewModelOption): Key
   if (option.source === 'modality') {
     const read = readEffectiveModalityModels('chat');
     const item = read.models.find((candidate) => candidate.id === option.routeId);
-    if (item?.channelId && !readStoredApiProviders().some((provider) => provider.id === item.channelId)) {
-      throw new Error('所选模型的渠道已移除，请重新选择');
+    if (!item) throw new Error('所选模型已移除，请重新选择');
+    if (item.channelId && !readStoredApiProviders().some((provider) => provider.id === item.channelId && provider.enabled !== false)) {
+      throw new Error('所选模型的渠道已停用或移除，请重新选择');
     }
     const own = modalityOwnCredentials(item);
     const route = resolveModalityModelRoute('chat', option.routeId);

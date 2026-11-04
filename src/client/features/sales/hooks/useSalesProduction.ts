@@ -1,26 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  assembleSalesVideoPrompt, bindBeatProductImages, describeBoundImageLabel, eligibleSalesImages,
+  assembleSalesVideoPrompt, bindBeatProductImages, eligibleSalesImages,
   recommendBgms, recommendPersonas, recommendScenes, recommendVoices,
   type SalesActionCandidate, type SalesAdaptedBeat, type SalesBeatVoiceMode,
   type SalesImitationMode, type SalesPresentationMode,
+  type AssembleSalesPromptInput,
 } from '@shared/domain/sales';
 import {
-  adaptSalesScriptPlan, mixSalesFinalVideo,
+  mixSalesFinalVideo,
   submitAndPollSalesVideo, synthesizeSalesVoiceover, uploadSalesCustomAsset,
   type SalesStudioAssetCatalog,
 } from '../api/salesProduction';
-import { ensureSalesAdaptationPromptCurrent } from '../api/salesProductionPrompt';
+import { prepareSalesProductionVideos } from '../api/salesDepthReference';
+import { ensureSalesProductionPromptsCurrent } from '../api/salesProductionPrompt';
+import { reviewSalesProductionSpeech } from '../api/salesProductionReview';
 import type { SalesCollectionState } from '../model/salesCollectionDraft';
 import { planForSelectedScript, type SalesProductionPlanState } from '../model/salesProductionDraft';
-import { applyMaterialAction, buildSalesBeatActionReferences, reconcileSalesMaterialBindings } from '../model/salesMaterial';
-import { hasCustomSalesPersona, salesPersonaDescription, selectedSalesPersona, uploadSalesPersonaReference } from '../model/salesPersonaBinding';
+import { applyMaterialAction, reconcileSalesMaterialBindings } from '../model/salesMaterial';
+import { hasCustomSalesPersona, selectedSalesPersona, uploadSalesPersonaReference } from '../model/salesPersonaBinding';
 import { salesPlanAdaptationSourceKey, salesPlanSource, salesProductionSourceError, salesProductionSummaryIsStale } from '../model/salesPlanSource';
 import { resolveSalesVideoSettings } from '../model/salesVideoSettings';
+import { resolveSalesProductionTimeline } from '../model/salesProductionTimeline';
+import { salesSpokenCopySourceKey } from '../model/salesSpokenCopySource';
+import { updateSalesManualPerformance } from '../model/salesPerformanceEdits';
 import { patchSalesProductionPlan, salesProductionOutputKeys, staleSalesProductionOutputs } from '../model/salesProductionOutputs';
 import { useSalesProductionCatalog } from './useSalesProductionCatalog';
 import { useSalesProductionTask } from './useSalesProductionTask';
 import { useSalesProductionModels } from './useSalesProductionModels';
+import { useSalesPlanAdapt } from './useSalesPlanAdapt';
+import { useSalesVideoRecovery } from './useSalesVideoRecovery';
 
 type ProductionBusy = '' | 'loading' | 'adapt' | 'tts' | 'video' | 'mix' | 'upload';
 
@@ -31,11 +39,12 @@ export function useSalesProduction(
   onOutputProduced?: () => void,
 ) {
   const contextKey = useMemo(() => JSON.stringify([
-    state.collectedProductUrl, state.productName, state.brand, state.category, state.audience, state.sellingPoints, state.props,
+    state.activeProductId, state.collectedProductUrl, state.productName, state.brand, state.category, state.audience, state.sellingPoints, state.props,
     state.ocrImages, state.ocrImageUrls, state.productSummary, state.imageCatalog,
-    state.colorSelection, state.variantMetadata, state.selectedScriptId, state.productionPlan,
+    state.colorSelection, state.variantMetadata, state.selectedScriptId,
+    { ...state.productionPlan, productFaceEdits: undefined, pendingVideoTask: null, spokenReviewPromptVersion: '', spokenReviewSourceKey: '' },
   ]), [state]);
-  const { busy: taskBusy, progressText, error, setError, runTask, cancel } = useSalesProductionTask(contextKey);
+  const { busy: taskBusy, progressText, error, errorPromptId, setError, notice, setNotice, clearNotice, runTask, cancel } = useSalesProductionTask(contextKey);
   const planRef = useRef(state.productionPlan);
   planRef.current = state.productionPlan;
 
@@ -56,10 +65,14 @@ export function useSalesProduction(
   const { scripts, catalog, reloadAssets } = resources;
   const busy: ProductionBusy = taskBusy || (resources.loading ? 'loading' : '');
 
-  const activeScript = useMemo(
+  const sourceScript = useMemo(
     () => scripts.find((item) => item.id === state.selectedScriptId) || null,
     [scripts, state.selectedScriptId],
   );
+  const durationPlanning = useMemo(() => sourceScript ? resolveSalesProductionTimeline(state.productionPlan, sourceScript.script) : null,
+    [sourceScript, state.productionPlan]);
+  const activeScript = useMemo(() => sourceScript && durationPlanning ? { ...sourceScript, script: durationPlanning.script } : null,
+    [durationPlanning, sourceScript]);
 
   const selectedImages = useMemo(
     () => eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata),
@@ -80,10 +93,9 @@ export function useSalesProduction(
     [catalog.personas, state.productionPlan],
   );
   const selectedScene = useMemo(
-    () => catalog.scenes.find((s) => s.id === state.productionPlan.sceneId) || (state.productionPlan.sceneId ? null : rankedScenes[0]?.item || null),
-    [catalog.scenes, rankedScenes, state.productionPlan.sceneId],
+    () => catalog.scenes.find((s) => s.id === state.productionPlan.sceneId) || null,
+    [catalog.scenes, state.productionPlan.sceneId],
   );
-  const generationSourceError = useMemo(() => salesProductionSourceError(state, activeScript?.script.assetSlots.persona.presence !== 'none', activeScript?.script, selectedScene), [activeScript, selectedScene, state]);
 
   const rankedVoices = useMemo(
     () => (activeScript ? recommendVoices({ ...activeScript.script, voiceMode: state.productionPlan.presentationMode === 'clean_visual' ? 'none' : state.productionPlan.voiceModeOverride || activeScript.script.voiceMode }, selectedPersona, catalog.voices) : []),
@@ -95,8 +107,8 @@ export function useSalesProduction(
   );
 
   const selectedVoice = useMemo(
-    () => catalog.voices.find((v) => v.id === state.productionPlan.voiceId) || rankedVoices[0]?.item || null,
-    [catalog.voices, rankedVoices, state.productionPlan.voiceId],
+    () => catalog.voices.find((v) => v.id === state.productionPlan.voiceId) || null,
+    [catalog.voices, state.productionPlan.voiceId],
   );
   const selectedBgm = useMemo(
     () => catalog.bgms.find((b) => b.id === state.productionPlan.bgmId) || rankedBgms[0]?.item || null,
@@ -113,7 +125,7 @@ export function useSalesProduction(
       scriptId: activeScript.id, personaId: topPersona?.id || '', customPersonaBodyUrl: '', customPersonaFaceUrl: '',
       sceneId: topScene?.id || '', voiceId: topVoices[0]?.item.id || '', bgmId: topBgm?.id || '',
       voiceModeOverride: planRef.current.presentationMode === 'clean_visual' ? 'none' : '',
-      ...(resetAdapted ? { adaptedBeats: [], adaptedSourceKey: '', adaptedPromptVersion: '', beatImageOverrides: {}, beatActionIds: {}, customPrompt: '' } : {}),
+      ...(resetAdapted ? { adaptedBeats: [], adaptedSourceKey: '', adaptedPromptVersion: '', spokenCopySourceKey: '', spokenCopyPromptVersion: '', spokenReviewPromptVersion: '', spokenReviewSourceKey: '', beatImageOverrides: {}, beatActionIds: {}, customPrompt: '' } : {}),
     });
   }, [activeScript, catalog.voices, patchPlan, rankedBgms, rankedPersonas, rankedScenes]);
 
@@ -124,51 +136,58 @@ export function useSalesProduction(
     patchPlan({
       ...planForSelectedScript(existing, activeScript.id),
       personaId: existing.personaId || (hasCustomSalesPersona(existing) ? '' : matchedPersonaId),
-      sceneId: existing.sceneId || rankedScenes[0]?.item.id || '',
-      voiceId: existing.voiceId || rankedVoices[0]?.item.id || '',
       bgmId: existing.bgmId || rankedBgms[0]?.item.id || '',
     });
-  }, [activeScript, patchPlan, rankedBgms, rankedPersonas, rankedScenes, rankedVoices, state.productionPlan]);
+  }, [activeScript, patchPlan, rankedBgms, rankedPersonas, state.productionPlan]);
 
   const beatBindings = useMemo(
     () => (activeScript ? bindBeatProductImages(activeScript.script, selectedImages, state.productionPlan.beatImageOverrides) : []),
     [activeScript, selectedImages, state.productionPlan.beatImageOverrides],
   );
 
-  const actionReferences = useMemo(
-    () => buildSalesBeatActionReferences(state.productionPlan.beatActionIds, catalog.actions),
-    [catalog.actions, state.productionPlan.beatActionIds],
-  );
+  const imitationMode = state.productionPlan.imitationMode === 'depth_imitation' && state.productionPlan.scriptVideoReference === 'depth' ? 'depth_imitation' : 'script_only';
+  const finalVideoPromptId = imitationMode === 'depth_imitation' ? 'final-video-depth' : 'final-video';
+  const finalVideoPrompt = resources.finalVideoPrompts.find((prompt) => prompt.id === finalVideoPromptId);
 
   const assembled = useMemo(() => {
     if (!activeScript) return null;
     const points = currentSummary?.points.map((p) => [p.benefit.trim(), p.feature.trim()].filter(Boolean).join(' · ')).filter(Boolean) || [];
-    return assembleSalesVideoPrompt({
+    const input: AssembleSalesPromptInput = {
+      finalVideoTemplate: finalVideoPrompt?.prompt, model: state.productionPlan.videoModel,
       script: activeScript.script,
-      aspectRatio: resolveSalesVideoSettings(state.productionPlan, activeScript.script, []).aspectRatio,
       productName: state.productName,
+      productFacts: salesPlanSource(state).facts,
       productSummary: currentSummary?.summary,
       buyingPoints: points,
       selectedImages,
       beatBindings,
       adaptedBeats: state.productionPlan.adaptedBeats,
-      actionReferences,
       scriptVideoReference: state.productionPlan.scriptVideoReference === 'depth' ? {
         kind: 'depth',
         url: activeScript.depthVideoUrl || '',
       } : undefined,
       persona: selectedPersona,
+      personaVisualProfile: state.productionPlan.personaVisualProfile,
       customPersonaBodyUrl: state.productionPlan.customPersonaBodyUrl,
       customPersonaFaceUrl: state.productionPlan.customPersonaFaceUrl,
       scene: selectedScene,
       customSceneImageUrl: state.productionPlan.customSceneImageUrl,
       voiceModeOverride: state.productionPlan.voiceModeOverride || undefined,
+      voice: selectedVoice,
+      voiceAudioUrl: state.productionPlan.voiceoverAudioUrl,
+      videoVoiceId: state.productionPlan.videoVoiceId,
       presentationMode: state.productionPlan.presentationMode,
-      imitationMode: state.productionPlan.imitationMode === 'depth_imitation' && state.productionPlan.scriptVideoReference === 'depth' ? 'depth_imitation' : 'script_only',
-    });
-  }, [actionReferences, activeScript, beatBindings, currentSummary, selectedImages, selectedPersona, selectedScene, state.productName, state.productionPlan]);
+      imitationMode, truncatedEnding: durationPlanning?.truncatedEnding,
+    };
+    const facts = assembleSalesVideoPrompt(input);
+    const settings = resolveSalesVideoSettings(state.productionPlan, activeScript.script, facts.references, facts.audios || []);
+    return assembleSalesVideoPrompt({ ...input, model: settings.model, aspectRatio: settings.aspectRatio, refMode: settings.refMode, durationSec: settings.durationSec, resolution: settings.resolution });
+  }, [activeScript, beatBindings, currentSummary, durationPlanning, finalVideoPrompt, imitationMode, selectedImages, selectedPersona, selectedScene, selectedVoice, state]);
 
-  const outputKeys = assembled ? salesProductionOutputKeys(assembled, state.productionPlan, selectedImages, selectedVoice, selectedBgm, salesPlanAdaptationSourceKey(state, activeScript?.script, selectedScene)) : null;
+  const generationSourceError = useMemo(() => durationPlanning?.error || salesProductionSourceError(state, activeScript?.script.assetSlots.persona.presence !== 'none', activeScript?.script, selectedScene,
+    activeScript && assembled ? { voiceMode: assembled.effectiveVoiceMode, durationSec: resolveSalesVideoSettings(state.productionPlan, activeScript.script, assembled.references).durationSec } : undefined), [activeScript, assembled, durationPlanning, selectedScene, state]);
+
+  const outputKeys = assembled && !assembled.templateError ? salesProductionOutputKeys(assembled, state.productionPlan, selectedImages, selectedVoice, selectedBgm, salesPlanAdaptationSourceKey(state, activeScript?.script, selectedScene), activeScript ? salesSpokenCopySourceKey(activeScript.script, assembled.effectiveVoiceMode, activeScript.script.durationSec) : '') : null;
   const previousOutputKeys = useRef(outputKeys);
   useEffect(() => {
     if (!outputKeys) return;
@@ -179,66 +198,41 @@ export function useSalesProduction(
     if (Object.keys(stale).length) patchPlan(stale);
   }, [outputKeys, patchPlan]);
 
-  const runPlanAdapt = useCallback(async (modelSelection: string) => {
-    if (!activeScript || !assembled) return;
-    if (activeScript.status !== 'verified') { setError('当前参考脚本尚未确认入库，请先到脚本库复核并确认后再制作'); return; }
-    if ((state.productionPlan.sceneId || state.productionPlan.customSceneImageUrl) && !(state.productionPlan.customSceneImageUrl.trim() || selectedScene?.coverUrl.trim())) { setError('所选场景的参考图不可用，请重新选择场景或上传场景主图后改编；原分镜已保留。'); return; }
-    const summaryRes = salesProductionSummaryIsStale(state) ? undefined : state.productSummary?.result;
-    const buyingPoints = summaryRes?.points.map((p) => [p.benefit.trim(), p.feature.trim(), p.expression.trim()].filter(Boolean).join('；')).filter(Boolean) || [];
-    const { facts, error: sourceError } = salesPlanSource(state);
-    if (sourceError) { setError(sourceError); return; }
-    if (!state.productName.trim() && !buyingPoints.length && !facts.trim()) {
-      setError('请先采集商品资料或收录图片文字，再优化分镜；卖点提炼可跳过');
-      return;
+  const { rememberVideoTask } = useSalesVideoRecovery({
+    plan: state.productionPlan, sourceKey: outputKeys?.video, ready: !resources.loading,
+    busy: taskBusy, patchPlan, runTask,
+    onRecovered: () => {
+      if (assembled?.effectiveVoiceMode !== 'voiceover' && !selectedBgm && !planRef.current.customBgmUrl) onOutputProduced?.();
+    },
+  });
+
+  const runPlanAdapt = useSalesPlanAdapt({
+    activeScript, assembled, beatBindings, durationError: durationPlanning?.error, truncatedEnding: durationPlanning?.truncatedEnding,
+    state, selectedPersona, selectedScene, patchPlan, runTask, setError,
+  });
+
+  const prepareDelivery = useCallback(async (modelSelection: string) => {
+    if (busy) return false;
+    if (!activeScript || !assembled) return true;
+    if (!modelSelection) { setError(''); setNotice('未配置改写模型，本次使用手动分镜。'); return true; }
+    const plan = planRef.current;
+    // Opening delivery must never replace an existing automatic or manual draft.
+    // Changed sources still block generation until the user explicitly adapts them.
+    if (plan.adaptedBeats.length) {
+      setError('');
+      setNotice('');
+      return true;
     }
-    const beatsInput: Parameters<typeof adaptSalesScriptPlan>[0]['beats'] = [];
-    let idx = 0;
-    activeScript.script.shots.forEach((shot, shotIndex) => {
-      shot.beats.forEach((beat) => {
-        const binding = beatBindings[idx];
-        beatsInput.push({
-          index: idx, shotIndex, start: beat.start, end: beat.end,
-          purpose: beat.purpose, shotSize: beat.shotSize, camera: beat.camera,
-          refAction: beat.actionTemplate || beat.action, subject: beat.subject,
-          scene: beat.scene, transition: beat.transition, expression: beat.expression,
-          requiredView: beat.requiredView, assignedView: binding?.assignedView || 'untagged',
-          imageLabel: binding ? describeBoundImageLabel(binding) : '主商品图',
-          buyingPoint: buyingPoints[idx % Math.max(1, buyingPoints.length)] || summaryRes?.summary || state.productName,
-          ...(assembled.imitationMode === 'depth_imitation' && activeScript.depthVideoUrl
-            ? { actionReference: `此脚本关联深度视频的 ${beat.start}—${beat.end} 秒动作` }
-            : actionReferences[idx]?.mediaType === 'image' ? { actionReference: actionReferences[idx].label } : {}),
-        });
-        idx += 1;
-      });
-    });
+    return runPlanAdapt(modelSelection);
+  }, [activeScript, assembled, busy, runPlanAdapt, setError, setNotice]);
 
-    const sourceExclusions = activeScript.script.sourceExclusions.flatMap((item) =>
-      item.term.split(/[、，,/；;\s]+/).map((s) => s.trim()).filter((s) => s.length >= 2),
-    );
-
-    const res = await runTask('adapt', '正在结合人物、场景、商品与深度动作优化适配分镜脚本…', (signal) =>
-      adaptSalesScriptPlan({
-        productName: state.productName,
-        brand: state.brand,
-        category: state.category,
-        summary: summaryRes?.summary || '',
-        facts,
-        buyingPoints,
-        cautions: summaryRes?.cautions || [],
-        scriptTitle: activeScript.title,
-        oneTake: activeScript.script.visualSpec.oneTake,
-        visualSpec: activeScript.script.visualSpec,
-        voiceMode: assembled.effectiveVoiceMode,
-        presentationMode: state.productionPlan.presentationMode,
-        imitationMode: assembled.imitationMode,
-        personaSummary: activeScript.script.assetSlots.persona.presence !== 'none' ? salesPersonaDescription(state.productionPlan, selectedPersona) : '按脚本限定的主体范围展示，不增加完整人物出镜',
-        sceneSummary: state.productionPlan.customSceneImageUrl ? '空间布局以用户上传的实景参考图为准，摄影画风按 visualSpec' : selectedScene ? `${selectedScene.title}（${selectedScene.description}；资产光线：${selectedScene.lighting}，仅在 visualSpec 未记录光线时参考）` : '按参考脚本的空间关系安排拍摄环境',
-        sourceExclusions,
-        beats: beatsInput,
-      }, modelSelection, signal),
-    );
-    if (res) patchPlan({ adaptedBeats: res.beats, adaptedSourceKey: salesPlanAdaptationSourceKey(state, activeScript.script, selectedScene), adaptedPromptVersion: res.promptVersion, customPrompt: '' });
-  }, [actionReferences, activeScript, assembled, beatBindings, patchPlan, runTask, selectedPersona, selectedScene, setError, state]);
+  const checkDeliveryScript = useCallback(() => {
+    if (!activeScript) return true;
+    if (assembled?.enginePrompt.trim() && !assembled.templateError) return true;
+    setError(assembled?.templateError || '成片脚本为空，请核对分镜和最终视频生成规则。',
+      finalVideoPrompt?.prompt.trim() ? '' : finalVideoPromptId);
+    return false;
+  }, [activeScript, assembled, finalVideoPrompt, finalVideoPromptId, setError]);
 
   const updateAdaptedBeat = useCallback((index: number, patch: Partial<SalesAdaptedBeat>) => {
     if (!activeScript) return;
@@ -246,7 +240,7 @@ export function useSalesProduction(
     if (!Number.isInteger(index) || !beats[index]) return;
     const current = new Map(planRef.current.adaptedBeats.map((beat) => [beat.index, beat]));
     const existing = current.get(index) || { index, subject: '', action: '', spokenLine: '', subtitle: '' };
-    current.set(index, { ...existing, ...patch, index });
+    current.set(index, updateSalesManualPerformance(planRef.current, existing, { ...patch, index }));
     patchPlan({ adaptedBeats: [...current.values()].sort((a, b) => a.index - b.index), customPrompt: '' });
   }, [activeScript, patchPlan]);
 
@@ -274,34 +268,58 @@ export function useSalesProduction(
     patchPlan({ imitationMode: mode, scriptVideoReference: mode === 'depth_imitation' ? 'depth' : 'none', customPrompt: '' });
   }, [patchPlan]);
 
-  const runSynthesizeVoice = useCallback(async () => {
-    if (!assembled?.narrationText.trim()) {
+  const runSynthesizeVoice = useCallback(async (modelSelection = state.summaryModel) => {
+    if (!assembled || assembled.effectiveVoiceMode === 'none') return;
+    if (assembled.effectiveVoiceMode === 'voiceover' && (generationSourceError || assembled.templateError)) {
+      setError(generationSourceError || assembled.templateError); return;
+    }
+    if (assembled.effectiveVoiceMode === 'voiceover' && !assembled.narrationText.trim()) {
       setError('请先生成或填写分镜台词，再合成配音');
       return;
     }
-    const voiceCode = selectedVoice?.ttsVoice || selectedVoice?.voiceId || 'zh-female-commercial';
-    const res = await runTask('tts', '正在使用音色库合成旁白配音…', (signal) =>
-      synthesizeSalesVoiceover({
-        text: assembled.narrationText,
-        voice: voiceCode,
-        model: planRef.current.voiceModel,
-      }, signal),
-    );
-    if (res) patchPlan({ voiceoverAudioUrl: res.audioUrl });
-  }, [assembled, patchPlan, runTask, selectedVoice, setError]);
+    if (!selectedVoice) { setError('请先在声音设置中选择有效的人声，再合成音频。'); return; }
+    if (assembled.effectiveVoiceMode === 'speech' && selectedVoice.sampleAudioUrl.trim()) { setError('所选人声已有声音样本，可直接作为口播参考，无需另行合成。'); return; }
+    const voiceCode = selectedVoice.ttsVoice.trim() || selectedVoice.voiceId.trim();
+    if (!voiceCode) { setError('所选人声没有合成音色标识，请使用已有声音样本或先在声音库配置合成音色。'); return; }
+    const res = await runTask('tts', assembled.effectiveVoiceMode === 'speech' ? '正在合成短音色参考…' : '正在验收口播并合成旁白…', async (signal, onProgress) => {
+      const review = assembled.effectiveVoiceMode === 'voiceover' && activeScript
+        ? await reviewSalesProductionSpeech(state, activeScript.script, beatBindings, assembled.effectiveVoiceMode,
+          resolveSalesVideoSettings(planRef.current, activeScript.script, assembled.references).durationSec, modelSelection, signal, onProgress, durationPlanning?.truncatedEnding)
+        : {};
+      signal.throwIfAborted();
+      patchPlan(review);
+      const audio = await synthesizeSalesVoiceover({
+        text: assembled.effectiveVoiceMode === 'speech' ? '你好，这是一段人声音色参考，请保持自然清晰的说话方式。' : assembled.narrationText,
+        voice: voiceCode, model: planRef.current.voiceModel,
+      }, signal);
+      return { ...audio, review };
+    });
+    if (res) patchPlan({ ...res.review, voiceoverAudioUrl: res.audioUrl });
+  }, [activeScript, assembled, beatBindings, durationPlanning, generationSourceError, patchPlan, runTask, selectedVoice, setError, state]);
 
-  const runGenerateVideo = useCallback(async () => {
+  const runGenerateVideo = useCallback(async (modelSelection = state.summaryModel) => {
     if (!activeScript || !assembled) return;
     if (activeScript.status !== 'verified') { setError('当前参考脚本尚未确认入库，请先到脚本库复核并确认后再制作'); return; }
     if (generationSourceError) { setError(generationSourceError); return; }
     if (!selectedImages.length) { setError('请先选择至少一张当前商品图，再生成视频'); return; }
+    if (assembled.templateError) { setError(assembled.templateError); return; }
+    if (assembled.voiceError) { setError(assembled.voiceError); return; }
     const plan = planRef.current;
-    const videoSettings = resolveSalesVideoSettings(plan, activeScript.script, assembled.references);
+    const videoSettings = resolveSalesVideoSettings(plan, activeScript.script, assembled.references, assembled.audios || []);
     if (videoSettings.validationError) { setError(videoSettings.validationError); return; }
     const res = await runTask('video', '正在核对提示词版本并准备视频任务…', async (signal, onProgress) => {
-      await ensureSalesAdaptationPromptCurrent(plan, signal);
+      const review = await reviewSalesProductionSpeech(state, activeScript.script, beatBindings, assembled.effectiveVoiceMode,
+        videoSettings.durationSec, modelSelection, signal, onProgress, durationPlanning?.truncatedEnding);
       signal.throwIfAborted();
-      return submitAndPollSalesVideo({
+      patchPlan(review);
+      try { await ensureSalesProductionPromptsCurrent({ ...plan, ...review }, finalVideoPrompt?.version || '', signal, assembled.effectiveVoiceMode, finalVideoPromptId); }
+      catch (err) { reloadAssets(); throw err; }
+      signal.throwIfAborted();
+      const videos = await prepareSalesProductionVideos({ imitationMode: assembled.imitationMode, sourceUrl: activeScript.depthVideoUrl,
+        endSec: activeScript.script.durationSec, videos: videoSettings.videos, model: plan.videoModel, durationSec: videoSettings.durationSec }, signal, onProgress);
+      const video = await submitAndPollSalesVideo({
+        jobName: [state.productName, assembled.imitationMode === 'depth_imitation' ? '深度视频版' : '纯分镜版'].filter(Boolean).join(' · '),
+        salesTrace: { scriptId: activeScript.id, scriptVersion: activeScript.version, templateVersion: finalVideoPrompt?.version || '', adaptVersion: plan.adaptedPromptVersion },
         prompt: assembled.enginePrompt,
         model: plan.videoModel,
         durationSec: videoSettings.durationSec,
@@ -309,17 +327,21 @@ export function useSalesProduction(
         refMode: videoSettings.refMode,
         resolution: videoSettings.resolution,
         images: videoSettings.images,
-        videos: videoSettings.videos,
+        videos,
+        audios: assembled.audios || [],
+        voiceIds: assembled.voiceIds,
         generateAudio: assembled.effectiveVoiceMode === 'speech',
-      }, onProgress, signal);
+        contextIrEnabled: plan.videoContextIrEnabled ?? true,
+      }, onProgress, signal, rememberVideoTask);
+      return { ...video, review };
     });
     if (res) {
-      patchPlan({ generatedVideoUrl: res.videoUrl, mixedVideoUrl: '' });
+      patchPlan({ ...res.review, generatedVideoUrl: res.videoUrl, generatedVideoTaskId: res.channelTaskId || res.taskId, mixedVideoUrl: '', pendingVideoTask: null });
       if (assembled.effectiveVoiceMode !== 'voiceover' && !selectedBgm && !planRef.current.customBgmUrl) {
         onOutputProduced?.();
       }
     }
-  }, [activeScript, assembled, generationSourceError, onOutputProduced, patchPlan, runTask, selectedBgm, selectedImages.length, setError]);
+  }, [activeScript, assembled, beatBindings, durationPlanning, finalVideoPrompt, finalVideoPromptId, generationSourceError, onOutputProduced, patchPlan, reloadAssets, rememberVideoTask, runTask, selectedBgm, selectedImages.length, setError, state]);
 
   const runMixFinal = useCallback(async () => {
     const sourceVideo = planRef.current.generatedVideoUrl;
@@ -333,6 +355,7 @@ export function useSalesProduction(
     }
     const res = await runTask('mix', '正在合成配音与背景音乐…', (signal) =>
       mixSalesFinalVideo({
+        jobName: [state.productName, assembled.imitationMode === 'depth_imitation' ? '深度视频版' : '纯分镜版'].filter(Boolean).join(' · '),
         videoUrl: sourceVideo,
         voiceMode: assembled.effectiveVoiceMode,
         voiceoverUrl: assembled.effectiveVoiceMode === 'voiceover' && planRef.current.voiceoverAudioUrl ? planRef.current.voiceoverAudioUrl : undefined,
@@ -344,7 +367,7 @@ export function useSalesProduction(
       patchPlan({ mixedVideoUrl: res.videoUrl });
       onOutputProduced?.();
     }
-  }, [assembled, onOutputProduced, patchPlan, runTask, selectedBgm, setError]);
+  }, [assembled, onOutputProduced, patchPlan, runTask, selectedBgm, setError, state.productName]);
 
   const uploadCustomSlot = useCallback(async (
     target: 'personaBody' | 'personaFace' | 'scene' | 'bgm' | 'rawVideo',
@@ -379,14 +402,14 @@ export function useSalesProduction(
   }, [patchPlan]);
 
   return {
-    scripts, catalog, activeScript, selectedImages, beatBindings, assembled,
+    scripts, catalog, sourceScript, activeScript, durationPlanning, selectedImages, beatBindings, assembled,
     rankedPersonas, rankedScenes, rankedVoices, rankedBgms,
     selectedPersona, selectedScene, selectedVoice, selectedBgm,
     videoModels, voiceModels, generationSourceError,
-    busy, progressText, error: error || resources.error, clearError: () => { setError(''); resources.clearError(); },
-    cancel,
+    busy, progressText, error: error || resources.error, errorPromptId, clearError: () => { setError(''); resources.clearError(); },
+    cancel, notice, clearNotice,
     reloadAssets, patchPlan, applySmartDefaults, selectPersona, setVoiceMode,
     setPresentationMode, setImitationMode, bindBeatAction,
-    runPlanAdapt, updateAdaptedBeat, runSynthesizeVoice, runGenerateVideo, runMixFinal, uploadCustomSlot,
+    prepareDelivery, checkDeliveryScript, runPlanAdapt, updateAdaptedBeat, runSynthesizeVoice, runGenerateVideo, runMixFinal, uploadCustomSlot,
   };
 }

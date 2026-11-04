@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { eligibleSalesImages, type SalesColorSelection } from '@shared/domain/sales';
 import { salesSummaryInputSchema, salesSummaryResponseSchema, salesSummaryResultSchema, type SalesSummaryInput, type SalesSummaryResult } from '@shared/contracts/salesSummary';
 import type { CollectedSalesProduct } from './productLink';
 import type { SalesOCRState } from './salesOCR';
@@ -27,25 +26,27 @@ export function parseSavedSalesSummary(value: unknown): SavedSalesSummary | unde
 }
 
 /** Use the current queue's latest edits; historical notes stay local. */
-type SummarySource = Pick<CollectedSalesProduct, 'productName' | 'brand' | 'sellingPoints' | 'props' | 'imageCatalog' | 'variantMetadata'> & Pick<SalesOCRState, 'ocrImages' | 'ocrImageUrls'> & { colorSelection: SalesColorSelection };
-export function salesSummarySource(state: SummarySource): { input: SalesSummaryInput; inputKey: string; error: string; referenceCount: number; textCount: number } {
-  const references = eligibleSalesImages(state.imageCatalog, state.colorSelection, state.variantMetadata);
+type SummarySource = Partial<Pick<CollectedSalesProduct, 'productName' | 'brand' | 'props' | 'sellingPoints'>> & Pick<CollectedSalesProduct, 'imageCatalog'> & Pick<SalesOCRState, 'ocrImages' | 'ocrImageUrls'>;
+export function salesSummarySource(state: SummarySource): { input: SalesSummaryInput; inputKey: string; error: string; textCount: number } {
   const queued = state.imageCatalog.filter((image) => state.ocrImageUrls.includes(image.url));
-  const textImages = queued.flatMap((image) => {
+  const textSources = queued.flatMap((image) => {
     const entry = state.ocrImages.find((item) => item.imageUrl === image.url);
-    return !image.unavailable && entry?.editedText.trim()
-      ? [{ index: image.index, url: image.url, text: entry.editedText.trim() }] : [];
+    return entry?.editedText.trim()
+      ? [{ index: image.index, text: entry.editedText.trim() }] : [];
   });
-  const input: SalesSummaryInput = {
-    productName: state.productName.trim(), brand: state.brand.trim(),
-    facts: [state.sellingPoints.trim(), ...Object.entries(state.props).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}：${value}`)].filter(Boolean).join('\n'),
-    referenceImages: references.map(({ index, url }) => ({ index, url })), textImages,
-  };
+  const productFacts = [state.productName?.trim(), state.brand?.trim() && `品牌：${state.brand.trim()}`,
+    ...Object.entries(state.props || {}).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}：${value}`), state.sellingPoints?.trim()].filter(Boolean).join('\n');
+  const input: SalesSummaryInput = { textSources, ...(productFacts ? {productFacts} : {}) };
   let error = '';
-  if (!textImages.length && !state.sellingPoints.trim()) error = '请先识别文字，或补充商品文字后提炼卖点。';
-  else if (new Set([...input.referenceImages, ...textImages].map((image) => image.url)).size > 16) error = '单次最多使用 16 张不同图片，请减少选图。';
-  else if (!salesSummaryInputSchema.safeParse(input).success || textImages.reduce((sum, image) => sum + image.text.length, 0) > 60_000) error = '商品资料过长，请减少文字图片或精简内容后重试。';
-  return { input, inputKey: JSON.stringify({ rulesVersion: 3, input }), error, referenceCount: references.length, textCount: textImages.length };
+  if (!textSources.length && !productFacts) error = '请先补充商品资料或核对 OCR 识别文字，再提炼卖点。';
+  else if (productFacts.length > 20000) error = '商品资料超过 20000 字，请精简后重试。';
+  else if (!salesSummaryInputSchema.safeParse(input).success) error = 'OCR 文字来源无效或过长，单条最多 40000 字、合计最多 60000 字，请核对或精简后重试。';
+  return { input, inputKey: JSON.stringify({ rulesVersion: 5, input }), error, textCount: textSources.length };
+}
+
+/** Older confirmed copy remains bound to the OCR text used to create it. */
+export function salesSummaryMatches(key: string, source: ReturnType<typeof salesSummarySource>): boolean {
+  return key === source.inputKey || key === JSON.stringify({ rulesVersion: 4, input: {textSources: source.input.textSources} });
 }
 
 export function salesSummaryText(result: SalesSummaryResult): string {

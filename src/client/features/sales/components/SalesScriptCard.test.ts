@@ -37,7 +37,7 @@ const item: StoredSalesScript = { id: 's', title: '参考', videoUrl: '', videoH
 const remove = vi.fn();
 function render(reference = item) {
   hooks.index = 0;
-  return SalesScriptCard({ item: reference, taxonomyItems: [], taxonomyLoading: false, onManageTaxonomy: vi.fn(), onQuickClassify: vi.fn(), onReview: vi.fn(), onArchive: vi.fn(), onDelete: remove });
+  return SalesScriptCard({ item: reference, taxonomyItems: [], taxonomyLoading: false, onManageTaxonomy: vi.fn(), onQuickClassify: vi.fn(), onReview: vi.fn(), onDelete: remove });
 }
 function deleteButton() { return find(render(), (node) => node.props['aria-label'] === '删除脚本 参考'); }
 const clickDelete = () => (deleteButton().props.onClick as () => void)();
@@ -89,7 +89,9 @@ it('prevents duplicate deletion and retains the card with a retry after failure'
   await vi.waitFor(() => expect(remove).toHaveBeenCalledTimes(2));
 });
 it('opens classification outside the overflow menu and unmounts it on cancel', () => {
-  const button = find(render(), (node) => node.props['aria-label'] === '调整 参考 分类与风格');
+  const preview = find(render(), (node) => node.props.className === 'sales-script-preview-slot');
+  const button = find(preview, (node) => node.props['aria-label'] === '调整 参考 分类与风格');
+  expect(() => find(preview, (node) => node.props.children === '已确认')).toThrow('Control not found');
   (button.props.onClick as () => void)();
   const root = render();
   const dialog = find(root, (node) => node.type === SalesScriptQuickClassify);

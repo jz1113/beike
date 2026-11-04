@@ -16,7 +16,7 @@ import {
   getAspectRatioFromSize,
   isDepthMediaType,
 } from '@shared/domain/media/drawing';
-import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
+import { isTaskVideoReference } from '@client/shared/media/mediaHelper';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import type { GenerationTask } from '@client/store';
 
@@ -282,7 +282,7 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
         <div className="pt-3 border-t border-slate-100 dark:border-white/10 flex items-center flex-wrap gap-x-2.5 gap-y-1.5 text-[12px] sm:text-[12.5px] text-slate-500 dark:text-slate-400 select-none">
           {/* 素材统一在参数行展示，保留所有参考图的查看入口。 */}
           {referenceImagesList.map((refUrl, index) => {
-            const referenceIsVideo = isVideoMediaUrl(refUrl);
+            const referenceIsVideo = isTaskVideoReference(previewTask, refUrl);
             const label = referenceIsVideo ? '参考视频' : isVideo && previewTask?.videoRefMode === 'first_last_frame' && index < 2
               ? (index === 0 ? '首帧' : '尾帧')
               : referenceImagesList.length === 1 ? '参考图' : `@图片${index + 1}`;

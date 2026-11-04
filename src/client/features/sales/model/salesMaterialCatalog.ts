@@ -1,20 +1,14 @@
-import { appearanceAudience, audienceDimensions, setAudienceDimensions } from '@shared/domain/assets/appearanceAudience';
-import type { SalesActionCandidate, SalesMaterialCatalog, SalesPersonaCandidate, SalesSceneCandidate, SalesVoiceCandidate } from '@shared/domain/sales';
+import { classifyPersonaGroup, personaCategory, PERSONA_CATEGORIES, type PersonaCategory } from './salesPersonaClassification';
+import { PERSONA_ANGLES } from './salesAssetViews';
+import { audienceDimensions } from '@shared/domain/assets/appearanceAudience';
+import type { SalesActionCandidate, SalesMaterialCatalog, SalesSceneCandidate, SalesVoiceCandidate } from '@shared/domain/sales';
 import { ACTION_MEDIA_LABELS, actionMedia, type ActionMediaType, type DepthActionKind } from './salesActionMedia';
 import { extractActionAngleEntries, type ActionAngleEntry } from './salesActionViews';
 import { compareSalesAssetNames } from './salesAssetNames';
 
 export type SalesMaterialKind = 'persona' | 'scene' | 'action' | 'sound';
-export type SalesPersonaGroup = 'male' | 'female' | 'senior' | 'child';
 export type SalesSceneSpace = 'indoor' | 'outdoor';
 export type ActionCategoryFilter = 'all' | 'unclassified' | `category:${string}`;
-
-export const PERSONA_GROUP_TABS: readonly { id: SalesPersonaGroup; label: string }[] = [
-  { id: 'female', label: '成年女' },
-  { id: 'male', label: '成年男' },
-  { id: 'senior', label: '老年' },
-  { id: 'child', label: '儿童' },
-];
 
 export const SCENE_SPACE_TABS: readonly { id: SalesSceneSpace; label: string }[] = [
   { id: 'outdoor', label: '户外' },
@@ -31,13 +25,6 @@ export const SOUND_KIND_TABS: readonly { id: 'voice' | 'bgm'; label: string }[] 
   { id: 'voice', label: '人声' },
   { id: 'bgm', label: 'BGM' },
 ];
-
-export const PERSONA_GROUP_LABELS: Record<SalesPersonaGroup, string> = {
-  female: '成年女',
-  male: '成年男',
-  senior: '老年',
-  child: '儿童',
-};
 
 export const SCENE_SPACE_LABELS: Record<SalesSceneSpace, string> = {
   outdoor: '户外',
@@ -76,8 +63,9 @@ export interface SalesMaterialCard {
   id: string;
   kind: SalesMaterialKind;
   soundType?: 'voice' | 'bgm';
-  voiceGroup?: SalesPersonaGroup;
-  personaGroup?: SalesPersonaGroup;
+  voiceGroup?: PersonaCategory;
+  voiceId?: string;
+  personaGroup?: PersonaCategory;
   sceneSpace?: SalesSceneSpace;
   depthKind?: DepthActionKind;
   categoryId?: string;
@@ -172,32 +160,6 @@ export function matchesActionCategoryFilter(
   return assigned.includes(targetId);
 }
 
-export function classifyPersonaGroup(persona: Pick<SalesPersonaCandidate, 'name' | 'description' | 'tags' | 'dimensions'>): SalesPersonaGroup {
-  const aud = appearanceAudience({
-    name: persona.name,
-    description: persona.description,
-    tags: persona.tags,
-    dimensions: persona.dimensions,
-  });
-  if (aud === 'child_male' || aud === 'child_female' || aud === 'child_unisex') return 'child';
-  if (aud === 'senior_male' || aud === 'senior_female' || aud === 'senior_unisex') return 'senior';
-  if (aud === 'adult_male') return 'male';
-  if (aud === 'adult_female') return 'female';
-  const text = `${persona.name} ${persona.tags} ${persona.description}`.toLowerCase();
-  if (/儿童|童|小孩|男孩|女孩|宝宝|少儿/.test(text)) return 'child';
-  if (/老年|老人|老爷爷|老奶奶|银发|长者|大爷|大妈|老\b/.test(text)) return 'senior';
-  if (/男|先生|子轩|博文|小哥|大叔|绅士/.test(text) && !/女/.test(text)) return 'male';
-  return 'female';
-}
-
-export function personaGroupToDimensions(existingDimensions: string | undefined, group: SalesPersonaGroup): string {
-  if (group === 'male' || group === 'female') return setAudienceDimensions(existingDimensions, `adult_${group}`);
-  const audience = audienceDimensions(existingDimensions).audience;
-  // Age-only groups must not silently change an existing boy or older man's gender.
-  const gender = typeof audience === 'string' && audience.endsWith('_male') ? 'male' : 'female';
-  return setAudienceDimensions(existingDimensions, `${group}_${gender}`);
-}
-
 const LEGACY_PERSONA_GROUP_TAGS = new Set(['男', '女', '老', '老年', '儿童', '成年女', '成年男']);
 
 export function mergeGroupTag(rawTags: string, groupLabel: string, pool: readonly string[]): string {
@@ -220,15 +182,14 @@ export function classifySceneSpace(scene: Pick<SalesSceneCandidate, 'title' | 'd
   return 'indoor';
 }
 
-export function classifyVoiceGroup(voice: Pick<SalesVoiceCandidate, 'name' | 'gender' | 'voiceGroup' | 'tags' | 'promptText'>): SalesPersonaGroup {
-  if (voice.voiceGroup === 'male' || voice.voiceGroup === 'female' || voice.voiceGroup === 'senior' || voice.voiceGroup === 'child') {
-    return voice.voiceGroup;
-  }
-  const text = `${voice.name} ${voice.tags.join(' ')} ${voice.promptText}`.toLowerCase();
-  if (/儿童|童声|小孩|男孩|女孩|少儿|正太|萝莉/.test(text)) return 'child';
-  if (/老年|老人|长者|老爷爷|老奶奶|银发|沧桑老/.test(text)) return 'senior';
-  if (voice.gender === 'male' || /男声|男神|男士|青年男|大叔/.test(text)) return 'male';
-  return 'female';
+export function classifyVoiceGroup(voice: Pick<SalesVoiceCandidate, 'name' | 'gender' | 'voiceGroup' | 'tags' | 'promptText'>): PersonaCategory {
+  const group = voice.voiceGroup || '';
+  if (Object.hasOwn(PERSONA_CATEGORIES, group)) return group as PersonaCategory;
+  const text = [voice.name, ...voice.tags, voice.promptText].join(' ');
+  const gender = voice.gender === 'male' || (voice.gender !== 'female' && /男|爷爷|大叔/.test(text)) ? 'male' : 'female';
+  const age = group === 'child' || group === 'senior' ? group : /幼年|儿童|童声|小孩|男孩|女孩|少儿|正太|萝莉/.test(text) ? 'child'
+    : /老年|老人|长者|爷爷|奶奶|银发/.test(text) ? 'senior' : /中年/.test(text) ? 'middle' : 'young';
+  return personaCategory(gender, age);
 }
 
 export function salesMaterialCards(catalog: SalesMaterialCatalog): SalesMaterialCard[] {
@@ -236,15 +197,9 @@ export function salesMaterialCards(catalog: SalesMaterialCatalog): SalesMaterial
     ...catalog.personas.map((p): SalesMaterialCard => {
       const personaGroup = classifyPersonaGroup(p);
       const rawPersonaViews = audienceDimensions(audienceDimensions(p.dimensions).personaViews);
+      const sheetImage = typeof rawPersonaViews.sheet === 'string' ? rawPersonaViews.sheet.trim() : '';
       const mainImage = rawPersonaViews.main;
-      const viewUrls = new Set(
-        [
-          ...Object.values(rawPersonaViews).filter((v): v is string => typeof v === 'string' && Boolean(v.trim())),
-          ...(p.sourceImages || []).filter(Boolean),
-          p.fullBodyUrl,
-          p.faceUrl,
-        ].filter(Boolean),
-      );
+      const angleCount = PERSONA_ANGLES.filter(({ id }) => typeof rawPersonaViews[id] === 'string' && rawPersonaViews[id].trim()).length;
       return {
         key: `persona:${p.id}`,
         id: p.id,
@@ -253,11 +208,11 @@ export function salesMaterialCards(catalog: SalesMaterialCatalog): SalesMaterial
         title: p.name,
         description: p.description,
         tags: splitTags(p.tags),
-        image: (typeof mainImage === 'string' && mainImage.trim()) || p.sourceImages?.[0] || p.fullBodyUrl || p.avatarUrl,
+        image: sheetImage || (typeof mainImage === 'string' && mainImage.trim()) || p.sourceImages?.[0] || p.fullBodyUrl || p.avatarUrl,
         audio: '',
         badge: p.fullBodyUrl && p.faceUrl && p.fullBodyUrl !== p.faceUrl ? '全身 + 人脸' : p.hasReferenceImage ? '单图参考' : '文字人物',
-        subBadge: PERSONA_GROUP_LABELS[personaGroup],
-        personaViewCount: viewUrls.size,
+        subBadge: PERSONA_CATEGORIES[personaGroup],
+        personaViewCount: sheetImage ? PERSONA_ANGLES.length : angleCount,
         sourceImages: p.sourceImages,
         dimensions: p.dimensions,
         editable: p.source === 'persona_library',
@@ -327,13 +282,14 @@ export function salesMaterialCards(catalog: SalesMaterialCatalog): SalesMaterial
         kind: 'sound',
         soundType: 'voice',
         voiceGroup,
+        voiceId: v.voiceId,
         title: v.name,
         description: v.promptText || '用于真人口播或画外旁白',
         tags: v.tags,
         image: '',
         audio: v.sampleAudioUrl,
         badge: '人声',
-        subBadge: PERSONA_GROUP_LABELS[voiceGroup],
+        subBadge: PERSONA_CATEGORIES[voiceGroup],
         editable: true,
       };
     }).sort((a, b) => compareSalesAssetNames(a.title, b.title)),

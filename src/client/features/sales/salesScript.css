@@ -1,10 +1,8 @@
 .sales-script-import,
-.sales-script-library,
 .sales-reviewer-card,
 .sales-reviewer-player,
 .sales-shot-group { border: 1px solid var(--sales-line); border-radius: 14px; background: #fff; padding: 18px; }
 .dark .sales-script-import,
-.dark .sales-script-library,
 .dark .sales-reviewer-card,
 .dark .sales-reviewer-player,
 .dark .sales-shot-group { background: #18191c; }
@@ -32,8 +30,6 @@
 .sales-script-paste-toolbar,
 .sales-script-paste-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; color: var(--sales-muted); font-size: 11px; }
 .sales-script-paste-actions { margin-top: 10px; }
-
-.sales-script-library { display: flex; min-height: 320px; flex: 1; flex-direction: column; }
 .sales-script-search { display: flex; min-width: 180px; flex: 1; max-width: 300px; align-items: center; gap: 7px; border: 1px solid var(--sales-line); border-radius: 8px; background: var(--sales-subtle); padding: 0 10px; height: 32px; color: var(--sales-muted); }
 .sales-script-search input { width: 100%; background: transparent; color: var(--sales-ink); font-size: 12px; outline: none; }
 
@@ -47,11 +43,12 @@
 .sales-script-card-cover img, .sales-script-card-cover video { display: block; height: 100%; width: 100%; object-fit: cover; pointer-events: none; }
 .sales-script-card-placeholder { display: flex; height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #94a3b8; font-size: 11px; }
 .sales-script-status { border-radius: 5px; padding: 2px 7px; font-size: 10px; font-weight: 600; }
-.sales-script-card-cover .sales-script-status { position: absolute; top: 8px; left: 8px; }
+.sales-script-preview-badges { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.sales-script-preview-badges, .sales-script-card-cover > .sales-script-status { position: absolute; top: 8px; left: 8px; }
 .sales-script-status.is-verified { background: #16a34a22; color: #15803d; }
 .dark .sales-script-status.is-verified { background: #22c55e30; color: #86efac; }
 .sales-script-status.is-draft { background: var(--sales-accent-bg); color: var(--sales-accent); }
-.sales-script-duration { position: absolute; right: 8px; bottom: 8px; border-radius: 5px; background: rgb(0 0 0 / 68%); padding: 2px 7px; color: #fff; font-size: 10px; font-variant-numeric: tabular-nums; }
+.sales-script-duration { border-radius: 5px; background: rgb(0 0 0 / 68%); padding: 2px 7px; color: #fff; font-size: 10px; font-variant-numeric: tabular-nums; }
 
 .sales-script-card-body { display: flex; flex: 1; flex-direction: column; gap: 7px; padding: 12px 14px; }
 .sales-script-card-tags { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -180,6 +177,8 @@
 .sales-script-card-menu > summary { display: grid; width: 28px; height: 28px; place-items: center; cursor: pointer; list-style: none; border-radius: 6px; background: #0008; color: #fff; }
 .sales-script-card-menu > summary::-webkit-details-marker { display: none; }
 .sales-script-card-menu-panel { position: absolute; right: 0; top: 34px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 180px; padding: 10px; border: 1px solid var(--sales-line); border-radius: 10px; background: var(--sales-surface, #fff); box-shadow: 0 8px 24px #0003; }
+/* Keep the gap below the trigger reachable when moving the mouse into the panel. */
+.sales-script-card-menu-panel::before { content: ""; position: absolute; bottom: 100%; left: -1px; right: -1px; height: 8px; }
 .sales-script-card-menu-panel > button:first-child { width: 100%; min-height: 30px; font-size: 11px; }
 @media (max-width: 520px) {
   .sales-script-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

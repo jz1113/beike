@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeScriptTemplate } from '@shared/domain/sales';
-import { listSalesScripts, normalizePastedScript, patchSalesScript, deleteSalesScript, type StoredSalesScript } from '../api/salesScripts';
+import { listSalesScripts, analyzeReferenceVideo, uploadScriptVideo, patchSalesScript, deleteSalesScript, type StoredSalesScript } from '../api/salesScripts';
 import { useSalesScripts } from './useSalesScripts';
 
 const hooks = vi.hoisted(() => ({ index: 0, slots: [] as unknown[], cleanup: undefined as (() => void) | undefined }));
@@ -22,7 +22,7 @@ vi.mock('react', () => ({
 }));
 vi.mock('../api/salesScripts', () => ({
   analyzeReferenceVideo: vi.fn(), deleteSalesScript: vi.fn(), fetchScriptAnalysisPrompt: vi.fn(), listSalesScripts: vi.fn(),
-  normalizePastedScript: vi.fn(), patchSalesScript: vi.fn(), saveSalesScript: vi.fn(), uploadScriptVideo: vi.fn(),
+  patchSalesScript: vi.fn(), saveSalesScript: vi.fn(), uploadScriptVideo: vi.fn(),
 }));
 const script = normalizeScriptTemplate({ title: '转身', durationSec: 3, shots: [{ start: 0, end: 3, beats: [{ start: 0, end: 3, actionTemplate: '转身展示{{商品}}' }] }] })!;
 const item: StoredSalesScript = { id: 'script-a', title: script.title, videoUrl: '', videoHash: '', status: 'draft', script, model: 'model', promptVersion: 'v1', version: 1, useCount: 0, updatedAt: '' };
@@ -49,8 +49,10 @@ describe('script request lifecycle', () => {
   });
   it('ignores canceled late analysis and does not clear a newer request', async () => {
     let done!: (value: { script: typeof script; model: string; promptVersion: string; videoHash: string }) => void;
-    vi.mocked(normalizePastedScript).mockReturnValueOnce(new Promise((resolve) => { done = resolve; }));
-    const oldRun = Render().normalize('old');
+    vi.mocked(uploadScriptVideo).mockResolvedValueOnce({ success: true, videoUrl: '/storage/local/ref.mp4', videoHash: 'hash', durationSec: 3, aspectRatio: '9:16', hasAudio: false, sizeBytes: 1 });
+    await Render().uploadVideo(new File(['v'], 'ref.mp4'));
+    vi.mocked(analyzeReferenceVideo).mockReturnValueOnce(new Promise((resolve) => { done = resolve; }));
+    const oldRun = Render().analyze('model');
     Render().cancel();
     expect(Render().busy).toBe('');
     Render().openStored(item);
@@ -114,8 +116,7 @@ describe('script request lifecycle', () => {
     expect(Render().hasUnsaved).toBe(false);
   });
   it('marks a newly imported script as unsaved even before editing it', async () => {
-    vi.mocked(normalizePastedScript).mockResolvedValueOnce({ script, model: 'model', promptVersion: 'v1', videoHash: '' });
-    await Render().normalize('分镜内容');
+    Render().acceptAnalysis({ script, model: 'model', promptVersion: 'v1', videoHash: '' }, '/storage/local/ref.mp4');
     expect(Render().hasUnsaved).toBe(true);
   });
   it('keeps an edited script open when a background import finishes', async () => {

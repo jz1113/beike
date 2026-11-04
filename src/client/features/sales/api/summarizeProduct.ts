@@ -4,7 +4,8 @@ import { selectedTextModel } from '@shared/domain/models/textModelRoute';
 import { salesSummaryBodySchema, salesSummaryResponseSchema, type SalesSummaryInput } from '@shared/contracts/salesSummary';
 
 export async function summarizeProduct(input: SalesSummaryInput, selection: string, signal: AbortSignal) {
-  const body = salesSummaryBodySchema.parse({ ...input,
+  signal.throwIfAborted();
+  const body = salesSummaryBodySchema.parse({ textSources: input.textSources, productFacts: input.productFacts,
     model: selection.startsWith('deepseek-official:') ? selection : selectedTextModel(selection).modelId,
     ...getMultimodalClientOverrides(selection),
   });

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -43,7 +44,7 @@ func parsePromptList(t *testing.T, rec *httptest.ResponseRecorder) []salesPrompt
 	var result struct {
 		Prompts []salesPrompt `json:"prompts"`
 	}
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &result) != nil || len(result.Prompts) != 6 {
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &result) != nil || len(result.Prompts) != 11 {
 		t.Fatalf("invalid prompt list: %d %s", rec.Code, rec.Body.String())
 	}
 	return result.Prompts
@@ -54,19 +55,19 @@ func TestPromptsPersistIsolateConflictAndReset(t *testing.T) {
 	mux := promptTestMux(cfg)
 	defaults := parsePromptList(t, requestPrompt(mux, "GET", "/api/sales/prompts", "", "first"))
 	for _, item := range defaults {
-		if item.Customized || item.Prompt == "" || item.Prompt != item.DefaultPrompt || item.Version == "" {
+		if item.Customized || !item.Configured || item.Prompt != item.DefaultPrompt || item.DefaultPrompt == "" || item.Version == "" {
 			t.Fatalf("invalid default: %+v", item)
 		}
 	}
 	original := defaults[1]
-	custom := original.Prompt + "\n保持自然拍摄节奏。"
+	custom := original.DefaultPrompt + "\n保持自然拍摄节奏。"
 	updated := requestPrompt(mux, "PUT", "/api/sales/prompts/"+original.ID, promptUpdateJSON(&custom, original.Version), "first")
 	if updated.Code != 200 {
 		t.Fatal(updated.Code, updated.Body.String())
 	}
 	// A fresh handler reloads persisted text; another workspace retains the default.
 	stored := parsePromptList(t, requestPrompt(promptTestMux(cfg), "GET", "/api/sales/prompts", "", "first"))[1]
-	if stored.Prompt != custom || !stored.Customized || stored.Version == original.Version || stored.DefaultPrompt != original.Prompt {
+	if stored.Prompt != custom || !stored.Customized || stored.Version == original.Version || stored.DefaultPrompt != original.DefaultPrompt {
 		t.Fatalf("save not reflected: %+v", stored)
 	}
 	other := parsePromptList(t, requestPrompt(mux, "GET", "/api/sales/prompts", "", "second"))[1]
@@ -93,7 +94,7 @@ func TestPromptsPersistIsolateConflictAndReset(t *testing.T) {
 		t.Fatal(reset.Code, reset.Body.String())
 	}
 	resetItem := parsePromptList(t, requestPrompt(mux, "GET", "/api/sales/prompts", "", "first"))[1]
-	if resetItem.Customized || resetItem.Version != original.Version || resetItem.Prompt != original.Prompt {
+	if resetItem.Customized || resetItem.Configured || resetItem.Version == original.Version || resetItem.Prompt != "" {
 		t.Fatal("reset failed")
 	}
 }
@@ -136,26 +137,23 @@ func TestPromptSavingBuiltInTextPreservesContentAcrossTemplateChanges(t *testing
 	cfg := setupSalesTestConfig(t)
 	mux := promptTestMux(cfg)
 	original := parsePromptList(t, requestPrompt(mux, "GET", "/api/sales/prompts", "", "local"))[0]
-	custom := original.Prompt + "\n保留真实商品信息。"
+	custom := original.DefaultPrompt + "\n保留真实商品信息。"
 	if rec := requestPrompt(mux, "PUT", "/api/sales/prompts/summary", promptUpdateJSON(&custom, original.Version), "local"); rec.Code != 200 {
 		t.Fatal(rec.Code, rec.Body.String())
 	}
 	current := parsePromptList(t, requestPrompt(mux, "GET", "/api/sales/prompts", "", "local"))[0]
-	if rec := requestPrompt(mux, "PUT", "/api/sales/prompts/summary", promptUpdateJSON(&original.Prompt, current.Version), "local"); rec.Code != 200 {
+	if rec := requestPrompt(mux, "PUT", "/api/sales/prompts/summary", promptUpdateJSON(&original.DefaultPrompt, current.Version), "local"); rec.Code != 200 {
 		t.Fatal(rec.Code, rec.Body.String())
 	}
 	stored, err := loadSalesPrompt(context.Background(), cfg, "local", "summary")
-	if err != nil || stored.Prompt != original.Prompt || !stored.Customized {
-		t.Fatalf("saved text was not persisted: %+v, %v", stored, err)
+	if err != nil || stored.Prompt != original.DefaultPrompt || stored.Customized {
+		t.Fatal("saving the official text must follow future updates", err)
 	}
-	// Changing the bundled template must not replace explicitly saved content
-	// or invalidate the version of the user's current prompt.
-	updatedDefinition, _ := findPromptDefinition("summary")
-	updatedDefinition.text = "升级后的内置内容。"
-	next := "用户在升级后继续修改的内容。"
-	saved, err := saveSalesPrompt(context.Background(), cfg, "local", updatedDefinition, &next, stored.Version)
-	if err != nil || saved.Prompt != next {
-		t.Fatalf("template update replaced saved content: %+v, %v", saved, err)
+	updated, _ := findPromptDefinition("summary")
+	updated.text = "升级后的模板"
+	next := "旧页面的编辑"
+	if _, err := saveSalesPrompt(t.Context(), cfg, "local", updated, &next, stored.Version); !errors.Is(err, errPromptConflict) {
+		t.Fatal("old editor overwrote a template update", err)
 	}
 }
 

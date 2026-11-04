@@ -9,7 +9,7 @@ export function LightboxImage({ resultUrl, alt }: { resultUrl: string; alt: stri
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const imageClass = 'col-start-1 row-start-1 max-h-[48vh] md:max-h-[82vh] max-w-full object-contain select-none';
+  const imageClass = 'col-start-1 row-start-1 max-h-[100cqh] max-w-full object-contain select-none';
 
   return (
     <div className={`relative max-h-full max-w-full inline-grid place-items-center rounded-2xl overflow-hidden shadow-2xl ${preview || loaded ? '' : 'min-h-48 min-w-48'}`}>

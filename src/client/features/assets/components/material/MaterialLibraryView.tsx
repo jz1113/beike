@@ -4,7 +4,7 @@ import type { ChatSession } from '@client/store/appStoreTypes';
 import type { AssetCanvasProject } from '../../model/canvasAssets';
 import type { MergedAssetTask } from '../../model/mergeAssetTasks';
 import MaterialProjectView from './MaterialProjectView';
-import { buildMaterialProjects, type ProjectFolderItem } from '../../model/materialProjects';
+import { buildMaterialProjects, taskBelongsToProject, type ProjectFolderItem } from '../../model/materialProjects';
 import { useMaterialSelection } from '../../hooks/useMaterialSelection';
 import MaterialProjectDetailView from './MaterialProjectDetailView';
 import MaterialFloatingDock from './MaterialFloatingDock';
@@ -24,6 +24,7 @@ interface Props {
   onBatchDelete: (ids: string[]) => Promise<boolean>;
   onBatchDownload: (ids: string[]) => void;
   onBatchDeleteProjects?: (projects: ProjectFolderItem[]) => Promise<boolean | void> | boolean | void;
+  projectHistoryReady?: boolean;
   isDownloadingZip?: boolean;
   isDeleting?: boolean;
 }
@@ -38,12 +39,14 @@ export default function MaterialLibraryView({
   onBatchDelete,
   onBatchDownload,
   onBatchDeleteProjects,
+  projectHistoryReady = false,
   isDownloadingZip = false,
   isDeleting = false,
 }: Props) {
   const { t, locale } = useI18n();
   // 🌟 核心视图模式：平铺视图 vs 项目视图
   const [viewMode, setViewMode] = useState<'flat' | 'project'>('flat');
+  const [returnProjectId, setReturnProjectId] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<ProjectFolderItem | null>(null);
 
   // 🌟 媒体分类筛选：全部 / 图片 / 视频 / 音频 / 文档（仅平铺模式）
@@ -100,6 +103,7 @@ export default function MaterialLibraryView({
   }, [clearTasks, clearProjects]);
   const handleViewModeChange = (nextMode: 'flat' | 'project') => {
     handleExitBatchMode();
+    setReturnProjectId(null);
     setViewMode(nextMode);
   };
   const handleToggleSelectAll = viewMode === 'project' ? projectsSelection.toggleAll : tasksSelection.toggleAll;
@@ -107,7 +111,7 @@ export default function MaterialLibraryView({
   useEffect(() => {
     if (!isBatchMode) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') handleExitBatchMode();
+      if (event.key === 'Escape' && !event.defaultPrevented) handleExitBatchMode();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -142,7 +146,7 @@ export default function MaterialLibraryView({
         mergedTasks={mergedTasks}
         sourceType={sourceType}
         onSourceTypeChange={onSourceTypeChange}
-        onBack={() => { setSelectedProject(null); handleExitBatchMode(); }}
+        onBack={() => { setReturnProjectId(currentProject.id); setSelectedProject(null); handleExitBatchMode(); }}
         setPreviewTask={setPreviewTask}
         onBatchDelete={onBatchDelete}
         onBatchDownload={onBatchDownload}
@@ -181,6 +185,7 @@ export default function MaterialLibraryView({
           <MaterialProjectView
             projects={projectList}
             onSelectProject={(project) => setSelectedProject(project)}
+            returnProjectId={returnProjectId}
             selectedProjectIds={selectedProjectIds}
             isBatchMode={isBatchMode}
             onToggleSelectProject={toggleSelectProject}
@@ -190,6 +195,13 @@ export default function MaterialLibraryView({
           <MaterialFloatingDock
             selectedCount={selectedProjectIds.length}
             onClearSelection={clearProjects}
+            onExitSelection={handleExitBatchMode}
+            onBatchDownload={() => {
+              const selected = projectList.filter(project => selectedProjectIds.includes(project.id));
+              const ids = sourceTasks.filter(task => selected.some(project => taskBelongsToProject(task, project))).map(task => task.id);
+              onBatchDownload(ids);
+            }}
+            downloadUnavailable={!projectHistoryReady}
             onBatchDelete={handleBatchDeleteSelectedProjects}
             itemUnit="个项目"
             isDeleting={isDeleting}
@@ -230,6 +242,7 @@ export default function MaterialLibraryView({
           <MaterialFloatingDock
             selectedCount={selectedTaskIds.length}
             onClearSelection={clearTasks}
+            onExitSelection={handleExitBatchMode}
             onBatchDelete={async () => { if (await onBatchDelete(selectedTaskIds)) handleExitBatchMode(); }}
             onBatchDownload={() => onBatchDownload(selectedTaskIds)}
             itemUnit="项"

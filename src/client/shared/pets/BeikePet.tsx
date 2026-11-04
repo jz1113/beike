@@ -7,6 +7,7 @@ import { beikePetMotion, type BeikePetPhase } from './beikeMotion';
 interface Props {
   phase: BeikePetPhase;
   label: string;
+  badge?: string;
   disabled?: boolean;
   onOpen: () => void;
   onFiles: (files: File[]) => void;
@@ -16,18 +17,23 @@ interface Props {
   onContextMenu?: HTMLAttributes<HTMLButtonElement>['onContextMenu'];
   pointerProps?: Pick<HTMLAttributes<HTMLButtonElement>, 'onPointerDown' | 'onPointerMove' | 'onPointerUp' | 'onPointerCancel' | 'onLostPointerCapture' | 'onClickCapture'>;
   decorative?: boolean;
+  lookIndex?: number | null;
 }
 
 const bodyOrigin = { transformBox: 'view-box', transformOrigin: '60px 90px' } as const;
 const eyeOrigin = { transformBox: 'fill-box', transformOrigin: 'center' } as const;
 const earOrigin = { transformBox: 'view-box', transformOrigin: '37px 46px' } as const;
 
-export function BeikePet({ phase, label, disabled, onOpen, onFiles, onDragging, moving, size = 96, onContextMenu, pointerProps, decorative = false }: Props) {
+export function BeikePet({ phase, label, badge, disabled, onOpen, onFiles, onDragging, moving, size = 96, onContextMenu, pointerProps, decorative = false, lookIndex = null }: Props) {
   const id = useId();
   const reduced = useMediaQuery('(prefers-reduced-motion: reduce)');
   const drop = useFileDropZone({ onFiles, disabled: disabled || decorative });
   useEffect(() => { onDragging?.(drop.isDragging); }, [drop.isDragging, onDragging]);
   const pose = beikePetMotion(phase, reduced);
+  const angle = (lookIndex ?? 0) * Math.PI / 8;
+  const gaze = lookIndex !== null && !reduced && phase === 'idle'
+    ? { x: Math.sin(angle) * 2.5, y: -Math.cos(angle) * 2, transition: { duration: 0.15 } }
+    : pose.gaze;
   const paint = (name: string) => `url(#${id}-${name})`;
   const failed = phase === 'partial' || phase === 'error';
 
@@ -84,7 +90,7 @@ export function BeikePet({ phase, label, disabled, onOpen, onFiles, onDragging, 
               {[47, 73].map((x) => (
                 <motion.g key={x} animate={pose.eyes} style={eyeOrigin}>
                   <ellipse cx={x} cy="63" rx="6.7" ry={pose.eyeHeight + 1.5} fill="#eee4ff" opacity="0.55" />
-                  <motion.g animate={pose.gaze}>
+                  <motion.g animate={gaze}>
                     <ellipse cx={x} cy={pose.pupilY} rx="5.2" ry={pose.eyeHeight} fill="#352648" />
                     <ellipse cx={x + 1} cy={pose.pupilY + 3} rx="2.8" ry="2" fill="#80649f" opacity="0.55" />
                     <circle cx={x - 1.5} cy={pose.pupilY - 2.5} r="1.8" fill="#fff" />
@@ -103,7 +109,7 @@ export function BeikePet({ phase, label, disabled, onOpen, onFiles, onDragging, 
         </motion.g>
       </svg>
       <span aria-hidden="true" className="pointer-events-none absolute -bottom-1 right-0 flex items-center gap-1 rounded-full border border-violet-200/80 bg-white/95 px-2 py-1 text-[10px] font-semibold leading-none text-violet-700 shadow-[0_2px_8px_#5b348214] dark:border-violet-300/15 dark:bg-[#292136] dark:text-violet-200">
-        <span className={`h-1 w-1 rounded-full ${failed ? 'bg-amber-400' : 'bg-violet-400'}`} />{pose.badge}
+        <span className={`h-1 w-1 rounded-full ${failed ? 'bg-amber-400' : 'bg-violet-400'}`} />{badge ?? pose.badge}
       </span>
     </>
   );

@@ -75,33 +75,7 @@ export function OneBoundLogo({ className = "w-5 h-5" }: { className?: string }) 
   );
 }
 
-/**
- * APIA 社媒多平台无水印解析矢量标志
- */
-export function ApiaLogo({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <img 
-      src="/brand/apia_logo.png" 
-      alt="APIA" 
-      draggable={false}
-      className={`${className} object-contain rounded-md bg-white border border-slate-100/80 p-0.5 flex-shrink-0 select-none pointer-events-none`} 
-    />
-  );
-}
 
-/**
- * 奇云 (Qiyun) 30+ 平台短视频/图集去水印官方标志
- */
-export function QiyunLogo({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <img 
-      src="/brand/qiyun_logo.png" 
-      alt="奇云" 
-      draggable={false}
-      className={`${className} object-contain rounded-full flex-shrink-0 select-none pointer-events-none`} 
-    />
-  );
-}
 
 /**
  * Comfly AI 网关官方微标（纯矢量无背景 SVG）
@@ -188,23 +162,6 @@ export function DeepSeekLogo({ className = "w-5 h-5" }: { className?: string }) 
         fill="#4D6BFE"
       />
     </svg>
-  );
-}
-
-/**
- * 全渠道智能采集中心双核微标 (万邦电商 + APIA 社媒)
- */
-export function CollectorHubIcon({ className = "w-10 h-10" }: { className?: string }) {
-  return (
-    <div className={`flex ${className} flex-shrink-0 items-center justify-center gap-[9%] rounded-[28%] transition-transform group-hover:scale-105`}>
-      {/* 两个来源图标并列呈现，避免在紧凑标题栏里相互遮挡。 */}
-      <div className="flex h-[68%] w-[42%] items-center justify-center overflow-hidden rounded-[28%] border border-slate-200/80 bg-white p-px shadow-xs">
-        <OneBoundLogo className="w-full h-full" />
-      </div>
-      <div className="flex h-[68%] w-[42%] items-center justify-center overflow-hidden rounded-[28%] border border-slate-200/80 bg-white p-px shadow-xs">
-        <ApiaLogo className="w-full h-full" />
-      </div>
-    </div>
   );
 }
 

@@ -122,7 +122,8 @@ func sampleFromGroup(group map[string]any) (Sample, bool) {
 		seenURL[images[n-1]] = true
 		refs = append(refs, images[n-1])
 	}
-	return Sample{ID: text(group, "id"), Title: text(group, "title"), Images: refs, Shots: shots}, true
+	number, _ := group["displayNumber"].(float64)
+	return Sample{ID: text(group, "id"), DisplayNumber: int(number), Title: text(group, "title"), Images: refs, Shots: shots}, true
 }
 func decode(value any, target any) {
 	if raw, ok := value.(string); ok {

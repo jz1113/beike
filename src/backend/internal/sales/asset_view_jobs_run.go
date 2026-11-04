@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"maps"
 	"net/http"
 	"time"
 
@@ -68,12 +69,40 @@ func runAssetViewJob(cfg config.Config, request *http.Request, job assetViewJob)
 		job.Status, job.Error = status, ""
 		return persistAssetViewJob(ctx, db, workspace, &job)
 	}
-	if len(job.Images) != 9 {
+	if err := runAssetCreation(ctx, cfg, db, request, &job, advance); err != nil {
+		fail(err)
+		return
+	}
+	if len(job.Images) != len(job.outputViews()) {
+		if job.checkpoint.TaskID == "" && job.checkpoint.ResultURL == "" && assetCreationText(job.generation["prompt"]) == "" {
+			prompt, err := loadSalesPrompt(ctx, cfg, workspace, job.Kind+"-grid")
+			if err != nil {
+				fail(err)
+				return
+			}
+			job.generation["prompt"] = prompt.Prompt
+			job.generation["metadata"] = map[string]any{"workflow": "sales_" + job.Kind + "_view", "layout": "3x3", "promptVersion": prompt.Version}
+		}
 		if err := advance("generating"); err != nil {
 			fail(err)
 			return
 		}
-		checkpoint, err := generate.RunImageTask(cfg, request.Clone(ctx), job.generation, job.Key, job.checkpoint, func(checkpoint generate.ImageTaskCheckpoint) error {
+		payload := job.generation
+		if job.gridKind() == personaStrip {
+			payload = maps.Clone(job.generation)
+			var description string
+			if creation := assetCreationSettings(job.generation); creation != nil {
+				description = assetCreationText(creation["prompt"])
+				ref := assetCreationText(creation["referenceImageUrl"])
+				payload["useReferenceImage"], payload["referenceImageUrl"], payload["referenceImages"] = true, ref, []any{ref}
+			} else if creation := assetCreationFromData(job.assetData); creation != nil {
+				description = creation.Prompt
+			}
+			if description != "" {
+				payload["prompt"] = assetCreationText(payload["prompt"]) + "\n\n人物参考描述：\n" + description
+			}
+		}
+		checkpoint, err := generate.RunImageTask(cfg, request.Clone(ctx), payload, job.Key, job.checkpoint, func(checkpoint generate.ImageTaskCheckpoint) error {
 			job.checkpoint = checkpoint
 			return persistAssetViewJob(ctx, db, workspace, &job)
 		})
@@ -82,7 +111,12 @@ func runAssetViewJob(cfg config.Config, request *http.Request, job assetViewJob)
 			fail(err)
 			return
 		}
-		if err := advance("cropping"); err != nil {
+		stage := "cropping"
+		whole := job.wholeSheet()
+		if whole {
+			stage = "saving"
+		}
+		if err := advance(stage); err != nil {
 			fail(err)
 			return
 		}
@@ -92,16 +126,26 @@ func runAssetViewJob(cfg config.Config, request *http.Request, job assetViewJob)
 			fail(ctx.Err())
 			return
 		}
-		images, err := cropAssetViewJob(ctx, job.checkpoint.ResultURL, job.Kind, workspace)
+		images, err := storeAssetViewJobResult(ctx, job.checkpoint.ResultURL, job.gridKind(), workspace, whole)
 		<-assetGridSlots
 		if err != nil {
-			fail(fmt.Errorf("九宫格已生成，裁切保存失败，可继续补全：%w", err))
+			fail(fmt.Errorf("视角图已生成，保存失败，可继续补全：%w", err))
 			return
 		}
 		job.Images = map[string]string{}
 		for _, image := range images {
 			job.Images[image.View] = image.URL
 		}
+	}
+	if state := assetCreationSettings(job.generation); job.gridKind() == personaStrip && state != nil {
+		main := assetViewJobMain(job.Kind, job.assetData)
+		if main == "" {
+			main = job.Images["sheet"]
+			if main == "" {
+				main = job.Images["face"]
+			}
+		}
+		state["imageUrl"] = main
 	}
 	if err := advance("saving"); err != nil {
 		fail(err)
@@ -116,10 +160,10 @@ func runAssetViewJob(cfg config.Config, request *http.Request, job assetViewJob)
 	}
 }
 
-func cropAssetViewJob(ctx context.Context, source, kind, workspace string) ([]assetGridImage, error) {
+func storeAssetViewJobResult(ctx context.Context, source, kind, workspace string, whole bool) ([]assetGridImage, error) {
 	data, err := readAssetGrid(ctx, source, workspace)
 	if err != nil {
 		return nil, err
 	}
-	return splitAssetGrid(ctx, data, kind, workspace)
+	return storeAssetViewResult(ctx, data, kind, workspace, whole)
 }

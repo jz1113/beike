@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { configureDomainRuntime } from '@shared/domain/core/runtime';
 import type { GenerationTask } from '@client/store/appStoreTypes';
 import { clearRefMediaRegistry, registerRefMedia } from '@client/shared/media/refMediaRegistry';
 
 const mocks = vi.hoisted(() => ({
   state: { generationTasks: [] as GenerationTask[], sessions: [] as Array<{ id: string; tasks: GenerationTask[] }>, assistantSessions: [], getActiveAssistantSkill: () => undefined, getAllAssistantSkills: () => [] },
-  events: [] as Record<string, unknown>[], fetch: vi.fn(), execute: vi.fn(), route: vi.fn(() => ({})),
+  events: [] as Record<string, unknown>[], fetch: vi.fn(), execute: vi.fn(),
   streamError: null as Error | null,
 }));
 vi.mock('@client/store', () => ({ useAppStore: { getState: () => mocks.state } }));
 vi.mock('@client/shared/api/apiClient', () => ({ apiFetch: mocks.fetch }));
-vi.mock('@client/shared/api/gatewayClient', () => ({ getGatewayClientOverrides: () => ({}), getModelCredentials: () => ({}), getMultimodalClientOverrides: mocks.route }));
 vi.mock('@client/shared/api/sseStream', () => ({ readSseEvents: async function* () { yield* mocks.events; if (mocks.streamError) throw mocks.streamError; } }));
 vi.mock('@client/shared/agent/dispatchGenerationBatch', () => ({ executeGenerationBatchAction: mocks.execute }));
 vi.mock('@client/shared/prompt-bar/agentDefinitions', () => ({ resolveAgentSystemPrompt: () => 'system' }));
@@ -70,10 +70,22 @@ describe('Agent batch action stream integration', () => {
     ]);
     expect(body.enableAgentTools).toBe(true); // The current prompt explicitly requests real media generation.
   });
-  it('resolves credentials and protocol using the selected route', async () => {
-    mocks.events = reply;
-    await submitAgentTask({ ...task, modelRouteKey: 'chat-selected-channel' }, vi.fn());
-    expect(mocks.route).toHaveBeenCalledWith('chat-selected-channel');
+  it('passes the selected channel entry to the API routing layer', async () => {
+    const entries = JSON.stringify([
+      { id: 'relay-entry', modelId: task.model, channelId: 'relay' },
+      { id: 'default-entry', modelId: task.model },
+    ]);
+    configureDomainRuntime({ storage: {
+      getItem: key => key === 'beike_modality_models_v1_chat' ? entries : null,
+      setItem: vi.fn(), removeItem: vi.fn(),
+    } });
+    try {
+      mocks.events = reply;
+      await submitAgentTask({ ...task, modelRouteKey: 'default-entry' }, vi.fn());
+      expect(JSON.parse(mocks.fetch.mock.calls[0][1].body).model).toBe('default-entry');
+    } finally {
+      configureDomainRuntime({ storage: null });
+    }
   });
   it('executes only completed actions once despite duplicate streamed events', async () => {
     mocks.events = [completed, { ...completed }, ...reply];

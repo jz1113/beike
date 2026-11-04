@@ -7,7 +7,7 @@ vi.mock('@client/shared/api/apiRequest', () => ({ apiRequest: vi.fn() }));
 vi.mock('@client/shared/api/gatewayClient', () => ({ getMultimodalClientOverrides: vi.fn() }));
 vi.mock('@shared/domain/models/textModelRoute', () => ({ selectedTextModel: () => ({ modelId: 'actual-vision' }) }));
 afterEach(() => vi.resetAllMocks());
-const input = { productName: '商品', brand: '', facts: '', referenceImages: [{ index: 0, url: '/storage/a.png' }], textImages: [] };
+const input = { textSources: [{ index: 0, text: '当前 OCR 文字' }] };
 describe('product selling points model API', () => {
   it('keeps the selected channel credentials, native protocol, Responses and cancellation', async () => {
     vi.mocked(getMultimodalClientOverrides).mockReturnValue({ customBaseUrl: 'https://chosen.test', customApiKey: 'chosen', textProtocol: 'anthropic', apiFormat: 'openai-responses' });
@@ -19,6 +19,18 @@ describe('product selling points model API', () => {
     const options = vi.mocked(apiRequest).mock.calls[0][2]!;
     expect(options.signal).toBe(signal);
     expect(JSON.parse(options.body as string)).toMatchObject({ model: 'actual-vision', customApiKey: 'chosen', textProtocol: 'anthropic', apiFormat: 'openai-responses' });
+  });
+  it('strips legacy images, URLs, product metadata and supplementary text before sending', async () => {
+    const legacy = { ...input, textSources: input.textSources.map((source) => ({ ...source, url: '/storage/private.png' })), productName: '商品名称', brand: '品牌', facts: '补充资料', referenceImages: [{ index: 0, url: '/storage/private.png' }], textImages: [{ index: 0, url: '/storage/private.png', text: '旧输入' }] };
+    vi.mocked(apiRequest).mockResolvedValue(new Response(JSON.stringify({ error: 'mock failure' }), { status: 400 }));
+    await expect(summarizeProduct(legacy, 'text-model', new AbortController().signal)).rejects.toThrow('mock failure');
+    const sent = JSON.parse(vi.mocked(apiRequest).mock.calls[0][2]!.body as string);
+    expect(sent).toEqual({ ...input, model: 'actual-vision' });
+    expect(JSON.stringify(sent)).not.toContain('/storage/');
+  });
+  it('does not send empty OCR input even when product metadata exists', async () => {
+    await expect(summarizeProduct({ textSources: [] }, 'text-model', new AbortController().signal)).rejects.toThrow();
+    expect(apiRequest).not.toHaveBeenCalled();
   });
   it('surfaces errors without substituting fabricated copy or making automatic retries', async () => {
     vi.mocked(apiRequest).mockResolvedValue(new Response(JSON.stringify({ error: '余额不足' }), { status: 429 }));

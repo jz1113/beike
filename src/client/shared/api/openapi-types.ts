@@ -1270,6 +1270,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/library/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_library_preferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patch_api_library_preferences"];
+        trace?: never;
+    };
+    "/api/library/shared-materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_library_shared_materials"];
+        put?: never;
+        post: operations["post_api_library_shared_materials"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/pets": {
         parameters: {
             query?: never;
@@ -1327,7 +1359,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 将一张人物或场景九宫格裁切为当前工作区的九张 JPG */
+        /** 裁切人物一行四格或场景九宫格到当前工作区 */
         post: operations["post_api_sales_asset_view_grid"];
         delete?: never;
         options?: never;
@@ -1342,57 +1374,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** 读取当前工作区的资产生成任务及已生成主图和提示词 */
         get: operations["get_api_sales_asset_view_jobs"];
         put?: never;
+        /** 创建或恢复资产生成任务，复用原任务标识与已生成结果 */
         post: operations["post_api_sales_asset_view_jobs"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sales/atlas/catalog": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_api_sales_atlas_catalog"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sales/atlas/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_sales_atlas_import"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sales/atlas/media": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_api_sales_atlas_media"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1425,6 +1411,24 @@ export interface paths {
         get: operations["get_api_sales_bgm_id"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/media-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查看当前工作区最近的媒体任务，按编号读取完整结果 */
+        get: operations["get_api_sales_media_jobs"];
+        put?: never;
+        /** 停止后续处理或继续原阶段 */
+        post: operations["post_api_sales_media_jobs"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1594,22 +1598,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/sales/script-normalize": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_sales_script_normalize"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/sales/script-taxonomy": {
         parameters: {
             query?: never;
@@ -1688,6 +1676,26 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["patch_api_sales_scripts_id"];
+        trace?: never;
+    };
+    "/api/sales/spoken-copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 改写并验收口播，或原样验收手工稿
+         * @description 改写需保存口播时长适配与口播语义验收提示词。reviewOnly 为 true 时只需保存语义验收规则，不改写台词；成功后返回本次审核规则版本。
+         */
+        post: operations["post_api_sales_spoken_copy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/sales/studio-assets": {
@@ -1779,8 +1787,59 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 根据商品原图、核对文字及商品卖点转买点技能整理卖点文案 */
+        /** 根据商品文字资料和修订后的 OCR 文字提炼有依据的买点 */
         post: operations["post_api_sales_summary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/task-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 分页读取当前工作区的任务记录 */
+        get: operations["get_api_sales_task_records"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/video-clip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 按完整动作结束时间准备原速静音参考片段，保留原视频 */
+        post: operations["post_api_sales_video_clip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/video-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 解码指定视频，核查画面及音轨 */
+        post: operations["post_api_sales_video_review"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2028,6 +2087,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workshop/task-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 分页读取当前工作区的任务记录 */
+        get: operations["get_api_workshop_task_records"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workshop/tasks/{taskId}/review": {
         parameters: {
             query?: never;
@@ -2048,6 +2124,93 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        SalesPersonaVisualProfile: {
+            /** @description 服务端绑定的本次原图地址 */
+            imageUrl: string;
+            /** @enum {string} */
+            presence: "full_presenter" | "silent_model" | "hands_only";
+            /** @description 外观传达的视觉气质及其可见依据，不推断内在性格 */
+            temperament: string;
+            gaze: string;
+            expression: string;
+            posture: string;
+            /** @description 裁切、遮挡及静态图的观察限制；不可见项留空，至少有一项可见观察 */
+            limitations: string;
+        };
+        SalesAssetCreation: {
+            referenceImageUrl: string;
+            prompt?: string;
+            imageUrl?: string;
+            promptModel?: string;
+            imageModel?: string;
+        };
+        SalesAssetViewJob: {
+            id: string;
+            key: string;
+            /** @enum {string} */
+            kind: "persona" | "scene";
+            assetId: string;
+            model: string;
+            name?: string;
+            /** @enum {string} */
+            status: "queued" | "analyzing" | "creating" | "generating" | "cropping" | "saving" | "completed" | "failed";
+            error: string;
+            images: {
+                [key: string]: string;
+            };
+            creation?: components["schemas"]["SalesAssetCreation"];
+            createdAt: string;
+            updatedAt: string;
+        };
+        VideoSubmissionResponse: {
+            submissionDiagnostics?: components["schemas"]["VideoSubmissionDiagnostics"];
+            /** @description 本次诊断是否已成功持久化；false 不改变已受理任务的状态 */
+            diagnosticsSaved?: boolean;
+        } & {
+            [key: string]: unknown;
+        };
+        VideoSubmissionDiagnostics: {
+            /** @enum {integer} */
+            version: 1;
+            /** @description 实际提交给渠道的模型标识；渠道未返回的底层型号不可由此推断 */
+            model: string;
+            family: string;
+            /** @description 实际请求明确提供的声音生成开关；缺省时不推断渠道默认值 */
+            generateAudio?: boolean;
+            /** @description 秘塔 H3 实际出站的 IR Context 开关；其他渠道省略 */
+            contextIrEnabled?: boolean;
+            audioReferenceCount: number;
+            audioReferences: {
+                index: number;
+                role: string;
+                /** @enum {string} */
+                sourceType: "local" | "remote" | "asset" | "preset";
+                /** @description 实际提交的 Grok 官方预置音色标识；文件音频引用省略 */
+                voiceId?: string;
+                /** @description 本地原始音频文件的 SHA-256，不保存路径或音频内容 */
+                sourceSha256?: string;
+                /** @description 实际提交引用字符串的 SHA-256，不保存签名链接 */
+                referenceSha256: string;
+                /** @description 本地原始音频时长；仅记录本地样本处理，远程引用无元数据时省略 */
+                sourceDurationSeconds?: number;
+                /** @description 本地样本实际提交片段的时长；远程引用无元数据时省略 */
+                submittedDurationSeconds?: number;
+                /** @description 本地样本是否已按模型时长限制截取；未截取或远程引用无元数据时可省略 */
+                trimmed?: boolean;
+            }[];
+            endpoint?: {
+                host: string;
+                /** @description 已剔除凭据、查询参数及敏感路径段 */
+                path: string;
+            };
+            endpointAttempts: number;
+            /** @enum {string} */
+            submissionOutcome: "prepared" | "accepted" | "rejected" | "unknown";
+            /** Format: date-time */
+            preparedAt: string;
+            /** Format: date-time */
+            submittedAt?: string;
+        };
         SalesPrompt: {
             id: string;
             title: string;
@@ -2152,19 +2315,14 @@ export interface components {
             requestedSkuId?: string;
             selectedVariantId?: string;
         };
-        SalesSummaryImage: {
+        SalesSummaryTextSource: {
             index: number;
-            url: string;
+            text: string;
         };
-        /** @description 去重后最多16张原图、合计20MiB；核对文字合计最多60000字。 */
+        /** @description 商品资料和 OCR 文字至少提供一种。OCR 单条最多 40000 字、合计最多 60000 字，来源编号不可重复。 */
         SalesSummaryRequest: {
-            productName: string;
-            brand: string;
-            facts: string;
-            referenceImages: components["schemas"]["SalesSummaryImage"][];
-            textImages: (components["schemas"]["SalesSummaryImage"] & {
-                text: string;
-            })[];
+            productFacts?: string;
+            textSources: components["schemas"]["SalesSummaryTextSource"][];
             model: string;
             /** @enum {string} */
             textProtocol?: "auto" | "openai" | "gemini" | "anthropic";
@@ -2195,6 +2353,21 @@ export interface components {
             copyPointIndexes: number[];
             conflicts: string[];
             questions: string[];
+        };
+        SalesVideoClipRequest: {
+            sourceUrl: string;
+            endSec: number;
+            /** @description 所选模型的参考视频预算，必须不短于 endSec；仅在边界处省去未完整的一帧，保持播放速度 */
+            maxDurationSec?: number;
+        };
+        SalesVideoClipResponse: {
+            /** @enum {boolean} */
+            success: true;
+            url: string;
+            /** @enum {number} */
+            startSec: 0;
+            endSec: number;
+            durationSec: number;
         };
         SalesOCRRequest: {
             imageUrl: string;
@@ -4259,26 +4432,51 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 视频轮询或按 taskKey 恢复回执；可带已保存的脱敏提交诊断 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["VideoSubmissionResponse"];
+                };
             };
         };
     };
     post_api_generate_video: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 经任务中心接管执行，未设置时使用同步响应 */
+                Prefer?: "respond-async";
+            };
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description 秘塔 H3 的 IR Context 开关；缺省开启，显式值优先于渠道控制台的全局开关，其他渠道不转发 */
+                    context_ir_enabled?: boolean;
+                    /** @description Grok 1.5 视频生成使用的官方预置音色标识，转发为 reference_audios.voice_id；不接受音频文件，编辑与延长模式不支持 */
+                    voice_ids?: string[];
+                } & {
+                    [key: string]: unknown;
+                };
+            };
+        };
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 视频提交或幂等复用回执；诊断仅证明发送内容，不证明上游采用了参考素材 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoSubmissionResponse"];
+                };
+            };
+            /** @description 返回已持久化的 job 与编号，可从 /api/sales/media-jobs 查询 */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4312,6 +4510,78 @@ export interface operations {
         };
     };
     get_api_health: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_library_preferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_api_library_preferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_library_shared_materials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_library_shared_materials: {
         parameters: {
             query?: never;
             header?: never;
@@ -4395,13 +4665,20 @@ export interface operations {
                 "application/json": {
                     /** @enum {string} */
                     kind: "persona" | "scene";
+                    /**
+                     * @description 新人物视角使用 1x4，省略时兼容已有九宫格
+                     * @enum {string}
+                     */
+                    layout?: "1x4" | "3x3";
+                    /** @description 人物 1x4 横图以单张 sheet 保存，默认兼容历史裁切请求 */
+                    whole?: boolean;
                     /** @description 当前工作区存储路径、公网图片 URL 或图片 data URL */
                     imageUrl: string;
                 };
             };
         };
         responses: {
-            /** @description 按从左到右、从上到下顺序裁切的九张 JPG；重试复用同一输出路径 */
+            /** @description 人物整图或历史裁片，重试复用同一输出路径 */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4412,7 +4689,7 @@ export interface operations {
                         success: true;
                         images: {
                             /** @enum {string} */
-                            view: "face" | "front" | "side" | "threeQuarterLeft" | "threeQuarterRight" | "back" | "sideRight" | "upperBody" | "backThreeQuarter" | "left" | "right" | "reverse" | "frontWide" | "leftWide" | "rightWide" | "reverseLeft" | "reverseRight" | "detail";
+                            view: "sheet" | "face" | "front" | "side" | "threeQuarterLeft" | "threeQuarterRight" | "back" | "sideRight" | "upperBody" | "backThreeQuarter" | "left" | "right" | "reverse" | "frontWide" | "leftWide" | "rightWide" | "reverseLeft" | "reverseRight" | "detail";
                             url: string;
                         }[];
                     };
@@ -4457,19 +4734,29 @@ export interface operations {
     };
     get_api_sales_asset_view_jobs: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 指定时仅返回该原任务；省略时返回任务列表 */
+                jobId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 任务列表或指定任务 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        job?: components["schemas"]["SalesAssetViewJob"];
+                        jobs?: components["schemas"]["SalesAssetViewJob"][];
+                    };
+                };
             };
         };
     };
@@ -4480,75 +4767,57 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
+        requestBody: {
+            content: {
+                "application/json": {
+                    key: string;
+                    /** @enum {string} */
+                    kind: "persona" | "scene";
+                    assetId?: string;
+                    data: {
+                        [key: string]: unknown;
+                    };
+                    generation: {
+                        assetCreation?: {
+                            referenceImageUrl: string;
+                            analysisModel: string;
+                            analysisModelSelection?: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    };
+                    checkpoint?: {
+                        taskId?: string;
+                        resultUrl?: string;
+                    };
                 };
-                content?: never;
             };
         };
-    };
-    get_api_sales_atlas_catalog: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
+            /** @description 已受理或复用原任务；提示词或主图已完成时一并返回 */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
-            };
-        };
-    };
-    post_api_sales_atlas_import: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        job: components["schemas"]["SalesAssetViewJob"];
+                    };
                 };
-                content?: never;
-            };
-        };
-    };
-    get_api_sales_atlas_media: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
     post_api_sales_audio_mix: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 经任务中心接管执行，未设置时使用同步响应 */
+                Prefer?: "respond-async";
+            };
             path?: never;
             cookie?: never;
         };
@@ -4556,6 +4825,13 @@ export interface operations {
         responses: {
             /** @description 沿用现有 JSON 或二进制响应 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 返回已持久化的 job 与编号，可从 /api/sales/media-jobs 查询 */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4574,6 +4850,68 @@ export interface operations {
         responses: {
             /** @description 沿用现有 JSON 或二进制响应 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_sales_media_jobs: {
+        parameters: {
+            query?: {
+                id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 返回 jobs 列表或指定 job，含阶段、状态、时间和结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 当前工作区没有该任务 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_media_jobs: {
+        parameters: {
+            query: {
+                id: string;
+                action: "cancel" | "retry";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已请求取消 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 已接管重试阶段 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 当前状态或渠道与原任务不匹配 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4651,10 +4989,56 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    productName: string;
+                    model: string;
+                    beats: {
+                        [key: string]: unknown;
+                    }[];
+                    /** @description 当前人物原始主图，缺失时可用主体或人脸图；按工作区与公网地址规则读取 */
+                    personaReferenceImageUrl?: string;
+                    /**
+                     * @description 提供人物图时必须指定实际出镜范围，不能为 none
+                     * @enum {string}
+                     */
+                    personaPresence?: "full_presenter" | "silent_model" | "hands_only" | "none";
+                } & {
+                    [key: string]: unknown;
+                };
+            };
+        };
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 商品分镜改编与同次人物原图视觉分析；无人物图时不返回分析 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        beats: {
+                            [key: string]: unknown;
+                        }[];
+                        model: string;
+                        promptVersion: string;
+                        personaVisualProfile?: components["schemas"]["SalesPersonaVisualProfile"];
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description 输入、出镜范围或人物原图无效，原稿保留 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 模型调用、分镜校验或人物视觉分析失败，原稿保留 */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4901,7 +5285,10 @@ export interface operations {
     post_api_sales_script_analysis: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 经任务中心接管执行，未设置时使用同步响应 */
+                Prefer?: "respond-async";
+            };
             path?: never;
             cookie?: never;
         };
@@ -4909,6 +5296,13 @@ export interface operations {
         responses: {
             /** @description 沿用现有 JSON 或二进制响应 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 返回已持久化的 job 与编号，可从 /api/sales/media-jobs 查询 */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4917,24 +5311,6 @@ export interface operations {
         };
     };
     get_api_sales_script_analysis_prompt: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_sales_script_normalize: {
         parameters: {
             query?: never;
             header?: never;
@@ -5114,6 +5490,95 @@ export interface operations {
             };
         };
     };
+    post_api_sales_spoken_copy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    model: string;
+                    productName: string;
+                    /** @description 当前商品原始资料，不含生成的概括、买点或文案。 */
+                    facts?: string;
+                    /** @description 待优化稿，不构成事实证据。 */
+                    sourceCopy?: string;
+                    /** @default false */
+                    reviewOnly?: boolean;
+                    /** @enum {string} */
+                    voiceMode: "speech" | "voiceover";
+                    duration: number;
+                    targetCps?: number;
+                    beats: {
+                        index: number;
+                        start: number;
+                        end: number;
+                        action: string;
+                        expression?: string;
+                        transition?: string;
+                        spokenLine?: string;
+                        subtitle?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description 改写稿或原稿已通过本次语义验收 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                        model: string;
+                        /** @description 本次写稿规则版本；reviewOnly 未执行写稿时为空。 */
+                        promptVersion: string;
+                        reviewPromptVersion: string;
+                        beats: {
+                            index: number;
+                            spokenLine: string;
+                            subtitle: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description 手工原稿未通过基础或语义验收，保留原稿并返回具体问题。 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 审稿失败、回执无效或三稿仍未通过，不返回成功稿与审核版本。临时审稿故障可携带 pendingReview，供下次 reviewOnly 原字续验；候选稿不表示审核通过。 */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: false;
+                        error: string;
+                        code?: string;
+                        stage?: string;
+                        pendingReview?: {
+                            promptVersion: string;
+                            beats: {
+                                index: number;
+                                spokenLine: string;
+                                subtitle: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+    };
     get_api_sales_studio_assets: {
         parameters: {
             query?: never;
@@ -5270,6 +5735,107 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_api_sales_task_records: {
+        parameters: {
+            query?: {
+                q?: string;
+                kind?: string;
+                model?: string;
+                status?: string;
+                from?: string;
+                until?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 筛选后的任务列表、总数与当前页 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_video_clip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesVideoClipRequest"];
+            };
+        };
+        responses: {
+            /** @description 当前工作区派生片段地址与实测时长 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesVideoClipResponse"];
+                };
+            };
+            /** @description 视频越界、结束时间无效或素材不可读取 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 本地视频处理环境不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_sales_video_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    videoUrl: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 检测对象的画面、音轨及媒体信息 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        /** @enum {string} */
+                        picture: "visible" | "dark" | "unreadable";
+                        /** @enum {string} */
+                        audio: "audible" | "quiet" | "missing" | "unreadable";
+                        width: number;
+                        height: number;
+                        durationSec: number;
+                    };
+                };
             };
         };
     };
@@ -5608,6 +6174,33 @@ export interface operations {
             400: components["responses"]["VideoDownloadError"];
             401: components["responses"]["VideoDownloadError"];
             503: components["responses"]["VideoDownloadError"];
+        };
+    };
+    get_api_workshop_task_records: {
+        parameters: {
+            query?: {
+                q?: string;
+                kind?: string;
+                model?: string;
+                status?: string;
+                from?: string;
+                until?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 筛选后的任务列表、总数与当前页 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     post_api_workshop_tasks_taskId_review: {

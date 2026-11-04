@@ -23,6 +23,14 @@ describe('material filtering and timeline', () => {
     expect(tasks.map((task) => task.id)).toEqual(['video', 'image', 'failed']);
   });
 
+  it('finds a prompt beyond the abbreviated title while respecting the media filter', () => {
+    const tasks = [
+      { id: 'image', mediaType: 'image', title: '海面', prompt: '海面上出现一艘蓝色小船' },
+      { id: 'video', mediaType: 'video', title: '小船', prompt: '镜头推进' },
+    ];
+    expect(filterMaterialTasks(tasks, { ...options, mediaCategory: 'image', searchInput: '小船' }).map(task => task.id)).toEqual(['image']);
+  });
+
   it('orders today, yesterday and earlier dates in both chronological directions', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 9, 26, 12));

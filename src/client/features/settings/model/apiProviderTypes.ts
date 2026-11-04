@@ -1,7 +1,7 @@
-import { API_PROVIDERS_STORAGE_KEY } from '@shared/domain/models/modalityStorage';
+import { API_PROVIDERS_STORAGE_KEY, API_REMOVED_PROVIDERS_KEY } from '@shared/domain/models/modalityStorage';
 import type { ImageRequestTemplate } from '@shared/contracts/imageRequestTemplate';
 
-export { API_PROVIDERS_STORAGE_KEY };
+export { API_PROVIDERS_STORAGE_KEY, API_REMOVED_PROVIDERS_KEY };
 
 export type ApiProviderProtocol = 'gemini' | 'openai' | 'anthropic' | 'custom' | 'dashscope' | 'template';
 
@@ -35,7 +35,7 @@ export const PROTOCOL_OPTIONS: { id: ApiProviderProtocol; label: string; formatH
     id: 'gemini',
     label: 'Gemini 原生文本协议',
     formatHint: '文本 / 图片理解 · Gemini generateContent（模型可显式覆盖）',
-    defaultCatalog: '/v1/models',
+    defaultCatalog: '/v1beta/models',
   },
   {
     id: 'anthropic',
@@ -80,7 +80,6 @@ export const DEFAULT_PROVIDERS: ApiProvider[] = [
   },
 ];
 
-export const API_REMOVED_PROVIDERS_KEY = 'beike_api_removed_providers_v2';
 const DEPRECATED_PROVIDER_IDS = new Set(['mita', 'soonstudio', 'google']);
 
 /** 不再默认展示。密钥为空且地址仍是原默认值时，从已存列表清掉。 */
@@ -94,6 +93,14 @@ const RETIRED_BUILTIN_BASE_URLS: Record<string, string> = {
 
 function normalizeProviderBaseUrl(value: string | undefined): string {
   return (value || '').trim().replace(/\/+$/, '');
+}
+
+/** 两个账户或两套协议可以共享域名，只有请求配置一致时才复用。 */
+export function sameProviderRoute(a: ApiProvider, b: Omit<ApiProvider, 'id' | 'isRemovable'>) {
+  const root = (url: string) => a.providerType === 'openai' ? normalizeProviderBaseUrl(url).replace(/\/v1$/i, '') : normalizeProviderBaseUrl(url);
+  return a.providerType === b.providerType && root(a.baseUrl) === root(b.baseUrl)
+    && (a.apiKey || '').trim() === (b.apiKey || '').trim() && a.catalogPath === b.catalogPath
+    && JSON.stringify(a.requestTemplate) === JSON.stringify(b.requestTemplate);
 }
 
 function isUntouchedRetiredProvider(item: ApiProvider): boolean {

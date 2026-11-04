@@ -3,7 +3,8 @@ import { buildGenerationPromptBatch, type BatchGenerationSettings } from './buil
 import { prepareAssistantImagePrompt, prepareBatchVideoPrompt } from './batchReferences';
 import type { GenerationPromptEntry } from '@shared/domain/assistant/generationPrompts';
 
-vi.mock('@shared/domain/models/modalityStorage', () => ({
+vi.mock('@shared/domain/models/modalityStorage', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@shared/domain/models/modalityStorage')>(),
   upstreamModalityModelId: (_kind: string, id: string) => id === 'image-channel' ? 'gpt-image-2' : id,
   modalityPickerSelections: (kind: string) => kind === 'image'
     ? [{ id: 'image-channel', name: '图片渠道', modelId: 'gpt-image-2' }]

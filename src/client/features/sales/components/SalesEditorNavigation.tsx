@@ -3,7 +3,7 @@ import { salesFocusClass } from './salesChrome';
 
 const VIEWS = [
   { id: 'summary', title: '商品资料', description: '选图识字与卖点提炼' },
-  { id: 'storyboard', title: '分镜脚本', description: '全宽分镜表格与制作设置' },
+  { id: 'storyboard', title: '分镜脚本', description: '编辑分镜与调整制作设置' },
   { id: 'delivery', title: '生成成片', description: '素材核对、视频生成与配乐导出' },
 ] as const;
 

@@ -15,14 +15,18 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	model := videoRequestedModel(payload)
 	base, apiKey := videoCredentials(cfg, r, payload)
 	prompt := strings.TrimSpace(rawString(payload, "prompt"))
+	if rawBool(payload, "preserve_prompt") {
+		_ = json.Unmarshal(payload["prompt"], &prompt)
+	}
 	adapted := buildVideoPayload(model, prompt, payload)
+	applyMinimaxH3Channel(base, payload, &adapted)
+	if adapted.family == "grok-video" {
+		mode := resolveVideoMode(model, videoRefMode(payload), len(adapted.images), len(rawStringList(payload["videos"])))
+		adapted.endpoints, adapted.queries = routeGrokEndpoints(base, mode)
+	}
 	protocol := r.Header.Get("x-custom-protocol")
 	if adapted.family == "wan" {
 		adapted.endpoints, adapted.queries = routeWanEndpoints(base, protocol)
-		if err := prepareWanMedia(r.Context(), adapted.payload, workspaceOf(r), cfg.Production()); err != nil {
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "submissionRejected": true, "retryable": false, "error": err.Error()})
-			return
-		}
 	}
 	key, err := videoSubmissionKey(r, payload)
 	if err != nil {
@@ -49,6 +53,7 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		return
 	}
 	if !claim.claimed {
+		claim.diagnostics = readVideoSubmissionDiagnostics(cfg, workspaceOf(r), claim.recordID)
 		writeVideoSubmission(w, claim, true)
 		return
 	}
@@ -58,22 +63,61 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "taskKey": key, "recordId": claim.recordID, "submissionOutcome": "rejected", "submissionRejected": true, "error": message, "missingConfig": "apiKey", "retryable": false})
 		return
 	}
-	if adapted.family == "seedance" {
-		if err := prepareSeedanceMedia(r.Context(), base, apiKey, adapted.payload, workspaceOf(r), cfg.Production(), r, payload); err != nil {
-			message := err.Error()
-			_ = settleVideoSubmission(cfg, r, claim.recordID, imageTaskDraft{Status: "FAILURE", FailReason: message})
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "taskKey": key, "recordId": claim.recordID, "submissionOutcome": "rejected", "submissionRejected": true, "retryable": false, "error": message})
-			return
+	// Claim the original references before uploading: object keys and signed URLs
+	// change per upload and must not alter a request's idempotency fingerprint.
+	var form *gateway.VideoForm
+	preparedAudios, audioPreparation, prepareErr := prepareVideoAudioReferences(r.Context(), cfg.Root, model, rawStringList(payload["audios"]), workspaceOf(r), cfg.Production(), resolveVideoStorageConfig(r, payload))
+	if prepareErr == nil {
+		adapted.audioPreparation = audioPreparation
+		replaceVideoAudioReferences(adapted.payload, adapted.family, preparedAudios)
+		switch adapted.family {
+		case "omni-flash":
+			form, prepareErr = prepareOmniForm(r.Context(), adapted, rawStringList(payload["videos"]), workspaceOf(r), cfg.Production())
+		case "grok-video":
+			prepareErr = prepareGrokMedia(r.Context(), adapted.payload, workspaceOf(r), cfg.Production())
+		case "minimax":
+			if minimaxH3(model) {
+				prepareErr = prepareMinimaxH3Media(r.Context(), cfg.Root, adapted.payload, workspaceOf(r), cfg.Production(), resolveVideoStorageConfig(r, payload))
+			}
+		case "vidu":
+			prepareErr = prepareViduAudioReferences(r.Context(), cfg.Root, adapted.payload, workspaceOf(r), cfg.Production(), resolveVideoStorageConfig(r, payload))
+			if prepareErr == nil {
+				prepareErr = prepareViduImageReferences(r.Context(), adapted.payload, workspaceOf(r), cfg.Production())
+			}
+		case "wan":
+			prepareErr = prepareWanMedia(r.Context(), cfg.Root, adapted.payload, workspaceOf(r), cfg.Production(), resolveVideoStorageConfig(r, payload))
+		case "seedance":
+			prepareErr = prepareSeedanceMedia(r.Context(), cfg.Root, base, apiKey, adapted.payload, workspaceOf(r), cfg.Production(), r, payload)
 		}
+	}
+	if prepareErr != nil {
+		message := prepareErr.Error()
+		_ = settleVideoSubmission(cfg, r, claim.recordID, imageTaskDraft{Status: "FAILURE", FailReason: message})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "taskKey": key, "recordId": claim.recordID, "submissionOutcome": "rejected", "submissionRejected": true, "retryable": false, "error": message})
+		return
+	}
+	var nativeH3 map[string]any
+	var multipartFields map[string][]string
+	if minimaxH3(model) {
+		nativeH3 = adapted.payload
+		multipartFields = routeMinimaxH3Submission(base, &adapted)
+	}
+	mode := resolveVideoMode(model, videoRefMode(payload), len(adapted.images), len(rawStringList(payload["videos"])))
+	alternateBodies := videoAlternateBodies(base, &adapted, mode, nativeH3)
+	diagnostic, diagnosticErr := prepareVideoSubmissionDiagnostics(cfg, r, claim.recordID, payload, adapted)
+	if diagnosticErr != nil {
+		rejectVideoDiagnosticPreparation(cfg, w, r, claim.recordID, key)
+		return
 	}
 	encoded, _ := json.Marshal(adapted.payload)
 	started := time.Now()
 	result := gateway.SubmitVideo(r.Context(), gateway.SubmitCommand{
-		Endpoints: expandVideoURLs(base, adapted.endpoints, ""), APIKey: apiKey, PayloadJSON: string(encoded), Headers: adapted.headers,
+		Endpoints: expandVideoURLs(base, adapted.endpoints, ""), APIKey: apiKey, PayloadJSON: string(encoded), EndpointBodies: alternateBodies, MultipartFields: multipartFields, Form: form, Headers: adapted.headers,
 		ReadTaskID:          func(data map[string]any) string { return readVideoTaskID(data, adapted.family) },
 		Client:              gateway.ModelHTTP(),
 		RetryOnMissingInput: adapted.family == "wan",
 	})
+	diagnosticSaved := finishVideoSubmissionDiagnostics(cfg, r, claim.recordID, diagnostic, result, apiKey)
 	if result.Outcome != gateway.Accepted {
 		unknown := result.Outcome == gateway.Unknown
 		status := http.StatusBadRequest
@@ -92,6 +136,7 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		}
 		_ = settleVideoSubmission(cfg, r, claim.recordID, imageTaskDraft{TaskID: result.TaskID, Status: state, FailReason: message})
 		body := map[string]any{"success": false, "taskKey": key, "recordId": claim.recordID, "submissionOutcome": string(result.Outcome), "submissionUnknown": unknown, "submissionRejected": !unknown, "retryable": false, "error": message}
+		body["submissionDiagnostics"], body["diagnosticsSaved"] = diagnostic, diagnosticSaved
 		if unknown && result.TaskID != "" {
 			body["taskId"] = result.TaskID
 		}
@@ -99,11 +144,16 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		return
 	}
 	recordID := claim.recordID
-	err = persistVideoTask(cfg, r, adapted, recordID, result.TaskID, prompt)
+	created := pollParsed{status: "IN_PROGRESS"}
+	if (adapted.family == "omni-flash" || minimaxH3(model)) && videoPollReady(result.Data) {
+		created = readVideoPoll(result.Data)
+	}
+	err = persistVideoTask(cfg, r, adapted, recordID, result.TaskID, prompt, created)
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{
 			"success": false, "taskKey": key, "recordId": recordID, "error": "任务已提交，但本地记录保存失败，请核对原任务", "taskId": result.TaskID,
 			"submissionOutcome": "accepted", "submissionUnknown": true, "retryable": false,
+			"submissionDiagnostics": diagnostic, "diagnosticsSaved": diagnosticSaved,
 		})
 		return
 	}
@@ -117,7 +167,8 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"success": true, "taskKey": key, "submissionOutcome": "accepted", "retryable": false, "taskId": result.TaskID, "recordId": recordID, "model": adapted.modelID, "family": adapted.family,
 		"duration": adapted.duration, "aspect_ratio": adapted.ratio, "resolution": adapted.resolution, "size": adapted.size,
-		"status": "IN_PROGRESS", "prompt": prompt,
+		"status": created.status, "resultUrl": created.result, "failReason": created.reason, "progress": created.progress, "prompt": prompt,
+		"submissionDiagnostics": diagnostic, "diagnosticsSaved": diagnosticSaved,
 		"timing": map[string]any{"parseMs": 0, "convertMs": 0, "gatewayMs": int(time.Since(started).Milliseconds()), "dbMs": 0, "totalMs": int(time.Since(started).Milliseconds()), "payloadKB": len(encoded) / 1024, "imageCount": len(adapted.images), "endpointAttempts": result.EndpointAttempts, "convertCacheHits": 0},
 	})
 }
@@ -126,6 +177,7 @@ type videoAdapted struct {
 	family, modelID, ratio, resolution, size string
 	duration                                 int
 	images                                   []string
+	audioPreparation                         []videoAudioPreparation
 	payload                                  map[string]any
 	endpoints, queries                       []string
 	headers                                  map[string]string
@@ -155,6 +207,13 @@ func buildVideoPayload(model, prompt string, payload map[string]json.RawMessage)
 	watermark := rawBool(payload, "watermark")
 	var body map[string]any
 	switch family {
+	case "omni-flash":
+		model = "omni_flash-10s"
+		duration = 10
+		body = map[string]any{"model": model, "prompt": prompt, "size": videoPixelSize(ratio, "720P")}
+		if len(images) > 0 {
+			body["images"] = images
+		}
 	case "vidu":
 		body = viduOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, audio, audioSet)
 		resolution = viduResolution(resolution)
@@ -169,26 +228,42 @@ func buildVideoPayload(model, prompt string, payload map[string]json.RawMessage)
 	case "kling":
 		body = klingOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, audio, audioSet, watermark)
 	case "minimax":
-		body = minimaxOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, audio, audioSet, watermark)
+		body = minimaxOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
 	case "veo":
 		body = veoOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
 	default:
 		body = flatVideoPayload(model, prompt, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
 	}
+	attachVideoAudioReferences(body, family, rawStringList(payload["audios"]))
+	attachVideoSeed(body, family, payload)
+	if family == "grok-video" {
+		attachGrokVoiceReferences(body, rawStringList(payload["voice_ids"]))
+	}
+	// Managed workflows opt out of adapter-written text and upstream prompt rewriting.
+	// This flag is local transport policy and is never forwarded to the provider.
+	if rawBool(payload, "preserve_prompt") {
+		switch family {
+		case "vidu":
+			if viduQ4Preview(model) && mode == "first_frame" {
+				body["is_rec"] = false
+			}
+		case "minimax":
+			if minimaxH3(model) {
+				body["content"].([]map[string]any)[0]["text"] = prompt
+			} else {
+				body["prompt"] = prompt
+			}
+		case "wan":
+			body["parameters"].(map[string]any)["prompt_extend"] = false
+		case "seedance":
+			content, _ := body["content"].([]map[string]any)
+			if len(content) > 0 && content[0]["type"] == "text" {
+				content[0]["text"] = prompt
+			}
+		}
+	}
 	endpoints, queries, headers := videoEndpoints(family, model, mode, images)
 	return videoAdapted{family: family, modelID: model, ratio: ratio, resolution: resolution, size: videoPixelSize(ratio, resolution), duration: duration, images: images, payload: body, endpoints: endpoints, queries: queries, headers: headers}
-}
-
-func rawBoolPresent(payload map[string]json.RawMessage, key string) (bool, bool) {
-	raw, ok := payload[key]
-	if !ok {
-		return false, false
-	}
-	var value bool
-	if json.Unmarshal(raw, &value) != nil {
-		return false, false
-	}
-	return value, true
 }
 
 func videoFamily(model string) string {
@@ -196,11 +271,13 @@ func videoFamily(model string) string {
 	switch {
 	case strings.Contains(id, "seedance"):
 		return "seedance"
-	case strings.Contains(id, "veo") || strings.Contains(id, "omni_flash") || strings.Contains(id, "omni-flash") || strings.Contains(id, "gemini-omni"):
+	case omniFlash(model):
+		return "omni-flash"
+	case strings.Contains(id, "veo"):
 		return "veo"
 	case strings.Contains(id, "wan"):
 		return "wan"
-	case strings.Contains(id, "minimax") || strings.Contains(id, "hailuo"):
+	case strings.Contains(id, "minimax") || strings.Contains(id, "hailuo") || id == "h3":
 		return "minimax"
 	case strings.Contains(id, "sora"):
 		return "sora"
@@ -249,81 +326,6 @@ func veoOfficialPayload(model, prompt, mode, ratio, resolution string, duration 
 	return body
 }
 
-func videoPixelSize(ratio, resolution string) string {
-	upper := strings.ToUpper(resolution)
-	is4K := strings.Contains(upper, "4K") || strings.Contains(upper, "UHD")
-	is1080 := strings.Contains(upper, "1080") || strings.Contains(upper, "FHD")
-	is480 := strings.Contains(upper, "480") || strings.Contains(upper, "SD")
-	switch ratio {
-	case "9:16":
-		if is4K {
-			return "2160x3840"
-		}
-		if is1080 {
-			return "1080x1920"
-		}
-		if is480 {
-			return "480x854"
-		}
-		return "720x1280"
-	case "1:1":
-		if is4K {
-			return "2048x2048"
-		}
-		if is1080 {
-			return "1440x1440"
-		}
-		if is480 {
-			return "720x720"
-		}
-		return "1024x1024"
-	case "4:3":
-		if is4K {
-			return "2880x2160"
-		}
-		if is1080 {
-			return "1440x1080"
-		}
-		if is480 {
-			return "640x480"
-		}
-		return "960x720"
-	case "3:4":
-		if is4K {
-			return "2160x2880"
-		}
-		if is1080 {
-			return "1080x1440"
-		}
-		if is480 {
-			return "480x640"
-		}
-		return "720x960"
-	case "21:9":
-		if is4K {
-			return "3840x1645"
-		}
-		if is1080 {
-			return "2560x1080"
-		}
-		if is480 {
-			return "1120x480"
-		}
-		return "1680x720"
-	default:
-		if is4K {
-			return "3840x2160"
-		}
-		if is1080 {
-			return "1920x1080"
-		}
-		if is480 {
-			return "854x480"
-		}
-		return "1280x720"
-	}
-}
-
 func rawNumber(payload map[string]json.RawMessage, key string) float64 {
 	var value float64
 	if json.Unmarshal(payload[key], &value) != nil {
@@ -335,6 +337,13 @@ func rawNumber(payload map[string]json.RawMessage, key string) float64 {
 func readVideoTaskID(data map[string]any, family string) string {
 	if data == nil || data["error"] != nil {
 		return ""
+	}
+	if family == "minimax" {
+		if task, ok := data["task"].(map[string]any); ok {
+			if id := firstString(task, "id", "task_id"); id != "" {
+				return id
+			}
+		}
 	}
 	if text, ok := data["task_id"].(string); ok && strings.TrimSpace(text) != "" {
 		return strings.TrimSpace(text)
@@ -375,9 +384,9 @@ func videoCredentials(cfg config.Config, r *http.Request, payload map[string]jso
 	return base, imageAPIKey(cfg, r, payload, clientBase)
 }
 
-func persistVideoTask(cfg config.Config, r *http.Request, adapted videoAdapted, recordID, taskID, prompt string) error {
+func persistVideoTask(cfg config.Config, r *http.Request, adapted videoAdapted, recordID, taskID, prompt string, created pollParsed) error {
 	return settleVideoSubmission(cfg, r, recordID, imageTaskDraft{
 		Prompt: prompt, TaskID: taskID, Model: adapted.modelID,
-		Size: adapted.ratio, Quality: adapted.resolution, Status: "IN_PROGRESS", MediaType: "video",
+		Size: adapted.ratio, Quality: adapted.resolution, Status: created.status, ResultURL: created.result, FailReason: created.reason, MediaType: "video",
 	})
 }

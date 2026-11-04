@@ -1,6 +1,10 @@
 import type { SalesAdaptedBeat, SalesImitationMode, SalesPresentationMode } from '@shared/domain/sales';
+import { parseSalesPersonaVisualProfile, type SalesPersonaVisualProfile } from '@shared/domain/sales/personaVisualProfile';
+import { parseSalesPendingVideoTask, type SalesPendingVideoTask } from './salesVideoTask';
+import { parseProductFaceEdits, type ProductFaceEdits } from './salesProductFaces';
 
 export interface SalesProductionPlanState {
+  productFaceEdits: ProductFaceEdits;
   scriptId: string;
   presentationMode: SalesPresentationMode;
   imitationMode: SalesImitationMode;
@@ -17,22 +21,32 @@ export interface SalesProductionPlanState {
   beatImageOverrides: Record<number, string>;
   beatActionIds: Record<number, string>;
   adaptedBeats: SalesAdaptedBeat[];
+  personaVisualProfile: SalesPersonaVisualProfile | null;
   adaptedSourceKey: string;
   adaptedPromptVersion: string;
+  spokenCopySourceKey: string;
+  spokenCopyPromptVersion: string;
+  spokenReviewPromptVersion: string;
+  spokenReviewSourceKey: string;
   customPrompt: string;
   videoModel: string;
   videoRefMode: string;
   videoAspectRatio: string;
   videoResolution: string;
   videoDurationSec: number;
+  videoContextIrEnabled?: boolean;
+  videoVoiceId?: string;
   voiceModel: string;
   voiceoverAudioUrl: string;
   generatedVideoUrl: string;
+  generatedVideoTaskId: string;
   mixedVideoUrl: string;
+  pendingVideoTask: SalesPendingVideoTask | null;
 }
 
 export function emptySalesProductionPlan(): SalesProductionPlanState {
   return {
+    productFaceEdits: {},
     scriptId: '',
     presentationMode: 'subtitled_intro',
     imitationMode: 'script_only',
@@ -49,18 +63,27 @@ export function emptySalesProductionPlan(): SalesProductionPlanState {
     beatImageOverrides: {},
     beatActionIds: {},
     adaptedBeats: [],
+    personaVisualProfile: null,
     adaptedSourceKey: '',
     adaptedPromptVersion: '',
+    spokenCopySourceKey: '',
+    spokenCopyPromptVersion: '',
+    spokenReviewPromptVersion: '',
+    spokenReviewSourceKey: '',
     customPrompt: '',
-    videoModel: 'doubao-seedance-2.5',
+    videoModel: 'wan3.0-video',
     videoRefMode: '',
     videoAspectRatio: '',
     videoResolution: '',
     videoDurationSec: 0,
+    videoContextIrEnabled: true,
+    videoVoiceId: '',
     voiceModel: 'speech-2.8-hd',
     voiceoverAudioUrl: '',
     generatedVideoUrl: '',
+    generatedVideoTaskId: '',
     mixedVideoUrl: '',
+    pendingVideoTask: null,
   };
 }
 
@@ -75,12 +98,18 @@ export function planForSelectedScript(plan: SalesProductionPlanState, scriptId: 
     adaptedBeats: [],
     adaptedSourceKey: '',
     adaptedPromptVersion: '',
+    spokenCopySourceKey: '',
+    spokenCopyPromptVersion: '',
+    spokenReviewPromptVersion: '',
+    spokenReviewSourceKey: '',
     beatImageOverrides: {},
     beatActionIds: {},
     customPrompt: '',
-    voiceoverAudioUrl: '',
+    voiceoverAudioUrl: plan.presentationMode !== 'clean_visual' && plan.voiceModeOverride === 'speech' ? plan.voiceoverAudioUrl : '',
     generatedVideoUrl: '',
+    generatedVideoTaskId: '',
     mixedVideoUrl: '',
+    pendingVideoTask: null,
   };
 }
 
@@ -105,13 +134,16 @@ export function parseSalesProductionPlan(value: unknown): SalesProductionPlanSta
         .map((item, i) => {
           const r = asRecord(item);
           const action = asText(r.action, 2000).trim();
-          if (![action, r.subject, r.expression, r.transition, r.spokenLine, r.subtitle].some((value) => typeof value === 'string' && value.trim())) return null;
+          const manualPerformanceFields = Array.isArray(r.manualPerformanceFields)
+            ? [...new Set(r.manualPerformanceFields.filter((field): field is 'action' | 'expression' | 'transition' | 'subject' => field === 'action' || field === 'expression' || field === 'transition' || field === 'subject'))] : undefined;
+          if (!manualPerformanceFields?.length && ![action, r.subject, r.expression, r.transition, r.spokenLine, r.subtitle].some((value) => typeof value === 'string' && value.trim())) return null;
           return {
             index: typeof r.index === 'number' && Number.isInteger(r.index) ? r.index : i,
             subject: asText(r.subject, 1000),
             action,
             ...(typeof r.expression === 'string' ? { expression: asText(r.expression, 600) } : {}),
             ...(typeof r.transition === 'string' ? { transition: asText(r.transition, 400) } : {}),
+            ...(manualPerformanceFields ? { manualPerformanceFields } : {}),
             spokenLine: asText(r.spokenLine, 1000),
             subtitle: asText(r.subtitle, 400),
           };
@@ -124,6 +156,7 @@ export function parseSalesProductionPlan(value: unknown): SalesProductionPlanSta
   // attach those media to new production requests.
   const useDepthVideo = raw.imitationMode === 'depth_imitation' && raw.scriptVideoReference === 'depth';
   return {
+    productFaceEdits: parseProductFaceEdits(raw.productFaceEdits),
     scriptId: asText(raw.scriptId, 120),
     presentationMode: presentationMode === 'clean_visual' ? 'clean_visual' : 'subtitled_intro',
     imitationMode: useDepthVideo ? 'depth_imitation' : 'script_only',
@@ -142,17 +175,26 @@ export function parseSalesProductionPlan(value: unknown): SalesProductionPlanSta
     beatImageOverrides,
     beatActionIds: Object.fromEntries(Object.entries(asRecord(raw.beatActionIds)).filter(([key, value]) => Number.isInteger(Number(key)) && Number(key) >= 0 && Number(key) < 64 && typeof value === 'string' && value.length <= 120)) as Record<number, string>,
     adaptedBeats,
+    personaVisualProfile: parseSalesPersonaVisualProfile(raw.personaVisualProfile),
     adaptedSourceKey: asText(raw.adaptedSourceKey, 400_000),
     adaptedPromptVersion: asText(raw.adaptedPromptVersion, 200).trim(),
+    spokenCopySourceKey: asText(raw.spokenCopySourceKey, 10_000),
+    spokenCopyPromptVersion: asText(raw.spokenCopyPromptVersion, 200).trim(),
+    spokenReviewPromptVersion: asText(raw.spokenReviewPromptVersion, 200).trim(),
+    spokenReviewSourceKey: asText(raw.spokenReviewSourceKey, 400_000),
     customPrompt: asText(raw.customPrompt, 20_000),
     videoModel: asText(raw.videoModel, 200) || base.videoModel,
     videoRefMode: ['omni', 'first_frame', 'first_last_frame', 'text', 'edit', 'extend'].includes(String(raw.videoRefMode)) ? String(raw.videoRefMode) : '',
     videoAspectRatio: asText(raw.videoAspectRatio, 20),
     videoResolution: asText(raw.videoResolution, 10),
     videoDurationSec: typeof raw.videoDurationSec === 'number' && Number.isFinite(raw.videoDurationSec) && raw.videoDurationSec > 0 ? Math.ceil(raw.videoDurationSec) : 0,
+    videoContextIrEnabled: typeof raw.videoContextIrEnabled === 'boolean' ? raw.videoContextIrEnabled : true,
+    videoVoiceId: asText(raw.videoVoiceId, 64).trim().toLowerCase(),
     voiceModel: asText(raw.voiceModel, 200) || base.voiceModel,
     voiceoverAudioUrl: asText(raw.voiceoverAudioUrl),
     generatedVideoUrl: asText(raw.generatedVideoUrl),
+    generatedVideoTaskId: asText(raw.generatedVideoTaskId, 500),
     mixedVideoUrl: asText(raw.mixedVideoUrl),
+    pendingVideoTask: parseSalesPendingVideoTask(raw.pendingVideoTask),
   };
 }

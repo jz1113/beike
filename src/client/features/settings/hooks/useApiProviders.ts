@@ -3,6 +3,7 @@ import {
   type ApiProvider,
   loadStoredProviders,
   saveStoredProviders,
+  sameProviderRoute,
   recordRemovedProvider,
 } from '../model/apiProviderTypes';
 import { testModelConnection } from '../model/settingsConnectionChecks';
@@ -32,6 +33,12 @@ export function useApiProviders({ isOpen, showToast, onProviderRemoved }: UseApi
     }
   }, [isOpen, selectedProviderId]);
 
+  // 同页工作区也要刷新模型选择器，例如停用渠道后不能继续显示该线路。
+  const routeAvailability = JSON.stringify(providers.map(provider => [provider.id, provider.enabled]));
+  useEffect(() => {
+    window.dispatchEvent(new Event('models_updated'));
+  }, [routeAvailability]);
+
   const currentProvider = useMemo(() => {
     return providers.find(p => p.id === selectedProviderId) || providers[0];
   }, [providers, selectedProviderId]);
@@ -46,6 +53,12 @@ export function useApiProviders({ isOpen, showToast, onProviderRemoved }: UseApi
   }, [currentProvider]);
 
   const addProvider = useCallback((newInfo: Omit<ApiProvider, 'id' | 'isRemovable'>) => {
+    const existing = providers.find(item => sameProviderRoute(item, newInfo));
+    if (existing) {
+      setSelectedProviderId(existing.id);
+      showToast(`该线路已存在，已选中「${existing.name}」`);
+      return existing.id;
+    }
     const id = `provider_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const created: ApiProvider = {
       ...newInfo,
@@ -61,7 +74,7 @@ export function useApiProviders({ isOpen, showToast, onProviderRemoved }: UseApi
     setSelectedProviderId(id);
     showToast(`已添加服务商「${created.name}」`);
     return id;
-  }, [showToast]);
+  }, [providers, showToast]);
 
   const removeProvider = useCallback((id: string) => {
     const target = providers.find(p => p.id === id);

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Sparkles, RefreshCw, Images, Brain, Settings2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Sparkles, RefreshCw, Brain, Settings2 } from 'lucide-react';
 import { ConfiguredModelPicker } from '@client/shared/models/ConfiguredModelPicker';
 import { loadSystemConfiguredModels } from '@client/shared/models/configuredModels';
 import { fullPromptGroupLabel } from '@shared/domain/assets/fullPromptGroupLabel';
@@ -9,20 +9,17 @@ import { CategoryLearningSummary } from './CategoryLearningSummary';
 import { CategoryMemoryView } from './CategoryMemoryView';
 import { CategorySkillVersionCard } from './CategorySkillVersionCard';
 
-export type CategorySkillTab = 'references' | 'memory' | 'skill';
+export type CategorySkillTab = 'memory' | 'skill';
 interface Props {
   folderId: string;
   tab: CategorySkillTab;
   onTab: (tab: CategorySkillTab) => void;
-  groupNumbers?: Map<string, number>;
   onPreview: (id: string) => void;
-  autoLearn?: boolean;
-  showReferences?: boolean;
 }
 const button = 'rounded-xl border border-slate-200/90 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08] cursor-pointer';
 const selectClass = 'h-8 rounded-xl border border-slate-200/90 bg-white px-2.5 text-xs font-semibold text-slate-800 outline-none transition-colors focus:border-indigo-400 dark:border-white/10 dark:bg-[#1B1C20] dark:text-slate-100';
 
-export function CategorySkillPanel({ folderId, tab, onTab, groupNumbers, onPreview, autoLearn = true, showReferences = true }: Props) {
+export function CategorySkillPanel({ folderId, tab, onTab, onPreview }: Props) {
   const panelRef = useRef<HTMLElement>(null);
   const selectTab = (next: CategorySkillTab) => {
     if (next !== tab && panelRef.current?.querySelector('[data-skill-dirty="true"]') && !window.confirm('技能修改尚未保存，确定切换吗？')) return;
@@ -45,7 +42,14 @@ export function CategorySkillPanel({ folderId, tab, onTab, groupNumbers, onPrevi
       window.removeEventListener('modality_models_updated', sync);
     };
   }, []);
-  const { state, busy, error, notice, refresh, run } = useCategorySkill(folderId, modelId, maxNewSamples, autoLearn);
+  const { state, busy, error, notice, refresh, run } = useCategorySkill(folderId, modelId, maxNewSamples, tab === 'memory');
+  const groupNumbers = useMemo(() => {
+    const numbers = new Map<string, number>();
+    for (const sample of state?.dataset.samples ?? []) {
+      if (sample.displayNumber) numbers.set(sample.id, sample.displayNumber);
+    }
+    return numbers;
+  }, [state?.dataset.samples]);
   const scope = state?.scope;
   const active = state?.versions.find(version => version.id === scope?.activeVersionId);
   const trial = state?.versions.find(version => version.id === scope?.trialVersionId);
@@ -58,8 +62,7 @@ export function CategorySkillPanel({ folderId, tab, onTab, groupNumbers, onPrevi
   const shown = new Set([active?.id, trial?.id, ...candidates.map(version => version.id)]);
   const history = state?.versions.filter(version => !shown.has(version.id)) || [];
   const versionCard = (version: NonNullable<typeof active>) => state && <CategorySkillVersionCard key={version.id} version={version} state={state} groupNumbers={groupNumbers} busy={running} onPreview={onPreview} onRun={run} />;
-  const tabItems: Array<{ id: CategorySkillTab; label: string; icon: typeof Images; count?: number }> = [
-    { id: 'references', label: '参考图库', icon: Images, count: state?.dataset.total },
+  const tabItems: Array<{ id: CategorySkillTab; label: string; icon: typeof Sparkles; count?: number }> = [
     { id: 'memory', label: '偏好与记忆', icon: Brain, count: state?.memory.entries.length },
     { id: 'skill', label: '技能正文与版本', icon: Sparkles, count: state?.versions.length },
   ];
@@ -69,7 +72,7 @@ export function CategorySkillPanel({ folderId, tab, onTab, groupNumbers, onPrevi
       <div className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2 sm:px-4">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <nav aria-label="类目学习导航" className="flex items-center gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
-            {tabItems.filter(item => showReferences || item.id !== 'references').map(({ id, label, icon: Icon, count }) => (
+            {tabItems.map(({ id, label, icon: Icon, count }) => (
               <button
                 type="button"
                 key={id}
@@ -157,7 +160,7 @@ export function CategorySkillPanel({ folderId, tab, onTab, groupNumbers, onPrevi
             </label>
 
             <label className="asset-skill-setting-row asset-skill-setting-toggle-row">
-              <span className="asset-skill-setting-copy"><span>自动学习</span><small>有新资料时自动启动一轮读图</small></span>
+              <span className="asset-skill-setting-copy"><span>自动学习</span><small>在「偏好与记忆」中，有新资料时启动一轮读图</small></span>
               <span className={`asset-skill-toggle ${scope?.autoAnalyze ? 'is-on' : ''}`}>
                 <input type="checkbox" checked={scope?.autoAnalyze || false} disabled={running || !scope} onChange={event => configure({ autoAnalyze: event.target.checked })} />
                 <span aria-hidden="true" />
@@ -175,20 +178,17 @@ export function CategorySkillPanel({ folderId, tab, onTab, groupNumbers, onPrevi
         </div>
       )}
     </div>
-    {tab !== 'references' && !state && !error && <p role="status" className="py-10 text-center text-xs text-slate-500">正在读取技能…</p>}
+    {!state && !error && <p role="status" className="py-10 text-center text-xs text-slate-500">正在读取技能…</p>}
     {error && <div role="alert" className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs leading-5 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">{error}<button type="button" onClick={() => void refresh()} className="ml-3 underline">重新读取状态</button></div>}
     {notice && <p role="status" className="mt-2 rounded-xl bg-emerald-50 px-3.5 py-2 text-xs leading-5 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{notice}</p>}
     {tab === 'memory' && state && <CategoryMemoryView memory={state.memory} groupNumbers={groupNumbers} busy={running} onPreview={onPreview} onRun={run} />}
     {tab === 'skill' && state && <div className="mt-4 space-y-4">
-      <p className="rounded-xl bg-slate-50 p-3 text-xs leading-6 text-slate-500 dark:bg-white/5">学习顺序：逐镜读图事实 → 提示词槽位与完整示例 → 整组分镜架构 → 同款多条差异规划。旧观察需按新方法重新读图；已启用版本继续用于生产，新版需完成学习后试用或启用。</p>
-      <p className="text-xs leading-6 text-slate-500">在下方查看完整技能，点击“编辑技能”修改正文；希望后续学习持续遵守的要求，请在<button type="button" onClick={() => selectTab('memory')} className="mx-1 text-indigo-500 underline">偏好与记忆</button>中补充。</p>
       {trial && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-indigo-50 p-4 text-xs leading-6 dark:bg-indigo-500/10"><span>后续新分析正在试用候选技能。固定同款商品图和相同生图设置，分别生成新旧版成图并评分。</span><button type="button" disabled={running} onClick={() => void run('baseline')} className={button}>切回正式版做对照</button></div>}
       {active && <div className="flex justify-end"><button type="button" disabled={running} onClick={() => void run('rollback')} className={button}>回滚上一正式版本</button></div>}
       {trial && versionCard(trial)}{active && versionCard(active)}{candidates.map(versionCard)}
       {history.length > 0 && <details className="rounded-xl border border-slate-200 p-4 text-xs dark:border-white/10"><summary className="cursor-pointer font-medium">更多版本（{history.length}）</summary><div className="mt-4 space-y-4">{history.map(versionCard)}</div></details>}
       {!state.versions.length && <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm leading-7 text-slate-500 dark:border-white/10"><Sparkles className="mx-auto mb-3 h-6 w-6 text-indigo-400" />还没有候选技能，先积累图片观察。<p className="text-xs">已记住 {state.memory.learned} 套，经验 {state.memory.notes.length} 条。暂时使用基础商品保真规则。</p><button type="button" onClick={() => selectTab('memory')} className="mt-3 text-xs text-indigo-500 underline">查看学习记忆</button></div>}
-      <details className="rounded-xl border border-slate-200 bg-white p-4 text-xs dark:border-white/10 dark:bg-[#18191c]"><summary className="cursor-pointer font-medium">可选：用实际成图对比技能</summary>
-        <p className="my-3 leading-6 text-slate-500">可以直接启用技能。需要比较效果时，固定商品图和生成设置，分别生成新旧版图片并评分。以下参考仅作为技能学习来源查看，不载入生产。</p>
+      <details className="rounded-xl border border-slate-200 bg-white p-4 text-xs dark:border-white/10 dark:bg-[#18191c]"><summary className="cursor-pointer font-medium">查看学习来源</summary>
         <div className="space-y-2">{state.dataset.samples.map(sample => <div key={sample.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/5"><button type="button" className="truncate text-left font-semibold tabular-nums hover:underline" onClick={() => onPreview(sample.id)}>{fullPromptGroupLabel(groupNumbers?.get(sample.id))}</button></div>)}</div>
       </details>
     </div>}

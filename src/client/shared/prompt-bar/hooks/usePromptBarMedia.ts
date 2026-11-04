@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type RefObject } from 'react';
+import { useAppStore } from '@client/store';
 import { useFileDropZone } from '@client/shared/hooks/useFileDropZone';
 import {
   isImageFile,
   isImageOrVideoFile,
   isVideoFile,
+  readFileAsDataUrl,
   type RefMediaKind,
 } from '@client/shared/api/mediaUpload';
 import { isAgentAttachmentFile, loadPromptBarUploads } from '../agentAttachments';
@@ -177,7 +179,7 @@ export function usePromptBarMedia({
       const newNamesMap: Record<string, string> = {};
       const newMentionNames: string[] = [];
 
-      let currentTotal = quickRefImages.filter((url) => !url.startsWith('agent-file:')).length;
+      let currentTotal = useAppStore.getState().quickRefImages.filter((url) => !url.startsWith('agent-file:')).length;
       items.forEach((item) => {
         registerRefMedia(item.previewUrl, item.file, item.origName);
         newNamesMap[item.previewUrl] = item.origName;
@@ -205,12 +207,12 @@ export function usePromptBarMedia({
         });
         if (mentionTokens.length > 0) {
           const mentionStr = mentionTokens.join(' ') + ' ';
-          const trimmed = quickPrompt.trim();
+          const trimmed = useAppStore.getState().quickPrompt.trim();
           setQuickPrompt(trimmed ? `${trimmed} ${mentionStr}` : mentionStr);
         }
       }
     },
-    [isDepthMode, quickGenMode, quickPrompt, quickRefImages, bumpRefMediaVersion, setQuickRefImages, addQuickRefImage, setQuickPrompt],
+    [isDepthMode, quickGenMode, bumpRefMediaVersion, setQuickRefImages, addQuickRefImage, setQuickPrompt],
   );
 
   const resolveMediaFile = useCallback(
@@ -225,38 +227,21 @@ export function usePromptBarMedia({
 
   const refMediaFile = quickRefImages[0] ? resolveRefMediaFile(quickRefImages[0]) ?? null : null;
 
-  // 上传文件处理 (参考图/参考视频素材，保留原始文件名，并批量将主体标号写入输入框)
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const list = e.target.files;
-    e.target.value = '';
-    if (!list?.length) return;
-    const selected = isDepthMode ? [list[0]] : Array.from(list);
-    void loadPromptBarUploads(selected, quickGenMode === 'agent')
-      .then(({ media, agentUrls }) => {
-        if (media.length) addMultipleRefMedia(media);
-        agentUrls.forEach((url) => addQuickRefImage(url));
-      })
-      .catch(() => showToast('无法读取上传的文件'));
-  };
-
   // 创建新主体
   const handleCreateSubject = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const origName = file.name.replace(/\.[^/.]+$/, '').trim() || file.name;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (typeof event.target?.result === 'string') {
-        const url = event.target.result;
-        registerRefMedia(url, file, origName); bumpRefMediaVersion();
-        const newSub: SubjectItem = { id: `custom-${Date.now()}`, name: origName, url };
-        setRefImageNames((prev) => ({ ...prev, [url]: origName }));
-        setCustomSubjects((prev) => [newSub, ...prev]);
-        handleSelectSubject(newSub);
-        setIsExpandedRefImages(true);
-      }
-    };
-    reader.readAsDataURL(file);
+    void useAppStore.getState().readPromptAttachments(async () => {
+      const url = await readFileAsDataUrl(file);
+      registerRefMedia(url, file, origName);
+      bumpRefMediaVersion();
+      const newSub: SubjectItem = { id: `custom-${Date.now()}`, name: origName, url };
+      setRefImageNames(prev => ({ ...prev, [url]: origName }));
+      setCustomSubjects(prev => [newSub, ...prev]);
+      handleSelectSubject(newSub);
+      setIsExpandedRefImages(true);
+    }).catch(() => showToast('无法读取主体图片，请重新选择文件'));
     e.target.value = '';
   };
 
@@ -329,16 +314,20 @@ export function usePromptBarMedia({
         return;
       }
       const selected = isDepthMode ? [filtered[0]] : filtered;
-      void loadPromptBarUploads(selected, quickGenMode === 'agent')
-        .then(({ media, agentUrls }) => {
-          if (media.length) addMultipleRefMedia(media);
-          agentUrls.forEach((url) => addQuickRefImage(url));
-          if (!media.length && !agentUrls.length) rejectDrop();
-        })
-        .catch(() => showToast('无法读取拖入的文件'));
+      void useAppStore.getState().readPromptAttachments(async () => {
+        const { media, agentUrls } = await loadPromptBarUploads(selected, quickGenMode === 'agent');
+        if (media.length) addMultipleRefMedia(media);
+        agentUrls.forEach(addQuickRefImage);
+      }).catch(() => showToast('无法读取参考素材，请重新选择文件'));
     },
     [acceptDropFile, addMultipleRefMedia, addQuickRefImage, isDepthMode, quickGenMode, rejectDrop, showToast],
   );
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (files.length) ingestMediaFiles(files);
+  };
 
   const { dropZoneProps } = useFileDropZone({
     onFiles: ingestMediaFiles,

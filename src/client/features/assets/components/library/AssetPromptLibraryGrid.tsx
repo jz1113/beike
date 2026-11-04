@@ -22,7 +22,6 @@ export function isGalleryAtomType(type: PromptAssetType): type is GalleryAtomTyp
 
 interface Props {
   onActionsTarget?: (element: HTMLDivElement | null) => void;
-  onOpenSkills?: () => void;
   audienceFilters?: ReactNode;
   activeSubTab: PromptAssetType;
   items: AssetLibrarySlim[];
@@ -82,7 +81,7 @@ interface Props {
 
 /** The library's folder and card presentation; mutations remain owned by its parent. */
 export function AssetPromptLibraryGrid({
-  onActionsTarget, onOpenSkills, audienceFilters, activeSubTab, items, displayedItems, promptGroupCategories, promptGroupAlbums,
+  onActionsTarget, audienceFilters, activeSubTab, items, displayedItems, promptGroupCategories, promptGroupAlbums,
   subcategoryFolders, assetScrollRef, loadError, isLoading,
   promptGroupCategoryFilter,
   promptGroupSubcategoryFilter, currentFolderName, isBatchMode, selectedIds,
@@ -104,18 +103,18 @@ export function AssetPromptLibraryGrid({
   const categoryLabels = useMemo(() => new Map(activeSubTab === 'full_prompt' ? displayedItems.map(item => [item.id, promptGroupCategoryLabel(item, promptGroupCategories, promptGroupAlbums)]) : []), [activeSubTab, displayedItems, promptGroupCategories, promptGroupAlbums]);
   const sharedCategoryLabel = new Set(categoryLabels.values()).size === 1 ? categoryLabels.values().next().value : undefined;
   const hasUsageSort = sortBy !== 'default' || new Set(items.map(item => item.usageCount || 0)).size > 1;
-  const typeTitle = { full_prompt: '全部母本', persona: '全部人物', outfit: '全部穿搭', scene: '全部场景', action: '全部动作' }[activeSubTab];
+  const typeTitle = { full_prompt: '全部参考图组', persona: '全部人物', outfit: '全部穿搭', scene: '全部场景', action: '全部动作' }[activeSubTab];
   return (
       <div className="asset-library-workspace">
         {activeSubTab === 'full_prompt' && <PromptLibrarySidebar items={items} categories={promptGroupCategories} albums={promptGroupAlbums}
           category={promptGroupCategoryFilter} subcategory={promptGroupSubcategoryFilter}
           onSelect={(category, subcategory) => { setManagingCategories(false); openCategoryFolder(category); if (subcategory) openSubcategoryFolder(subcategory); }}
-          onManage={() => setManagingCategories(true)} onOpenSkills={onOpenSkills} />}
+          onManage={() => setManagingCategories(true)} />}
         <div className="asset-library-main">
         <div className="asset-gallery-heading">
           <nav aria-label="当前素材分类" className="asset-gallery-path">
             {isGroup && promptGroupCategoryFilter !== 'all' ? <>
-              <button type="button" onClick={() => openCategoryFolder('all')}>全部母本</button><span>/</span>
+              <button type="button" onClick={() => openCategoryFolder('all')}>全部参考图组</button><span>/</span>
               {promptGroupSubcategoryFilter === 'all' ? <strong aria-current="page">{currentFolderName}</strong> : <>
                 <button type="button" onClick={() => openCategoryFolder(promptGroupCategoryFilter)}>{currentFolderName}</button><span>/</span>
                 <strong aria-current="page">{subcategoryFolders.find(folder => folder.id === promptGroupSubcategoryFilter)?.name || '待分类'}</strong>

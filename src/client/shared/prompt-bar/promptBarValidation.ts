@@ -7,6 +7,7 @@ import {
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { isVideoFile } from '@client/shared/api/mediaUpload';
 import { videoInputError } from '@shared/domain/media/videoCapabilities';
+import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
 import {
   mediaReferenceSlots,
   normalizeVideoReferenceMentions,
@@ -241,6 +242,7 @@ export function validateSubmitInput(
     if (!quickPrompt.trim()) return '请补充视频的动作、镜头或编辑要求';
     const mediaError = videoInputError({
       model: upstreamModalityModelId('video', input.quickVideoModel),
+      baseUrl: getGatewayClientBaseUrl(input.quickVideoModel),
       refMode: quickVideoRefMode,
       images: effectiveImages.filter((url) => !isVideoMediaUrl(url)),
       videos: effectiveImages.filter(isVideoMediaUrl),

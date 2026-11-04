@@ -8,6 +8,7 @@ export default defineConfig([
   globalIgnores([
     '.local/**',
     'tools/build/**',
+    'src/client/public/canvas-studio/assets/**',
     'node_modules/**',
     'src/client/shared/api/openapi-types.ts',
   ]),
@@ -19,6 +20,10 @@ export default defineConfig([
     },
   },
   js.configs.recommended,
+  {
+    files: ['src/client/public/canvas-studio/host.js'],
+    languageOptions: {globals: globals.browser},
+  },
   ...tseslint.configs.recommended,
   {
     files: ['src/client/**/*.{ts,tsx}'],

@@ -117,8 +117,8 @@
 .sales-product-media .sales-thumbnail-grid .sales-reference-tile.is-ocr:not(.is-selected) { border-color: var(--sales-ocr-accent); }
 .sales-product-media .sales-thumbnail-grid .sales-reference-frame { width: 100%; aspect-ratio: 4 / 5; }
 .sales-product-media .sales-thumbnail-grid .sales-reference-trigger { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; }
-.sales-product-media .sales-thumbnail-grid .sales-reference-image { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; min-height: 0; object-fit: contain; opacity: .45; filter: grayscale(1); transition: opacity 160ms ease, filter 160ms ease; }
-.sales-product-media .sales-thumbnail-grid .sales-reference-tile.is-selected .sales-reference-image { opacity: 1; filter: none; }
+.sales-product-media .sales-thumbnail-grid .sales-reference-image { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; min-height: 0; object-fit: contain; transition: filter 160ms ease; }
+.sales-product-media .sales-thumbnail-grid .sales-reference-tile.is-selected .sales-reference-image { filter: brightness(.48); }
 .sales-reference-ocr { position: absolute; top: 6px; right: 6px; display: inline-flex; min-height: 18px; align-items: center; gap: 3px; border-radius: 4px; background: var(--sales-ocr-accent); padding: 2px 4px; color: var(--sales-surface); font-size: 9px; font-weight: 600; line-height: 1; pointer-events: none; }
 .sales-product-media .sales-reference-tile.is-selected::after { content: none; }
 .sales-product-media .sales-image-zoom-btn { opacity: .55; transition: opacity 140ms ease, background 140ms ease; }
@@ -126,6 +126,7 @@
 .sales-product-media .sales-reference-tile:focus-within .sales-image-zoom-btn { opacity: 1; }
 .sales-product-media .sales-gallery-confirm {
   display: flex;
+  flex-wrap: wrap;
   min-height: var(--sales-product-footer-height, 72px);
   flex-shrink: 0;
   align-items: center;
@@ -137,7 +138,7 @@
   background: var(--sales-surface);
 }
 .sales-product-media .sales-gallery-confirm > span { flex-shrink: 0; color: var(--sales-muted); font-size: 12px; white-space: nowrap; }
-.sales-gallery-footer-actions { display: flex; align-items: center; gap: 8px; }
+.sales-gallery-footer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sales-product-media .sales-gallery-menu > summary { width: auto; min-height: 32px; gap: 4px; border: 0; padding: 0 4px; font-size: 12px; white-space: nowrap; }
 .sales-product-media .sales-gallery-menu-items { top: auto; right: -88px; bottom: calc(100% + 12px); min-width: 256px; }
 .sales-product-media .sales-gallery-menu-items > button { min-height: 36px; font-size: 12px; }
@@ -193,6 +194,9 @@
   .sales-product-settings-identity > img { width: 56px; height: 92px; }
   .sales-product-settings-dialog > footer { gap: 8px; }
   .sales-product-settings-finish { gap: 8px; }
+}
+@container (min-width: 510px) {
+  .sales-product-media .sales-thumbnail-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @container (max-width: 340px) {
   .sales-product-media .sales-thumbnail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

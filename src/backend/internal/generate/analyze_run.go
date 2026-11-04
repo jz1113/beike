@@ -48,14 +48,14 @@ func runAnalyze(cfg config.Config, w http.ResponseWriter, r *http.Request, paylo
 		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"error": promptErr.Error()})
 		return
 	}
-	fingerprint := TextField(parsed, "productFingerprint", "product_fingerprint")
+	fingerprint := workshopFingerprint(parsed)
 	role := TextField(parsed, "productRole", "product_role")
 	scene := TextField(parsed, "masterScene", "master_scene")
 	look := TextField(parsed, "lookBible", "look_bible")
 	style := TextField(parsed, "styleBible", "style_bible")
 	identity := TextField(parsed, "identityBible", "identity_bible")
 	action := TextField(parsed, "actionDigest")
-	saveAnalysis(cfg, r, title, fingerprint, model, prompts)
+	saveAnalysis(cfg, r, rawString(payload, "productId"), title, fingerprint, model, prompts, binding)
 	var group any
 	if scene != "" {
 		group = map[string]any{"scene": scene, "actionDigest": action}
@@ -88,7 +88,24 @@ func TextField(data map[string]any, keys ...string) string {
 	return ""
 }
 
-func saveAnalysis(cfg config.Config, r *http.Request, title, fingerprint, model string, prompts []any) {
+// Models sometimes return the visible features grouped by part rather than as
+// one sentence. Keep those observations when passing the plan to image generation.
+func workshopFingerprint(parsed map[string]any) string {
+	if value := TextField(parsed, "productFingerprint", "product_fingerprint"); value != "" {
+		return value
+	}
+	for _, key := range []string{"productFingerprint", "product_fingerprint"} {
+		switch value := parsed[key].(type) {
+		case map[string]any, []any:
+			if raw, err := json.Marshal(value); err == nil && len(raw) > 2 && len(raw) <= 8192 {
+				return string(raw)
+			}
+		}
+	}
+	return ""
+}
+
+func saveAnalysis(cfg config.Config, r *http.Request, productID, title, fingerprint, model string, prompts []any, binding *workshopBinding) {
 	db, err := openTaskDB(cfg)
 	if err != nil {
 		return
@@ -98,7 +115,15 @@ func saveAnalysis(cfg config.Config, r *http.Request, title, fingerprint, model 
 	if title == "" {
 		title = "未命名商品"
 	}
-	_, _ = dbcatalog.CreatePromptRecord(r.Context(), db, workspaceOf(r), dbcatalog.PromptDraft{
-		ProductTitle: title, Fingerprint: fingerprint, ModelUsed: model, StyleName: "技能创作", PromptsJSON: string(raw),
-	})
+	input := dbcatalog.PromptDraft{ProductTitle: title, Fingerprint: fingerprint, ModelUsed: model, StyleName: "技能创作", PromptsJSON: string(raw)}
+	if productID != "" {
+		input.ProductID = productID
+	}
+	if binding != nil {
+		input.StyleName = TextField(binding.Skill, "name")
+		if version := TextField(binding.Skill, "libraryVersion"); version != "" {
+			input.StyleName += " · " + version
+		}
+	}
+	_, _ = dbcatalog.CreatePromptRecord(r.Context(), db, workspaceOf(r), input)
 }

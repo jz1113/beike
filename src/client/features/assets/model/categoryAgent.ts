@@ -29,5 +29,5 @@ export function categoryNextStep(state: CategorySkillState): { label: string; de
   if (memory.pending) return { label: '有新图可学', detail: `还有 ${memory.pending} 套待处理。已成功观察且输入未变的图组会复用，不会重复调用模型。` };
   if (!canConsolidate(state)) return { label: '积累参考', detail: '读完一套有效参考图，或添加手动经验，即可整理技能。' };
   if (state.needsConsolidation) return { label: '可以整理技能', detail: '观察、经验或反馈已更新，可以整理新的候选技能。' };
-  return { label: '记忆已保存', detail: '自动学习只会按当前页面触发一轮；继续投喂参考图或评分后，再开始下一轮。' };
+  return { label: '记忆已保存', detail: '可导入新的参考图或补充经验。' };
 }

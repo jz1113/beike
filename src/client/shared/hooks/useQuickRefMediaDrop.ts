@@ -24,7 +24,7 @@ export function useQuickRefMediaDrop() {
 
   const ingestPageMediaFiles = useCallback(
     (files: File[]) => {
-      void processDroppedMediaFiles(
+      void useAppStore.getState().readPromptAttachments(() => processDroppedMediaFiles(
         files,
         (url, origName, file) => {
           registerRefMedia(url, file, origName);
@@ -34,7 +34,7 @@ export function useQuickRefMediaDrop() {
           onAllSkipped: rejectDrop,
           onError: (msg) => showToast(msg),
         },
-      ).catch(() => showToast('无法读取拖入的文件'));
+      )).catch(() => showToast('无法读取拖入的文件'));
     },
     [addQuickRefImage, rejectDrop, showToast],
   );

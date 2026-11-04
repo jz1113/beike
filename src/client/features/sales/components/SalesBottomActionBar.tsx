@@ -67,7 +67,7 @@ export function SalesDropup({
         >
           <span className="sales-dropup-key">{label}</span>
           {thumbUrl ? <img src={thumbUrl} alt="" className="sales-dropup-thumb" aria-hidden /> : null}
-          <span className="sales-dropup-val">{value}</span>
+          <span className="sales-dropup-val" title={typeof value === 'string' ? value : undefined}>{value}</span>
           <ChevronUp size={13} className={`sales-dropup-caret ${open ? 'rotate-180' : ''}`} aria-hidden />
         </button>
       )}

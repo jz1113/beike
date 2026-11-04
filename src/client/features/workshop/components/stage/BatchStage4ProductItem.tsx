@@ -25,7 +25,6 @@ export interface BatchStage4ProductItemProps {
   updateItemCopywriting?: (itemId: string, copywriting: { title: string; content: string; tags?: string[] }) => void;
   retrySingleShotTask?: (itemId: string, shotIndex: number) => Promise<void>;
   isExportingZip: boolean;
-  handleExportSingleProductZip?: (item: BatchProductItem) => Promise<void>;
   handleDownloadSingleTaskImage?: (url: string, filename?: string) => Promise<void>;
   setPreviewImageUrl: (url: string | null) => void;
   onPreviewGallery?: (images: string[], index?: number, title?: string) => void;
@@ -86,6 +85,7 @@ export function BatchStage4ProductItem({
     <div key={item.id} className="grid grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)] gap-4 items-start animate-in fade-in duration-200">
       {/* ===================== 左侧栏 (3/12 宽度)：商品信息 ===================== */}
       <div className="lg:row-span-2 min-w-0 space-y-4">
+      {productNavigation}
       <BatchStage4ProductInfo
         item={item}
         productUrl={productUrl}
@@ -98,10 +98,8 @@ export function BatchStage4ProductItem({
       />
 
       {/* ===================== 中间栏 (5/12 宽度)：成图展台 ===================== */}
-      {productNavigation}
       </div>
       <div className="workshop-image-gallery lg:col-start-2 min-w-0 rounded-2xl border border-slate-200/80 bg-white/95 p-4 sm:p-5 space-y-4 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-[#18191c]/95">
-        <WorkshopPromoteGroup item={item} visionModel={selectedVisionModel} />
         {/* 切片成图展台 (4 张大图) */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -154,7 +152,8 @@ export function BatchStage4ProductItem({
                         retrySingleShotTask(item.id, shotIdx);
                       }
                     }}
-                    className={`aspect-[3/4] rounded-xl border overflow-hidden relative flex items-center justify-center transition-colors group ${hasImage || (!readOnly && isGenFailure) ? 'cursor-pointer' : 'cursor-default'} ${
+                    style={{ aspectRatio: task.outputSize?.replace('x', ' / ') }}
+                    className={`aspect-[var(--workshop-output-aspect,3/4)] rounded-xl border overflow-hidden relative flex items-center justify-center transition-colors group ${hasImage || (!readOnly && isGenFailure) ? 'cursor-pointer' : 'cursor-default'} ${
                       hasImage
                         ? 'border-slate-200 hover:border-indigo-400 bg-slate-50 dark:bg-[#131417] dark:border-white/10 dark:hover:border-indigo-400/60'
                         : task.recoveryRequired
@@ -280,6 +279,7 @@ export function BatchStage4ProductItem({
             })}
           </div>
         </div>
+        {!readOnly && <WorkshopPromoteGroup item={item} visionModel={selectedVisionModel} />}
       </div>
 
       <BatchStage4CopyPanel

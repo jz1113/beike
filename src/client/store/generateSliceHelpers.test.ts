@@ -146,6 +146,18 @@ describe('generateSliceHelpers - session optimization', () => {
     expect(sessions[0].tasks[0].agentTurn?.reply).toBe('画面是一只白猫。');
   });
 
+  it('keeps local failures and real receipt identities distinct during archive hydration', () => {
+    const local = { id:'hub-gen-local', prompt:'失败后重试', model:'gpt-image-2', status:'FAILURE', createdAt:1 } as GenerationTask;
+    const [restored] = mergeAndSortTasks([local], [local]);
+    expect(restored.dbId).toBeUndefined();
+    const oldAlias = { ...local, dbId:local.id };
+    expect(mergeAndSortTasks([oldAlias], [oldAlias])[0].dbId).toBeUndefined();
+    const completed = { ...local, status:'SUCCESS', resultUrl:'/storage/result.png', dbId:'real-row' } as GenerationTask;
+    expect(mergeAndSortTasks([completed], [completed])[0].dbId).toBe('real-row');
+    const database = { ...completed, id:'real-row', dbId:undefined };
+    expect(mergeAndSortTasks([local], [database], true).some(task=>task.dbId === 'real-row')).toBe(true);
+  });
+
   it('marks and recognizes deleted session tombstones correctly', async () => {
     const { isSessionDeleted, markSessionDeleted } = await import('./persist/index');
     expect(isSessionDeleted('test-sess-123')).toBe(false);

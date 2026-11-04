@@ -42,6 +42,7 @@ describe('saved adaptation reaches the actual Mini video submission', () => {
         expression: '看向旧窗后浅笑', transition: '转向旧窗结束' }] }],
     })!;
     const assembled = assembleSalesVideoPrompt({
+      finalVideoTemplate: '这是工作区保存的最终规则：仅延续末姿势、呼吸和材质自然回落。\n{{referenceFacts}}\n{{photographyFacts}}\n{{timelineFacts}}\n{{audioFacts}}',
       script, productName: '当前开衫', selectedImages: [{ index: 0, role: 'main', url: '/product.jpg' }],
       beatBindings: [], persona: null, scene: null, customPersonaBodyUrl: '/persona.jpg',
       customSceneImageUrl: '/room.jpg', adaptedBeats: adapted.beats, presentationMode: 'clean_visual',

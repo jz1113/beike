@@ -26,7 +26,7 @@ func largeAssetGridFixture(t *testing.T) []byte {
 	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, 3072, 3072))
 	for index, value := range gridColors {
-		draw.Draw(img, assetGridCell(img.Bounds(), index), image.NewUniform(value), image.Point{}, draw.Src)
+		draw.Draw(img, assetGridCell(img.Bounds(), index, "scene"), image.NewUniform(value), image.Point{}, draw.Src)
 	}
 	var encoded bytes.Buffer
 	encoder := png.Encoder{CompressionLevel: png.NoCompression}

@@ -296,25 +296,12 @@
 .batch-name-hint > span:last-child { flex-shrink: 0; }
 .batch-name-body .history-action-error { margin-top: 14px; font-size: 12px; }
 .batch-name-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 18px 24px; border-top: 1px solid var(--history-line); }
-.batch-workspace-identity { display: flex; align-items: center; flex-shrink: 0; gap: 9px; margin: 0 32px 10px; padding: 10px 0; border-bottom: 1px solid #dcdce5; color: #777582; font-size: 11px; min-width: 0; }
-.dark .batch-workspace-identity { border-color: #ffffff0d; color: #96939f; }
-.batch-workspace-label { flex-shrink: 0; }
-.batch-workspace-name { display: inline-flex; align-items: center; gap: 7px; color: #40394f; min-width: 0; font-size: 12px; }
-.dark .batch-workspace-name { color: #d9d3e7; }
-.batch-workspace-name > span { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
-.batch-workspace-name > svg { flex-shrink: 0; opacity: .6; }
-.batch-workspace-name:hover { color: #9c86d8; }
-@media (max-width: 1100px) {
-  .batch-workspace-identity { margin-inline: 24px; }
-}
 @media (max-width: 767px) {
   .history-header .history-create { padding: 8px; }
   .history-create > span, .history-header-divider, .history-count { display: none; }
   .batch-name-overlay { padding: 16px; }
   .batch-name-dialog { width: 100%; height: auto; border-radius: 18px; }
   .batch-name-body { padding: 20px; }
-  .batch-workspace-identity { margin-inline: 16px; gap: 6px; }
-  .batch-workspace-identity > svg { display: none; }
 }
 
 

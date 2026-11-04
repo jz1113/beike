@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeScriptTemplate } from '@shared/domain/sales';
 import { updateBeat } from './salesScriptEditor';
-import { buildScriptStoryboard, exportScriptStoryboard, formatStoryboardTime } from './salesScriptStoryboard';
+import { buildScriptStoryboard, exportScriptRecords, exportScriptStoryboard, formatStoryboardTime } from './salesScriptStoryboard';
 
 const sample = () => normalizeScriptTemplate({
   title: '自然光商品展示', durationSec: 12.4,
@@ -21,56 +21,71 @@ describe('script storyboard reading and export', () => {
     const script = sample();
     const before = JSON.stringify(script);
     script.shots.push({ ...script.shots[0], start: 12.4, end: 14, summary: '结尾定格', beats: [{ ...script.shots[0].beats[1], start: 12.4, end: 14 }] });
-    const segments = buildScriptStoryboard(script);
-    expect(segments.map((segment) => segment.index)).toEqual([1, 2, 3]);
-    expect(segments[1]).toMatchObject({ address: { shot: 0, beat: 1 }, range: '00:05.1 - 00:12.4' });
-    expect(segments[2]).toMatchObject({ address: { shot: 1, beat: 0 }, title: '结尾定格' });
-    expect(segments[0].fields.map((field) => field.label)).toEqual(['画面风格', '主体', '动作描述', '镜头变化', '眼神表情', '场景与光线', '衔接方式']);
+    const shots = buildScriptStoryboard(script);
+    expect(shots.map((shot) => shot.title)).toEqual(['分镜一', '分镜二', '分镜三']);
+    expect(shots[1].segments[0]).toMatchObject({ address: { shot: 0, beat: 1 }, range: '00:05.1 - 00:12.4' });
+    expect(shots.map((shot) => shot.number)).toEqual(['01.1', '01.2', '02']);
+    expect(shots[2]).toMatchObject({ index: 3, range: '00:12.4 - 00:14' });
+    expect(shots[0].fields.map((field) => field.label)).toEqual(['画面风格', '主体', '动作描述', '镜头变化', '人物神态']);
     script.shots.pop();
     expect(JSON.stringify(script)).toBe(before);
   });
 
-  it('builds a complete reusable Chinese prompt and follows live edits', () => {
+  it('exports recorded storyboard fields and follows live edits without adding generation instructions', () => {
     const script = sample();
-    const prompt = buildScriptStoryboard(script)[0].prompt;
+    const prompt = buildScriptStoryboard(script)[0].segments[0].prompt;
     for (const text of ['5.1秒', '日系胶片质感', '窗边自然柔光', '人物展示{{商品}}', '木质车厢', '双手轻抚{{商品}}', '手持跟随', '直视镜头', '[开场惊叹]', '一镜到底']) expect(prompt).toContain(text);
-    expect(prompt).not.toContain('原片独有广告词');
+    expect(prompt).toContain('原片台词记录：原片独有广告词');
+    for (const added of ['无水印', '无额外字幕', '不额外增加镜头运动', '填入当前商品']) expect(prompt).not.toContain(added);
     const edited = updateBeat(script, { shot: 0, beat: 0 }, { actionTemplate: '抬手指向{{商品细节}}', expression: '低头浅笑' });
-    const updated = buildScriptStoryboard(edited)[0];
+    const updated = buildScriptStoryboard(edited)[0].segments[0];
     expect(updated.prompt).toContain('抬手指向{{商品细节}}');
     expect(updated.prompt).toContain('低头浅笑');
     expect(updated.prompt).not.toContain('双手轻抚');
   });
 
-  it('removes source exclusions from every generated prompt field and keeps raw records out', () => {
+  it('preserves source entities and raw observations as records rather than replacing them with invented product instructions', () => {
     const script = sample();
     script.sourceExclusions = [{ type: 'brand_signage', term: '原片品牌、私人配饰', replacementRule: '替换' }];
     const beat = script.shots[0].beats[0];
     Object.assign(beat, { subject: '原片品牌', scene: '私人配饰', referenceActionRaw: '原片观察专属内容', subtitle: '原片字幕' });
-    const prompt = buildScriptStoryboard(script)[0].prompt;
-    for (const raw of ['原片品牌', '私人配饰', '原片观察专属内容', '原片字幕']) expect(prompt).not.toContain(raw);
-    expect(prompt).toContain('{{商品}}');
+    const prompt = buildScriptStoryboard(script)[0].segments[0].prompt;
+    for (const raw of ['主体：原片品牌', '场景与光线：私人配饰', '原片动作记录：原片观察专属内容', '原片字幕记录：原片字幕']) expect(prompt).toContain(raw);
+    expect(exportScriptRecords(script)).toContain('原片专属元素记录：');
+    expect(exportScriptRecords(script)).toContain('brand_signage：原片品牌、私人配饰（替换）');
   });
 
-  it('respects silent and voiceover modes and provides honest missing-field fallbacks', () => {
+  it('records voice mode and audio availability without inventing mouth or speech directions', () => {
     const script = sample();
     const beat = script.shots[0].beats[0];
     beat.voice.mode = 'voiceover';
-    expect(buildScriptStoryboard(script)[0].prompt).toContain('画外旁白，人物不做说话口型');
+    expect(buildScriptStoryboard(script)[0].segments[0].prompt).toContain('声音模式记录：voiceover；音轨可用：是');
     script.audioAvailable = false;
-    expect(buildScriptStoryboard(script)[0].prompt).toContain('无口播');
-    const second = buildScriptStoryboard(script)[1];
-    expect(second.fields.find((field) => field.label === '眼神表情')?.text).toBe('未记录眼神表情');
-    expect(second.prompt).not.toContain('未记录');
+    expect(buildScriptStoryboard(script)[0].segments[0].prompt).toContain('声音模式记录：voiceover；音轨可用：否');
+    expect(buildScriptStoryboard(script)[0].segments[0].prompt).not.toContain('人物不做说话口型');
+    expect(buildScriptStoryboard(script)[1].segments[0].prompt).not.toContain('未记录');
   });
 
-  it('copies the full reading format with precise timestamps and each segment prompt', () => {
+  it('copies the full reading format with precise timestamps and source records', () => {
     const script = sample();
+    script.shots[0].beats[0].referenceActionRaw = '她拿起卡片';
+    script.shots[0].beats[0].shows = '开场律动';
+    script.shots[0].beats.forEach(beat=>{beat.subtitle='同一条屏幕字幕';});
+    script.sampleTimesSec = [0, 5.1, 11.8];
+    script.shots[0].beats[1].shows = '她转身面向窗户';
     const exported = exportScriptStoryboard(script);
-    expect(exported).toContain('不代表真实切镜');
-    expect(exported).toContain('分镜 2：商品展示（00:05.1 - 00:12.4）');
-    expect(exported).toContain('• 画面风格：日系胶片质感，窗边自然柔光');
-    expect(exported.match(/即梦生成提示词（中文）/g)).toHaveLength(2);
-    expect(exported).not.toContain('原片独有广告词');
+    expect(exported).toContain('### 视频总体风格');
+    expect(exported).toContain('### 分镜总览（12.4 秒 · 1 个镜头 · 2 行）');
+    expect(exported).toContain('| 镜号 | 时间 / 时长 | 画面与动作 | 镜头方式 |');
+    expect(exported).toContain('| 01.1 | 00:00 - 00:05.1（约 5.1 秒） | 她拿起卡片');
+    expect(exported).toContain('| 01.2 | 00:05.1 - 00:12.4（约 7.3 秒） | 她转身面向窗户 | 中景 |');
+    expect(exported.match(/同一条屏幕字幕/g)).toHaveLength(1);
+    expect(exported).not.toContain('开场律动');
+    expect(exported).not.toMatch(/原片独有广告词|分镜资料|开场吸引|\{\{商品/);
+    Object.assign(script.shots[0].beats[0], { sectionLabel:'车内' });
+    Object.assign(script.shots[0].beats[1], { sectionLabel:'窗边', cameraLabel:'侧面跟拍', shows:'经过栏杆 | 看向窗外' });
+    const grouped = exportScriptStoryboard(script);
+    expect(grouped).toContain('第 2 段 · 窗边（5.1–12.4 秒，1 行）');
+    expect(grouped).toContain('经过栏杆 \\| 看向窗外 | 侧面跟拍');
   });
 });

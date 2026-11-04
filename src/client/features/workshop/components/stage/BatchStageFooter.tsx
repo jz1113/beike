@@ -35,14 +35,14 @@ export default function BatchStageFooter({
         <span>{prevLabel}</span>
       </button>}
 
-      <div className="ml-auto flex items-center gap-3 flex-wrap justify-end">
+      <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
         {hint}
         {secondaryActions}
         <button
           type="button"
           onClick={primaryAction.onClick}
           disabled={primaryAction.disabled}
-          className="px-5 py-3 rounded-xl text-xs font-bold bg-slate-950 hover:bg-black text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          className="w-full justify-center sm:w-auto px-5 py-3 rounded-xl text-xs font-bold bg-slate-950 hover:bg-black text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
         >
           {primaryAction.icon}
           <span>{primaryAction.label}</span>

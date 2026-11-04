@@ -31,3 +31,18 @@ func TestReadVideoPollRequiresResultURL(t *testing.T) {
 		t.Fatalf("nested json fail_reason: %+v", nestedJSON)
 	}
 }
+
+func TestReadVideoPollDoesNotFinishQueuedResults(t *testing.T) {
+	for _, status := range []string{"PENDING", "SUBMITTED", "NOT_START", "QUEUED", "RUNNING"} {
+		t.Run(status, func(t *testing.T) {
+			parsed := readVideoPoll(map[string]any{"status": status, "url": "https://cdn.example/preview.mp4"})
+			if parsed.status != "IN_PROGRESS" || parsed.result != "" {
+				t.Fatalf("unfinished task became downloadable: %+v", parsed)
+			}
+		})
+	}
+	parsed := readVideoPoll(map[string]any{"url": "https://cdn.example/completed.mp4"})
+	if parsed.status != "SUCCESS" || parsed.result == "" {
+		t.Fatalf("result-only completion lost: %+v", parsed)
+	}
+}

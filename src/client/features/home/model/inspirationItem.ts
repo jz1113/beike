@@ -33,5 +33,5 @@ export interface InspirationUseOptions {
   videoDuration?: number;
   videoModel?: string;
   videoAspectId?: string;
-  videoResolution?: '480P' | '540P' | '720P' | '1080P' | '2K' | '4K';
+  videoResolution?: '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
 }

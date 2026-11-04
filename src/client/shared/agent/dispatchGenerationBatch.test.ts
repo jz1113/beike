@@ -249,7 +249,9 @@ describe('shared button and followup batch submission', () => {
   });
 
   it('reads current live controls only as a fallback', () => {
-    expect(currentBatchSettings()).toEqual(settings);
+    expect(currentBatchSettings()).toEqual({ ...settings, videoContextIrEnabled: true });
+    Object.assign(state, { quickVideoContextIrEnabled: false });
+    expect(currentBatchSettings().videoContextIrEnabled).toBe(false);
     state.quickQuality = 'medium';
     expect(currentBatchSettings().imageQuality).toBe('medium');
   });

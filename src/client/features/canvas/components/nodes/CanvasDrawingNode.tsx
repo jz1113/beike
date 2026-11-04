@@ -13,8 +13,10 @@ import { ArrowUp, Plus, Loader2, X, WandSparkles, Video } from 'lucide-react';
 import { useAppStore } from '@client/store';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
-import { getEnabledVideoModelsFromSettings, getEnabledImageModelsFromSettings, readWorkflowModelsFromStorage } from '@shared/domain/models/workflowModels';
-import { clampVideoDuration, getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
+import { loadCanvasGenerationModels } from '../../model/canvasGenerationModels';
+import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
+import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
+import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
 import { buildPromptBarGenerationTasks } from '@client/shared/prompt-bar/promptBarSubmit';
 import { calculateImageDimensions } from '@client/shared/prompt-bar/promptBarDisplay';
 import { IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
@@ -22,21 +24,14 @@ import type { CanvasNode } from '../../model/types';
 import { canReference, isTextSource, referenceReady, linkedPrompt } from '../../model/canvasGraph';
 import { CanvasPromptInput, type CanvasPromptInputRef } from '../prompt/CanvasPromptInput';
 import { CanvasModelPicker } from '../tools/CanvasModelPicker';
-const loadModels = (video = false) => (video ? getEnabledVideoModelsFromSettings : getEnabledImageModelsFromSettings)(readWorkflowModelsFromStorage())
-  .filter(item => typeof item.id === 'string' && item.id)
-  .map(item => ({ ...item,
-    supportedAspectRatios: 'supportedAspectRatios' in item ? item.supportedAspectRatios : undefined,
-    supportedResolutions: 'supportedResolutions' in item ? item.supportedResolutions : undefined,
-    supportedDurations: 'supportedDurations' in item ? item.supportedDurations : undefined,
-    id: String(item.id), name: typeof item.name === 'string' ? item.name : String(item.id) }));
 
 export function CanvasDrawingNode({ node, projectId, nodes, selected = false, highlighted = false, onPreview }: { node: CanvasNode; projectId: string; nodes: CanvasNode[]; selected?: boolean; highlighted?: boolean; onPreview?: (url: string) => void }) {
   const editorAnchor = useRef<HTMLDivElement>(null);
   const updateNode = useCanvasStore(s => s.updateNode);
   const initial = useAppStore.getState();
   const isVideo = node.generationKind === 'video';
-  const config = node.drawing || { model: isVideo ? initial.quickVideoModel : initial.quickModel, quality: isVideo ? resolveVideoResolution(initial.quickVideoResolution, getVideoModelById(initial.quickVideoModel)?.supportedResolutions) : initial.quickQuality || 'medium', aspect: isVideo ? '16:9' : initial.quickAspectId || '1:1', count: 1, references: [] };
-  const [models, setModels] = useState(() => loadModels(isVideo));
+  const config = node.drawing || { model: isVideo ? initial.quickVideoModel : initial.quickModel, quality: isVideo ? resolveVideoResolution(initial.quickVideoResolution, getVideoModelById(upstreamModalityModelId('video', initial.quickVideoModel), getGatewayClientBaseUrl(initial.quickVideoModel))?.supportedResolutions) : initial.quickQuality || 'medium', aspect: isVideo ? '16:9' : initial.quickAspectId || '1:1', count: 1, references: [] };
+  const [models, setModels] = useState(() => loadCanvasGenerationModels(isVideo));
   const [error, setError] = useState('');
   const promptInput = useRef<CanvasPromptInputRef>(null);
   const lock = useRef(false);
@@ -44,9 +39,10 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, hi
   const uploadLock = useRef(false);
   const [uploading, setUploading] = useState(false);
   useEffect(() => {
-    const refresh = () => setModels(loadModels(isVideo));
+    const refresh = () => setModels(loadCanvasGenerationModels(isVideo));
     window.addEventListener('models_updated', refresh);
-    return () => window.removeEventListener('models_updated', refresh);
+    window.addEventListener('modality_models_updated', refresh);
+    return () => { window.removeEventListener('models_updated', refresh); window.removeEventListener('modality_models_updated', refresh); };
   }, [isVideo]);
   const change = (patch: Partial<typeof config>) => {
     // Removing a linked thumbnail also disconnects its source, without copying other links into static URLs.
@@ -61,19 +57,23 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, hi
   };
   const busy = node.status === 'generating';
   const selectedModel = config.model || models[0]?.id || '';
+  const videoModel = upstreamModalityModelId('video', selectedModel);
+  const videoBaseUrl = getGatewayClientBaseUrl(selectedModel);
   useEffect(() => {
     if (!isVideo || !selectedModel) return;
-    const supported = (models.find(item => item.id === selectedModel)?.supportedResolutions as string[] | undefined)
-      ?? getVideoModelById(selectedModel)?.supportedResolutions;
+    const supported = getVideoModelById(videoModel, videoBaseUrl)?.supportedResolutions
+      ?? (models.find(item => item.id === selectedModel)?.supportedResolutions as string[] | undefined);
     const quality = resolveVideoResolution(config.quality, supported);
     if (quality !== config.quality) change({ quality });
-  }, [isVideo, selectedModel, config.quality, models]); // eslint-disable-line react-hooks/exhaustive-deps
-  const duration = clampVideoDuration(selectedModel, config.duration || 5);
+  }, [isVideo, selectedModel, config.quality, models, videoModel, videoBaseUrl]); // eslint-disable-line react-hooks/exhaustive-deps
   const linkedNodes = (node.referenceNodeIds || []).map(id => nodes.find(item => item.id === id)).filter((item): item is CanvasNode => Boolean(item));
   const refs = [...new Set([...config.references, ...linkedNodes.filter(item => canReference(item) || (isVideo && item.videoUrl && !item.missingMedia)).map(item => isVideo ? item.videoUrl || item.imageUrl! : item.imageUrl!)])];
   const referenceNames = mediaReferenceSlots(refs).map(item => item.name);
-  const videoMode = resolveVideoMode(selectedModel, config.refMode, refs.filter(url => !isVideoMediaUrl(url)).length, refs.filter(isVideoMediaUrl).length);
-  const videoValidation = isVideo ? videoInputError({ model: selectedModel, refMode: videoMode, images: refs.filter(url => !isVideoMediaUrl(url)), videos: refs.filter(isVideoMediaUrl), duration, resolution: config.quality, aspectRatio: config.aspect }) : null;
+  const videoMode = resolveVideoMode(videoModel, config.refMode, refs.filter(url => !isVideoMediaUrl(url)).length, refs.filter(isVideoMediaUrl).length);
+  const durations = videoDurationOptions(videoModel, config.quality, videoMode, videoBaseUrl);
+  const requestedDuration = config.duration || 5;
+  const duration = durations.includes(requestedDuration) ? requestedDuration : durations.reduce((best, value) => Math.abs(value - requestedDuration) < Math.abs(best - requestedDuration) ? value : best, durations[0] || 5);
+  const videoValidation = isVideo ? videoInputError({ model: videoModel, baseUrl: videoBaseUrl, refMode: videoMode, images: refs.filter(url => !isVideoMediaUrl(url)), videos: refs.filter(isVideoMediaUrl), duration, resolution: config.quality, aspectRatio: config.aspect }) : null;
   const uploadReferences = async (files: File[]) => {
     if (uploadLock.current || !files.length) return;
     uploadLock.current = true;
@@ -101,7 +101,7 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, hi
     if (lock.current || busy || useCanvasStore.getState().projects.find(project => project.id === projectId)?.nodes.find(item => item.id === node.id)?.status === 'generating') return;
     if (!models.some(model => model.id === selectedModel)) { setError('请先配置并选择生成模型'); return; }
     if (isVideo) {
-      const validation = videoInputError({ model: selectedModel, refMode: videoMode, images: refs.filter(url => !isVideoMediaUrl(url)), videos: refs.filter(isVideoMediaUrl), duration, resolution: config.quality, aspectRatio: config.aspect });
+      const validation = videoInputError({ model: videoModel, baseUrl: videoBaseUrl, refMode: videoMode, images: refs.filter(url => !isVideoMediaUrl(url)), videos: refs.filter(isVideoMediaUrl), duration, resolution: config.quality, aspectRatio: config.aspect });
       if (validation) { setError(validation); return; }
     }
     const ratio = IMAGE_RATIO_ITEMS.find(item => item.id === config.aspect) || IMAGE_RATIO_ITEMS[0];
@@ -112,7 +112,7 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, hi
       currentView: 'canvas', hasImageModels: models.some(model => model.id === selectedModel),
       quickVideoRefMode: videoMode, quickVideoFirstFrame: refs[0] || null, quickVideoLastFrame: refs[1] || null, quickVideoMultiFrames: refs, quickVideoCount: config.count,
       quickVideoModel: selectedModel, quickVideoAspectId: config.aspect, quickVideoResolution: config.quality, quickVideoDuration: duration,
-      quickVideoGenerateAudio: config.audio, quickDepthStyle: 'mocap', quickDepthQuality: 'standard',
+      quickVideoGenerateAudio: config.audio, quickVideoContextIrEnabled: config.contextIrEnabled ?? true, quickDepthStyle: 'mocap', quickDepthQuality: 'standard',
     });
     if (!result.ok) { setError(result.error); return; }
     lock.current = true;
@@ -160,10 +160,13 @@ export function CanvasDrawingNode({ node, projectId, nodes, selected = false, hi
         <CanvasModelPicker label={isVideo ? '视频模型' : '绘图模型'} models={models} value={selectedModel} onChange={model => {
           if (!isVideo) { change({model}); return; }
           const next = models.find(item => item.id === model);
-          const ratios = next?.supportedAspectRatios as string[] || ['16:9'];
-          const quality = resolveVideoResolution(config.quality, next?.supportedResolutions as string[] | undefined);
-          const refMode = videoModes(model).some(item => item.id === videoMode) ? videoMode : videoModes(model)[0].id;
-          const durations = videoDurationOptions(model, quality, refMode);
+          const upstream = upstreamModalityModelId('video', model);
+          const baseUrl = getGatewayClientBaseUrl(model);
+          const profile = getVideoModelById(upstream, baseUrl);
+          const ratios = profile?.supportedAspectRatios || next?.supportedAspectRatios as string[] || ['16:9'];
+          const quality = resolveVideoResolution(config.quality, profile?.supportedResolutions || next?.supportedResolutions as string[] | undefined);
+          const refMode = videoModes(upstream).some(item => item.id === videoMode) ? videoMode : videoModes(upstream)[0].id;
+          const durations = videoDurationOptions(upstream, quality, refMode, baseUrl);
           change({model, aspect: ratios.includes(config.aspect) ? config.aspect : ratios[0], quality, refMode, duration: durations.includes(duration) ? duration : durations[0]});
         }} disabled={busy} />
 

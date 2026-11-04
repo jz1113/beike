@@ -101,7 +101,7 @@ func TestPrepareWanMediaConvertsStorageImages(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(".azhuo_storage") })
 	body := wanOfficialPayload("wan3.0-video", "展示卫衣", "omni", "9:16", "720P", 15, []string{"/storage/" + filepath.ToSlash(rel), "https://cdn.example/front.jpg"}, nil, true, true, false)
-	if err := prepareWanMedia(context.Background(), body, "local", false); err != nil {
+	if err := prepareWanMedia(context.Background(), "", body, "local", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	input, _ := body["input"].(map[string]any)
@@ -110,7 +110,7 @@ func TestPrepareWanMediaConvertsStorageImages(t *testing.T) {
 		t.Fatalf("converted %#v", body)
 	}
 	rejected := wanOfficialPayload("wan3.0-video", "展示卫衣", "omni", "9:16", "720P", 15, []string{"/uploads/local.jpg"}, nil, true, true, false)
-	if err := prepareWanMedia(context.Background(), rejected, "local", false); err == nil {
+	if err := prepareWanMedia(context.Background(), "", rejected, "local", false, nil); err == nil {
 		t.Fatal("relative image was accepted")
 	}
 }
@@ -172,8 +172,8 @@ func TestOfficialVideoFamiliesUseTheirRequestBodies(t *testing.T) {
 		"ref_mode": rawJSON(t, "omni"), "images": rawJSON(t, []string{first}),
 		"resolution": rawJSON(t, "720P"), "duration": rawJSON(t, 6),
 	})
-	urls, _ := minimax.payload["imageUrls"].([]string)
-	if minimax.payload["mode"] != "reference-to-video" || minimax.payload["resolution"] != "768P" || len(urls) != 1 || minimax.payload["seconds"] != 6 {
+	refs, _ := minimax.payload["content"].([]map[string]any)
+	if minimax.payload["mode"] != nil || minimax.payload["resolution"] != "768P" || len(refs) != 2 || refs[1]["role"] != "reference_image" || minimax.payload["duration"] != 6 {
 		t.Fatalf("minimax: %#v", minimax.payload)
 	}
 }

@@ -8,10 +8,11 @@ interface Props {
   lookIndex: number | null;
   size: number;
   paused?: boolean;
+  onError?: () => void;
   onVersion?: (version: PetSpriteVersion) => void;
 }
 
-export function PetSprite({ src, version, pose, lookIndex, size, paused = false, onVersion }: Props) {
+export function PetSprite({ src, version, pose, lookIndex, size, paused = false, onVersion, onError }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const height = Math.round(size * PET_CELL.height / PET_CELL.width);
@@ -27,6 +28,8 @@ export function PetSprite({ src, version, pose, lookIndex, size, paused = false,
   const paintRef = useRef(paint);
   paintRef.current = paint;
 
+  const errorRef = useRef(onError);
+  errorRef.current = onError;
   useEffect(() => {
     const canvas = canvasRef.current;
     const image = new Image();
@@ -35,8 +38,9 @@ export function PetSprite({ src, version, pose, lookIndex, size, paused = false,
       onVersion?.(image.naturalHeight >= 2200 ? 2 : 1);
       paintRef.current(canvas, image, 0);
     };
+    image.onerror = () => errorRef.current?.();
     image.src = src;
-    return () => { image.onload = null; if (imageRef.current === image) imageRef.current = null; };
+    return () => { image.onload = null; image.onerror = null; if (imageRef.current === image) imageRef.current = null; };
   }, [onVersion, src]);
 
   useEffect(() => {

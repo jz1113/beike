@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"modernc.org/sqlite"
@@ -14,6 +15,12 @@ import (
 
 var errPromptConflict = errors.New("prompt version conflict")
 
+type promptUnconfiguredError struct{ ID, Title string }
+
+func (e *promptUnconfiguredError) Error() string {
+	return fmt.Sprintf("尚未保存「%s」提示词，请在提示词管理中编辑并保存后再执行；初始模板不会自动执行", e.Title)
+}
+
 func loadSalesPrompts(ctx context.Context, cfg config.Config, workspace string) ([]salesPrompt, error) {
 	overrides := map[string]string{}
 	if cfg.SQLiteFile() != "" {
@@ -22,20 +29,32 @@ func loadSalesPrompts(ctx context.Context, cfg config.Config, workspace string) 
 			return nil, err
 		}
 		defer db.Close()
-		rows, err := db.QueryContext(ctx, `SELECT "promptId","prompt" FROM "SalesPromptOverride" WHERE "workspaceId"=?`, workspace)
+		rows, err := db.QueryContext(ctx, `SELECT "promptId","prompt","templateVersion" FROM "SalesPromptOverride" WHERE "workspaceId"=?`, workspace)
 		if err != nil {
 			return nil, err
 		}
 		defer rows.Close()
+		stale := map[string]string{}
 		for rows.Next() {
-			var id, text string
-			if err := rows.Scan(&id, &text); err != nil {
+			var id, text, version string
+			if err := rows.Scan(&id, &text, &version); err != nil {
 				return nil, err
 			}
-			overrides[id] = text
+			d, ok := findPromptDefinition(id)
+			if ok && version == d.resolve(nil).Version {
+				overrides[id] = text
+			} else {
+				stale[id] = version
+			}
 		}
 		if err := rows.Err(); err != nil {
 			return nil, err
+		}
+		for id, version := range stale {
+			// A concurrent save may already have replaced the stale row.
+			if _, err := db.ExecContext(ctx, `DELETE FROM "SalesPromptOverride" WHERE "workspaceId"=? AND "promptId"=? AND "templateVersion"=?`, workspace, id, version); err != nil {
+				return nil, err
+			}
 		}
 	}
 	items := []salesPrompt{}
@@ -50,12 +69,18 @@ func loadSalesPrompts(ctx context.Context, cfg config.Config, workspace string) 
 }
 
 func loadSalesPrompt(ctx context.Context, cfg config.Config, workspace, id string) (salesPrompt, error) {
+	if saved, ok := ctx.Value(mediaPromptKey{}).(salesPrompt); ok && saved.ID == id {
+		return saved, nil
+	}
 	items, err := loadSalesPrompts(ctx, cfg, workspace)
 	if err != nil {
 		return salesPrompt{}, err
 	}
 	for _, item := range items {
 		if item.ID == id {
+			if !item.Configured {
+				return item, &promptUnconfiguredError{ID: item.ID, Title: item.Title}
+			}
 			return item, nil
 		}
 	}
@@ -115,7 +140,7 @@ func trySaveSalesPrompt(ctx context.Context, cfg config.Config, workspace string
 	defer func() { _, _ = conn.ExecContext(context.Background(), `ROLLBACK`) }()
 	var currentText string
 	var override *string
-	err = conn.QueryRowContext(ctx, `SELECT "prompt" FROM "SalesPromptOverride" WHERE "workspaceId"=? AND "promptId"=?`, workspace, d.id).Scan(&currentText)
+	err = conn.QueryRowContext(ctx, `SELECT "prompt" FROM "SalesPromptOverride" WHERE "workspaceId"=? AND "promptId"=? AND "templateVersion"=?`, workspace, d.id, d.resolve(nil).Version).Scan(&currentText)
 	if err == nil {
 		override = &currentText
 	} else if !errors.Is(err, sql.ErrNoRows) {
@@ -125,10 +150,15 @@ func trySaveSalesPrompt(ctx context.Context, cfg config.Config, workspace string
 	if current.Version != expectedVersion {
 		return current, errPromptConflict
 	}
+	// Explicitly clearing a prompt disables it until the next template revision.
 	if text == nil {
+		disabled := ""
+		text = &disabled
+	}
+	if *text == d.text {
 		_, err = conn.ExecContext(ctx, `DELETE FROM "SalesPromptOverride" WHERE "workspaceId"=? AND "promptId"=?`, workspace, d.id)
 	} else {
-		_, err = conn.ExecContext(ctx, `INSERT INTO "SalesPromptOverride" ("workspaceId","promptId","prompt","updatedAt") VALUES (?,?,?,?) ON CONFLICT("workspaceId","promptId") DO UPDATE SET "prompt"=excluded."prompt","updatedAt"=excluded."updatedAt"`, workspace, d.id, *text, time.Now().UTC().Format(time.RFC3339Nano))
+		_, err = conn.ExecContext(ctx, `INSERT INTO "SalesPromptOverride" ("workspaceId","promptId","prompt","updatedAt","templateVersion") VALUES (?,?,?,?,?) ON CONFLICT("workspaceId","promptId") DO UPDATE SET "prompt"=excluded."prompt","updatedAt"=excluded."updatedAt","templateVersion"=excluded."templateVersion"`, workspace, d.id, *text, time.Now().UTC().Format(time.RFC3339Nano), d.resolve(nil).Version)
 	}
 	if err != nil {
 		return salesPrompt{}, err

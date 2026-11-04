@@ -7,7 +7,7 @@ export interface StudioSheetProps {
   title: string;
   subtitle?: string;
   side?: 'right' | 'left';
-  /** 面板宽度类名，默认右侧检查器 400px，大型图鉴可传更宽尺寸 */
+  /** 面板宽度类名，默认右侧检查器 420px */
   widthClassName?: string;
   /** 是否允许不阻断背后画布查看（弱化遮罩层） */
   nonBlocking?: boolean;
@@ -18,7 +18,7 @@ export interface StudioSheetProps {
 
 /**
  * 轻奢毛玻璃侧滑抽屉（Studio Sheet）
- * 用于非阻塞属性检查器（Inspector）与开源图鉴中心（Atlas Hub），避免居中弹窗遮挡分镜上下文。
+ * 用于属性检查器与工作台侧栏，方便对照分镜上下文。
  */
 export function StudioSheet({
   open,

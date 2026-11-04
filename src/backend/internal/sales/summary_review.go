@@ -34,8 +34,8 @@ func validateSummaryCopyPoints(result summaryResult) error {
 }
 
 func summarySourceText(input summaryInput) string {
-	parts := []string{input.ProductName, input.Facts}
-	for _, source := range input.TextImages {
+	parts := []string{input.ProductFacts}
+	for _, source := range summaryOCRTextSources(input) {
 		parts = append(parts, source.Text)
 	}
 	return strings.Join(parts, "\n")

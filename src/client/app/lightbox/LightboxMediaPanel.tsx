@@ -31,7 +31,7 @@ export function LightboxMediaPanel({
   if (!resultUrl) return null;
 
   return (
-    <div className="relative flex items-center justify-center flex-1 max-w-full md:max-w-[calc(100%-420px)] h-[50vh] md:h-[80vh] gap-3 sm:gap-5 lg:gap-7 min-w-0 pointer-events-none">
+    <div className="relative flex items-center justify-center flex-1 max-w-full md:max-w-[calc(100%-420px)] w-full h-full min-h-0 md:h-[80vh] gap-3 sm:gap-5 lg:gap-7 min-w-0 pointer-events-none">
       {/* 左侧外侧翻页按键 (稍微在往外一点，脱离图片) */}
       {total > 1 && (
         <button
@@ -50,7 +50,7 @@ export function LightboxMediaPanel({
       {/* 中间媒体展示区 */}
       <div className="relative flex flex-col items-center justify-center h-full max-w-full min-w-0 flex-1 pointer-events-none">
         <div
-          className="w-full flex-1 flex items-center justify-center overflow-hidden min-h-0 relative group/view pointer-events-auto"
+          className="w-full flex-1 flex items-center justify-center overflow-hidden min-h-0 relative group/view pointer-events-auto [container-type:size]"
           onClick={(e) => {
             e.stopPropagation();
           }}
@@ -99,7 +99,7 @@ export function LightboxMediaPanel({
                   onDurationChange={handleVideoDuration}
                   onLoadedData={() => setIsVideoLoading(false)}
                   onError={handleVideoError}
-                  className={`max-h-[48vh] md:max-h-[82vh] max-w-full object-contain transition-all duration-300 pointer-events-auto bg-black ${
+                  className={`max-h-[100cqh] max-w-full object-contain transition-all duration-300 pointer-events-auto bg-black ${
                     isVideoLoading ? 'opacity-0 scale-98' : 'opacity-100 scale-100'
                   }`}
                   onClick={(e) => e.stopPropagation()}

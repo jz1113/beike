@@ -14,7 +14,7 @@ import (
 
 func CanvasText(cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 32<<20))
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "请选择模型并填写生成要求（最多 20000 字）"})
 			return
@@ -31,12 +31,17 @@ func CanvasText(cfg config.Config) http.Handler {
 		}
 		model, _ := payload["model"].(string)
 		prompt, _ := payload["prompt"].(string)
-		if strings.TrimSpace(model) == "" || utf8.RuneCountInString(strings.TrimSpace(model)) > 200 || strings.TrimSpace(prompt) == "" || utf8.RuneCountInString(strings.TrimSpace(prompt)) > 20000 {
+		messages, chat := payload["messages"].([]any)
+		if strings.TrimSpace(model) == "" || utf8.RuneCountInString(strings.TrimSpace(model)) > 200 || (chat && (len(messages) == 0 || len(messages) > 512)) || (!chat && (strings.TrimSpace(prompt) == "" || utf8.RuneCountInString(strings.TrimSpace(prompt)) > 20000)) {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "请选择模型并填写生成要求（最多 20000 字）"})
 			return
 		}
 		if message := unsafeCanvasGateway(cfg, r, payload); message != "" {
 			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": message})
+			return
+		}
+		if chat {
+			writeCanvasChat(cfg, w, r, payload)
 			return
 		}
 		writeCanvasText(cfg, w, r, payload, body)

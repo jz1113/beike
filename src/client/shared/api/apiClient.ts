@@ -30,7 +30,7 @@ export function setMediaSession(value: { exp: number; sig: string } | undefined)
  */
 export function proxyMediaUrl(
   rawUrl?: string | null,
-  opts?: { asVideo?: boolean; thumb?: boolean; width?: number }
+  opts?: { asVideo?: boolean; asAudio?: boolean; thumb?: boolean; width?: number }
 ): string {
   if (!rawUrl) return '';
   if (rawUrl.startsWith('//')) rawUrl = `https:${rawUrl}`;
@@ -58,11 +58,11 @@ export function proxyMediaUrl(
   }
   syncAppTokenCookie();
   syncWorkspaceCookie();
-  const videoFlag = opts?.asVideo ? '&as=video' : '';
+  const mediaFlag = opts?.asVideo ? '&as=video' : opts?.asAudio ? '&as=audio' : '';
   const thumbFlag = opts?.thumb ? '&thumb=1' : '';
   const widthFlag = opts?.width ? `&w=${opts.width}` : '';
   const signed = mediaSession ? `&exp=${mediaSession.exp}&sig=${mediaSession.sig}` : '';
-  const path = `/api/system/proxy-image?url=${encodeURIComponent(rawUrl)}${videoFlag}${thumbFlag}${widthFlag}${signed}`;
+  const path = `/api/system/proxy-image?url=${encodeURIComponent(rawUrl)}${mediaFlag}${thumbFlag}${widthFlag}${signed}`;
   const base = resolveApiUrl(path);
   return typeof base === 'string' ? base : path;
 }

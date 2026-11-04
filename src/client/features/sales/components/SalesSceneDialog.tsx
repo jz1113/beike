@@ -16,29 +16,31 @@ import '../salesPersona.css';
 
 interface Props {
   scene?: SalesSceneCandidate;
+  draftId?: string;
   defaultSpace?: SalesSceneSpace;
   onClose: () => void;
   onSaved: (message: string) => void;
 }
 
-export function SalesSceneDialog({ scene, defaultSpace = 'indoor', onClose, onSaved }: Props) {
+export function SalesSceneDialog({ scene, draftId, defaultSpace = 'indoor', onClose, onSaved }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const abort = useRef<AbortController | null>(null);
-  const draft = useSalesAssetDraft('scene', scene?.id, { name: scene?.title || '', space: scene ? classifySceneSpace(scene) : defaultSpace, tags: scene?.tags || '' });
+  const draft = useSalesAssetDraft('scene', draftId ?? scene?.id, { name: scene?.title || '', space: scene ? classifySceneSpace(scene) : defaultSpace, tags: scene?.tags || '' });
   const { name, tags } = draft.fields;
   const space = (Object.hasOwn(SCENE_SPACE_LABELS, draft.fields.space) ? draft.fields.space : defaultSpace) as SalesSceneSpace;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const photos = useSalesSceneViews(scene, draft, {
-    kind: 'scene', assetId: scene?.id, enabled: Boolean(name.trim()),
+    kind: 'scene', assetId: scene?.id, enabled: Boolean(name.trim()), waitForResult: true,
     data: (views, extraImages) => ({
       title: name.trim(), tags: mergeGroupTag(scene?.tags ?? tags ?? '', SCENE_SPACE_LABELS[space], ['室内', '户外']),
       spatialType: scene && classifySceneSpace(scene) === space ? scene.spatialType : space === 'outdoor' ? 'outdoor' : 'indoor_room',
       ...sceneImageFields(views, extraImages, scene?.dimensions),
     }),
-    onQueued: () => { const cleared = draft.clear(); onSaved(`场景「${name.trim()}」已入库，九宫格正在后台生成，完成后自动保存${cleared ? '' : '；本机旧草稿未清除，请勿重复入库'}`); onClose(); },
+    onQueued: () => {},
   });
   const busy = pending || photos.active.length > 0;
+  const canClose = !pending && (!busy || Boolean(photos.background && photos.savedAssetId && !photos.unconfirmedBackground && photos.stage !== 'uploading'));
   useEffect(() => {
     if (abort.current?.signal.aborted) {
       abort.current = null; setPending(false);
@@ -48,7 +50,7 @@ export function SalesSceneDialog({ scene, defaultSpace = 'indoor', onClose, onSa
     return () => abort.current?.abort();
   }, []);
 
-  const close = () => { if (!busy && draft.flush()) onClose(); };
+  const close = () => { if (canClose && draft.flush()) onClose(); };
 
   const discardDraft = async () => {
     if (busy) return;
@@ -64,7 +66,7 @@ export function SalesSceneDialog({ scene, defaultSpace = 'indoor', onClose, onSa
       const data = {
         title: name.trim(), tags: mergeGroupTag(scene?.tags ?? tags ?? '', SCENE_SPACE_LABELS[space], ['室内', '户外']),
         spatialType: scene && classifySceneSpace(scene) === space ? scene.spatialType : space === 'outdoor' ? 'outdoor' : 'indoor_room',
-        ...sceneImageFields(photos.views, photos.extraImages, scene?.dimensions),
+        ...sceneImageFields(photos.views, photos.extraImages, photos.withCreationDimensions(scene?.dimensions)),
       };
       const assetId = scene?.id || photos.savedAssetId;
       if (assetId) await updateSalesMaterial('scene', assetId, data, controller.signal);
@@ -94,12 +96,11 @@ export function SalesSceneDialog({ scene, defaultSpace = 'indoor', onClose, onSa
     <form onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <header className="sales-asset-header">
         <div className="sales-asset-heading"><h2 id="sales-scene-title">{scene ? '编辑场景' : '新增场景'}</h2>
-          <SalesAssetDraftStatus status={draft.status} existing={Boolean(scene)} busy={busy} pending={pending} onDiscard={() => void discardDraft()} />
+          <SalesAssetDraftStatus status={draft.status} existing={Boolean(scene || photos.savedAssetId)} busy={busy} pending={pending} onDiscard={() => void discardDraft()} />
         </div>
-        <button type="button" className={salesGhostButtonClass} aria-label="关闭场景窗口" disabled={busy} onClick={close}><X size={18} /></button>
+        <button type="button" className={salesGhostButtonClass} aria-label="关闭场景窗口" disabled={!canClose} onClick={close}><X size={18} /></button>
       </header>
       <div className="sales-asset-content">
-        <SalesAssetViewGallery subject="场景" definitions={SCENE_VIEWS} photos={photos} busy={busy} />
         <div className="sales-asset-fields">
         <label>场景名称 <span className="sales-asset-required">*</span><input autoFocus required maxLength={80} value={name} disabled={busy} onChange={(event) => draft.setField('name', event.target.value)} placeholder="给场景起个名字" className={salesInputClass} /></label>
         <div className="sales-dialog-field sales-asset-select-field"><span>空间分类</span>
@@ -107,12 +108,13 @@ export function SalesSceneDialog({ scene, defaultSpace = 'indoor', onClose, onSa
             options={Object.entries(SCENE_SPACE_LABELS).map(([value, label]) => ({ value, label }))} />
         </div>
         </div>
+        <SalesAssetViewGallery subject="场景" definitions={SCENE_VIEWS} photos={photos} busy={busy} />
         {draft.error && <p role="alert" className="sales-material-error">{draft.error}</p>}
         {error && <p role="alert" className="sales-material-error">{error}</p>}
       </div>
       <footer className="sales-asset-footer">
         {scene && <button type="button" className={salesGhostButtonClass} disabled={busy} onClick={() => void removeScene()}><Trash2 size={14} />删除场景</button>}
-        <div><button type="button" className={salesGhostButtonClass} disabled={busy} onClick={close}>暂存关闭</button>
+        <div><button type="button" className={salesGhostButtonClass} disabled={!canClose} onClick={close}>暂存关闭</button>
           <button type="submit" disabled={busy || !name.trim() || !photos.views.main || (!scene && photos.unconfirmedBackground)} className={`sales-collect-primary ${salesFocusClass}`}>{pending && <Loader2 size={14} className="animate-spin" />}{scene ? '保存修改' : '保存到资产库'}</button>
         </div>
       </footer>

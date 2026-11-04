@@ -19,6 +19,7 @@ var errVideoSubmissionConflict = errors.New("该任务标识已用于其他视�
 type videoSubmission struct {
 	recordID, key, taskID, status, result, reason, model, prompt, ratio, resolution string
 	found, claimed                                                                  bool
+	diagnostics                                                                     *videoSubmissionDiagnostics
 }
 
 func videoSubmissionKey(r *http.Request, payload map[string]json.RawMessage) (string, error) {
@@ -140,7 +141,11 @@ func lookupVideoSubmission(cfg config.Config, r *http.Request, key string) (vide
 		return videoSubmission{}, err
 	}
 	defer db.Close()
-	return readVideoSubmission(r.Context(), db, workspaceOf(r), key)
+	row, err := readVideoSubmission(r.Context(), db, workspaceOf(r), key)
+	if err == nil && row.found {
+		row.diagnostics = readVideoSubmissionDiagnostics(cfg, workspaceOf(r), row.recordID)
+	}
+	return row, err
 }
 
 func settleUnknownVideoTerminal(cfg config.Config, r *http.Request, taskID string, parsed pollParsed, usage string) {

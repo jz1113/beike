@@ -16,6 +16,8 @@ import { MultiAngleModal } from './LightboxMultiAngleModal';
 import { SmartEditModal } from '../../shared/modals/lightbox/SmartEditModal';
 import { OutpaintModal } from './OutpaintModal';
 import { useLightboxEditActions } from './useLightboxEditActions';
+import { X } from 'lucide-react';
+import { useModalDialog } from '@client/shared/hooks/useModalDialog';
 import { LightboxMediaPanel } from './LightboxMediaPanel';
 import { resolveTaskPreviewQueue } from '@client/shared/modals/lightbox/taskPreviewQueue';
 import { useGenerateTaskActions } from '@client/features/generate/hooks/useGenerateTaskActions';
@@ -232,36 +234,13 @@ export function ImageLightboxModal() {
     }
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!previewTask) return;
-      if (e.key === 'Escape') {
-        setPreviewTask(null);
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-        if (total > 1 && currentIndex >= 0) {
-          const prevIdx = (currentIndex - 1 + total) % total;
-          setPreviewTask(successTasks[prevIdx], livePreviewQueue);
-        }
-      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-        if (total > 1 && currentIndex >= 0) {
-          const nextIdx = (currentIndex + 1) % total;
-          setPreviewTask(successTasks[nextIdx], livePreviewQueue);
-        }
-      } else if (e.key === ' ' && isVideo && videoRef.current) {
-        e.preventDefault();
-        if (videoRef.current.paused) {
-          videoRef.current.play();
-        } else {
-          videoRef.current.pause();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [previewTask, currentIndex, successTasks, livePreviewQueue, total, setPreviewTask, isVideo]);
-
-
-
+  const editing = isMultiAngleOpen || isSmartEditOpen || isOutpaintOpen;
+  const dialogRef = useModalDialog(hasPreviewTask, () => {
+    if (isMultiAngleOpen) setIsMultiAngleOpen(false);
+    else if (isSmartEditOpen) setIsSmartEditOpen(false);
+    else if (isOutpaintOpen) setIsOutpaintOpen(false);
+    else setPreviewTask(null);
+  }, { initialFocusSelector: '[aria-label="关闭预览"]' });
 
   const handleDownload = async () => {
     if (!previewTask?.resultUrl || isDownloading) return;
@@ -341,11 +320,28 @@ export function ImageLightboxModal() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-2 sm:p-4 pb-24 sm:pb-28 md:pb-20 animate-fade-in select-none"
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={isVideo ? '视频预览' : '图片预览'}
+      tabIndex={-1}
+      onKeyDown={(event) => {
+        if (editing || event.defaultPrevented || (event.target as HTMLElement).closest('input,textarea,video,[contenteditable=true]')) return;
+        if (total > 1 && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+          event.preventDefault();
+          if (event.key === 'ArrowLeft') handlePrev(); else handleNext();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs px-2 pt-12 pb-2 md:p-4 animate-fade-in select-none"
       onClick={() => setPreviewTask(null)}
     >
-      <div
-        className="w-full max-w-7xl max-h-[88vh] flex flex-col md:flex-row items-center justify-center gap-4 sm:gap-6 relative pointer-events-none"
+      {!editing && <button type="button" aria-label="关闭预览"
+        onClick={(event) => { event.stopPropagation(); setPreviewTask(null); }}
+        className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black">
+        <X size={18} />
+      </button>}
+      <div inert={editing}
+        className="w-full max-w-7xl h-full md:h-auto md:max-h-[88vh] grid grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] md:flex md:flex-row items-center justify-center gap-2 md:gap-6 relative pointer-events-none"
       >
         <LightboxMediaPanel
           previewTask={previewTask}
@@ -387,6 +383,13 @@ export function ImageLightboxModal() {
             onUseAsReference={handleUseAsReference}
             fallbackReferenceImages={batchReferenceImages}
           />
+
+          {currentView === 'assets' && (isVideo || previewTask.mediaType === 'image' || !previewTask.mediaType) && (
+            <button type="button" onClick={handleReEdit}
+              className="w-full shrink-0 rounded-xl bg-white p-3 text-sm font-medium shadow-xs hover:bg-slate-50 dark:bg-[#18191c]">
+              复用生成参数
+            </button>
+          )}
 
           {/* 2.2 生产对话生成界面特有的扩展工具箱面板 (完全对齐图 2 红框区域) */}
           {isGenerateView && (

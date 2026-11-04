@@ -28,9 +28,3 @@ async function testServiceConnection(name: string, body: Record<string, string>)
 export const testWanbangConnection = (key: string, secret: string) => testServiceConnection('万邦', {
   type: 'wanbang', wanbangKey: key.trim(), wanbangSecret: secret.trim(),
 });
-export const testScraperConnection = (id: string, secret: string) => testServiceConnection('APIA', {
-  type: 'external_scraper', externalScraperId: id.trim(), externalScraperSecret: secret.trim(),
-});
-export const testQiyunConnection = (id: string, key: string) => testServiceConnection('奇云', {
-  type: 'qiyun', qiyunAppId: id.trim(), qiyunAppKey: key.trim(),
-});

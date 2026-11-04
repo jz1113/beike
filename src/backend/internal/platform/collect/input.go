@@ -59,7 +59,7 @@ func resolveProductInput(body map[string]any) (productInput, string) {
 	}
 	matches := productLinkPattern.FindAllString(raw, -1)
 	if len(matches) > 1 {
-		return productInput{}, "每次请传入一个商品链接，多个链接请使用批量采集"
+		return productInput{}, "每次请传入一个商品链接"
 	}
 	candidate := raw
 	if len(matches) == 1 {

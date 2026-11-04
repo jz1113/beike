@@ -18,10 +18,9 @@ const imageAdaptersSrc = fs.readFileSync(
   path.join(workspaceRoot, 'src/shared/domain/models/model-adapters/image/adapters.ts'),
   'utf8',
 );
-const videoAdaptersSrc = fs.readFileSync(
-  path.join(workspaceRoot, 'src/shared/domain/models/model-adapters/video/adapters.ts'),
-  'utf8',
-);
+const videoAdaptersSrc = ['adapters.ts', 'omniFlash.ts'].map(name => fs.readFileSync(
+  path.join(workspaceRoot, 'src/shared/domain/models/model-adapters/video', name), 'utf8',
+)).join('\n');
 
 const adapterIds = new Set([
   ...[...imageAdaptersSrc.matchAll(/^\s+id: '([^']+)',/gm)].map((m) => m[1]),

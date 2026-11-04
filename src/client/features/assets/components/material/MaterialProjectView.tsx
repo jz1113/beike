@@ -5,6 +5,7 @@ import type { ProjectFolderItem } from '../../model/materialProjects';
 
 interface Props {
   projects: ProjectFolderItem[];
+  returnProjectId?: string | null;
   onSelectProject: (project: ProjectFolderItem) => void;
   selectedProjectIds?: string[];
   isBatchMode?: boolean;
@@ -14,6 +15,7 @@ interface Props {
 interface ProjectCardProps {
   project: ProjectFolderItem;
   photos: string[];
+  restoreFocus: boolean;
   isSelected: boolean;
   isBatchMode: boolean;
   onToggleSelect: (id: string, e: React.MouseEvent) => void;
@@ -22,7 +24,7 @@ interface ProjectCardProps {
 
 function MaterialProjectCard({
   project,
-  photos,
+  photos, restoreFocus,
   isSelected,
   isBatchMode,
   onToggleSelect,
@@ -58,15 +60,6 @@ function MaterialProjectCard({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={handleCardClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleCardClick(e as unknown as React.MouseEvent);
-        }
-      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`group relative flex flex-col items-center p-2 pb-2 rounded-2xl transition-all duration-200 cursor-pointer text-center select-none ${
@@ -75,6 +68,10 @@ function MaterialProjectCard({
           : 'hover:bg-slate-100/70 border border-transparent hover:border-slate-200/60'
       }`}
     >
+      <button type="button" autoFocus={restoreFocus} onClick={handleCardClick}
+        aria-label={`${isBatchMode ? '勾选项目' : '打开项目'}：${project.title}`}
+        aria-pressed={isBatchMode ? isSelected : undefined}
+        className="absolute inset-0 z-10 rounded-2xl cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500" />
       {/* 🌟 复选框：支持鼠标悬停勾选（非批量）与常驻勾选（批量），对齐平铺素材卡片 */}
       <button
         type="button"
@@ -82,13 +79,14 @@ function MaterialProjectCard({
           e.stopPropagation();
           onToggleSelect(project.id, e);
         }}
+        aria-pressed={isSelected}
         aria-label={isSelected ? `取消选择项目 ${project.title}` : `选择项目 ${project.title}`}
         className={`absolute left-1.5 top-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-sm transition-all cursor-pointer ${
           isSelected
             ? 'bg-slate-900 text-white shadow-xs opacity-100 dark:bg-white dark:text-slate-950'
             : isBatchMode
             ? 'border border-slate-300 bg-white/95 opacity-100 hover:bg-white text-transparent dark:hover:bg-white/10 dark:bg-[#18191c]/95'
-            : 'border border-slate-300 bg-white/90 opacity-0 group-hover:opacity-100 hover:bg-white text-transparent dark:hover:bg-white/10 dark:bg-[#18191c]/95'
+            : 'border border-slate-300 bg-white/90 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-white text-transparent dark:hover:bg-white/10 dark:bg-[#18191c]/95'
         }`}
       >
         {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
@@ -109,7 +107,7 @@ function MaterialProjectCard({
       </div>
 
       {/* 标题与素材数：z-10 确保层级置顶，与文件夹保持清晰间距 */}
-      <div className="relative z-10 mt-1.5 w-full px-1">
+      <div className="relative mt-1.5 w-full px-1">
         <h3
           className="truncate text-xs font-semibold text-slate-800 group-hover:text-slate-950 dark:text-slate-100"
           title={project.title}
@@ -125,7 +123,7 @@ function MaterialProjectCard({
 }
 
 export default function MaterialProjectView({
-  projects: projectList,
+  projects: projectList, returnProjectId,
   onSelectProject,
   selectedProjectIds = [],
   isBatchMode = false,
@@ -150,6 +148,7 @@ export default function MaterialProjectView({
         <MaterialProjectCard
           key={project.id}
           project={project}
+          restoreFocus={project.id === returnProjectId}
           photos={project.photos}
           isSelected={selectedProjectIds.includes(project.id)}
           isBatchMode={Boolean(isBatchMode)}

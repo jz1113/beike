@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
-  Film, Play, Pause, MapPin, Sparkles, Clock,
-  ArrowLeft, RefreshCw,
+  Film, Play, Pause, MapPin, Clock,
+  ArrowLeft,
 } from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
+import { isStoryboardShot, type StoryboardNode } from '../../model/studioStoryboard';
 import type { CanvasNode, CanvasProject } from '../../model/types';
 
 interface Props {
-  project: CanvasProject;
+  project: Omit<CanvasProject, 'nodes'> & {nodes: StoryboardNode[]};
   onBackToCanvas: (focusNodeId?: string) => void;
   onRegenerateNode?: (node: CanvasNode) => void;
 }
@@ -18,54 +19,80 @@ export const CanvasStoryboardView: React.FC<Props> = ({
   onRegenerateNode,
 }) => {
   const [isPlayingAll, setIsPlayingAll] = useState(false);
-  const [currentShotIndex, setCurrentShotIndex] = useState(0);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [warning, setWarning] = useState('');
   const activeVideoRef = useRef<HTMLVideoElement>(null);
+  const activeCard = useRef<HTMLDivElement>(null);
+  const imageClock = useRef({id: '', remaining: 0});
 
-  // Filter media / shot nodes
-  const shotNodes = useMemo(() => {
-    return project.nodes
-      .filter((n) => !n.layerHidden && Boolean(n.imageUrl || n.videoUrl))
-      .sort((a, b) => a.x - b.x);
-  }, [project.nodes]);
-
-  const totalDuration = useMemo(() => {
-    return shotNodes.reduce((sum, node) => {
-      const dur = node.drawing?.duration || (node.type === 'video' ? 5 : 3);
-      return sum + dur;
-    }, 0);
-  }, [shotNodes]);
-
-  const handlePlayNext = () => {
-    if (currentShotIndex < shotNodes.length - 1) {
-      setCurrentShotIndex((idx) => idx + 1);
-    } else {
-      setIsPlayingAll(false);
-      setCurrentShotIndex(0);
-    }
-  };
+  const shotNodes = useMemo(() => project.nodes
+    .filter(isStoryboardShot)
+    .sort((a, b) => a.x - b.x || a.y - b.y), [project.nodes]);
+  const durationOf = (node: StoryboardNode) => node.shotDuration || node.drawing?.duration || (node.videoUrl ? 5 : 3);
+  const totalDuration = shotNodes.reduce((sum, node) => sum + durationOf(node), 0);
+  const current = shotNodes.find(node => node.id === currentId);
+  const currentMs = current ? durationOf(current) * 1000 : 0;
+  const index = shotNodes.findIndex(node => node.id === currentId);
+  const nextId = shotNodes[index + 1]?.id ?? null;
+  const videoUrl = current?.videoUrl;
 
   useEffect(() => {
-    if (!isPlayingAll) return;
-    const node = shotNodes[currentShotIndex];
-    if (!node || node.videoUrl) return;
-    const durationMs = Math.max(1, node.drawing?.duration || 3) * 1000;
+    if (!currentId || current) return;
+    setCurrentId(null);
+    setIsPlayingAll(false);
+  }, [currentId, current]);
+
+  useEffect(() => {
+    if (!currentId || !isPlayingAll) return;
+    activeCard.current?.scrollIntoView({block: 'nearest', inline: 'nearest'});
+  }, [currentId, isPlayingAll]);
+
+  useEffect(() => {
+    if (!isPlayingAll || !currentId || !currentMs || videoUrl) return;
+    const clock = imageClock.current;
+    if (clock.id !== currentId) { clock.id = currentId; clock.remaining = currentMs; }
+    const started = performance.now();
     const timer = window.setTimeout(() => {
-      setCurrentShotIndex((idx) => {
-        if (idx < shotNodes.length - 1) return idx + 1;
-        setIsPlayingAll(false);
-        return 0;
-      });
-    }, durationMs);
-    return () => window.clearTimeout(timer);
-  }, [isPlayingAll, currentShotIndex, shotNodes]);
+      clock.id = '';
+      setCurrentId(nextId);
+      if (!nextId) setIsPlayingAll(false);
+    }, clock.remaining);
+    return () => {
+      window.clearTimeout(timer);
+      clock.remaining = Math.max(0, clock.remaining - (performance.now() - started));
+    };
+  }, [currentId, currentMs, isPlayingAll, nextId, videoUrl]);
+
+  useEffect(() => {
+    const video = activeVideoRef.current;
+    if (!video || !videoUrl || !isPlayingAll) return;
+    let active = true;
+    const ended = () => {
+      if (!active) return;
+      setCurrentId(nextId);
+      if (!nextId) setIsPlayingAll(false);
+    };
+    const failed = () => {
+      if (!active) return;
+      setWarning('视频未能播放，请检查该镜头的素材。');
+      ended();
+    };
+    video.addEventListener('ended', ended);
+    video.addEventListener('error', failed);
+    video.play().catch(() => { if (active && !video.error) { setWarning('播放已暂停，请点击继续预览。'); setIsPlayingAll(false); } });
+    if (video.error) failed();
+    return () => {
+      active = false;
+      video.removeEventListener('ended', ended);
+      video.removeEventListener('error', failed);
+      video.pause();
+    };
+  }, [currentId, videoUrl, isPlayingAll, nextId]);
 
   const handleTogglePlayAll = () => {
-    if (isPlayingAll) {
-      setIsPlayingAll(false);
-    } else {
-      setIsPlayingAll(true);
-      setCurrentShotIndex(0);
-    }
+    setWarning('');
+    if (!currentId) setCurrentId(shotNodes[0]?.id ?? null);
+    setIsPlayingAll(!isPlayingAll);
   };
 
   return (
@@ -91,7 +118,7 @@ export const CanvasStoryboardView: React.FC<Props> = ({
         </div>
 
         {/* 短剧时间与顺播控制 */}
-        <div className="flex items-center gap-4">
+        {shotNodes.length > 0 && <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
             <Clock size={14} className="text-purple-400" />
             <span>共 {shotNodes.length} 个镜头 · 预估时长 {totalDuration}s</span>
@@ -100,7 +127,6 @@ export const CanvasStoryboardView: React.FC<Props> = ({
           <button
             type="button"
             onClick={handleTogglePlayAll}
-            disabled={shotNodes.length === 0}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg active:scale-95 ${
               isPlayingAll
                 ? 'bg-purple-600 text-white ring-4 ring-purple-500/20'
@@ -108,18 +134,19 @@ export const CanvasStoryboardView: React.FC<Props> = ({
             }`}
           >
             {isPlayingAll ? <Pause size={14} /> : <Play size={14} />}
-            <span>{isPlayingAll ? '暂停预览' : '一键连贯顺播'}</span>
+            <span>{isPlayingAll ? '暂停预览' : currentId ? '继续预览' : '一键连贯顺播'}</span>
           </button>
-        </div>
+        </div>}
       </div>
 
+      {warning && <p role="status" className="px-6 pt-2 text-xs text-amber-300">{warning}</p>}
       {/* 故事板横向走廊网格 */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-6 flex gap-6 items-stretch">
         {shotNodes.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-500 text-sm dark:text-slate-400">
             <Film size={36} className="mb-3 opacity-30 text-purple-400" />
             <p className="font-semibold text-slate-300">画布暂无生成镜头</p>
-            <p className="text-xs text-slate-500 mt-1 dark:text-slate-400">在画布中添加图片或视频生成节点后，故事板将自动同步编排分镜</p>
+            <p className="text-xs text-slate-500 mt-1 dark:text-slate-400">在画布中导入图片、视频或完成生成后，镜头会按节点从左到右排列。</p>
             <button
               type="button"
               onClick={() => onBackToCanvas()}
@@ -130,14 +157,14 @@ export const CanvasStoryboardView: React.FC<Props> = ({
           </div>
         ) : (
           shotNodes.map((node, index) => {
-            const isVideo = node.type === 'video' || node.generationKind === 'video';
+            const isVideo = Boolean(node.videoUrl);
             const mediaUrl = node.videoUrl || node.imageUrl;
-            const isCurrentPlaying = isPlayingAll && currentShotIndex === index;
-            const duration = node.drawing?.duration || (isVideo ? 5 : 3);
+            const isCurrentPlaying = currentId === node.id;
+            const duration = durationOf(node);
 
             return (
               <div
-                key={node.id}
+                key={node.id} ref={isCurrentPlaying ? activeCard : undefined}
                 className={`relative flex flex-col w-[320px] rounded-2xl bg-slate-900/90 border transition-all shrink-0 overflow-hidden group shadow-xl ${
                   isCurrentPlaying
                     ? 'border-purple-500 ring-4 ring-purple-500/30'
@@ -155,20 +182,14 @@ export const CanvasStoryboardView: React.FC<Props> = ({
 
                 {/* 媒体画面区 */}
                 <div className="relative w-full h-[200px] bg-black flex items-center justify-center overflow-hidden">
-                  {!mediaUrl ? (
-                    <div className="flex flex-col items-center justify-center text-slate-600 text-xs dark:text-slate-300">
-                      <Sparkles size={20} className="mb-1 text-purple-400 opacity-60" />
-                      <span>待生成画面</span>
-                    </div>
-                  ) : isVideo ? (
+                  {isVideo ? (
                     <video
                       ref={isCurrentPlaying ? activeVideoRef : undefined}
-                      src={proxyMediaUrl(mediaUrl)}
+                      src={proxyMediaUrl(mediaUrl, { asVideo: true })}
+                      preload="metadata"
                       className="w-full h-full object-cover"
-                      autoPlay={isCurrentPlaying}
                       playsInline
                       muted={!isCurrentPlaying}
-                      onEnded={handlePlayNext}
                     />
                   ) : (
                     <img src={proxyMediaUrl(mediaUrl)} alt="" className="w-full h-full object-cover" />
@@ -198,11 +219,10 @@ export const CanvasStoryboardView: React.FC<Props> = ({
                     <span className="text-slate-500 uppercase font-mono dark:text-slate-400">{isVideo ? 'VIDEO' : 'IMAGE'}</span>
                     <button
                       type="button"
-                      onClick={() => onRegenerateNode?.(node)}
+                      onClick={() => onRegenerateNode ? onRegenerateNode(node) : onBackToCanvas(node.id)}
                       className="flex items-center gap-1 text-purple-400 hover:text-purple-300 font-semibold cursor-pointer"
                     >
-                      <RefreshCw size={12} />
-                      <span>重绘</span>
+                      <span>{onRegenerateNode ? '重新生成' : '编辑节点'}</span>
                     </button>
                   </div>
                 </div>

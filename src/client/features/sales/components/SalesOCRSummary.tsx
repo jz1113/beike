@@ -1,48 +1,35 @@
-import { useMemo, useRef, useState } from 'react';
-import { Check, Copy } from 'lucide-react';
-import { patchOCRImage, summarizeSalesOCR } from '../model/salesOCR';
+import { useRef, useState } from 'react';
+import { Copy } from 'lucide-react';
+import { editSalesProductText, salesProductTextParts } from '../model/salesProductText';
 import type { SalesOCRProps } from './salesOCRTypes';
 import { salesFocusClass } from './salesChrome';
 
-type Props = Pick<SalesOCRProps, 'state' | 'disabled' | 'onChange'> & { imageUrls?: string[]; historical?: boolean };
-
-export function SalesOCRSummary({ state, disabled, onChange, imageUrls = state.ocrImageUrls, historical = false }: Props) {
-  const summary = useMemo(() => summarizeSalesOCR(state.imageCatalog, imageUrls, state.ocrImages), [state.imageCatalog, imageUrls, state.ocrImages]);
-  const fallbackRef = useRef<HTMLTextAreaElement>(null);
-  const [copyStatus, setCopyStatus] = useState<{ text: string; ok: boolean } | null>(null);
-  const selectedImages = state.imageCatalog.filter((image) => imageUrls.includes(image.url));
+export function SalesOCRSummary({ state, disabled, onChange }: Pick<SalesOCRProps, 'state' | 'disabled' | 'onChange'>) {
+  const text = salesProductTextParts(state).map((part) => part.text).join('');
+  const editor = useRef<HTMLTextAreaElement>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const originals = state.imageCatalog.filter((image) => state.ocrImageUrls.includes(image.url)).flatMap((image) => {
+    const entry = state.ocrImages.find((item) => item.imageUrl === image.url);
+    return entry?.result ? [{ index: image.index, text: entry.result.text }] : [];
+  });
   const copy = async () => {
-    try { await navigator.clipboard.writeText(summary.text); setCopyStatus({ text: summary.text, ok: true }); }
-    catch { fallbackRef.current?.focus(); fallbackRef.current?.select(); setCopyStatus({ text: summary.text, ok: false }); }
+    try { await navigator.clipboard.writeText(text); setCopied(text); }
+    catch { editor.current?.focus(); editor.current?.select(); }
   };
-
-  return (
-    <article className="sales-ocr-document" aria-label="识别文字原文">
-      <div className="sales-document-toolbar">
-        <div className="sales-document-heading">
-          <h3>{historical ? '历史识别原文' : '识别原文'}</h3>
-          <p>{historical ? '已保存的历史原文；加入识别队列后可用于提炼。' : '核对并修改原文，提炼时使用当前文字。'}</p>
-        </div>
-        <button type="button" disabled={!summary.text} onClick={() => { void copy(); }} aria-label="复制全部文字" className={`sales-summary-copy ${salesFocusClass}`}>
-          {copyStatus?.text === summary.text && copyStatus.ok ? <Check size={12} aria-hidden /> : <Copy size={12} aria-hidden />}
-          {copyStatus?.text === summary.text && copyStatus.ok ? '已复制' : '复制全部'}
-        </button>
-      </div>
-      <div className="sales-ocr-groups-scroll">
-        {selectedImages.map((image) => {
-          const entry = state.ocrImages.find((item) => item.imageUrl === image.url);
-          return <div key={image.url} className="sales-ocr-group-row">
-            <div className="sales-ocr-group-tag"><strong>#{image.index + 1}</strong></div>
-            <div className="sales-ocr-group-editor">
-              {entry?.error && <p className="sales-ocr-group-hint is-err">{entry.error}，可从队列或底部重试。</p>}
-              <textarea aria-label={`图片 #${image.index + 1} 识别文字`} disabled={disabled} maxLength={40000} rows={Math.min(16, Math.max(4, entry?.editedText.split('\n').length || 4))} value={entry?.editedText ?? ''} placeholder={entry?.result ? '未识别到文字，可手动补充或留空跳过' : '等待识别，也可直接输入或粘贴图片中的文字'} onChange={(event) => onChange({ ocrImages: patchOCRImage(state.ocrImages, image.url, { editedText: event.target.value }) })} />
-              {entry?.result && <details className="sales-ocr-raw"><summary className={salesFocusClass}>查看未修订识别文字</summary><p>{entry.result.text || '此图片未识别到文字'}</p></details>}
-            </div>
-          </div>;
-        })}
-      </div>
-      <textarea ref={fallbackRef} aria-label="汇总识别文字" readOnly value={summary.text} className="sr-only" tabIndex={-1} />
-      {copyStatus?.text === summary.text && !copyStatus.ok && <p className="sales-copy-error" role="status">复制失败，请手动选中文字复制。</p>}
-    </article>
-  );
+  return <div className="sales-manual-text">
+    <div className="sales-manual-text-heading">
+      <label htmlFor="sales-product-text">商品文字</label>
+      {originals.length > 0 && <button type="button" popoverTarget="sales-ocr-originals" className={`sales-originals-button ${salesFocusClass}`}>查看原文</button>}
+      <button type="button" disabled={!text} onClick={() => { void copy(); }} className={`sales-summary-copy ${salesFocusClass}`} aria-label="复制全部文字">
+        <Copy size={12} aria-hidden />{copied === text ? '已复制' : '复制全部'}
+      </button>
+    </div>
+    <textarea id="sales-product-text" ref={editor} disabled={disabled} rows={14} value={text} maxLength={state.ocrImageUrls.length ? 80000 : 20000}
+      placeholder="输入商品资料，或添加详情图后识别文字。"
+      onChange={(event) => onChange(editSalesProductText(state, event.currentTarget.value, event.currentTarget.selectionStart))} />
+    {originals.length > 0 && <div id="sales-ocr-originals" popover="auto" className="sales-originals-popover" aria-label="未修订识别文字">
+      <header><strong>查看未修订识别文字</strong><button type="button" popoverTarget="sales-ocr-originals" popoverTargetAction="hide" className={salesFocusClass}>关闭</button></header>
+      {originals.map((item) => <p key={item.index}>#{item.index + 1}&#x3000;{item.text || '此图片未识别到文字'}</p>)}
+    </div>}
+  </div>;
 }

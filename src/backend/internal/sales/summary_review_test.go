@@ -23,7 +23,7 @@ func TestSummaryReviewRejectsUnsupportedSellingClaims(t *testing.T) {
 
 func TestSummaryReviewRetainsLabelLimitsAndRejectsConflictDecisions(t *testing.T) {
 	input := exampleSummaryRequest().summaryInput
-	input.TextImages[0].Text = "洗护TIPS\n手洗洗涤温度不高于40℃\n不可干洗\n不可漂白\n不可翻转干燥\n在阴凉处平摊晾干\n熨斗底板温度不高于1\n10℃℃"
+	input.TextSources[0].Text = "洗护TIPS\n手洗洗涤温度不高于40℃\n不可干洗\n不可漂白\n不可翻转干燥\n在阴凉处平摊晾干\n熨斗底板温度不高于1\n10℃℃"
 	result, err := parseSummaryCompletion(summaryCompletion(exampleSummaryResult()), input)
 	if err != nil {
 		t.Fatal(err)

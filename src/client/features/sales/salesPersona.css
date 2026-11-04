@@ -1,4 +1,4 @@
-.sales-asset-view-layout { display: grid; grid-template-columns: 204px minmax(0, 1fr); gap: 20px; }
+.sales-asset-view-layout { display: grid; grid-template-columns: 248px minmax(0, 1fr); gap: 20px; }
 .sales-asset-view-layout h3 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; color: var(--sales-ink); font-size: 12px; font-weight: 600; }
 .sales-asset-view-layout h3 span, .sales-asset-main-view > p { color: var(--sales-muted); font-size: 11px; font-weight: 400; }
 .sales-asset-main-view > p { margin-top: 10px; line-height: 1.7; }
@@ -22,9 +22,12 @@
 .sales-persona-view-label { position: absolute; bottom: 8px; left: 8px; pointer-events: none; border-radius: 5px; padding: 2px 7px; color: var(--sales-muted); background: var(--sales-subtle); font-size: 11px; }
 .has-image .sales-persona-view-label { background: #0009; color: #fff; }
 .sales-persona-remove { position: absolute; top: 7px; right: 7px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: #fff; background: #0008; }
+.sales-persona-preview { position: absolute; top: 7px; left: 7px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: #fff; background: #0008; }
+.sales-persona-preview:hover { background: #000b; }
 .sales-persona-loading { position: absolute; inset: 0; background: #0009; color: #fff; padding: 12px; font-size: 12px; pointer-events: none; }
-.sales-persona-complete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: -4px 0 6px; }
+.sales-persona-complete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0; }
 .sales-persona-complete p { color: var(--sales-muted); font-size: 12px; }
+.sales-asset-generation-status { color: var(--sales-muted); font-size: 12px; }
 .sales-persona-complete-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 100%; }
 .sales-persona-complete-actions > div { max-width: 100%; }
 .sales-persona-complete .sales-persona-model { height: 36px; gap: 6px; border: 1px solid var(--sales-line); border-radius: 8px; background: var(--sales-subtle); color: var(--sales-ink); }
@@ -33,8 +36,35 @@
 .sales-persona-history summary { cursor: pointer; }
 .sales-persona-history > div { display: flex; gap: 8px; overflow-x: auto; padding-top: 8px; }
 .sales-persona-history img { width: 80px; height: 106px; object-fit: contain; border-radius: 6px; }
+.sales-asset-reference { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 76px; padding: 10px 12px; border: 1px dashed var(--sales-line); border-radius: 12px; background: var(--sales-subtle); }
+.sales-asset-reference.has-image { border-style: solid; }
+.sales-persona-dialog .sales-asset-reference-upload { position: relative; display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; align-self: stretch; margin: 0; color: var(--sales-muted); cursor: pointer; }
+.sales-asset-reference-upload > img { flex-shrink: 0; width: 48px; height: 56px; border-radius: 6px; object-fit: cover; }
+.sales-asset-reference-upload > span { display: flex; flex-direction: column; gap: 5px; }
+.sales-asset-reference-upload strong { color: var(--sales-ink); font-size: 12px; font-weight: 600; }
+.sales-asset-reference-upload small { font-size: 11px; font-weight: 400; }
+.sales-asset-reference-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.sales-asset-reference-upload:focus-within { outline: 2px solid var(--sales-accent); outline-offset: 4px; border-radius: 6px; }
+.sales-asset-reference-upload input:disabled { cursor: default; }
+.sales-asset-generate-button { min-width: 112px; justify-content: center; }
+.sales-asset-prompt { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--sales-line); border-radius: 12px; background: var(--sales-subtle); }
+.sales-asset-prompt > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sales-asset-prompt h3 { font-size: 12px; font-weight: 600; color: var(--sales-ink); }
+.sales-asset-prompt textarea { width: 100%; min-height: 112px; max-height: 260px; resize: vertical; border: 0; padding: 0; background: transparent; color: var(--sales-muted); font-size: 12px; line-height: 1.8; outline-color: var(--sales-accent); }
+.sales-persona-sheet { min-width: 0; }
+.sales-persona-sheet header, .sales-persona-sheet header a { display: flex; align-items: center; gap: 6px; }
+.sales-persona-sheet header { justify-content: space-between; margin-bottom: 8px; font-size: 12px; }
+.sales-persona-sheet header a { color: var(--sales-muted); }
+.sales-persona-sheet > a, .sales-persona-sheet > p { display: grid; place-items: center; border: 1px solid var(--sales-line); border-radius: 12px; overflow: hidden; background: var(--sales-subtle); }
+.sales-persona-sheet > a { cursor: zoom-in; }
+.sales-persona-sheet img { display: block; width: 100%; max-height: 58dvh; object-fit: contain; }
+.sales-persona-sheet > p { min-height: 140px; color: var(--sales-muted); font-size: 12px; }
+@media (max-width: 760px) {
+  .sales-asset-view-layout { grid-template-columns: 180px minmax(0, 1fr); gap: 14px; }
+  .sales-asset-grid-views .sales-persona-view { height: 96px; }
+}
 @media (max-width: 540px) {
   .sales-asset-view-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-  .sales-asset-main-view .sales-persona-view { width: 110px; }
+  .sales-asset-main-view .sales-persona-view { width: min(100%, 200px); margin: 0 auto; }
   .sales-asset-grid-views .sales-persona-view { height: 96px; }
 }

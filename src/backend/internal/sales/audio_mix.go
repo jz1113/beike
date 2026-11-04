@@ -82,7 +82,7 @@ func audioMixHandler(cfg config.Config, client audioMixMediaClient) http.Handler
 			fail(400, err.Error())
 			return
 		}
-		probe, err := system.ProbeVideo(cfg.Root, videoFile)
+		probe, err := system.ProbeLocalVideo(r.Context(), cfg.Root, videoFile)
 		if err != nil || probe.Duration <= 0 {
 			fail(400, "无法读取待合成视频的时长规格")
 			return
@@ -104,6 +104,24 @@ func audioMixHandler(cfg config.Config, client audioMixMediaClient) http.Handler
 			}
 		}
 
+		if voiceFile != "" {
+			duration, err := system.ProbeAudioDuration(r.Context(), cfg.Root, voiceFile)
+			if err != nil {
+				fail(422, err.Error())
+				return
+			}
+			window := probe.Duration
+			if probe.VideoDuration > 0 {
+				window = probe.VideoDuration
+			}
+			if duration > window+0.05 {
+				fail(422, fmt.Sprintf("旁白实测 %.2f 秒，画面 %.2f 秒；请缩短超时台词或延长镜头后重试，原片与配音已保留", duration, window))
+				return
+			}
+		} else if body.VoiceMode == "voiceover" || (body.VoiceMode == "speech" && !probe.HasAudio) {
+			fail(422, "缺少本次旁白或原片口播音轨，请核对声音后合成")
+			return
+		}
 		bgmFile := ""
 		cleanupBgm := func() {}
 		defer func() { cleanupBgm() }()
@@ -132,10 +150,23 @@ func audioMixHandler(cfg config.Config, client audioMixMediaClient) http.Handler
 			keepOrig = *body.KeepOriginalAudio && probe.HasAudio && voiceFile == ""
 		}
 
+		if voiceFile != "" || body.VoiceMode == "speech" && keepOrig {
+			track := voiceFile
+			if track == "" {
+				track = videoFile
+			}
+			if err := checkSalesAudioSignal(r.Context(), ffmpeg, track); err != nil {
+				fail(422, err.Error())
+				return
+			}
+		}
 		hasSpeech := voiceFile != "" || keepOrig
 		bgmVol, _ := audioMixBgmVolume(body.BgmVolume, hasSpeech)
 
-		dur := math.Max(0.5, probe.Duration)
+		dur := probe.Duration
+		if probe.VideoDuration > 0 {
+			dur = probe.VideoDuration
+		}
 		fadeStart := math.Max(0, dur-0.6)
 		fadeDur := math.Min(0.6, dur)
 
@@ -146,7 +177,7 @@ func audioMixHandler(cfg config.Config, client audioMixMediaClient) http.Handler
 			return
 		}
 
-		args := buildAudioMixFFmpegArgs(videoFile, voiceFile, bgmFile, keepOrig, bgmVol, dur, fadeStart, fadeDur, output)
+		args := buildAudioMixFFmpegArgs(videoFile, voiceFile, bgmFile, probe.Codec == "h264" && probe.PixelFormat == "yuv420p", keepOrig, bgmVol, dur, fadeStart, fadeDur, output)
 		ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, ffmpeg, args...)
@@ -158,10 +189,16 @@ func audioMixHandler(cfg config.Config, client audioMixMediaClient) http.Handler
 			return
 		}
 
+		delivered, err := system.ProbeLocalVideo(r.Context(), cfg.Root, output)
+		if err != nil || !delivered.HasAudio || delivered.Width <= 0 || delivered.Height <= 0 || math.Abs(delivered.Duration-dur) > 0.15 {
+			_ = os.Remove(output)
+			fail(500, "成片音视频轨道或时长校验失败，可重试合成")
+			return
+		}
 		httpx.WriteJSON(w, 200, map[string]any{
 			"success":     true,
 			"videoUrl":    "/storage/" + rel,
-			"durationSec": roundTenth(dur),
+			"durationSec": roundTenth(delivered.Duration),
 			"duckedBgm":   hasSpeech && bgmFile != "",
 		})
 	}
@@ -180,7 +217,7 @@ func audioMixBgmVolume(volume *float64, hasSpeech bool) (float64, error) {
 	return 0.38, nil
 }
 
-func buildAudioMixFFmpegArgs(videoFile, voiceFile, bgmFile string, keepOrig bool, bgmVol, dur, fadeStart, fadeDur float64, output string) []string {
+func buildAudioMixFFmpegArgs(videoFile, voiceFile, bgmFile string, compatibleVideo, keepOrig bool, bgmVol, dur, fadeStart, fadeDur float64, output string) []string {
 	args := append([]string{"-y"}, audioMixInputArgs(videoFile)...)
 	var filter string
 	// The bundled Linux FFmpeg predates apad's whole_dur and amix's normalize.
@@ -214,8 +251,8 @@ func buildAudioMixFFmpegArgs(videoFile, voiceFile, bgmFile string, keepOrig bool
 
 	// WebM commonly uses VP8, which cannot be copied into MP4; MOV may use ProRes.
 	videoCodec := []string{"-c:v", "copy"}
-	if ext := strings.ToLower(filepath.Ext(videoFile)); ext == ".webm" || ext == ".mov" {
-		videoCodec = []string{"-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p"}
+	if !compatibleVideo {
+		videoCodec = []string{"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p"}
 	}
 	args = append(args, videoCodec...)
 	args = append(args,

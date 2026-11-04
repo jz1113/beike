@@ -59,7 +59,7 @@ describe('collection to image selection', () => {
 
     expect(itemsRef.current).toHaveLength(1);
     expect(itemsRef.current[0]).toMatchObject({ id: 'ready', selected: false });
-    expect(showToast).toHaveBeenCalledWith('已放弃商品「ready」');
+    expect(showToast).toHaveBeenCalledWith('已跳过图文「ready」');
   });
 
   it('waits for all collection requests before opening selection and ignores repeat submissions', async () => {

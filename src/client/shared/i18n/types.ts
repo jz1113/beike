@@ -38,6 +38,7 @@ export interface TranslationSchema {
     unmodifiedNotice: string;
     globalSettings: string;
     nav: {
+      library: string;
       profile: string;
       api: string;
       chat: string;
@@ -57,11 +58,10 @@ export interface TranslationSchema {
   sidebar: {
     create: string;
     skills: string;
-    assets: string;
+    generationHistory: string;
     settings: string;
     expand: string;
     collapse: string;
-    skillsComingSoon: string;
     history: {
       chats: string;
       recent: string;
@@ -121,12 +121,14 @@ export interface TranslationSchema {
     import: string;
     export: string;
     newFolder: string;
+    historySearchPlaceholder: string;
     searchPlaceholder: string;
     noAssets: string;
     materialLibrary: string;
     assetLibrary: string;
     aiGenerated: string;
     myUploads: string;
+    historyView: string;
     flatView: string;
     projectView: string;
     noMatchingMaterials: string;

@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"beike.local/cloud/src/backend/internal/gateway"
@@ -18,45 +17,25 @@ import (
 )
 
 var (
-	seedanceAssetCache    sync.Map
 	seedanceAssetPollWait = 1200 * time.Millisecond
 	seedanceAssetMaxWait  = 90 * time.Second
 )
 
-func seedanceCacheKey(base, assetType, ref string) string {
-	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
-	return root + "|" + assetType + "|" + strings.TrimSpace(ref)
-}
-
-func loadSeedanceCachedURI(base, assetType, ref string) string {
-	if cached, ok := seedanceAssetCache.Load(seedanceCacheKey(base, assetType, ref)); ok {
-		if text, ok := cached.(string); ok && text != "" {
-			return text
-		}
-	}
-	return ""
-}
-
-func storeSeedanceCachedURI(base, assetType, ref, uri string) {
-	if strings.TrimSpace(ref) == "" || strings.TrimSpace(uri) == "" {
-		return
-	}
-	seedanceAssetCache.Store(seedanceCacheKey(base, assetType, ref), uri)
-}
-
-func prepareSeedanceMedia(ctx context.Context, base, apiKey string, body map[string]any, workspace string, production bool, r *http.Request, payload map[string]json.RawMessage) error {
+func prepareSeedanceMedia(ctx context.Context, root, base, apiKey string, body map[string]any, workspace string, production bool, r *http.Request, payload map[string]json.RawMessage) error {
 	content, ok := body["content"].([]map[string]any)
 	if !ok || len(content) == 0 {
 		return nil
 	}
 	storeCfg := resolveVideoStorageConfig(r, payload)
+	scope := seedanceAssetScope{base: base, apiKey: apiKey, model: videoRequestedModel(payload), workspace: workspace}
+	scope.preferSourceURL = seedanceUsesSourceURL(base, scope.model)
 	imageIndex := 0
 	for index, item := range content {
 		switch item["type"] {
 		case "image_url":
 			node, _ := item["image_url"].(map[string]string)
 			raw := strings.TrimSpace(node["url"])
-			resolved, err := resolveSeedanceImageRef(ctx, base, apiKey, raw, imageIndex, workspace, production, storeCfg)
+			resolved, err := resolveSeedanceImageRef(ctx, scope, raw, imageIndex, workspace, production, storeCfg)
 			if err != nil {
 				return err
 			}
@@ -65,46 +44,56 @@ func prepareSeedanceMedia(ctx context.Context, base, apiKey string, body map[str
 		case "video_url":
 			node, _ := item["video_url"].(map[string]string)
 			raw := strings.TrimSpace(node["url"])
-			resolved, err := resolveSeedanceVideoRef(ctx, base, apiKey, raw, workspace, production, storeCfg)
+			resolved, err := resolveSeedanceVideoRef(ctx, scope, raw, workspace, production, storeCfg)
 			if err != nil {
 				return err
 			}
 			content[index]["video_url"] = map[string]string{"url": resolved}
+		case "audio_url":
+			node, _ := item["audio_url"].(map[string]string)
+			resolved, err := resolveSeedanceAudioRef(ctx, root, scope, node["url"], workspace, production, storeCfg)
+			if err != nil {
+				return err
+			}
+			content[index]["audio_url"] = map[string]string{"url": resolved}
 		}
 	}
 	body["content"] = content
 	return nil
 }
 
-func resolveSeedanceImageRef(ctx context.Context, base, apiKey, raw string, index int, workspace string, production bool, storeCfg *storage.ObjectConfig) (string, error) {
+func resolveSeedanceImageRef(ctx context.Context, scope seedanceAssetScope, raw string, index int, workspace string, production bool, storeCfg *storage.ObjectConfig) (string, error) {
 	ref := strings.TrimSpace(raw)
 	if strings.HasPrefix(ref, "//") {
 		ref = "https:" + ref
 	}
-	if cached := loadSeedanceCachedURI(base, "Image", ref); cached != "" {
-		return cached, nil
+	if cached, err := reuseSeedanceCachedURI(ctx, scope, "Image", ref); cached != "" || err != nil {
+		if err != nil {
+			return "", err
+		}
+		return scope.mediaURI(cached, ref), nil
 	}
 	lower := strings.ToLower(ref)
 	if strings.HasPrefix(lower, "asset://") {
-		return ensureSeedanceAssetActive(ctx, base, apiKey, strings.TrimSpace(ref[len("asset://"):]), "Image")
+		return ensureSeedanceAssetActive(ctx, scope, strings.TrimSpace(ref[len("asset://"):]), "Image")
 	}
 	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") {
-		if assetURI, err := registerSeedanceAsset(ctx, base, apiKey, ref, "Image"); err != nil {
+		if assetURI, err := registerSeedanceAsset(ctx, scope, ref, "Image"); err != nil {
 			return "", err
 		} else if assetURI != "" {
-			return assetURI, nil
+			return scope.mediaURI(assetURI, ref), nil
 		}
 	}
 	if storeCfg != nil && (strings.HasPrefix(lower, "data:image/") || strings.HasPrefix(ref, "/storage/")) {
 		uploaded, err := uploadSeedanceLocalImage(ctx, ref, index, workspace, production, *storeCfg)
 		if err == nil && uploaded != "" {
-			if assetURI, assetErr := registerSeedanceAsset(ctx, base, apiKey, uploaded, "Image"); assetErr != nil {
+			if assetURI, assetErr := registerSeedanceAsset(ctx, scope, uploaded, "Image"); assetErr != nil {
 				return "", assetErr
 			} else if assetURI != "" {
 				if strings.HasPrefix(ref, "/storage/") {
-					storeSeedanceCachedURI(base, "Image", ref, assetURI)
+					storeSeedanceCachedURI(scope, "Image", ref, assetURI)
 				}
-				return assetURI, nil
+				return scope.mediaURI(assetURI, uploaded), nil
 			}
 			return uploaded, nil
 		}
@@ -119,24 +108,27 @@ func resolveSeedanceImageRef(ctx context.Context, base, apiKey, raw string, inde
 	return converted, nil
 }
 
-func resolveSeedanceVideoRef(ctx context.Context, base, apiKey, raw, workspace string, production bool, storeCfg *storage.ObjectConfig) (string, error) {
+func resolveSeedanceVideoRef(ctx context.Context, scope seedanceAssetScope, raw, workspace string, production bool, storeCfg *storage.ObjectConfig) (string, error) {
 	ref := strings.TrimSpace(raw)
 	if strings.HasPrefix(ref, "//") {
 		ref = "https:" + ref
 	}
-	if cached := loadSeedanceCachedURI(base, "Video", ref); cached != "" {
-		return cached, nil
+	if cached, err := reuseSeedanceCachedURI(ctx, scope, "Video", ref); cached != "" || err != nil {
+		if err != nil {
+			return "", err
+		}
+		return scope.mediaURI(cached, ref), nil
 	}
 	origRef := ref
 	lower := strings.ToLower(ref)
 	if strings.HasPrefix(lower, "asset://") {
-		return ensureSeedanceAssetActive(ctx, base, apiKey, strings.TrimSpace(ref[len("asset://"):]), "Video")
+		return ensureSeedanceAssetActive(ctx, scope, strings.TrimSpace(ref[len("asset://"):]), "Video")
 	}
 	if strings.HasPrefix(ref, "/storage/") {
 		if storeCfg == nil {
 			return "", imageEditPrepareError{"当前未配置对象存储（OSS/R2/COS/S3）。Seedance 参考视频需要公网可访问链接，请在【设置 -> 对象存储】中完成配置后重试。"}
 		}
-		uploaded, err := uploadSeedanceLocalVideo(ctx, ref, workspace, production, *storeCfg)
+		uploaded, err := uploadVideoReference(ctx, ref, workspace, production, *storeCfg)
 		if err != nil {
 			return "", err
 		}
@@ -144,29 +136,26 @@ func resolveSeedanceVideoRef(ctx context.Context, base, apiKey, raw, workspace s
 	} else if !strings.HasPrefix(lower, "https://") && !strings.HasPrefix(lower, "http://") {
 		return "", imageEditPrepareError{"参考视频需要公网可访问链接或 asset:// 素材标识"}
 	}
-	assetURI, err := registerSeedanceAsset(ctx, base, apiKey, ref, "Video")
+	assetURI, err := registerSeedanceAsset(ctx, scope, ref, "Video")
 	if err != nil {
 		return "", err
 	}
 	if assetURI != "" {
 		if strings.HasPrefix(origRef, "/storage/") {
-			storeSeedanceCachedURI(base, "Video", origRef, assetURI)
+			storeSeedanceCachedURI(scope, "Video", origRef, assetURI)
 		}
-		return assetURI, nil
+		return scope.mediaURI(assetURI, ref), nil
 	}
 	return ref, nil
 }
 
-func registerSeedanceAsset(ctx context.Context, base, apiKey, mediaURL, assetType string) (string, error) {
-	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
-	if root == "" || apiKey == "" {
+func registerSeedanceAsset(ctx context.Context, scope seedanceAssetScope, mediaURL, assetType string) (string, error) {
+	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(scope.base), "/")
+	if root == "" || scope.apiKey == "" {
 		return "", nil
 	}
-	if cached := loadSeedanceCachedURI(base, assetType, mediaURL); cached != "" {
-		return cached, nil
-	}
 	endpoint := root + "/seedance/v3/assets/create"
-	status, raw, err := gateway.PostModel(ctx, http.MethodPost, endpoint, apiKey, map[string]any{
+	status, raw, err := gateway.PostModel(ctx, http.MethodPost, endpoint, scope.apiKey, map[string]any{
 		"url":       mediaURL,
 		"assetType": assetType,
 	}, 20*time.Second)
@@ -175,66 +164,82 @@ func registerSeedanceAsset(ctx context.Context, base, apiKey, mediaURL, assetTyp
 	}
 	var data map[string]any
 	if json.Unmarshal(raw, &data) != nil {
+		if status < 200 || status >= 300 {
+			return "", errors.New("Seedance 素材创建失败，请检查渠道凭证和素材地址")
+		}
 		return "", nil
 	}
 	assetID, assetState, reason := parseSeedanceAssetResponse(data)
 	if status < 200 || status >= 300 || isSeedanceAssetFailure(data, assetState) {
-		if reason != "" {
-			return "", errors.New(gateway.PresentVideoError(reason))
+		if reason == "" {
+			reason = seedanceAssetRejectText(assetType, assetState)
 		}
-		if status >= 400 && status < 500 {
-			return "", nil
-		}
+		return "", errors.New(gateway.PresentVideoError(reason))
 	}
 	if assetID == "" {
 		return "", nil
 	}
 	if strings.EqualFold(assetState, "Active") {
 		uri := "asset://" + assetID
-		storeSeedanceCachedURI(base, assetType, mediaURL, uri)
+		storeSeedanceCachedURI(scope, assetType, mediaURL, uri)
 		return uri, nil
 	}
-	uri, err := ensureSeedanceAssetActive(ctx, base, apiKey, assetID, assetType)
+	uri, err := ensureSeedanceAssetActive(ctx, scope, assetID, assetType)
+	if errors.Is(err, errSeedanceAssetQueryUnsupported) {
+		return "", nil
+	}
 	if err != nil {
 		return "", err
 	}
 	if uri != "" {
-		storeSeedanceCachedURI(base, assetType, mediaURL, uri)
+		storeSeedanceCachedURI(scope, assetType, mediaURL, uri)
 	}
 	return uri, nil
 }
 
-func ensureSeedanceAssetActive(ctx context.Context, base, apiKey, assetID, assetType string) (string, error) {
+func ensureSeedanceAssetActive(ctx context.Context, scope seedanceAssetScope, assetID, assetType string) (string, error) {
 	assetID = strings.TrimSpace(strings.TrimPrefix(assetID, "asset://"))
 	if assetID == "" {
 		return "", imageEditPrepareError{"Seedance 素材 ID 不能为空"}
 	}
-	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
+	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(scope.base), "/")
 	endpoint := root + "/seedance/v3/assets/query"
 	deadline := time.Now().Add(seedanceAssetMaxWait)
 	for {
-		status, raw, err := gateway.PostModel(ctx, http.MethodPost, endpoint, apiKey, map[string]any{
+		status, raw, err := gateway.PostModel(ctx, http.MethodPost, endpoint, scope.apiKey, map[string]any{
 			"assetId": assetID,
 		}, 15*time.Second)
 		if err != nil {
 			if ctx.Err() != nil {
 				return "", errors.New("等待 Seedance 素材审核就绪已取消")
 			}
-		} else if status == http.StatusNotFound || status == http.StatusMethodNotAllowed || status == http.StatusNotImplemented {
-			return "asset://" + assetID, nil
+		} else if status == http.StatusMethodNotAllowed || status == http.StatusNotImplemented {
+			return "", errSeedanceAssetQueryUnsupported
 		} else {
 			var data map[string]any
 			if json.Unmarshal(raw, &data) == nil {
 				_, state, reason := parseSeedanceAssetResponse(data)
-				if strings.EqualFold(state, "Active") {
-					return "asset://" + assetID, nil
+				missing := seedanceAssetUnavailable(state, reason) && !seedanceAssetAccessFailure(data)
+				failed := isSeedanceAssetFailure(data, state)
+				if status >= 200 && status < 500 && status != http.StatusUnauthorized && status != http.StatusForbidden &&
+					(missing || ((status == http.StatusNotFound || status == http.StatusGone) && !failed)) {
+					return "", errSeedanceAssetUnavailable
 				}
-				if isSeedanceAssetFailure(data, state) || (status >= 400 && status < 500) {
+				if failed || (status >= 400 && status < 500) {
 					if reason == "" {
 						reason = seedanceAssetRejectText(assetType, state)
 					}
 					return "", errors.New(gateway.PresentVideoError(reason))
 				}
+				if status >= 200 && status < 300 && strings.EqualFold(state, "Active") {
+					return "asset://" + assetID, nil
+				}
+			}
+			if status == http.StatusNotFound || status == http.StatusGone {
+				return "", errSeedanceAssetUnavailable
+			}
+			if status >= 400 && status < 500 {
+				return "", errors.New("Seedance 素材查询失败，请检查渠道凭证和素材地址")
 			}
 		}
 		if !time.Now().Before(deadline) {
@@ -293,6 +298,12 @@ func seedanceErrorMessages(raw any) string {
 
 func isSeedanceAssetFailure(data map[string]any, state string) bool {
 	if code, ok := data["code"].(float64); ok && code != 0 {
+		return true
+	}
+	if code, ok := data["code"].(string); ok && code != "" && code != "0" {
+		return true
+	}
+	if data["error"] != nil && data["error"] != "" {
 		return true
 	}
 	switch strings.ToUpper(strings.TrimSpace(state)) {
@@ -367,7 +378,7 @@ func resolveSeedanceLocalVideoPath(ref, workspace string, production bool) (stri
 	return path, nil
 }
 
-func uploadSeedanceLocalVideo(ctx context.Context, ref, workspace string, production bool, cfg storage.ObjectConfig) (string, error) {
+func uploadVideoReference(ctx context.Context, ref, workspace string, production bool, cfg storage.ObjectConfig) (string, error) {
 	path, err := resolveSeedanceLocalVideoPath(ref, workspace, production)
 	if err != nil {
 		return "", err

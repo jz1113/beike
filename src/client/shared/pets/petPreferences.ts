@@ -4,7 +4,11 @@ import type { BeikePetPhase } from './beikeMotion';
 
 export type PetSizeName = 'sm' | 'md' | 'lg';
 
+export type CanvasPetLink = 'all' | 'generation' | 'off';
+
 export interface PetPreferences {
+  canvasVisible: boolean;
+  canvasLink: CanvasPetLink;
   petId: string;
   visible: boolean;
   size: PetSizeName;
@@ -12,7 +16,7 @@ export interface PetPreferences {
 
 export const PET_SIZES: Record<PetSizeName, number> = { sm: 72, md: 96, lg: 128 };
 const PREFERENCE_KEY = 'beike.pet.preferences.v1';
-const fallback: PetPreferences = { petId: 'beike', visible: true, size: 'md' };
+const fallback: PetPreferences = { petId: 'beike', visible: true, size: 'md', canvasVisible: true, canvasLink: 'all' };
 
 function read(storage: Pick<Storage, 'getItem'>): PetPreferences {
   try {
@@ -22,6 +26,8 @@ function read(storage: Pick<Storage, 'getItem'>): PetPreferences {
     return {
       petId: typeof record.petId === 'string' && record.petId ? record.petId : fallback.petId,
       visible: record.visible !== false,
+      canvasVisible: record.canvasVisible !== false,
+      canvasLink: record.canvasLink === 'generation' || record.canvasLink === 'off' ? record.canvasLink : 'all',
       size: record.size === 'sm' || record.size === 'lg' ? record.size : 'md',
     };
   } catch {
@@ -31,6 +37,12 @@ function read(storage: Pick<Storage, 'getItem'>): PetPreferences {
 
 let preferences = typeof window === 'undefined' ? fallback : read(window.localStorage);
 const listeners = new Set<() => void>();
+
+if (typeof window !== 'undefined') window.addEventListener('storage', event => {
+  if (event.key !== PREFERENCE_KEY && event.key !== null) return;
+  preferences = read(window.localStorage);
+  listeners.forEach(listener => listener());
+});
 
 export function getPetPreferences() {
   return preferences;

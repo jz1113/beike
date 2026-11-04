@@ -98,50 +98,16 @@ export function SalesOCRQueueStrip({
   );
 }
 
-/** 在商品卖点编辑区中展示 OCR 原文或识别引导。 */
-export function SalesOCRResults({ state, disabled, onChange, onAddOCRImages, onRequestImages }: {
-  onAddOCRImages?: (urls: string[]) => void;
-  onRequestImages?: () => void;
-} & Pick<SalesOCRProps, 'state' | 'disabled' | 'onChange' | 'onRecognize' | 'progress' | 'summaryActions'>) {
-  const selected = state.imageCatalog.filter((image) => state.ocrImageUrls.includes(image.url));
-  const historicalUrls = state.ocrImages.filter((item) => (item.result || item.editedText.trim()) && !state.ocrImageUrls.includes(item.imageUrl)).map((item) => item.imageUrl);
-  const quickCandidates = state.imageCatalog.filter((image) => !image.unavailable && image.role === 'detail').slice(0, 6);
-  const fallbackCandidates = quickCandidates.length ? quickCandidates : state.imageCatalog.filter((image) => !image.unavailable).slice(0, 6);
-  const canAdd = Boolean(onRequestImages || (onAddOCRImages && fallbackCandidates.length));
-  const showEmptyGuide = !selected.length && !historicalUrls.length && !state.sellingPoints.trim();
-  const hasSource = selected.length > 0 || historicalUrls.length > 0 || showEmptyGuide;
-  const addImages = () => onRequestImages ? onRequestImages() : onAddOCRImages?.(fallbackCandidates.map((image) => image.url));
-
+export function SalesOCRResults({ state, disabled, onChange, onAddOCRImages }: Pick<SalesOCRProps, 'state' | 'disabled' | 'onChange'> & { onAddOCRImages: (urls: string[]) => void }) {
+  const historical = state.ocrImages.filter((item) => !state.ocrImageUrls.includes(item.imageUrl) && (item.result || item.editedText));
   return (
-    <section className={`sales-ocr-results${hasSource ? '' : ' is-manual-only'}`} aria-label="识别文字编辑">
-      {hasSource && <div className="sales-ocr-source">
-        {selected.length || historicalUrls.length ? (
-          <>
-            {!selected.length && onAddOCRImages && <div className="sales-document-toolbar"><button type="button" disabled={disabled} onClick={() => onAddOCRImages(historicalUrls)} className={`sales-gallery-quick-btn ${salesFocusClass}`}>使用这些原文提炼卖点</button></div>}
-            <SalesOCRSummary state={state} disabled={disabled} onChange={onChange} imageUrls={selected.length ? state.ocrImageUrls : historicalUrls} historical={!selected.length} />
-            {selected.length > 0 && historicalUrls.length > 0 && <details className="sales-ocr-notes"><summary>查看其他已识别原文 · {historicalUrls.length} 张</summary><SalesOCRSummary state={state} disabled={disabled} onChange={onChange} imageUrls={historicalUrls} historical /></details>}
-          </>
-        ) : showEmptyGuide ? (
-          <div className="sales-ocr-empty">
-            <span className="sales-ocr-empty-icon"><ScanText size={20} aria-hidden /></span>
-            <h3>添加详情图，识别商品文字</h3>
-            <p>从商品图片中添加，或将图片拖入此处。</p>
-            {fallbackCandidates.length > 0 && <span className="sales-ocr-add-hint">默认添加前 {fallbackCandidates.length} 张{quickCandidates.length ? '详情图' : '商品图'}，可调整</span>}
-            {canAdd && <div className="sales-ocr-empty-actions"><button type="button" disabled={disabled} onClick={addImages} className={`sales-ocr-add-link ${salesFocusClass}`}><Plus size={13} aria-hidden />添加详情图</button></div>}
-          </div>
-        ) : null}
-      </div>}
-      <div className="sales-manual-text">
-        <div className="sales-manual-text-heading">
-          <label htmlFor="sales-product-text">补充商品文字</label>
-          <span className="sales-manual-text-count">{state.sellingPoints.length.toLocaleString('zh-CN')} / 20,000</span>
-        </div>
-        <p className="sales-manual-text-hint">补充材质、规格、使用体验等信息，与识别原文一起提炼。</p>
-        <div className="sales-manual-text-actions">
-          {!selected.length && !showEmptyGuide && canAdd && <button type="button" disabled={disabled} onClick={addImages} className={`sales-ocr-add-link ${salesFocusClass}`}><Plus size={13} aria-hidden />添加详情图</button>}
-        </div>
-        <textarea id="sales-product-text" aria-label="补充商品文字" value={state.sellingPoints} disabled={disabled} maxLength={20000} rows={4} placeholder="也可以直接补充或粘贴商品介绍、材质、功能和卖点。" onChange={(event) => onChange({ sellingPoints: event.target.value })} />
-      </div>
+    <section className="sales-ocr-results" aria-label="识别文字编辑">
+      {historical.length > 0 && <details className="sales-ocr-raw">
+        <summary className={salesFocusClass}>已保存的历史原文 · {historical.length} 张</summary>
+        {historical.map((item) => <p key={item.imageUrl}>{item.editedText}</p>)}
+        <button type="button" disabled={disabled} className={salesFocusClass} onClick={() => onAddOCRImages(historical.map((item) => item.imageUrl))}>使用这些原文提炼卖点</button>
+      </details>}
+      <SalesOCRSummary state={state} disabled={disabled} onChange={onChange} />
     </section>
   );
 }

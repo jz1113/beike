@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { bindBeatProductImages } from './assetRecommendation';
 import { eligibleSalesImages } from './imageSelection';
-import { assembleSalesVideoPrompt } from './promptAssembler';
+import { assembleSalesVideoPrompt as renderSalesPrompt } from './promptAssembler';
 import { normalizeScriptTemplate } from './scriptTemplate';
+
+const assembleSalesVideoPrompt = (input: Parameters<typeof renderSalesPrompt>[0]) => renderSalesPrompt({
+  finalVideoTemplate: '{{referenceFacts}}\n{{photographyFacts}}\n{{timelineFacts}}\n{{audioFacts}}', ...input,
+});
 
 describe('sales final video prompt assembler', () => {
   it.each([true, false])('includes every selected product image even when only the primary is bound (bindings: %s)', (withBindings) => {
@@ -22,8 +26,8 @@ describe('sales final video prompt assembler', () => {
     expect(assembled.references.map((slot) => [slot.url, slot.apiToken, slot.kind])).toEqual([
       ['/primary.jpg', '图片1', 'product'], ['/supplement.jpg', '图片2', 'product'],
     ]);
-    expect(assembled.enginePrompt).toContain('商品外观 图片1、商品外观 图片2');
-    expect(assembled.enginePrompt.match(/清晰还原 图片1/g)).toHaveLength(2);
+    expect(assembled.enginePrompt).toContain('商品用途（@图片1、@图片2）');
+    expect(assembled.enginePrompt.match(/重点商品参考：@图片1/g)).toHaveLength(1);
     expect(assembled.jimengPrompt).toContain('{{Mixed 2}}');
   });
 
@@ -37,11 +41,11 @@ describe('sales final video prompt assembler', () => {
     const assembled = assembleSalesVideoPrompt({ script, productName: '商品', selectedImages,
       beatBindings: bindBeatProductImages(script, selectedImages), persona: null, scene: null });
     expect(assembled.references.map((slot) => slot.url)).toEqual(['/supplement.jpg', '/front.jpg']);
-    expect(assembled.enginePrompt).toContain('商品外观 图片1、商品正面 图片2');
-    expect(assembled.enginePrompt).toContain('清晰还原 图片2 的款式');
+    expect(assembled.enginePrompt).toContain('商品用途（@图片1、@图片2·正面）');
+    expect(assembled.enginePrompt).toContain('重点商品参考：@图片2');
   });
 
-  it.each([['16:9', '16:9 画幅'], ['adaptive', '跟随参考图比例']])('aligns automatic prompts with the selected output ratio %s', (aspectRatio, expected) => {
+  it.each([['16:9', '输出画幅：16:9'], ['adaptive', '输出画幅：adaptive']])('aligns automatic prompts with the selected output ratio %s', (aspectRatio, expected) => {
     const script = normalizeScriptTemplate({ durationSec: 5, visualSpec: { aspectRatio: '9:16' }, shots: [{ beats: [{ start: 0, end: 5, action: '展示商品' }] }] })!;
     const assembled = assembleSalesVideoPrompt({ script, aspectRatio, productName: '商品', selectedImages: [], beatBindings: [], persona: null, scene: null });
     expect(assembled.enginePrompt).toContain(expected);
@@ -96,8 +100,8 @@ describe('sales final video prompt assembler', () => {
     ]);
     expect(assembled.jimengPrompt).toContain('{{Mixed 1}}');
     expect(assembled.jimengPrompt).toContain('{{Mixed 5}}');
-    expect(assembled.enginePrompt).toContain('图片1');
-    expect(assembled.enginePrompt).toContain('图片5');
+    expect(assembled.enginePrompt).toContain('@图片1');
+    expect(assembled.enginePrompt).toContain('@图片5');
     expect(assembled.enginePrompt).not.toContain('{{Mixed');
     expect(assembled.jimengPrompt).not.toContain('黑色菱格纹链条包');
     expect(assembled.narrationText).toContain('自带呼吸感');
@@ -113,7 +117,7 @@ describe('sales final video prompt assembler', () => {
       productName: '针织开衫',
       selectedImages: images,
       beatBindings: bindBeatProductImages(script, images),
-      actionReferences: { 0: { url: '/depth.mp4', mediaType: 'video', label: '动作段 1 · 深度转身' } },
+      scriptVideoReference: { url: '/depth.mp4', kind: 'depth' },
       imitationMode: 'depth_imitation',
       persona: null,
       scene: null,
@@ -122,11 +126,12 @@ describe('sales final video prompt assembler', () => {
       ['{{Mixed 1}}', '图片1', 'product', 'image'],
       ['{{Mixed 2}}', '视频1', 'action', 'video'],
     ]);
-    expect(assembled.jimengPrompt).toContain('动作参考：参照 {{Mixed 2}} 的姿态');
-    expect(assembled.enginePrompt).toContain('动作参考：参照 视频1 的姿态');
+    expect(assembled.jimengPrompt).toContain('动作参考：{{Mixed 2}}（深度动作视频）');
+    expect(assembled.enginePrompt).toContain('动作参考：@视频1（深度动作视频）');
+    expect(assembled.enginePrompt).toContain('仅取前景动作与接触时序');
   });
 
-  it('supports clean_visual mode and scrubs noisy size/price tokens from video prompt', () => {
+  it('retains raw size and price facts for the editable template while keeping clean_visual audio metadata', () => {
     const script = normalizeScriptTemplate({
       title: '纯展示脚本',
       durationSec: 6,
@@ -147,19 +152,19 @@ describe('sales final video prompt assembler', () => {
     expect(assembled.effectiveVoiceMode).toBe('none');
     expect(assembled.narrationText).toBe('');
     expect(assembled.subtitles).toEqual([]);
-    expect(assembled.jimengPrompt).not.toContain('到手价');
-    expect(assembled.jimengPrompt).not.toContain('SKU:102330');
-    expect(assembled.sanitizedNoiseTerms).toContain('价格促销字样');
-    expect(assembled.warnings.some((w) => w.includes('深度视频模仿'))).toBe(true);
+    expect(assembled.jimengPrompt).toContain('到手价￥299');
+    expect(assembled.jimengPrompt).toContain('SKU:102330');
+    expect(assembled.sanitizedNoiseTerms).toEqual([]);
+    expect(assembled.warnings.some((w) => w.includes('关联深度视频尚未就绪'))).toBe(true);
   });
 
-  it('keeps fractional beat timing and removes source-only terms from all script descriptions', () => {
+  it('keeps fractional timing without including source review titles or exclusion records', () => {
     const script = normalizeScriptTemplate({
       title: '短动作展示', durationSec: 5.2,
       visualSpec: { moodTags: ['旧牌专属风格'], lighting: '旧牌专属光线', cameraFeel: '经过旧牌专属招牌' },
-      sourceExclusions: [{ type: 'brand', term: '旧牌专属', replacementRule: '剔除' }],
+      sourceExclusions: [{ type: 'brand_signage', term: '旧牌专属', replacementRule: '剔除' }],
       shots: [{ start: 0, end: 5.2, summary: '旧牌专属展示', beats: [
-        { start: 0, end: 0.4, actionTemplate: '举起{{商品}}', camera: '旧牌专属招牌前推近', expression: '对旧牌专属微笑' },
+        { start: 0, end: 0.4, actionTemplate: '举起{{商品}}', camera: '固定机位', expression: '看向镜头微笑' },
         { start: 0.4, end: 5.2, actionTemplate: '展示{{商品}}细节' },
       ] }],
     })!;
@@ -169,27 +174,28 @@ describe('sales final video prompt assembler', () => {
     expect(assembled.jimengPrompt).toContain('00:00 - 00:00.4');
     expect(assembled.enginePrompt).toContain('00:00.4 - 00:05.2');
     expect(assembled.jimengPrompt).not.toContain('旧牌专属');
-    expect(assembled.sanitizedNoiseTerms).toContain('旧牌专属');
+    expect(assembled.sanitizedNoiseTerms).toEqual([]);
+    expect(assembled.jimengPrompt).not.toContain('原词=');
   });
 });
 
 describe('sales motion mode isolation', () => {
-  it.each(['depth', 'source'] as const)('uses one linked %s video across beats with matching source timestamps', (kind) => {
+  it('uses one linked depth video across beats with matching source timestamps', () => {
     const script = normalizeScriptTemplate({ durationSec: 5, shots: [{ beats: [
       { start: 0, end: 2.5, action: '走近商品' }, { start: 2.5, end: 5, action: '展示商品' },
     ] }] })!;
     const assembled = assembleSalesVideoPrompt({ script, productName: '当前商品', selectedImages: [{ index: 0, url: '/product.jpg', role: 'main' }],
       beatBindings: [], persona: null, scene: null, imitationMode: 'depth_imitation',
-      scriptVideoReference: { url: '/linked.mp4', kind },
+      scriptVideoReference: { url: '/linked.mp4', kind: 'depth' },
       actionReferences: { 0: { url: '/old-action.mp4', mediaType: 'video', label: '旧动作' } },
     });
     expect(assembled.references.filter((slot) => slot.mediaType === 'video')).toEqual([
       expect.objectContaining({ url: '/linked.mp4', apiToken: '视频1', kind: 'action' }),
     ]);
-    expect(assembled.enginePrompt).toContain('参照 视频1 在 00:00 - 00:02.5 对应片段');
-    expect(assembled.enginePrompt).toContain('参照 视频1 在 00:02.5 - 00:05 对应片段');
+    expect(assembled.enginePrompt).toContain('源片对应时间 00:00 - 00:02.5');
+    expect(assembled.enginePrompt).toContain('源片对应时间 00:02.5 - 00:05');
     expect(assembled.references.some((slot) => slot.url === '/old-action.mp4')).toBe(false);
-    if (kind === 'source') expect(assembled.enginePrompt).toContain('不沿用原片人物、商品、字幕、品牌或声音');
+    expect(assembled.enginePrompt).toContain('动作参考：@视频1（深度动作视频）');
   });
 
   it('ignores a linked video in script and image mode', () => {
@@ -197,39 +203,53 @@ describe('sales motion mode isolation', () => {
     const assembled = assembleSalesVideoPrompt({ script, productName: '商品', selectedImages: [], beatBindings: [], persona: null, scene: null,
       imitationMode: 'script_only', scriptVideoReference: { url: '/linked.mp4', kind: 'depth' } });
     expect(assembled.references).toEqual([]);
-    expect(assembled.enginePrompt).not.toContain('动作参考');
+    expect(assembled.enginePrompt).not.toContain('动作参考：');
+    expect(assembled.enginePrompt).not.toContain('源片对应时间');
   });
 
   it('keeps saved depth bindings out of script-only requests and restores them when depth mode returns', () => {
     const script = normalizeScriptTemplate({ durationSec: 5, shots: [{ beats: [{ start: 0, end: 5, action: '展示商品' }] }] })!;
     const input = { script, productName: '商品', selectedImages: [], beatBindings: [], persona: null, scene: null,
-      actionReferences: { 0: { url: '/saved-depth.mp4', mediaType: 'video' as const, label: '深度动作' } } };
+      actionReferences: { 0: { url: '/old-action.mp4', mediaType: 'video' as const, label: '旧动作' } },
+      scriptVideoReference: { url: '/saved-depth.mp4', kind: 'depth' as const } };
     const scriptOnly = assembleSalesVideoPrompt({ ...input, imitationMode: 'script_only' });
     expect(scriptOnly.references.some((slot) => slot.kind === 'action')).toBe(false);
-    expect(scriptOnly.enginePrompt).not.toContain('动作参考');
+    expect(scriptOnly.enginePrompt).not.toContain('动作参考：');
     const depth = assembleSalesVideoPrompt({ ...input, imitationMode: 'depth_imitation' });
     expect(depth.references.find((slot) => slot.kind === 'action')?.url).toBe('/saved-depth.mp4');
     expect(depth.enginePrompt).toContain('动作参考');
   });
 
-  it('includes static pose image action references in script_only mode without requiring depth video mode', () => {
+  it.each(['script_only', 'depth_imitation'] as const)('excludes historical pose images in %s mode without mutating their bindings', (imitationMode) => {
     const script = normalizeScriptTemplate({ durationSec: 5, shots: [{ beats: [{ start: 0, end: 5, action: '叉腰站立展示商品' }] }] })!;
     const images = [{ index: 0, url: '/prod.jpg', role: 'main' as const }];
+    const actionReferences = { 0: { url: '/atlas-pose-diagonal.jpg', mediaType: 'image' as const, label: '片段 1 动作参考（叉腰站姿）' } };
     const assembled = assembleSalesVideoPrompt({
       script,
       productName: '修身风衣',
       selectedImages: images,
       beatBindings: bindBeatProductImages(script, images),
-      actionReferences: { 0: { url: '/atlas-pose-diagonal.jpg', mediaType: 'image', label: '片段 1 动作参考（叉腰站姿）' } },
-      imitationMode: 'script_only',
+      actionReferences,
+      imitationMode,
       persona: null,
       scene: null,
     });
     expect(assembled.references.map((r) => [r.mixedToken, r.apiToken, r.kind, r.mediaType])).toEqual([
       ['{{Mixed 1}}', '图片1', 'product', 'image'],
-      ['{{Mixed 2}}', '图片2', 'action', 'image'],
     ]);
-    expect(assembled.enginePrompt).toContain('动作参考：参照 图片2 的姿态');
+    expect(assembled.enginePrompt).not.toContain('动作参考：');
+    expect(actionReferences[0].url).toBe('/atlas-pose-diagonal.jpg');
+  });
+
+  it('rejects source-video and per-beat fallbacks when the linked depth video is unavailable', () => {
+    const script = normalizeScriptTemplate({ durationSec: 5, shots: [{ beats: [{ start: 0, end: 5, action: '展示商品' }] }] })!;
+    const assembled = assembleSalesVideoPrompt({ script, productName: '商品', selectedImages: [], beatBindings: [], persona: null, scene: null,
+      imitationMode: 'depth_imitation', scriptVideoReference: { url: '/source.mp4', kind: 'source' },
+      actionReferences: { 0: { url: '/old-action.mp4', mediaType: 'video', label: '历史动作' } },
+    });
+    expect(assembled.references).toEqual([]);
+    expect(assembled.enginePrompt).not.toContain('视频1');
+    expect(assembled.warnings).toContain('脚本关联深度视频尚未就绪，请回素材库继续处理，或切换为「仅按脚本」。');
   });
 });
 
@@ -240,9 +260,9 @@ describe('custom scene references', () => {
       scene: { id: 'old', title: '旧室内影棚', description: '旧场景', lighting: '旧紫色霓虹灯', category: '', spatialType: 'studio', tags: '', suitableCategories: [], coverUrl: '/old-scene.jpg', sourceImages: [], source: 'scene_library' },
       customSceneImageUrl: '/uploaded-outdoor.jpg' });
     expect(assembled.references.find((slot) => slot.kind === 'scene')).toMatchObject({ url: '/uploaded-outdoor.jpg', label: '场景参考（自定义实景）' });
-    expect(assembled.enginePrompt).toContain('上传实景图中的环境');
+    expect(assembled.enginePrompt).toContain('当前场景参考：@图片1');
     expect(assembled.enginePrompt).not.toContain('旧室内影棚');
     expect(assembled.enginePrompt).not.toContain('旧紫色霓虹灯');
-    expect(assembled.enginePrompt).toContain('柔和光线');
+    expect(assembled.enginePrompt).not.toContain('柔和光线');
   });
 });

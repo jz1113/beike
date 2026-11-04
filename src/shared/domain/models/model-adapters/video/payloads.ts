@@ -222,6 +222,7 @@ export function buildWanOfficialPayload(input: VideoAdapterInput, modelId: strin
     }
   }
 
+  for (const url of input.audios || []) media.push({ type: 'reference_audio', url });
   const inputObj: Record<string, unknown> = { prompt };
   if (media.length > 0) inputObj.media = media;
 
@@ -245,7 +246,8 @@ export function buildWanOfficialPayload(input: VideoAdapterInput, modelId: strin
 
   if (input.seed !== undefined && input.seed !== null) {
     const s = Number(input.seed);
-    if (!Number.isNaN(s) && s >= 0) parametersObj.seed = Math.min(s, 2147483647);
+    if (!Number.isInteger(s) || s < -1 || s > 2147483647) throw new Error('万相随机种子须为 -1 或 0～2147483647 的整数');
+    parametersObj.seed = s;
   }
 
   return { model: modelId, input: inputObj, parameters: parametersObj };

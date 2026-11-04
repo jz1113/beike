@@ -728,12 +728,48 @@ paths:
       operationId: get_api_generate_video
       responses:
         '200':
-          description: 沿用现有 JSON 或二进制响应
+          description: 视频轮询或按 taskKey 恢复回执；可带已保存的脱敏提交诊断
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoSubmissionResponse'
     post:
       operationId: post_api_generate_video
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              properties:
+                context_ir_enabled:
+                  type: boolean
+                  description: 秘塔 H3 的 IR Context 开关；缺省开启，显式值优先于渠道控制台的全局开关，其他渠道不转发
+                voice_ids:
+                  type: array
+                  maxItems: 3
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 64
+                  description: Grok 1.5 视频生成使用的官方预置音色标识，转发为 reference_audios.voice_id；不接受音频文件，编辑与延长模式不支持
+      parameters:
+        - in: header
+          name: Prefer
+          schema:
+            type: string
+            enum: [respond-async]
+          description: 经任务中心接管执行，未设置时使用同步响应
       responses:
+        '202':
+          description: 返回已持久化的 job 与编号，可从 /api/sales/media-jobs 查询
         '200':
-          description: 沿用现有 JSON 或二进制响应
+          description: 视频提交或幂等复用回执；诊断仅证明发送内容，不证明上游采用了参考素材
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoSubmissionResponse'
   /api/generate/video/bind:
     post:
       operationId: post_api_generate_video_bind
@@ -758,6 +794,28 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/library/preferences:
+    get:
+      operationId: get_api_library_preferences
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    patch:
+      operationId: patch_api_library_preferences
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/library/shared-materials:
+    get:
+      operationId: get_api_library_shared_materials
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_library_shared_materials
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
   /api/pets:
     get:
       operationId: get_api_pets
@@ -779,7 +837,7 @@ paths:
   /api/sales/asset-view-grid:
     post:
       operationId: post_api_sales_asset_view_grid
-      summary: 将一张人物或场景九宫格裁切为当前工作区的九张 JPG
+      summary: 裁切人物一行四格或场景九宫格到当前工作区
       requestBody:
         required: true
         content:
@@ -791,13 +849,20 @@ paths:
                 kind:
                   type: string
                   enum: [persona, scene]
+                layout:
+                  type: string
+                  enum: [1x4, 3x3]
+                  description: 新人物视角使用 1x4，省略时兼容已有九宫格
+                whole:
+                  type: boolean
+                  description: 人物 1x4 横图以单张 sheet 保存，默认兼容历史裁切请求
                 imageUrl:
                   type: string
                   minLength: 1
                   description: 当前工作区存储路径、公网图片 URL 或图片 data URL
       responses:
         '200':
-          description: 按从左到右、从上到下顺序裁切的九张 JPG；重试复用同一输出路径
+          description: 人物整图或历史裁片，重试复用同一输出路径
           content:
             application/json:
               schema:
@@ -809,7 +874,7 @@ paths:
                     enum: [true]
                   images:
                     type: array
-                    minItems: 9
+                    minItems: 1
                     maxItems: 9
                     items:
                       type: object
@@ -817,7 +882,7 @@ paths:
                       properties:
                         view:
                           type: string
-                          enum: [face, front, side, threeQuarterLeft, threeQuarterRight, back, sideRight, upperBody, backThreeQuarter, left, right, reverse, frontWide, leftWide, rightWide, reverseLeft, reverseRight, detail]
+                          enum: [sheet, face, front, side, threeQuarterLeft, threeQuarterRight, back, sideRight, upperBody, backThreeQuarter, left, right, reverse, frontWide, leftWide, rightWide, reverseLeft, reverseRight, detail]
                         url:
                           type: string
         '400':
@@ -833,36 +898,102 @@ paths:
   /api/sales/asset-view-jobs:
     get:
       operationId: get_api_sales_asset_view_jobs
+      summary: 读取当前工作区的资产生成任务及已生成主图和提示词
+      parameters:
+        - in: query
+          name: jobId
+          schema:
+            type: string
+          description: 指定时仅返回该原任务；省略时返回任务列表
       responses:
         '200':
-          description: 沿用现有 JSON 或二进制响应
+          description: 任务列表或指定任务
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+                  job:
+                    $ref: '#/components/schemas/SalesAssetViewJob'
+                  jobs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SalesAssetViewJob'
     post:
       operationId: post_api_sales_asset_view_jobs
+      summary: 创建或恢复资产生成任务，复用原任务标识与已生成结果
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, kind, data, generation]
+              properties:
+                key:
+                  type: string
+                  maxLength: 256
+                kind:
+                  type: string
+                  enum: [persona, scene]
+                assetId:
+                  type: string
+                data:
+                  type: object
+                  additionalProperties: true
+                generation:
+                  type: object
+                  additionalProperties: true
+                  properties:
+                    assetCreation:
+                      type: object
+                      additionalProperties: true
+                      required: [referenceImageUrl, analysisModel]
+                      properties:
+                        referenceImageUrl:
+                          type: string
+                        analysisModel:
+                          type: string
+                        analysisModelSelection:
+                          type: string
+                checkpoint:
+                  type: object
+                  properties:
+                    taskId:
+                      type: string
+                    resultUrl:
+                      type: string
       responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/sales/atlas/catalog:
-    get:
-      operationId: get_api_sales_atlas_catalog
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/sales/atlas/import:
-    post:
-      operationId: post_api_sales_atlas_import
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/sales/atlas/media:
-    get:
-      operationId: get_api_sales_atlas_media
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
+        '202':
+          description: 已受理或复用原任务；提示词或主图已完成时一并返回
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, job]
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+                  job:
+                    $ref: '#/components/schemas/SalesAssetViewJob'
   /api/sales/audio-mix:
     post:
       operationId: post_api_sales_audio_mix
+      parameters:
+        - in: header
+          name: Prefer
+          schema:
+            type: string
+            enum: [respond-async]
+          description: 经任务中心接管执行，未设置时使用同步响应
       responses:
+        '202':
+          description: 返回已持久化的 job 与编号，可从 /api/sales/media-jobs 查询
         '200':
           description: 沿用现有 JSON 或二进制响应
   '/api/sales/bgm/{id}':
@@ -871,6 +1002,42 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/sales/media-jobs:
+    get:
+      operationId: get_api_sales_media_jobs
+      summary: 查看当前工作区最近的媒体任务，按编号读取完整结果
+      parameters:
+        - in: query
+          name: id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 返回 jobs 列表或指定 job，含阶段、状态、时间和结果
+        '404':
+          description: 当前工作区没有该任务
+    post:
+      operationId: post_api_sales_media_jobs
+      summary: 停止后续处理或继续原阶段
+      parameters:
+        - in: query
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: action
+          required: true
+          schema:
+            type: string
+            enum: [cancel, retry]
+      responses:
+        '200':
+          description: 已请求取消
+        '202':
+          description: 已接管重试阶段
+        '409':
+          description: 当前状态或渠道与原任务不匹配
   /api/sales/ocr:
     post:
       operationId: post_api_sales_ocr
@@ -908,9 +1075,62 @@ paths:
   /api/sales/plan-adapt:
     post:
       operationId: post_api_sales_plan_adapt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [productName, model, beats]
+              properties:
+                productName:
+                  type: string
+                model:
+                  type: string
+                beats:
+                  type: array
+                  minItems: 1
+                  maxItems: 24
+                  items:
+                    type: object
+                    additionalProperties: true
+                personaReferenceImageUrl:
+                  type: string
+                  maxLength: 8192
+                  description: 当前人物原始主图，缺失时可用主体或人脸图；按工作区与公网地址规则读取
+                personaPresence:
+                  type: string
+                  enum: [full_presenter, silent_model, hands_only, none]
+                  description: 提供人物图时必须指定实际出镜范围，不能为 none
       responses:
         '200':
-          description: 沿用现有 JSON 或二进制响应
+          description: 商品分镜改编与同次人物原图视觉分析；无人物图时不返回分析
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                required: [success, beats, model, promptVersion]
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+                  beats:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                  model:
+                    type: string
+                  promptVersion:
+                    type: string
+                  personaVisualProfile:
+                    $ref: '#/components/schemas/SalesPersonaVisualProfile'
+        '400':
+          description: 输入、出镜范围或人物原图无效，原稿保留
+        '502':
+          description: 模型调用、分镜校验或人物视觉分析失败，原稿保留
   /api/sales/presets:
     get:
       operationId: get_api_sales_presets
@@ -1028,18 +1248,21 @@ paths:
   /api/sales/script-analysis:
     post:
       operationId: post_api_sales_script_analysis
+      parameters:
+        - in: header
+          name: Prefer
+          schema:
+            type: string
+            enum: [respond-async]
+          description: 经任务中心接管执行，未设置时使用同步响应
       responses:
+        '202':
+          description: 返回已持久化的 job 与编号，可从 /api/sales/media-jobs 查询
         '200':
           description: 沿用现有 JSON 或二进制响应
   /api/sales/script-analysis/prompt:
     get:
       operationId: get_api_sales_script_analysis_prompt
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/sales/script-normalize:
-    post:
-      operationId: post_api_sales_script_normalize
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
@@ -1093,6 +1316,157 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  /api/sales/spoken-copy:
+    post:
+      operationId: post_api_sales_spoken_copy
+      summary: 改写并验收口播，或原样验收手工稿
+      description: 改写需保存口播时长适配与口播语义验收提示词。reviewOnly 为 true 时只需保存语义验收规则，不改写台词；成功后返回本次审核规则版本。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, productName, voiceMode, duration, beats]
+              properties:
+                model:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                productName:
+                  type: string
+                  maxLength: 2000
+                facts:
+                  type: string
+                  maxLength: 20000
+                  description: 当前商品原始资料，不含生成的概括、买点或文案。
+                sourceCopy:
+                  type: string
+                  maxLength: 10000
+                  description: 待优化稿，不构成事实证据。
+                reviewOnly:
+                  type: boolean
+                  default: false
+                voiceMode:
+                  type: string
+                  enum: [speech, voiceover]
+                duration:
+                  type: number
+                  exclusiveMinimum: 0
+                  maximum: 600
+                targetCps:
+                  type: number
+                  minimum: 2
+                  maximum: 4.6
+                beats:
+                  type: array
+                  minItems: 1
+                  maxItems: 24
+                  items:
+                    type: object
+                    required: [index, start, end, action]
+                    properties:
+                      index:
+                        type: integer
+                        minimum: 0
+                      start:
+                        type: number
+                        minimum: 0
+                      end:
+                        type: number
+                        exclusiveMinimum: 0
+                        maximum: 600
+                      action:
+                        type: string
+                        maxLength: 2000
+                      expression:
+                        type: string
+                        maxLength: 600
+                      transition:
+                        type: string
+                        maxLength: 400
+                      spokenLine:
+                        type: string
+                        maxLength: 2000
+                      subtitle:
+                        type: string
+                        maxLength: 1000
+      responses:
+        '200':
+          description: 改写稿或原稿已通过本次语义验收
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, beats, model, promptVersion, reviewPromptVersion]
+                properties:
+                  success:
+                    type: boolean
+                    const: true
+                  model:
+                    type: string
+                  promptVersion:
+                    type: string
+                    description: 本次写稿规则版本；reviewOnly 未执行写稿时为空。
+                  reviewPromptVersion:
+                    type: string
+                    minLength: 1
+                  beats:
+                    type: array
+                    minItems: 1
+                    maxItems: 24
+                    items:
+                      type: object
+                      required: [index, spokenLine, subtitle]
+                      properties:
+                        index:
+                          type: integer
+                          minimum: 0
+                        spokenLine:
+                          type: string
+                        subtitle:
+                          type: string
+        '422':
+          description: 手工原稿未通过基础或语义验收，保留原稿并返回具体问题。
+        '502':
+          description: 审稿失败、回执无效或三稿仍未通过，不返回成功稿与审核版本。临时审稿故障可携带 pendingReview，供下次 reviewOnly 原字续验；候选稿不表示审核通过。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, error]
+                properties:
+                  success:
+                    type: boolean
+                    const: false
+                  error:
+                    type: string
+                  code:
+                    type: string
+                  stage:
+                    type: string
+                  pendingReview:
+                    type: object
+                    required: [beats, promptVersion]
+                    properties:
+                      promptVersion:
+                        type: string
+                        minLength: 1
+                      beats:
+                        type: array
+                        minItems: 1
+                        maxItems: 24
+                        items:
+                          type: object
+                          required: [index, spokenLine, subtitle]
+                          properties:
+                            index:
+                              type: integer
+                              minimum: 0
+                            spokenLine:
+                              type: string
+                            subtitle:
+                              type: string
   /api/sales/studio-assets:
     get:
       operationId: get_api_sales_studio_assets
@@ -1131,7 +1505,7 @@ paths:
   /api/sales/summary:
     post:
       operationId: post_api_sales_summary
-      summary: 根据商品原图、核对文字及商品卖点转买点技能整理卖点文案
+      summary: 根据商品文字资料和修订后的 OCR 文字提炼有依据的买点
       requestBody:
         required: true
         content:
@@ -1162,6 +1536,95 @@ paths:
           description: 模型失败、超时或返回内容不完整；不自动重试或生成替代文案
         '504':
           description: 商品原图读取取消或超时
+  /api/sales/task-records:
+    get:
+      operationId: get_api_sales_task_records
+      summary: 分页读取当前工作区的任务记录
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+        - in: query
+          name: kind
+          schema:
+            type: string
+        - in: query
+          name: model
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+        - in: query
+          name: until
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: size
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 筛选后的任务列表、总数与当前页
+  /api/sales/video-clip:
+    post:
+      operationId: post_api_sales_video_clip
+      summary: 按完整动作结束时间准备原速静音参考片段，保留原视频
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SalesVideoClipRequest'
+      responses:
+        '200':
+          description: 当前工作区派生片段地址与实测时长
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesVideoClipResponse'
+        '400':
+          description: 视频越界、结束时间无效或素材不可读取
+        '503':
+          description: 本地视频处理环境不可用
+  /api/sales/video-review:
+    post:
+      operationId: post_api_sales_video_review
+      summary: 解码指定视频，核查画面及音轨
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [videoUrl]
+              properties:
+                videoUrl: { type: string, minLength: 1, maxLength: 8192 }
+      responses:
+        '200':
+          description: 检测对象的画面、音轨及媒体信息
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, picture, audio, width, height, durationSec]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  picture: { type: string, enum: [visible, dark, unreadable] }
+                  audio: { type: string, enum: [audible, quiet, missing, unreadable] }
+                  width: { type: integer }
+                  height: { type: integer }
+                  durationSec: { type: number }
   /api/system/config:
     get:
       operationId: get_api_system_config
@@ -1354,6 +1817,46 @@ paths:
           $ref: '#/components/responses/VideoDownloadError'
         '503':
           $ref: '#/components/responses/VideoDownloadError'
+  /api/workshop/task-records:
+    get:
+      operationId: get_api_workshop_task_records
+      summary: 分页读取当前工作区的任务记录
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+        - in: query
+          name: kind
+          schema:
+            type: string
+        - in: query
+          name: model
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+        - in: query
+          name: until
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: size
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 筛选后的任务列表、总数与当前页
   '/api/workshop/tasks/{taskId}/review':
     post:
       operationId: post_api_workshop_tasks_taskId_review
@@ -1376,6 +1879,165 @@ components:
               error:
                 type: string
   schemas:
+    SalesPersonaVisualProfile:
+      type: object
+      required: [imageUrl, presence, temperament, gaze, expression, posture, limitations]
+      properties:
+        imageUrl:
+          type: string
+          maxLength: 8192
+          description: 服务端绑定的本次原图地址
+        presence:
+          type: string
+          enum: [full_presenter, silent_model, hands_only]
+        temperament:
+          type: string
+          maxLength: 600
+          description: 外观传达的视觉气质及其可见依据，不推断内在性格
+        gaze:
+          type: string
+          maxLength: 600
+        expression:
+          type: string
+          maxLength: 600
+        posture:
+          type: string
+          maxLength: 600
+        limitations:
+          type: string
+          maxLength: 600
+          description: 裁切、遮挡及静态图的观察限制；不可见项留空，至少有一项可见观察
+    SalesAssetCreation:
+      type: object
+      required: [referenceImageUrl]
+      properties:
+        referenceImageUrl:
+          type: string
+        prompt:
+          type: string
+        imageUrl:
+          type: string
+        promptModel:
+          type: string
+        imageModel:
+          type: string
+    SalesAssetViewJob:
+      type: object
+      required: [id, key, kind, assetId, model, status, error, images, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        kind:
+          type: string
+          enum: [persona, scene]
+        assetId:
+          type: string
+        model:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [queued, analyzing, creating, generating, cropping, saving, completed, failed]
+        error:
+          type: string
+        images:
+          type: object
+          additionalProperties:
+            type: string
+        creation:
+          $ref: '#/components/schemas/SalesAssetCreation'
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    VideoSubmissionResponse:
+      type: object
+      additionalProperties: true
+      properties:
+        submissionDiagnostics:
+          $ref: '#/components/schemas/VideoSubmissionDiagnostics'
+        diagnosticsSaved:
+          type: boolean
+          description: 本次诊断是否已成功持久化；false 不改变已受理任务的状态
+    VideoSubmissionDiagnostics:
+      type: object
+      required: [version, model, family, audioReferenceCount, audioReferences, endpointAttempts, submissionOutcome, preparedAt]
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        model:
+          type: string
+          description: 实际提交给渠道的模型标识；渠道未返回的底层型号不可由此推断
+        family:
+          type: string
+        generateAudio:
+          type: boolean
+          description: 实际请求明确提供的声音生成开关；缺省时不推断渠道默认值
+        contextIrEnabled:
+          type: boolean
+          description: 秘塔 H3 实际出站的 IR Context 开关；其他渠道省略
+        audioReferenceCount:
+          type: integer
+          minimum: 0
+        audioReferences:
+          type: array
+          items:
+            type: object
+            required: [index, role, sourceType, referenceSha256]
+            properties:
+              index:
+                type: integer
+                minimum: 1
+              role:
+                type: string
+              sourceType:
+                type: string
+                enum: [local, remote, asset, preset]
+              voiceId:
+                type: string
+                description: 实际提交的 Grok 官方预置音色标识；文件音频引用省略
+              sourceSha256:
+                type: string
+                description: 本地原始音频文件的 SHA-256，不保存路径或音频内容
+              referenceSha256:
+                type: string
+                description: 实际提交引用字符串的 SHA-256，不保存签名链接
+              sourceDurationSeconds:
+                type: number
+                minimum: 0
+                description: 本地原始音频时长；仅记录本地样本处理，远程引用无元数据时省略
+              submittedDurationSeconds:
+                type: number
+                minimum: 0
+                description: 本地样本实际提交片段的时长；远程引用无元数据时省略
+              trimmed:
+                type: boolean
+                description: 本地样本是否已按模型时长限制截取；未截取或远程引用无元数据时可省略
+        endpoint:
+          type: object
+          required: [host, path]
+          properties:
+            host:
+              type: string
+            path:
+              type: string
+              description: 已剔除凭据、查询参数及敏感路径段
+        endpointAttempts:
+          type: integer
+          minimum: 0
+        submissionOutcome:
+          type: string
+          enum: [prepared, accepted, rejected, unknown]
+        preparedAt:
+          type: string
+          format: date-time
+        submittedAt:
+          type: string
+          format: date-time
     SalesPrompt:
       type: object
       required: [id, title, description, prompt, defaultPrompt, version, customized]
@@ -1583,50 +2245,30 @@ components:
           type: string
         selectedVariantId:
           type: string
-    SalesSummaryImage:
+    SalesSummaryTextSource:
       type: object
-      required: [index, url]
+      required: [index, text]
       properties:
         index:
           type: integer
           minimum: 0
           maximum: 99999
-        url:
+        text:
           type: string
           minLength: 1
-          maxLength: 8192
+          maxLength: 40000
     SalesSummaryRequest:
       type: object
-      required: [productName, brand, facts, referenceImages, textImages, model]
-      description: 去重后最多16张原图、合计20MiB；核对文字合计最多60000字。
+      required: [textSources, model]
+      description: 商品资料和 OCR 文字至少提供一种。OCR 单条最多 40000 字、合计最多 60000 字，来源编号不可重复。
       properties:
-        productName:
-          type: string
-          maxLength: 2000
-        brand:
-          type: string
-          maxLength: 500
-        facts:
+        productFacts:
           type: string
           maxLength: 20000
-        referenceImages:
+        textSources:
           type: array
-          maxItems: 16
           items:
-            $ref: '#/components/schemas/SalesSummaryImage'
-        textImages:
-          type: array
-          maxItems: 16
-          items:
-            allOf:
-              - $ref: '#/components/schemas/SalesSummaryImage'
-              - type: object
-                required: [text]
-                properties:
-                  text:
-                    type: string
-                    minLength: 1
-                    maxLength: 40000
+            $ref: '#/components/schemas/SalesSummaryTextSource'
         model:
           type: string
           minLength: 1
@@ -1714,6 +2356,46 @@ components:
             type: string
             minLength: 1
             maxLength: 1000
+    SalesVideoClipRequest:
+      type: object
+      additionalProperties: false
+      required: [sourceUrl, endSec]
+      properties:
+        sourceUrl:
+          type: string
+          minLength: 1
+          maxLength: 8192
+        endSec:
+          type: number
+          minimum: 0.1
+          maximum: 600
+        maxDurationSec:
+          type: number
+          minimum: 0.1
+          maximum: 600
+          description: 所选模型的参考视频预算，必须不短于 endSec；仅在边界处省去未完整的一帧，保持播放速度
+    SalesVideoClipResponse:
+      type: object
+      required: [success, url, startSec, endSec, durationSec]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        url:
+          type: string
+          pattern: '^/storage/'
+        startSec:
+          type: number
+          enum: [0]
+        endSec:
+          type: number
+          minimum: 0.1
+          maximum: 600
+        durationSec:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          maximum: 600.1
     SalesOCRRequest:
       type: object
       required: [imageUrl]

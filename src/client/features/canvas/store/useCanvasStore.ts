@@ -1,10 +1,11 @@
-import {normalizeCanvasProjects} from './canvasProjectDefaults';
+import {hasStudioContent, normalizeCanvasProjects} from './canvasProjectDefaults';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { canvasStorage, finishCanvasHydration } from './canvasPersistence';
 export type { CanvasProject, CanvasNode, CanvasEdge, NodeRunHistory } from '../model/types';
 import type { CanvasProject, CanvasNode, CanvasEdge, NodeRunHistory } from '../model/types';
 import { appendNodeRun, rollbackNodeRun } from '../model/canvasGraph';
+import { createVideoWorkflowProject, type VideoWorkflowKind } from '../model/videoWorkflowProjects';
 
 interface CanvasStoreState {
   projects: CanvasProject[];
@@ -13,7 +14,7 @@ interface CanvasStoreState {
   activeNodeId: string | null;
   selectProject: (id: string | null) => void;
   selectNode: (id: string | null) => void;
-  createProject: (title?: string) => CanvasProject;
+  createProject: (title?: string, workflow?: VideoWorkflowKind) => CanvasProject;
   updateProjectTitle: (id: string, title: string) => void;
   deleteProject: (id: string) => void;
   addNode: (projectId: string, node: Omit<CanvasNode, 'id' | 'createdAt'> & { id?: string; createdAt?: number }) => void;
@@ -36,13 +37,13 @@ export const useCanvasStore = create<CanvasStoreState>()(
       selectProject: (id) => set({ activeProjectId: id, activeNodeId: null }),
       selectNode: (id) => set({ activeNodeId: id }),
 
-      createProject: (customTitle) => {
-        if(!customTitle?.trim()) {
-          const draft=get().projects.find(project=>project.draft && !project.nodes.length);
+      createProject: (customTitle, workflow) => {
+        if(!customTitle?.trim() && !workflow) {
+          const draft=get().projects.find(project=>project.draft && !project.nodes.length && !hasStudioContent(project.studioScene));
           if(draft){set({activeProjectId:draft.id});return draft;}
         }
         const timestamp = Date.now();
-        const newProject: CanvasProject = {
+        const newProject: CanvasProject = workflow ? createVideoWorkflowProject(workflow, `canvas-proj-${crypto.randomUUID()}`, timestamp) : {
           id: `canvas-proj-${crypto.randomUUID()}`,
           title: customTitle?.trim() || '未命名项目',
           draft:!customTitle?.trim(),

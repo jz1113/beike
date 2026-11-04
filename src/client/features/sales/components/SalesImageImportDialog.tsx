@@ -1,3 +1,4 @@
+import { PERSONA_CATEGORIES } from '../model/salesPersonaClassification';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Image, Loader2, Trash2, Upload, X } from 'lucide-react';
 import { ConfiguredModelPicker } from '@client/shared/models/ConfiguredModelPicker';
@@ -6,7 +7,7 @@ import { importSalesImageAsset } from '../api/salesImageImport';
 import { uploadSalesViewImage } from '../api/salesAssetViews';
 import { fetchSalesStudioAssets } from '../api/salesProduction';
 import { addSalesImageImportFiles, MAX_IMAGE_IMPORT_FILES, runSalesImageImportBatch, type SalesImageImportCategory, type SalesImageImportItem, type SalesImageImportKind } from '../model/salesImageImport';
-import { PERSONA_GROUP_LABELS, SCENE_SPACE_LABELS } from '../model/salesMaterialCatalog';
+import { SCENE_SPACE_LABELS } from '../model/salesMaterialCatalog';
 import { supportsSalesAssetReferences } from '../model/salesAssetModels';
 import { salesFocusClass, salesGhostButtonClass } from './salesChrome';
 import '../salesAssetDialog.css';
@@ -15,17 +16,19 @@ import '../salesBgmImport.css';
 interface Props extends SalesImageImportCategory {
   kind: SalesImageImportKind;
   existingNames: string[];
+  initialFiles?: File[];
   onClose: () => void;
   onImported: (count: number) => void;
 }
 const STATUS = { queued: '待导入', uploading: '上传中…', saving: '保存中…', done: '已入库', error: '导入失败' } as const;
 
-export function SalesImageImportDialog({ kind, existingNames, personaGroup, sceneSpace, onClose, onImported }: Props) {
+export function SalesImageImportDialog({ kind, existingNames, initialFiles = [], personaGroup, sceneSpace, onClose, onImported }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const operation = useRef<AbortController | null>(null);
-  const [items, setItems] = useState<SalesImageImportItem[]>([]);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [selection] = useState(() => addSalesImageImportFiles(kind, [], initialFiles, existingNames));
+  const [items, setItems] = useState<SalesImageImportItem[]>(selection.items);
+  const [errors, setErrors] = useState<string[]>(selection.errors);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
   const [background, setBackground] = useState(false);
@@ -33,7 +36,7 @@ export function SalesImageImportDialog({ kind, existingNames, personaGroup, scen
   const models = configured.availableImageModels.filter(({ id }) => supportsSalesAssetReferences(id));
   const [model, setModel] = useState(() => models.some(({ id }) => id === configured.selectedImageGenModel) ? configured.selectedImageGenModel : models[0]?.id || '');
   const subject = kind === 'persona' ? '人物' : '场景';
-  const category = kind === 'persona' ? PERSONA_GROUP_LABELS[personaGroup] : SCENE_SPACE_LABELS[sceneSpace];
+  const category = kind === 'persona' ? PERSONA_CATEGORIES[personaGroup] : SCENE_SPACE_LABELS[sceneSpace];
   const done = items.filter((item) => item.status === 'done').length;
   const remaining = items.length - done;
   useEffect(() => {
@@ -75,9 +78,9 @@ export function SalesImageImportDialog({ kind, existingNames, personaGroup, scen
       <div className="sales-asset-content">
         <p className="sales-material-notice">每张图片创建一个{subject}资产，归入「{category}」。名称按库中「{subject}1、{subject}2…」的已有编号顺延，导入后可编辑。</p>
         <div className="flex flex-col gap-2 rounded-lg border border-[var(--sales-line)] p-3">
-          <label className="flex items-center gap-2"><input type="checkbox" checked={background} disabled={pending} onChange={(event) => setBackground(event.target.checked)} />导入后后台补全九宫格</label>
-          {background && <><ConfiguredModelPicker ariaLabel="批量九宫格生图模型" options={models} value={model} onChange={setModel} disabled={pending} modalityKind="image" variant="agent" emptyLabel="请先配置支持参考图的生图模型" />
-            <small className="text-[var(--sales-muted)]">使用所选模型为每个资产生成一张九宫格，裁切后自动保存。提交完成后可关闭窗口，在资产库查看后台进度。</small></>}
+          <label className="flex items-center gap-2"><input type="checkbox" checked={background} disabled={pending} onChange={(event) => setBackground(event.target.checked)} />导入后后台补全{kind === 'persona' ? '人物三视图与特写' : '场景九宫格'}</label>
+          {background && <><ConfiguredModelPicker ariaLabel="批量视角生图模型" options={models} value={model} onChange={setModel} disabled={pending} modalityKind="image" variant="agent" emptyLabel="请先配置支持参考图的生图模型" />
+            <small className="text-[var(--sales-muted)]">使用所选模型为每个资产{kind === 'persona' ? '生成并保存一张完整的人物三视图' : '生成场景九宫格，裁切后自动保存'}。提交完成后可关闭窗口，在资产库查看后台进度。</small></>}
         </div>
         <input ref={input} className="hidden" type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif,image/gif,.jpg,.jpeg,.png,.webp,.avif,.gif" disabled={pending}
           aria-label={`选择一批${subject}图片`} onChange={(event) => { addFiles(Array.from(event.target.files || [])); event.target.value = ''; }} />

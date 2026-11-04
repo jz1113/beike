@@ -4,6 +4,7 @@
  */
 
 import { canonicalModelId, listApprovedModels, vendorLabel, type VideoAudioSupportType } from '@shared/domain/models/modelCatalog';
+import { isMetasoH3 } from './videoChannels';
 
 export type { VideoAudioSupportType };
 
@@ -18,7 +19,7 @@ export interface VideoGenModel {
   badge?: string;
   description: string;
   supportedDurations: number[]; // e.g. [4, 5, 8, 10]
-  supportedResolutions: ('480P' | '540P' | '720P' | '1080P' | '2K' | '4K')[];
+  supportedResolutions: ('480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K')[];
   supportedAspectRatios: string[];
   audioSupport?: VideoAudioSupportType;
 }
@@ -74,7 +75,7 @@ export const VIDEO_REF_MODES: VideoRefModeItem[] = [
   { id: 'extend', name: '视频延长', desc: '描述原视频之后发生的内容' },
 ];
 
-export const VIDEO_RESOLUTIONS: ('480P' | '540P' | '720P' | '1080P' | '2K' | '4K')[] = ['480P', '540P', '720P', '1080P', '2K', '4K'];
+export const VIDEO_RESOLUTIONS: ('480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K')[] = ['480P', '540P', '720P', '768P', '1080P', '2K', '4K'];
 export type VideoResolution = (typeof VIDEO_RESOLUTIONS)[number];
 export const VIDEO_DURATIONS: number[] = [4, 5, 8, 10, 15, 30];
 
@@ -90,6 +91,7 @@ export function defaultVideoResolution(supported?: readonly string[]): VideoReso
 export function resolveVideoResolution(current: string | null | undefined, supported?: readonly string[]): VideoResolution {
   const normalized = (current ?? '').toUpperCase();
   const allowed = (supported ?? []).map((value) => value.toUpperCase());
+  if (normalized === '720P' && allowed.includes('768P') && !allowed.includes('720P')) return '768P';
   if ((VIDEO_RESOLUTIONS as readonly string[]).includes(normalized) && (allowed.length === 0 || allowed.includes(normalized))) {
     return normalized as VideoResolution;
   }
@@ -97,11 +99,12 @@ export function resolveVideoResolution(current: string | null | undefined, suppo
 }
 
 /** 按模型 id 查找视频模型配置 */
-export function getVideoModelById(modelId?: string | null): VideoGenModel | undefined {
+export function getVideoModelById(modelId?: string | null, baseUrl?: string): VideoGenModel | undefined {
   if (!modelId) return undefined;
   const canonical = canonicalModelId(modelId).toLowerCase().trim();
   const exact = VIDEO_GEN_MODELS.find((x) => x.id.toLowerCase() === canonical);
-  if (exact) return exact;
+  if (exact) return isMetasoH3(modelId, baseUrl) ? { ...exact, supportedResolutions: ['480P', '768P', '1080P', '2K'],
+    supportedDurations: Array.from({ length: 12 }, (_, index) => index + 4) } : exact;
   const m = modelId.toLowerCase().trim();
   return (
     VIDEO_GEN_MODELS.find((x) => x.id.toLowerCase() === m) ||

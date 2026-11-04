@@ -14,6 +14,7 @@ export const salesExclusionTypeSchema = z.enum([
   'product',
   'brand_signage',
   'person_appearance',
+  'scene',
   'accessory',
   'copy_claim',
 ]);
@@ -37,6 +38,7 @@ export const salesScriptBeatSchema = z.object({
   subject: z.string().max(800).default(''),
   action: z.string().max(1500).default(''),
   actionTemplate: z.string().max(1500).default(''),
+  productVisible: z.boolean().optional(),
   referenceActionRaw: z.string().max(1500).default(''),
   expression: z.string().max(600).default(''),
   scene: z.string().max(600).default(''),
@@ -45,6 +47,8 @@ export const salesScriptBeatSchema = z.object({
   voice: salesBeatVoiceSchema.default({}),
   subtitle: z.string().max(400).default(''),
   shows: z.string().max(800).default(''),
+  sectionLabel: z.string().max(80).optional(),
+  cameraLabel: z.string().max(80).optional(),
   inferred: z.array(z.string().max(500)).max(12).default([]),
 });
 
@@ -53,7 +57,11 @@ export const salesScriptShotSchema = z.object({
   end: z.number().min(0).max(600),
   estimated: z.boolean().default(false),
   summary: z.string().max(500).default(''),
-  beats: z.array(salesScriptBeatSchema).min(1).max(12),
+  analysis: z.object({
+    style: z.string().max(300).optional(), subject: z.string().max(300).optional(), action: z.string().max(300).optional(),
+    camera: z.string().max(300).optional(), expression: z.string().max(300).optional(),
+  }).optional(),
+  beats: z.array(salesScriptBeatSchema).min(1).max(24),
 });
 
 export const salesVisualSpecSchema = z.object({
@@ -90,7 +98,7 @@ export const salesAssetSlotsSchema = z.object({
 });
 
 export const salesSourceExclusionSchema = z.object({
-  type: salesExclusionTypeSchema.catch('product'),
+  type: salesExclusionTypeSchema.catch('copy_claim'),
   term: z.string().trim().min(1).max(300),
   replacementRule: z.string().max(400).default(''),
 });
@@ -116,6 +124,7 @@ export const salesScriptTemplateSchema = z.object({
   format: salesScriptFormatSchema.catch('presenter'),
   voiceMode: salesScriptVoiceModeSchema.catch('speech'),
   audioAvailable: z.boolean().default(true),
+  sampleTimesSec: z.array(z.number().nonnegative()).max(24).optional(),
   overview: z.string().max(1200).default(''),
   taxonomy: salesScriptTaxonomySchema.default({}),
   visualSpec: salesVisualSpecSchema.default({}),
@@ -152,21 +161,9 @@ export const salesScriptAnalysisBodySchema = z.object({
   videoUrl: z.string().trim().min(1).max(8192),
   model: z.string().trim().min(1).max(200),
   force: z.boolean().optional(),
+  includeDepth: z.boolean().optional(),
+  depthOperationId: z.string().max(256).optional(),
   ...TextRequestRoutingFields,
-  ...TextReasoningRoutingFields,
-  ...TextReasoningRoutingFields,
-  customBaseUrl: z.string().max(8192).optional(),
-  customApiKey: z.string().max(8192).optional(),
-  apiFormat: z.literal('openai-responses').optional(),
-  allowInsecureHttp: z.boolean().optional(),
-});
-
-export const salesScriptNormalizeBodySchema = z.object({
-  rawText: z.string().trim().min(1).max(60_000),
-  videoUrl: z.string().trim().max(8192).optional(),
-  model: z.string().trim().max(200).optional(),
-  ...TextRequestRoutingFields,
-  ...TextReasoningRoutingFields,
   ...TextReasoningRoutingFields,
   customBaseUrl: z.string().max(8192).optional(),
   customApiKey: z.string().max(8192).optional(),
@@ -238,6 +235,7 @@ export const saveSalesScriptBodySchema = z.object({
 });
 
 export const patchSalesScriptBodySchema = z.object({
+  expectedVersion: z.number().int().positive().optional(),
   videoUrl: z.string().max(8192).optional(),
   depthVideoUrl: z.string().max(8192).optional(),
   depthTaskId: z.string().max(256).optional(),

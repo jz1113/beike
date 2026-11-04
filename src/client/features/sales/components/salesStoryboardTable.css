@@ -1,0 +1,20 @@
+.script-reading{--shot-line:var(--ml-line,var(--sales-line));--shot-muted:var(--ml-muted,var(--sales-muted));--shot-band:var(--ml-bg,var(--sales-subtle));min-width:0}
+.script-reading .script-timing-note{color:var(--shot-muted);font-size:12px;margin:4px 0}
+.script-common-notes{display:grid;gap:3px;margin:6px 0 10px}
+.script-reading dl div{display:flex;align-items:baseline;gap:6px}
+.script-reading dt{flex:none;font-size:11px;color:var(--shot-muted)}
+.script-reading dd{margin:0;overflow-wrap:anywhere}
+.script-table-scroll{overflow-x:auto}
+.script-reading table{width:100%;min-width:440px;table-layout:fixed;border-collapse:collapse;text-align:left;font-size:13px;line-height:1.55}
+.script-id-col{width:4em}.script-time-col{width:8.6em}.script-camera-col{width:27%}
+.script-reading :is(th,td){padding:7px 8px;vertical-align:top;border-bottom:1px solid var(--shot-line);overflow-wrap:anywhere}
+.script-reading thead,.script-section-row{background:var(--shot-band)}
+.script-reading tr.is-current{background:var(--ml-active,var(--shot-band))}
+.script-reading tr:has(button){cursor:pointer}
+.script-reading .script-time{font-variant-numeric:tabular-nums}
+.script-time strong,.script-time small{display:block;font-weight:inherit}
+.script-time small,.script-row-notes{font-size:12px;color:var(--shot-muted)}
+.script-row-notes{display:grid;gap:2px;margin-top:3px}
+.script-reading th[scope=row],.script-reading th button,.script-time small{white-space:nowrap}
+.script-reading th button{padding:1px 4px}
+.script-time small{font-size:11px}

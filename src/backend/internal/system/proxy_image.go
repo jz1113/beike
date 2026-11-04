@@ -23,6 +23,7 @@ import (
 const maxProxyBytes = 25 << 20
 
 var videoURLPattern = regexp.MustCompile(`(?i)\.(mp4|mov|webm|avi|m4v)(\?|!|$)`)
+var audioURLPattern = regexp.MustCompile(`(?i)\.(mp3|wav|m4a|aac|ogg|oga|flac|opus)(\?|!|$)`)
 var videoHostPattern = regexp.MustCompile(`(?i)video|snssdk\.com|bytecdn\.cn|yximgs|kwaicdn|kwimgs|kwai\.|kuaishou|douyinvod`)
 
 var proxyCache = media.NewProxyCache(128<<20, 256, 15*time.Minute, 8)
@@ -54,9 +55,11 @@ func ProxyImage(cfg config.Config) http.Handler {
 			return
 		}
 		forceVideo := r.URL.Query().Get("as") == "video" || r.URL.Query().Get("type") == "video"
+		forceAudio := r.URL.Query().Get("as") == "audio" || r.URL.Query().Get("type") == "audio"
 		isVideo := forceVideo || videoURLPattern.MatchString(raw) || videoHostPattern.MatchString(raw)
+		isMedia := isVideo || forceAudio || audioURLPattern.MatchString(raw)
 		imageURL := raw
-		if !isVideo {
+		if !isMedia {
 			imageURL = normalizeProxyURL(raw)
 		}
 		if strings.HasPrefix(imageURL, "//") {
@@ -88,8 +91,8 @@ func ProxyImage(cfg config.Config) http.Handler {
 			writeProxySVG(w, http.StatusForbidden, "地址被安全策略拦截")
 			return
 		}
-		if isVideo {
-			proxyRemote(w, r, imageURL, true)
+		if isMedia {
+			proxyRemoteMedia(w, r, imageURL)
 			return
 		}
 		width := proxyThumbWidth(r)
@@ -125,31 +128,6 @@ func proxyAuthorized(r *http.Request, cfg config.Config) bool {
 	sig := strings.TrimSpace(r.URL.Query().Get("sig"))
 	raw := strings.TrimSpace(r.URL.Query().Get("url"))
 	return mediasign.Verify(raw, exp, sig, cfg.AccessToken) || mediasign.Verify("proxy-media-session", exp, sig, cfg.AccessToken)
-}
-
-func proxyRemote(w http.ResponseWriter, r *http.Request, rawURL string, video bool) {
-	request, err := http.NewRequestWithContext(r.Context(), http.MethodGet, rawURL, nil)
-	if err != nil {
-		writeProxySVG(w, http.StatusBadGateway, "商品素材保护中")
-		return
-	}
-	for key, value := range upstreamHeaders(rawURL, video, r.Header.Get("Range")) {
-		request.Header.Set(key, value)
-	}
-	response, err := network.SafeClient().Do(request)
-	if err != nil {
-		writeProxySVG(w, http.StatusBadGateway, "商品素材保护中")
-		return
-	}
-	defer response.Body.Close()
-	w.Header().Set("Content-Type", response.Header.Get("Content-Type"))
-	if contentRange := response.Header.Get("Content-Range"); contentRange != "" {
-		w.Header().Set("Content-Range", contentRange)
-	}
-	w.Header().Set("Accept-Ranges", "bytes")
-	w.Header().Set("Cache-Control", "public, max-age=3600")
-	w.WriteHeader(response.StatusCode)
-	_, _ = io.Copy(w, io.LimitReader(response.Body, maxProxyBytes))
 }
 
 func fetchProxy(r *http.Request, rawURL string, video bool) ([]byte, string, bool) {

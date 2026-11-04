@@ -76,7 +76,7 @@ export function MovePromptGroupsDialog({ items, categories, albums, onClose, onM
           <h2 id="move-prompt-groups-title" className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
             <FolderInput className="h-4 w-4 text-indigo-600" />移动到分类
           </h2>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">已选 {items.length} 个图组母本</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">已选 {items.length} 个参考图组</p>
         </div>
         <button type="button" aria-label="关闭" disabled={saving} onClick={onClose}
           className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><X className="h-4 w-4" /></button>

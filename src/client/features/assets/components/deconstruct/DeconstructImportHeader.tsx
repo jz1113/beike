@@ -9,7 +9,7 @@ export function DeconstructImportHeader({ mode, onModeChange, onClose, disabled 
   return (
     <header className="deconstruct-import-header">
       <div className="deconstruct-heading">
-        <h2 id="deconstruct-import-title">投喂参考图<span>素材与技能</span></h2>
+        <h2 id="deconstruct-import-title">导入参考图<span>参考图库</span></h2>
         <p id="deconstruct-import-description">让喜欢的作品，成为下一次创作的参考。</p>
       </div>
       <div className="deconstruct-header-actions">

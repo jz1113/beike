@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
-import { videoModes, videoResolutionLabel } from '@shared/domain/media/videoCapabilities';
+import { videoModes, videoResolutionLabel, videoDurationOptions, videoResolutionOptions } from '@shared/domain/media/videoCapabilities';
 import { VIDEO_ASPECT_RATIOS, VIDEO_RESOLUTIONS, resolveVideoResolution } from '@shared/domain/media/video';
+import { VideoGenerationCostNotice } from '@client/shared/ui/VideoGenerationCostNotice';
+import { isMetasoH3 } from '@shared/domain/media/videoChannels';
 import { AspectRatioCardGroup } from './AspectRatioCardGroup';
 import { VideoDurationRulerSlider } from './VideoDurationRulerSlider';
 
@@ -17,10 +19,13 @@ const MODE_LABELS: Record<string, string> = {
   extend: '视频延长',
 };
 
-export type VideoResolutionValue = '480P' | '540P' | '720P' | '1080P' | '2K' | '4K';
+export type VideoResolutionValue = '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
 
 interface Props {
   modelId: string;
+  baseUrl?: string;
+  contextIrEnabled?: boolean;
+  onContextIrEnabled?: (value: boolean) => void;
   supportedAspectRatios?: string[];
   supportedResolutions?: string[];
   supportedDurations?: number[];
@@ -74,6 +79,9 @@ function nearestId(current: string, order: string[], enabled: string[]) {
 
 export function PromptBarVideoTab({
   modelId,
+  baseUrl,
+  contextIrEnabled = true,
+  onContextIrEnabled,
   supportedAspectRatios,
   supportedResolutions,
   supportedDurations,
@@ -96,11 +104,12 @@ export function PromptBarVideoTab({
   }));
   const enabledAspects = aspects.filter((item) => !item.disabled).map((item) => item.id);
   const currentAspect = aspect === 'smart' ? 'adaptive' : aspect;
+  const modeResolutions = videoResolutionOptions(modelId, mode, baseUrl) || supportedResolutions;
   const resolutions = VIDEO_RESOLUTIONS
-    .filter((item) => !supportedResolutions?.length || supportedResolutions.includes(item))
+    .filter((item) => (!supportedResolutions?.length || supportedResolutions.includes(item)) && (!modeResolutions?.length || modeResolutions.includes(item)))
     .map((item) => ({
       id: item,
-      label: videoResolutionLabel(modelId, item),
+      label: videoResolutionLabel(modelId, item, baseUrl),
     }));
   const enabledResolutions = resolutions.map((item) => item.id);
 
@@ -142,7 +151,12 @@ export function PromptBarVideoTab({
       <div className="text-xs font-medium text-slate-500 dark:text-slate-400">时长</div>
       {supportedDurations?.length === 0
         ? <p className="text-xs text-amber-600 dark:text-amber-300">当前模型时长不足以完成整条脚本，请更换模型或参考脚本。</p>
-        : <VideoDurationRulerSlider value={duration} modelId={modelId} allowedDurations={supportedDurations} onChange={onDuration} />}
+        : <VideoDurationRulerSlider value={duration} allowedDurations={supportedDurations ?? videoDurationOptions(modelId, resolution, mode, baseUrl)} onChange={onDuration} />}
+      {isMetasoH3(modelId, baseUrl) && onContextIrEnabled && <label className="flex items-start gap-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+        <input type="checkbox" checked={contextIrEnabled} onChange={(event) => onContextIrEnabled(event.target.checked)} />
+        <span>IR Context 优化素材理解与提示词表达 · 0.05元/次</span>
+      </label>}
+      <VideoGenerationCostNotice model={modelId} baseUrl={baseUrl} duration={duration} contextIrEnabled={contextIrEnabled} />
     </div>
   );
 

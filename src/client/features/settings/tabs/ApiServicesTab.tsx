@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SettingsConnectionContext } from '../components/SettingsControls';
 import { ApiServicesWanbangPanel } from '../components/vendors/ApiServicesWanbangPanel';
-import { ApiServicesApiaPanel } from '../components/vendors/ApiServicesApiaPanel';
-import { ApiServicesQiyunPanel } from '../components/vendors/ApiServicesQiyunPanel';
 import { ApiServicesStoragePanel } from '../components/storage/ApiServicesStoragePanel';
 import { ApiProvidersNavList } from '../components/providers/ApiProvidersNavList';
 import { ApiProviderDetailPanel } from '../components/providers/ApiProviderDetailPanel';
@@ -70,8 +68,8 @@ export default function ApiServicesTab({
     },
   });
 
-  // 如果 selectedServiceId 是集成服务（wanbang, apia, qiyun），或独立存储页的 cloud_storage，保持在这些服务上
-  const isIntegrationService = ['wanbang_ecommerce', 'apia_parser', 'qiyun_parser'].includes(selectedServiceId) || (group === 'storage' && selectedServiceId === 'cloud_storage');
+  // 如果 selectedServiceId 是集成服务（wanbang），或独立存储页的 cloud_storage，保持在这些服务上
+  const isIntegrationService = selectedServiceId === 'wanbang_ecommerce' || (group === 'storage' && selectedServiceId === 'cloud_storage');
 
   useEffect(() => {
     if (group !== 'storage' && selectedServiceId === 'cloud_storage') {
@@ -81,7 +79,7 @@ export default function ApiServicesTab({
   }, [group, selectedServiceId, currentProvider?.id, selectedProviderId, setSelectedServiceId]);
 
   const handleSelectNav = (id: string) => {
-    if (['wanbang_ecommerce', 'apia_parser', 'qiyun_parser'].includes(id)) {
+    if (id === 'wanbang_ecommerce') {
       setSelectedServiceId(id);
     } else {
       setSelectedServiceId(id);
@@ -140,7 +138,7 @@ export default function ApiServicesTab({
     }
   };
 
-  // 针对集成服务（万邦、APIA、奇云、存储）的状态
+  // 针对集成服务（万邦、存储）的状态
   const statuses = serviceStatuses(c);
   const status = statuses[selectedServiceId] || {
     state: 'unconfigured' as const,
@@ -164,7 +162,7 @@ export default function ApiServicesTab({
 
       <div className="settings-page-scroll flex-1 min-w-0 overflow-y-auto">
         <div className="settings-page-content w-full p-4 lg:p-6 space-y-4">
-          {/* 集成服务视图（万邦、APIA、奇云、云端存储） */}
+          {/* 集成服务视图（万邦、云端存储） */}
           {isIntegrationService ? (
             <form className="settings-config-card" onSubmit={e => e.preventDefault()}>
               <SettingsConnectionContext.Provider
@@ -180,8 +178,6 @@ export default function ApiServicesTab({
                 }
               >
                 {selectedServiceId === 'wanbang_ecommerce' && <ApiServicesWanbangPanel {...c} />}
-                {selectedServiceId === 'apia_parser' && <ApiServicesApiaPanel {...c} />}
-                {selectedServiceId === 'qiyun_parser' && <ApiServicesQiyunPanel {...c} />}
                 {selectedServiceId === 'cloud_storage' && <ApiServicesStoragePanel {...c} showToast={showToast} />}
               </SettingsConnectionContext.Provider>
             </form>

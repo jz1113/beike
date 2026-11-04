@@ -18,10 +18,11 @@ export interface BatchGenerationSettings {
   imageInferenceStrength?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   videoModel: string;
   videoAspect: string;
-  videoResolution: '480P' | '540P' | '720P' | '1080P' | '2K' | '4K';
+  videoResolution: '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
   videoDuration: number;
   videoRefMode: string;
   videoGenerateAudio?: boolean;
+  videoContextIrEnabled?: boolean;
 }
 
 export function availableBatchModels(kind: 'image' | 'video') {
@@ -78,6 +79,7 @@ export function buildGenerationPromptBatch(entries: BatchPromptDraft[], media: M
         sizeStr: video ? aspect : imageSize(aspect, resolvedModel, settings.imageQuality), quickQuality: settings.imageQuality,
         quickVideoAspectId: aspect, quickVideoResolution: settings.videoResolution, quickVideoDuration: entry.duration ?? settings.videoDuration,
         quickVideoGenerateAudio: settings.videoGenerateAudio,
+        quickVideoContextIrEnabled: settings.videoContextIrEnabled ?? true,
         currentView: 'generate', hasImageModels: true, hasVideoModels: true, quickDepthStyle: 'mocap', quickDepthQuality: 'standard',
       };
       if (video && ['first_frame', 'first_last_frame'].includes(mode) && (prepared.urls.length !== (mode === 'first_frame' ? 1 : 2) || imageRefs.length !== prepared.urls.length)) throw new Error(mode === 'first_frame' ? '首帧模式需要恰好一张图片' : '首尾帧模式需要恰好两张图片，按素材顺序作为首帧、尾帧');

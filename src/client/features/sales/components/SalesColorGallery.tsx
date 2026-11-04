@@ -1,4 +1,5 @@
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
+import type { ProductFaceEdits } from '../model/salesProductFaces';
 import { memo, useRef, useState, type ReactNode } from 'react';
 import { Check, CheckSquare, ChevronDown, RotateCcw, ScanText, Search, X } from 'lucide-react';
 import type { SalesColorSelection, SalesImageRef } from '@shared/domain/sales';
@@ -17,6 +18,8 @@ interface Props {
   initialGroup?: SalesGalleryGroup;
   onRetryUnavailable?: () => void;
   images: SalesImageRef[];
+  edits?: ProductFaceEdits;
+  onEditFaces?: (urls: string[]) => void;
   emptyContent?: ReactNode;
   metadata: SalesCollectionState['variantMetadata'];
   selection: SalesColorSelection;
@@ -27,7 +30,7 @@ interface Props {
   onRecognizeImages?: (urls: string[]) => void;
 }
 
-export const SalesColorGallery = memo(function SalesColorGallery({ images, metadata, selection, disabled, onChange, onImageError, emptyContent, initialGroup = 'all', onRetryUnavailable, ocrImageUrls = [], ocrDisabled = disabled, onAddOCRImages, onImageDragging, onConfirmSelection, onRecognizeImages }: Props) {
+export const SalesColorGallery = memo(function SalesColorGallery({ images, edits, onEditFaces, metadata, selection, disabled, onChange, onImageError, emptyContent, initialGroup = 'all', onRetryUnavailable, ocrImageUrls = [], ocrDisabled = disabled, onAddOCRImages, onImageDragging, onConfirmSelection, onRecognizeImages }: Props) {
   const [group, setGroup] = useState<SalesGalleryGroup>(initialGroup);
   const [retryVersion, setRetryVersion] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
@@ -66,6 +69,7 @@ export const SalesColorGallery = memo(function SalesColorGallery({ images, metad
       {images.length === 0 ? emptyContent : <div className={`sales-reference-grid sales-thumbnail-grid ${selected.size > 0 ? 'has-selection' : ''}`}>
         {visible.map((image) => {
               const isSelected = selected.has(image.url);
+              const previewUrl = isSelected && edits?.[image.url]?.url || image.url;
               const isOCR = ocrImages.has(image.url);
               const selectionOrder = selectedOrderMap.get(image.url);
               const canDrag = Boolean(onAddOCRImages) && !ocrDisabled && !image.unavailable;
@@ -78,7 +82,7 @@ export const SalesColorGallery = memo(function SalesColorGallery({ images, metad
                     ignoreClickUntil.current = Infinity;
                     onImageDragging?.(image.url);
                   }} onDragEnd={() => { ignoreClickUntil.current = Date.now() + 200; onImageDragging?.(null); }} onClick={() => toggleImage(image.url)} title={disabled ? '资料处理中，请稍后选择商品图' : ocrDisabled ? '识别进行中，仍可单击选择商品图' : '单击选为视频参考图；拖到右侧加入文字识别'} aria-label={`${isSelected ? '取消选择' : '选择'}商品图 ${image.index + 1}`} aria-pressed={isSelected} className="sales-reference-trigger relative block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-stone-900 dark:focus-visible:ring-zinc-200 disabled:cursor-not-allowed">
-                    <SalesImageThumbnail key={retryVersion} url={image.url} index={image.index} alt={`商品图 ${image.index + 1}`} className="sales-reference-image block w-full" onUnavailable={onImageError} />
+                    <SalesImageThumbnail key={previewUrl + retryVersion} url={previewUrl} index={image.index} alt={`商品图 ${image.index + 1}`} className="sales-reference-image block w-full" onUnavailable={previewUrl === image.url ? onImageError : undefined} />
                     {isSelected && (
                       <span className="sales-reference-check absolute left-1.5 top-1.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-stone-900 px-1 font-mono-nums text-[10px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900" aria-hidden>
                         {selectionOrder}
@@ -98,6 +102,7 @@ export const SalesColorGallery = memo(function SalesColorGallery({ images, metad
       <footer className="sales-gallery-confirm">
         <span>已选 {selected.size} 张参考图</span>
         <div className="sales-gallery-footer-actions">
+          {onEditFaces && selected.size > 0 && <button type="button" disabled={disabled} onClick={() => onEditFaces([...selected])} className={salesGhostButtonClass}>调整人脸打码</button>}
           <details ref={menuRef} className="sales-gallery-menu" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) closeMenu(); }} onKeyDown={(event) => { if (event.key === 'Escape') { closeMenu(); menuRef.current?.querySelector('summary')?.focus(); } }}>
             <summary title="管理当前分类的图片" className={salesFocusClass}>批量操作<ChevronDown size={12} aria-hidden /></summary>
             <div className="sales-gallery-menu-items">
@@ -122,7 +127,7 @@ export const SalesColorGallery = memo(function SalesColorGallery({ images, metad
         if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }}>
         <button type="button" autoFocus onClick={closePreview} className="ml-auto flex items-center gap-1 rounded-xl bg-white/10 px-3 py-2 text-sm text-white"><X className="h-4 w-4" />关闭大图</button>
-        <img src={proxyMediaUrl(preview.url)} alt={`完整商品图 ${preview.index + 1}`} className="min-h-0 w-full flex-1 object-contain p-4" />
+        <img src={proxyMediaUrl(selected.has(preview.url) && edits?.[preview.url]?.url || preview.url)} alt={`完整商品图 ${preview.index + 1}`} className="min-h-0 w-full flex-1 object-contain p-4" />
         <div className="flex flex-wrap items-center justify-center gap-3 text-white">
           <button type="button" disabled={previewIndex <= 0} onClick={() => movePreview(-1)} className="rounded-xl px-4 py-2 text-sm disabled:opacity-40">上一张</button>
           <span className="text-xs">{previewIndex + 1} / {images.length}</span>

@@ -1,5 +1,4 @@
 import type { GenerationStrategy } from '../../model/batchTypes';
-import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 
 export interface WorkshopSettingsModalProps {
   isOpen: boolean;
@@ -9,7 +8,7 @@ export interface WorkshopSettingsModalProps {
   skillLoadState?: 'loading' | 'ready' | 'error';
   skillLoadError?: string;
   onReloadSkills?: () => void;
-  onOpenAssets?: (type?: PromptAssetType) => void;
+  onOpenSkills?: () => void;
   onClose: () => void;
   selectedArchId: string;
   setSelectedArchId: (id: string) => void;

@@ -30,6 +30,7 @@ export interface PromptBarSubmitInput {
   quickDepthStyle: DepthVideoStyle;
   quickDepthQuality: DepthQuality;
   quickVideoGenerateAudio?: boolean;
+  quickVideoContextIrEnabled?: boolean;
   refMediaFile?: File | null;
   depthModelReady?: boolean;
 }

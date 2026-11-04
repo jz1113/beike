@@ -56,6 +56,22 @@ describe('text model request routing', () => {
     expect(JSON.parse(result!.body as string)).toMatchObject({ textProtocol: 'gemini' });
     expect(JSON.parse(result!.body as string)).not.toHaveProperty('customApiKey');
   });
+  it('keeps the default Agent route when only the server has its credentials', () => {
+    data.delete('ai_base_url');
+    data.delete('ai_api_key');
+    data.set('beike_modality_models_v1_chat', JSON.stringify([
+      { id: 'relay', modelId: 'gemini-custom', name: 'Relay', baseUrl: 'https://relay.test', apiKey: 'relay-key' },
+      { id: 'global', modelId: 'gemini-custom', name: 'Default' },
+    ]));
+    const request = routed('/api/assistant/turn/start', { model: 'global' });
+    expect(request.model).toBe('gemini-custom');
+    expect(request.customBaseUrl).toBeUndefined();
+    expect(request.customApiKey).toBeUndefined();
+    expect(request.textProtocol).toBe('openai'); // Built-in default gateway.
+    expect(routed('/api/assistant/turn/start', { model: 'relay' })).toMatchObject({
+      model: 'gemini-custom', customBaseUrl: 'https://relay.test', customApiKey: 'relay-key',
+    });
+  });
   it('uses duplicate selection credentials before restoring the upstream ID', () => {
     data.set('beike_modality_models_v1_chat', JSON.stringify([
       { id: 'a', modelId: 'gemini-4-argon', name: 'GPT', modality: 'chat', baseUrl: 'https://a.test', apiKey: 'a' },

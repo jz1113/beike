@@ -24,3 +24,9 @@
 .sales-bgm-import-item.is-builtin label > span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .sales-bgm-import-item audio { width: 100%; height: 34px; }
 .sales-bgm-import .sales-material-error { margin: 0; overflow-wrap: anywhere; }
+.sales-material-dialog .sales-script-batch-depth-choice {
+  display: flex; align-items: center; gap: 8px; margin: 0;
+}
+.sales-material-dialog .sales-script-batch-depth-choice input {
+  flex-shrink: 0; width: 16px; height: 16px; margin: 0; accent-color: var(--sales-accent);
+}

@@ -48,7 +48,7 @@ func TestAssetGridDownloadRetriesStalledBodyWithAlternateConnection(t *testing.T
 	if err != nil || !bytes.Equal(data, want) || firstCalls != 1 || secondCalls != 1 {
 		t.Fatal("failed to recover original image", err, firstCalls, secondCalls)
 	}
-	if err := validateAssetGrid(data); err != nil {
+	if err := validateAssetGrid(data, "scene"); err != nil {
 		t.Fatal(err)
 	}
 }

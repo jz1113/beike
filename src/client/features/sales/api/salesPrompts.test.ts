@@ -4,7 +4,7 @@ import { listSalesPrompts, SalesPromptRequestError, saveSalesPrompt } from './sa
 
 vi.mock('@client/shared/api/apiClient', () => ({ apiFetch: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
-const prompt = { id: 'summary', title: '卖点提炼', description: '整理商品买点', prompt: '当前要求', defaultPrompt: '默认要求', version: 'v2', customized: true };
+const prompt = { id: 'summary', title: '卖点提炼', description: '整理商品买点', prompt: '当前要求', defaultPrompt: '默认要求', version: 'v2', customized: true, configured: true };
 
 it('reads effective prompts and defaults from the authenticated API', async () => {
   const abort = new AbortController();

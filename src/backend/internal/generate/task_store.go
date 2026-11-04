@@ -113,19 +113,23 @@ func readTaskUsage(ctx context.Context, db *sql.DB, scope taskScope, taskID stri
 
 func updateTaskTerminal(ctx context.Context, db *sql.DB, scope taskScope, taskID, status, result, reason, usageJSON string) {
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	// A late success can recover a failed receipt; a saved success remains immutable.
+	recoverFailure := status == "SUCCESS" && result != ""
 	if usageJSON != "" {
 		_, err := db.ExecContext(ctx, `
 			UPDATE "ImageTask" SET "status" = ?, "resultUrl" = ?, "failReason" = ?, "usage" = ?, "updatedAt" = ?
-			WHERE "workspaceId" = ? AND COALESCE(NULLIF("mediaType", ''), 'image') = ? AND "taskId" = ? AND "status" IN ('PENDING', 'IN_PROGRESS', 'SUBMISSION_UNKNOWN')`,
-			status, emptyNull(result), emptyNull(reason), usageJSON, now, scope.workspace, scope.media, taskID)
+			WHERE "workspaceId" = ? AND COALESCE(NULLIF("mediaType", ''), 'image') = ? AND "taskId" = ?
+			AND ("status" IN ('PENDING', 'IN_PROGRESS', 'SUBMISSION_UNKNOWN') OR ("status" = 'FAILURE' AND ?))`,
+			status, emptyNull(result), emptyNull(reason), usageJSON, now, scope.workspace, scope.media, taskID, recoverFailure)
 		if err == nil {
 			return
 		}
 	}
 	_, _ = db.ExecContext(ctx, `
 		UPDATE "ImageTask" SET "status" = ?, "resultUrl" = ?, "failReason" = ?, "updatedAt" = ?
-		WHERE "workspaceId" = ? AND COALESCE(NULLIF("mediaType", ''), 'image') = ? AND "taskId" = ? AND "status" IN ('PENDING', 'IN_PROGRESS', 'SUBMISSION_UNKNOWN')`,
-		status, emptyNull(result), emptyNull(reason), now, scope.workspace, scope.media, taskID)
+		WHERE "workspaceId" = ? AND COALESCE(NULLIF("mediaType", ''), 'image') = ? AND "taskId" = ?
+		AND ("status" IN ('PENDING', 'IN_PROGRESS', 'SUBMISSION_UNKNOWN') OR ("status" = 'FAILURE' AND ?))`,
+		status, emptyNull(result), emptyNull(reason), now, scope.workspace, scope.media, taskID, recoverFailure)
 }
 
 func rememberTaskUsage(ctx context.Context, cfg config.Config, scope taskScope, taskID string, usage map[string]any) {

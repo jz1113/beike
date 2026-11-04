@@ -45,6 +45,9 @@ func ExportZip(cfg config.Config) http.Handler {
 			httpx.WriteJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"success": false, "error": "分卷文案超过 4 MB，请减少每卷条目数量"})
 			return
 		}
+		if serveNamedMediaExport(cfg, w, r, payload) {
+			return
+		}
 		if offlineMatrixNeedsUpstream(payload) {
 			if shots, ok := matrixShotCount(payload); ok && shots > 500 {
 				httpx.WriteJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"success": false, "error": "一次最多导出 500 个媒体文件，请分批导出"})
@@ -92,7 +95,7 @@ func writeExportArchive(w http.ResponseWriter, name string, files map[string][]b
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+url.QueryEscape(name)+`.zip"; filename*=UTF-8''`+url.QueryEscape(name+".zip"))
 	w.Header().Set("Content-Length", generate.Itoa(archive.Len()))
-	w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length")
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length, X-Export-Total, X-Export-Succeeded, X-Export-Failed, X-Export-Partial")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(archive.Bytes())
 }
@@ -102,7 +105,7 @@ func buildExportEntries(cfg config.Config, r *http.Request, payload map[string]a
 	products, _ := payload["products"].([]any)
 	if len(products) > 0 {
 		title, _ := payload["batchTitle"].(string)
-		root := sanitizeExportName(title, "全渠道批量采集成果")
+		root := sanitizeExportName(title, "批量导出")
 		seen := map[string]struct{}{}
 		count := 0
 		var items []matrixSummaryItem
@@ -285,14 +288,26 @@ func readExportMedia(cfg config.Config, r *http.Request, raw string, video bool)
 		return body, ext, nil
 	}
 	if strings.HasPrefix(raw, "/storage/") {
-		rel := strings.TrimPrefix(raw, "/storage/")
+		parsed, err := url.Parse(raw)
+		if err != nil {
+			return nil, "", err
+		}
+		rel := strings.TrimPrefix(parsed.Path, "/storage/")
+		if !exportLocalMediaAllowed(cfg, r, rel) {
+			return nil, "", errors.New("Host not allowed: local media workspace")
+		}
 		path := storage.StoredFile(rel)
 		if path == "" {
 			path = storage.SafeWithin(storage.ResolveRoot(), rel)
 		}
-		body, err := os.ReadFile(path)
+		file, err := os.Open(path)
 		if err != nil {
 			return nil, "", err
+		}
+		defer file.Close()
+		body, err := io.ReadAll(io.LimitReader(file, (200<<20)+1))
+		if err != nil || len(body) > 200<<20 {
+			return nil, "", errors.New("媒体文件超过 200 MB 导出上限")
 		}
 		return body, exportExt(rel, video), nil
 	}

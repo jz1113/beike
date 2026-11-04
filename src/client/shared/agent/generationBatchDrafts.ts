@@ -13,8 +13,9 @@ const schema = z.object({
     imageModel: z.string().max(200), imageAspect: z.string().max(32), imageQuality: z.enum(['high', 'medium', 'low']),
     imageQualityTier: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
     imageInferenceStrength: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
-    videoModel: z.string().max(200), videoAspect: z.string().max(32), videoResolution: z.enum(['480P', '540P', '720P', '1080P', '2K', '4K']),
+    videoModel: z.string().max(200), videoAspect: z.string().max(32), videoResolution: z.enum(['480P', '540P', '720P', '768P', '1080P', '2K', '4K']),
     videoDuration: z.number().finite(), videoRefMode: z.string().max(40), videoGenerateAudio: z.boolean().optional(),
+    videoContextIrEnabled: z.boolean().optional(),
   }),
 });
 

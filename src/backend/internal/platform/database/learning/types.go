@@ -15,6 +15,7 @@ type Folder struct {
 	MajorName string `json:"majorName"`
 }
 type Sample struct {
+	DisplayNumber     int              `json:"displayNumber,omitempty"`
 	ObservationKey    string           `json:"observationKey,omitempty"`
 	ObservationDigest string           `json:"observationDigest,omitempty"`
 	ID                string           `json:"id"`

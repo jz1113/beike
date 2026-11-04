@@ -44,6 +44,9 @@ func extractDepthFrames(root, input, outDir string, maxWidth int, probedFPS floa
 	if fps <= 0 {
 		fps = 24
 	}
+	if _, err := holdDepthTerminalBlackFrames(outDir, fps); err != nil {
+		return 0, 0, errors.New("无法核对深度参考视频的片尾帧")
+	}
 	return count, fps, nil
 }
 

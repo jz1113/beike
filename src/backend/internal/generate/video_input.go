@@ -6,10 +6,41 @@ import (
 	"strings"
 )
 
-func videoInputError(payload map[string]json.RawMessage, model string) string {
+func rawBoolPresent(payload map[string]json.RawMessage, key string) (bool, bool) {
+	raw, ok := payload[key]
+	if !ok {
+		return false, false
+	}
+	var value bool
+	if json.Unmarshal(raw, &value) != nil {
+		return false, false
+	}
+	return value, true
+}
+
+func videoInputError(payload map[string]json.RawMessage, model string, bases ...string) string {
+	if message := videoPromptInputError(payload, model); message != "" {
+		return message
+	}
+	if message := videoSeedInputError(payload, model); message != "" {
+		return message
+	}
+	base := rawStringValue(payload["customBaseUrl"])
+	if len(bases) > 0 {
+		base = bases[0]
+	}
 	images := videoFrameList(payload)
 	videos := rawStringList(payload["videos"])
 	mode := resolveVideoMode(model, videoRefMode(payload), len(images), len(videos))
+	if message := grokOfficialModeError(base, model, mode); message != "" {
+		return message
+	}
+	if message := grokVoiceInputError(payload, model, mode); message != "" {
+		return message
+	}
+	if message := videoAudioInputError(payload, model, mode, len(images)+len(videos)); message != "" {
+		return message
+	}
 	if !videoModeAllowed(model, mode) {
 		return "当前模型尚未接入这种生成方式，请切换模式"
 	}
@@ -41,8 +72,8 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 			return "Vidu 最多支持 " + Itoa(maxViduImages) + " 张参考图片"
 		}
 	}
-	if regexp.MustCompile(`(?i)omni[_-]flash|gemini-omni`).MatchString(model) && (len(images) > 7 || len(videos) > 3) {
-		return "Omni Flash 最多支持 7 张参考图片、3 个参考视频"
+	if omniFlash(model) && len(images)+len(videos) > 7 {
+		return "Omni Flash 最多支持 7 项参考素材（图片与视频合计）"
 	}
 	if regexp.MustCompile(`(?i)^veo-?3\.1`).MatchString(model) && mode == "omni" && len(images) > 3 {
 		return "Veo 最多支持 3 张参考图片"
@@ -50,7 +81,7 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 	if regexp.MustCompile(`^wan3`).MatchString(model) && (len(images) > 10 || len(videos) > 5) {
 		return "万相最多支持 10 张参考图、5 个参考视频"
 	}
-	if regexp.MustCompile(`(?i)minimax-h3`).MatchString(model) && (len(images) > 9 || len(videos) > 3 || len(images)+len(videos) > 12) {
+	if minimaxH3(model) && (len(images) > 9 || len(videos) > 3 || len(images)+len(videos) > 12) {
 		return "H3 最多支持 9 张参考图、3 个参考视频，合计不超过 12 个素材"
 	}
 	if regexp.MustCompile(`(?i)grok-imagine-video`).MatchString(model) && mode == "omni" && len(images) > 14 {
@@ -72,6 +103,10 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 		}
 	}
 	resolution := defaultVideoResolution(model)
+	metasoH3 := minimaxH3(model) && minimaxMetasoHost(base)
+	if metasoH3 {
+		resolution = "480P"
+	}
 	if value := rawStringValue(payload["resolution"]); value != "" {
 		resolution = strings.ToUpper(value)
 	}
@@ -84,8 +119,13 @@ func videoInputError(payload map[string]json.RawMessage, model string) string {
 		if json.Unmarshal(raw, &duration) != nil {
 			return ""
 		}
+	} else if omniFlash(model) {
+		duration = 10
 	} else if regexp.MustCompile(`(?i)grok`).MatchString(model) && mode == "extend" {
 		duration = 6
+	}
+	if metasoH3 {
+		return minimaxMetasoSpecError(resolution, aspect, duration)
 	}
 	return videoSpecError(model, mode, resolution, aspect, duration)
 }
@@ -158,7 +198,7 @@ func videoModeAllowed(model, mode string) bool {
 }
 
 func referenceVideoAllowed(model string) bool {
-	return regexp.MustCompile(`(?i)seedance`).MatchString(model) || regexp.MustCompile(`^wan3`).MatchString(model) || regexp.MustCompile(`(?i)minimax-h3`).MatchString(model) || regexp.MustCompile(`(?i)omni[_-]flash|gemini-omni`).MatchString(model)
+	return regexp.MustCompile(`(?i)seedance`).MatchString(model) || regexp.MustCompile(`^wan3`).MatchString(model) || minimaxH3(model) || regexp.MustCompile(`(?i)omni[_-]flash|gemini-omni`).MatchString(model)
 }
 
 func viduQ4Preview(id string) bool {
@@ -185,8 +225,8 @@ func videoModes(model string) []string {
 		return full
 	case viduQ4Preview(id):
 		return []string{"omni", "first_frame"}
-	case regexp.MustCompile(`omni[_-]flash|gemini-omni`).MatchString(id):
-		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
+	case omniFlash(id):
+		return []string{"omni", "text", "edit"}
 	case regexp.MustCompile(`^veo3\.1`).MatchString(id):
 		return full
 	case regexp.MustCompile(`sora`).MatchString(id):

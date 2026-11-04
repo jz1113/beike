@@ -85,7 +85,7 @@ export function SalesAssetBindingPanel({
                   </button>
                 </div>)}
               </div>
-              {!rankedPersonas.length && <p className="sales-binding-note">可直接上传参考图，或<button type="button" disabled={disabled} onClick={() => onOpenMaterials('persona')} className={`sales-link-btn ${salesFocusClass}`}>去添加人物<ArrowUpRight size={11} aria-hidden /></button>。</p>}
+              {!rankedPersonas.length && <p className="sales-binding-note">可直接上传参考图，或<button type="button" disabled={disabled} onClick={() => onOpenMaterials('persona')} className={`sales-link-btn ${salesFocusClass}`}>浏览人物素材<ArrowUpRight size={11} aria-hidden /></button>。</p>}
             </> : <div className="sales-binding-empty">
               <UserRound size={22} aria-hidden /><div><strong>当前脚本无需出镜人物</strong><p>按脚本展示商品或局部画面。</p></div>
             </div>}
@@ -103,17 +103,17 @@ export function SalesAssetBindingPanel({
               </div>
               <div className="sales-binding-controls">
                 <div className="sales-binding-select">
-                  <SalesLibrarySelect label={!rankedScenes.length && !plan.customSceneImageUrl ? '暂无场景素材' : '选择拍摄场景'} searchable
-                    value={plan.customSceneImageUrl ? '' : selectedScene?.id || ''} disabled={disabled || !rankedScenes.length}
-                    onChange={(id) => { if (id) onPatchPlan({ sceneId: id, customSceneImageUrl: '', customPrompt: '' }); }}
-                    options={plan.customSceneImageUrl ? [{ value: '', label: '使用上传的实景图' }, ...sceneOptions] : sceneOptions} />
+                  <SalesLibrarySelect label="选择拍摄场景" searchable
+                    value={plan.customSceneImageUrl ? 'uploaded' : plan.sceneId} disabled={disabled}
+                    onChange={(id) => { onPatchPlan({ sceneId: id, customSceneImageUrl: '', customPrompt: '' }); }}
+                    options={[{ value: '', label: '沿用分镜场景' }, ...(plan.customSceneImageUrl ? [{ value: 'uploaded', label: '使用上传的实景图' }] : []), ...sceneOptions]} />
                 </div>
-                <p className="sales-binding-note sales-binding-scene-description">{plan.customSceneImageUrl ? '以本次上传的图片作为场景参考。' : selectedScene ? selectedScene.description || selectedScene.lighting || '按所选场景的空间布局生成。' : '选择已有场景，或上传实景参考图。'}</p>
+                <p className="sales-binding-note sales-binding-scene-description">{plan.customSceneImageUrl ? '以本次上传的图片作为场景参考。' : selectedScene ? selectedScene.description || selectedScene.lighting || '按所选场景的空间布局生成。' : plan.sceneId ? '所选场景已失效，请重新选择。' : '按各镜记录的地点和现场光拍摄。'}</p>
                 <div className="sales-binding-scene-actions">
                   <input ref={sceneInputRef} type="file" accept="image/*" disabled={disabled} className="hidden" aria-label="上传实景图"
                     onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) onUploadSlot('scene', file); }} />
                   <button type="button" disabled={disabled} onClick={() => sceneInputRef.current?.click()} className={`sales-link-btn ${salesFocusClass}`}><Upload size={12} aria-hidden />{plan.customSceneImageUrl ? '更换实景图' : '上传实景图'}</button>
-                  {!rankedScenes.length && <button type="button" disabled={disabled} onClick={() => onOpenMaterials('scene')} className={`sales-link-btn ${salesFocusClass}`}>去添加场景<ArrowUpRight size={11} aria-hidden /></button>}
+                  {!rankedScenes.length && <button type="button" disabled={disabled} onClick={() => onOpenMaterials('scene')} className={`sales-link-btn ${salesFocusClass}`}>浏览场景素材<ArrowUpRight size={11} aria-hidden /></button>}
                 </div>
               </div>
             </div>
@@ -123,7 +123,7 @@ export function SalesAssetBindingPanel({
         <section className="sales-binding-section" aria-label="声音">
           <h3><Volume2 size={16} aria-hidden />声音</h3>
           <div className="sales-binding-controls">
-            <SalesVoiceSettings effectiveVoiceMode={effectiveVoiceMode} rankedVoices={rankedVoices} selectedVoice={selectedVoice}
+            <SalesVoiceSettings effectiveVoiceMode={effectiveVoiceMode} rankedVoices={rankedVoices} selectedVoice={selectedVoice} voiceId={plan.voiceId} videoModel={plan.videoModel} videoVoiceId={plan.videoVoiceId}
               disabled={disabled} onEditPresentation={onEditPresentation} onOpenMaterials={() => onOpenMaterials('sound')} onPatchPlan={onPatchPlan} />
           </div>
         </section>

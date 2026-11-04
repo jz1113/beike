@@ -39,4 +39,10 @@ describe('workshop product sources', () => {
     expect(workshopProductSource({ platform: '1688', itemId: '12345678' })).toBe('https://detail.1688.com/offer/12345678.html');
     expect(workshopProductSource({ platform: 'jd', itemId: '12345678', url: 'javascript:alert(1)' })).toBe('https://item.jd.com/12345678.html');
   });
+  it('enforces the content cap for link additions to multi-content table batches', () => {
+    const batch = parseBatchInputLines('20000001\n20000002', new Set(['jd:12345678']), 199);
+    expect(batch.newItems).toHaveLength(1);
+    expect(batch.skipped).toBe(1);
+  });
+
 });

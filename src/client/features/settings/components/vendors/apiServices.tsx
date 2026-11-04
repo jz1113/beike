@@ -1,6 +1,6 @@
 import React from 'react';
 import { Database } from 'lucide-react';
-import { ComflyLogo, OneBoundLogo, ApiaLogo, QiyunLogo, LianchiLogo } from '@client/shared/icons';
+import { ComflyLogo, OneBoundLogo, LianchiLogo } from '@client/shared/icons';
 import { ModelIcon } from '@client/shared/ui/ModelIcons';
 
 export interface ApiServiceItem {
@@ -91,36 +91,6 @@ export const API_SERVICES: ApiServiceItem[] = [
     defaultBaseUrl: 'https://api-gw.onebound.cn',
     description: '专业级电商商品数据采集开放平台，支持天猫、淘宝、京东、1688、拼多多、抖音电商商品高清主图、SKU 规格及详情图集毫秒级解析。',
     capabilities: ['全网电商商品爬取', '高清无水印主图', 'SKU 与规格解析', '批量图集抓取']
-  },
-  {
-    id: 'apia_parser',
-    name: 'APIA 第三方短视频/图集解析接口',
-    subTitle: 'https://apia.vip · 小红书/抖音/快手无水印提取',
-    category: 'social',
-    renderLogo: (cls = "w-5 h-5") => <ApiaLogo className={cls} />,
-    isEnabled: true,
-    tag: '社媒图集解析',
-    docsUrl: 'https://apia.vip',
-    registerUrl: 'https://apia.vip',
-    registerName: '前往 APIA 官网注册获取凭证',
-    defaultBaseUrl: 'https://apia.vip',
-    description: '第三方社媒内容逆向解析引擎，支持小红书爆款图集、抖音高清视频与快手无水印原图毫秒级直链提取。',
-    capabilities: ['小红书笔记图集', '抖音高清短视频', '快手作品解析', '无水印原图提取']
-  },
-  {
-    id: 'qiyun_parser',
-    name: '奇云解析',
-    subTitle: 'https://qyapi.ipaybuy.cn · 抖音/小红书/视频号/快手/B站/微博等',
-    category: 'social',
-    renderLogo: (cls = "w-5 h-5") => <QiyunLogo className={cls} />,
-    isEnabled: true,
-    tag: '30+平台去水印',
-    docsUrl: 'https://qyapi.ipaybuy.cn',
-    registerUrl: 'https://qyapi.ipaybuy.cn',
-    registerName: '前往奇云平台注册并申请 AppId',
-    defaultBaseUrl: 'https://qyapi.ipaybuy.cn/api/video',
-    description: '全能短视频与图集去水印 RESTful API，支持抖音、快手、小红书、微信视频号、微博、B站等 30+ 主流短视频与图集平台一键解析无水印资源。',
-    capabilities: ['支持 30+ 平台', '抖音/快手/小红书', '微信视频号', '图集与实况视频', '毫秒级解析']
   },
   {
     id: 'cloud_storage',

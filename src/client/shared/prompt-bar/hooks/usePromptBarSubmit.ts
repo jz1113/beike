@@ -29,6 +29,7 @@ interface UsePromptBarSubmitOptions {
   quickVideoAspectId: string;
   quickVideoResolution: string;
   quickVideoDuration: number;
+  quickVideoContextIrEnabled?: boolean;
   currentView: string;
   availableImageModelsLength: number;
   availableVideoModelsLength?: number;
@@ -43,6 +44,8 @@ interface UsePromptBarSubmitOptions {
   setActiveSubjects: React.Dispatch<React.SetStateAction<SubjectItem[]>>;
   onSubmitSuccess?: (info: { prompt: string; refImages: string[]; mode: QuickGenMode; tasks: any[] }) => void;
 }
+
+const SUBMIT_COOLDOWN_MS = 3000;
 
 export function usePromptBarSubmit({
   composerRef,
@@ -65,6 +68,7 @@ export function usePromptBarSubmit({
   quickVideoAspectId,
   quickVideoResolution,
   quickVideoDuration,
+  quickVideoContextIrEnabled,
   currentView,
   availableImageModelsLength,
   availableVideoModelsLength,
@@ -79,12 +83,19 @@ export function usePromptBarSubmit({
   setActiveSubjects,
   onSubmitSuccess,
 }: UsePromptBarSubmitOptions) {
+  const readingAttachments = useAppStore(state => state.pendingAttachmentReads > 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 🌟 生产事故级防重：物理节流冷却锁（至少 3 秒冷却，杜绝连击、双击或回车与点击并发提交）
   const lastSubmitTimeRef = useRef<number>(0);
-  const submittingLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The home view can be hidden while a task runs. Resume the same deadline when it reopens.
+  useEffect(() => {
+    if (!isSubmitting) return;
+    const remaining = lastSubmitTimeRef.current + SUBMIT_COOLDOWN_MS - Date.now();
+    const timer = setTimeout(() => setIsSubmitting(false), Math.max(0, remaining));
+    return () => clearTimeout(timer);
+  }, [isSubmitting]);
 
   const showToast = useCallback((msg: string) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -98,13 +109,13 @@ export function usePromptBarSubmit({
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      if (submittingLockTimerRef.current) clearTimeout(submittingLockTimerRef.current);
     };
   }, []);
 
   const handleSendPrompt = useCallback(() => {
+    if (useAppStore.getState().pendingAttachmentReads > 0) return;
     const now = Date.now();
-    if (now - lastSubmitTimeRef.current < 3000) {
+    if (now - lastSubmitTimeRef.current < SUBMIT_COOLDOWN_MS) {
       console.warn('[usePromptBarSubmit] 拦截 3 秒内的重复提交操作，保障资金安全');
       return;
     }
@@ -128,6 +139,7 @@ export function usePromptBarSubmit({
       quickVideoAspectId,
       quickVideoResolution,
       quickVideoDuration,
+      quickVideoContextIrEnabled,
       currentView,
       hasImageModels: availableImageModelsLength > 0,
       hasVideoModels: (availableVideoModelsLength ?? 0) > 0,
@@ -191,13 +203,7 @@ export function usePromptBarSubmit({
     });
     clearComposerMedia();
 
-    // 保持 2 秒按钮禁用冷却，给予用户明确反馈并防止快速连续点击
-    if (submittingLockTimerRef.current) clearTimeout(submittingLockTimerRef.current);
-    submittingLockTimerRef.current = setTimeout(() => {
-      setIsSubmitting(false);
-      submittingLockTimerRef.current = null;
-    }, 2000);
-  }, [quickGenMode, quickPrompt, quickRefImages, activeSubjects, allSubjects, quickVideoRefMode, quickVideoFirstFrame, quickVideoLastFrame, quickVideoMultiFrames, quickCount, quickVideoCount, quickModel, quickVideoModel, quickAudioModel, sizeStr, quickQuality, quickVideoAspectId, quickVideoResolution, quickVideoDuration, currentView, availableImageModelsLength, availableVideoModelsLength, availableAudioModelsLength, quickDepthStyle, quickDepthQuality, refMediaFile, depthModelReady, isDepthMode, onSubmitSuccess, clearComposerMedia, showToast, setupCommand]);
+  }, [quickGenMode, quickPrompt, quickRefImages, activeSubjects, allSubjects, quickVideoRefMode, quickVideoFirstFrame, quickVideoLastFrame, quickVideoMultiFrames, quickCount, quickVideoCount, quickModel, quickVideoModel, quickAudioModel, sizeStr, quickQuality, quickVideoAspectId, quickVideoResolution, quickVideoDuration, quickVideoContextIrEnabled, currentView, availableImageModelsLength, availableVideoModelsLength, availableAudioModelsLength, quickDepthStyle, quickDepthQuality, refMediaFile, depthModelReady, isDepthMode, onSubmitSuccess, clearComposerMedia, showToast, setupCommand]);
 
   const handleSendPromptRef = useRef(handleSendPrompt);
   useEffect(() => {
@@ -241,7 +247,7 @@ export function usePromptBarSubmit({
     [isDepthMode, handleKeyDown, handleSendPrompt]
   );
 
-  const canSend = canSubmitPromptBar({
+  const canSend = !readingAttachments && canSubmitPromptBar({
     quickGenMode,
     quickPrompt,
     quickRefImages,
@@ -277,6 +283,7 @@ export function usePromptBarSubmit({
     toastMsg,
     showToast,
     canSend,
+    readingAttachments,
     handleSendPrompt,
     handleComposerKeyDown,
   };

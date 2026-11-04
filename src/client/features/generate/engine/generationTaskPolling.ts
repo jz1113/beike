@@ -7,7 +7,6 @@ import {
   isDepthImageTask,
   isVideoTask,
   getMaxPollCount,
-  getGatewayBaseUrl,
   type TaskUpdater,
   SLOW_POLL_HINT,
 } from './generationTaskTypes';
@@ -52,7 +51,6 @@ export async function pollTasksOnce(
   },
 ) {
   const noPersist = { persist: false as const };
-  const localUrl = getGatewayBaseUrl();
   const pollFailureCounts = options?.pollFailureCounts || {};
 
   await Promise.allSettled(
@@ -112,14 +110,13 @@ export async function pollTasksOnce(
           : isAudio
             ? '/api/generate/audio'
             : '/api/generate/image';
-        const queryParams = new URLSearchParams(recovering ? { taskKey: t.id, model: t.model } : { taskId: t.taskId! });
+        const queryParams = new URLSearchParams(recovering ? { taskKey: t.id, model: t.model } : { taskId: t.taskId!, model: t.model });
         const taskGatewayHeaders = getGatewayClientHeaders(t.modelRouteKey || t.model);
 
         const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
           headers: {
             ...taskGatewayHeaders,
             ...storageConfigHeaders(),
-            ...(localUrl && !depthVideo ? { 'x-custom-base-url': localUrl } : {}),
           },
         });
 
@@ -229,8 +226,10 @@ export async function pollTasksOnce(
   );
 }
 
-function isUnrecordedSubmission(data: { status?: unknown; submissionPending?: unknown } | null): boolean {
+function isUnrecordedSubmission(data: { status?: unknown; submissionPending?: unknown; taskId?: unknown } | null): boolean {
   if (!data || data.submissionPending === true) return false;
+  // An uncertain receipt can already contain the real upstream ID. Poll that original task.
+  if (typeof data.taskId === 'string' && data.taskId && !data.taskId.startsWith('pending_')) return false;
   return typeof data.status === 'string' && data.status.toUpperCase() === 'QUERY_FAILED';
 }
 
@@ -276,22 +275,19 @@ export async function probeFailedTasks(
   recoveredOnce: Set<string>,
   slowPollIds: Set<string>,
 ) {
-  const localUrl = getGatewayBaseUrl();
-
   await Promise.allSettled(
     tasks.map(async (t) => {
       if (t.mediaType === 'agent' || t.id.startsWith('agent-task-')) return;
       if (recoveredOnce.has(t.id)) return;
       try {
         const pollEndpoint = failedTaskPollEndpoint(t);
-        const queryParams = new URLSearchParams({ taskId: t.taskId! });
+        const queryParams = new URLSearchParams({ taskId: t.taskId!, model: t.model, recheck_failed: '1' });
         const taskGatewayHeaders = getGatewayClientHeaders(t.modelRouteKey || t.model);
 
         const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
           headers: {
             ...taskGatewayHeaders,
             ...storageConfigHeaders(),
-            ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
           },
         }).catch(() => null);
 

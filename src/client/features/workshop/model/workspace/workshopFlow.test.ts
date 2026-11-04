@@ -15,15 +15,15 @@ describe('workshop flow gating', () => {
   it('keeps stage navigation predictable before a batch exists', () => {
     const flow = getWorkshopFlow([], { generationStrategy: 'single_shot', selectedShotCount: 4 });
     expect(flow.reasonForStage(2)).toBe('请先添加并采集商品');
-    expect(flow.reasonForStage(3)).toBe('请先为每款商品选择至少一张商品图');
-    expect(flow.reasonForStage(4)).toBe('请先在「分析与确认」中确认提示词并开始生图');
+    expect(flow.reasonForStage(3)).toBe('请先为每条图文选择至少一张商品图');
+    expect(flow.reasonForStage(4)).toBe('请先在「配图方案」确认方案并开始生图');
   });
 
   it('allows revisiting selection while keeping analysis blocked until prompts exist', () => {
     const flow = getWorkshopFlow([product()], { generationStrategy: 'single_shot', selectedShotCount: 4 });
     expect(flow.reasonForStage(2)).toBeNull();
     expect(flow.reasonForStage(3)).toBeNull();
-    expect(flow.reasonForStage(4)).toBe('请先在「分析与确认」中确认提示词并开始生图');
+    expect(flow.reasonForStage(4)).toBe('请先在「配图方案」确认方案并开始生图');
     expect(flow.pendingAnalysisIds).toEqual(['p1']);
   });
 
@@ -81,6 +81,13 @@ describe('workshop flow gating', () => {
     expect(flow.imageReadyCount).toBe(3);
     expect(flow.completedStages).toEqual([1]);
     expect(flow.readiness.issues.find(issue => issue.productId === 'edit')?.resolution).toBe('edit');
+  });
+
+  it('only asks to edit the grid prompt once the shots exist', () => {
+    const config = { generationStrategy: 'grid_first', selectedShotCount: 4 } as const;
+    expect(getWorkshopFlow([product()], config).readiness.issues.map(issue => issue.resolution)).toEqual(['analyze']);
+    const analyzed = product({ analyzedSuccess: true, prompts: [1, 2, 3, 4].map(shot_no => ({ shot_no, prompt: '场景' })) });
+    expect(getWorkshopFlow([analyzed], config).readiness.issues.map(issue => issue.resolution)).toEqual(['edit']);
   });
 
   it('rejects out-of-range shot numbers even when their count is correct', () => {

@@ -26,7 +26,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
     activeVideoModelObj, activeImageModelObj, availableVideoModels, availableImageModels,
     depthStyleMenu, depthQualityMenu, videoRefModeMenu, activeVideoRefModeObj, aspectMenu,
     activeVideoRatioObj, activeImageRatioObj, currentW, currentH, durationMenu, videoDurationBounds,
-    handleSendPrompt, canSend, isSubmitting, fileAccept, toastMsg, showToast,
+    handleSendPrompt, canSend, readingAttachments, isSubmitting, fileAccept, toastMsg, showToast,
   } = usePromptActionBar(props);
   const {
     quickGenMode,
@@ -51,6 +51,8 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
     setQuickAudioModel,
     quickVideoDuration,
     setQuickVideoDuration,
+    quickVideoContextIrEnabled,
+    setQuickVideoContextIrEnabled,
     quickVideoResolution,
     setQuickVideoResolution,
     quickVideoAspectId,
@@ -272,6 +274,8 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
               quickAudioModel={quickAudioModel}
               setQuickAudioModel={setQuickAudioModel}
               quickVideoDuration={quickVideoDuration}
+              quickVideoContextIrEnabled={quickVideoContextIrEnabled}
+              setQuickVideoContextIrEnabled={setQuickVideoContextIrEnabled}
               setQuickVideoModel={setQuickVideoModel}
               setQuickVideoDuration={setQuickVideoDuration}
               setQuickModel={setQuickModel}
@@ -381,6 +385,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
       <input ref={videoFrames.lastFrameInputRef} type="file" accept="image/*" className="hidden" onChange={videoFrames.handleUploadLastFrame} />
       <input ref={videoFrames.multiFrameInputRef} type="file" accept="image/*" multiple className="hidden" onChange={videoFrames.handleUploadMultiFrame} />
 
+      {readingAttachments && <p role="status" className="mt-1 text-xs text-slate-500">正在读取参考素材…</p>}
       {toastMsg && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-4 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-medium shadow-xl dark:bg-white dark:text-slate-950">
           {toastMsg}

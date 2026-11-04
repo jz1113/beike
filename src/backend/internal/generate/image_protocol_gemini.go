@@ -72,7 +72,8 @@ func (geminiImageProtocol) Submit(req imageRequest) (imageSubmitResult, error) {
 		endpoint: "generateContent",
 		payload:  body,
 	}
-	endpoint := geminiImageEndpoint(req.Base, req.Model)
+	adapted.modelID = comflyGeminiImageModel(req.Base, req.Model, imageSize)
+	endpoint := geminiImageEndpoint(req.Base, adapted.modelID)
 	status, raw, err := postGeminiGenerateContent(req.context(), endpoint, req.APIKey, body, 120*time.Second)
 	if err != nil {
 		return imageSubmitResult{}, err

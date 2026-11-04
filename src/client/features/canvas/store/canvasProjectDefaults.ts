@@ -1,4 +1,4 @@
-import type {CanvasProject} from '../model/types';
+import type {CanvasProject, StudioScene} from '../model/types';
 
 /** 仅用于滤掉早期内置 Unsplash 演示项目，不再作为运行时素材来源。 */
 const LEGACY_PROJECTS: CanvasProject[] = [
@@ -58,9 +58,35 @@ const LEGACY_PROJECTS: CanvasProject[] = [
 ];
 
 
+export function hasStudioContent(scene?: StudioScene): boolean {
+  return !!scene && [scene.nodes, scene.connections, scene.groups, scene.strokes, scene.textBoxes].some(list => list?.length > 0);
+}
+
+/** 使用可再次打开的图片地址，跳过音视频正文和页面临时 blob。 */
+export function studioCover(scene?: StudioScene): string | undefined {
+  for (const node of scene?.nodes ?? []) {
+    const settings = node.settings as Record<string,unknown> | undefined;
+    if (node.videoUrl || node.type === 'gen-video' || ['audio','video'].includes(String(node.previewType ?? settings?.mediaType))) {
+      continue;
+    }
+    const images = settings?.generatedImages ?? node.generatedImages;
+    const selected = Array.isArray(images) ? images[Number(settings?.selectedImageIndex)] : undefined;
+    const candidates = Array.isArray(images)
+      ? images.flatMap(item => [item?.thumbUrl, item?.fullUrl])
+      : [];
+    if (selected) candidates.unshift(selected.thumbUrl, selected.fullUrl);
+    candidates.push(node.imageUrl);
+    if (['gen-image', 'input-image', 'preview'].includes(node.type)) {
+      candidates.push(node.content);
+    }
+    const cover = candidates.find(value => typeof value === 'string' && /^(?:https?:\/\/|\/storage\/|data:image\/)/i.test(value));
+    if (typeof cover === 'string') return cover;
+  }
+}
+
 export function normalizeCanvasProjects(projects:CanvasProject[]) {
   return projects.filter(project=> !LEGACY_PROJECTS.some(legacy=>{
-    if(project.id!==legacy.id || project.title!==legacy.title || project.nodes.length!==legacy.nodes.length)return false;
+    if(hasStudioContent(project.studioScene) || project.id!==legacy.id || project.title!==legacy.title || project.nodes.length!==legacy.nodes.length)return false;
     return project.nodes.every((node,index)=>{
       const expected=legacy.nodes[index];
       const keys=new Set([...Object.keys(node),...Object.keys(expected)]);
@@ -69,6 +95,12 @@ export function normalizeCanvasProjects(projects:CanvasProject[]) {
   })).map(project => {
     const rest = { ...project } as CanvasProject & { productionDraft?: unknown };
     delete rest.productionDraft;
+    // Imported workflow text may use content; Studio renders its saved text from settings.text.
+    if (rest.studioScene) rest.studioScene = { ...rest.studioScene, nodes: rest.studioScene.nodes.map(node => {
+      const settings = node.settings as Record<string, unknown> | undefined;
+      return node.type === 'text-node' && node.id.startsWith(`${rest.id}-step-`) && typeof node.content === 'string' && settings?.text === undefined
+        ? { ...node, settings: { ...settings, text: node.content, aiGenerated: true } } : node;
+    }) };
     const title = rest.title?.trim() || '';
     // 早期草稿可能被错误写入单个数字（如 "1"）。无节点时这不是有效名称，统一回到未命名状态。
     const isUntitled = !title || title === '未命名项目' || title === '新建画布' || (!rest.nodes.length && /^\d+$/.test(title));
@@ -78,8 +110,10 @@ export function normalizeCanvasProjects(projects:CanvasProject[]) {
     return {
       ...rest,
       title: firstNodeTitle || '未命名项目',
-      draft: !rest.nodes.length,
+      draft: !rest.nodes.length && !hasStudioContent(rest.studioScene),
     };
   });
 }
-export const visibleCanvasProjects=(projects:CanvasProject[])=>normalizeCanvasProjects(projects).filter(project=>!project.draft || project.nodes.length>0);
+export const visibleCanvasProjects = (projects:CanvasProject[]) => normalizeCanvasProjects(projects)
+  .filter(project => !project.draft || project.nodes.length > 0 || hasStudioContent(project.studioScene))
+  .sort((a,b) => b.updatedAt - a.updatedAt);

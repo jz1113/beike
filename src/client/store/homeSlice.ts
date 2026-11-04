@@ -1,11 +1,21 @@
 import type { StateCreator } from 'zustand';
 import type { AppState, HomeSlice } from '@client/store/types';
+import { loadPromptPreferences, savePromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 
 export const createHomeSlice: StateCreator<AppState, [], [], HomeSlice> = (set) => ({
   quickGenMode: 'agent',
   quickDepthStyle: 'mocap',
   quickDepthQuality: 'standard',
   quickPrompt: '',
+  pendingAttachmentReads: 0,
+  readPromptAttachments: async (read) => {
+    set(state => ({ pendingAttachmentReads: state.pendingAttachmentReads + 1 }));
+    try {
+      await read();
+    } finally {
+      set(state => ({ pendingAttachmentReads: state.pendingAttachmentReads - 1 }));
+    }
+  },
   quickRefImage: null,
   quickRefImages: [],
   quickModel: 'gpt-image-2',
@@ -15,6 +25,7 @@ export const createHomeSlice: StateCreator<AppState, [], [], HomeSlice> = (set) 
   quickAudioModel: 'speech-2.8-hd',
   quickVideoModel: 'doubao-seedance-2.0-mini',
   quickVideoDuration: 5,
+  quickVideoContextIrEnabled: loadPromptPreferences().video.contextIrEnabled ?? true,
   quickVideoResolution: '480P',
   quickVideoAspectId: '16:9',
   quickVideoRefMode: 'omni',
@@ -56,6 +67,11 @@ export const createHomeSlice: StateCreator<AppState, [], [], HomeSlice> = (set) 
   setQuickAudioModel: (quickAudioModel) => set({ quickAudioModel }),
   setQuickVideoModel: (quickVideoModel) => set({ quickVideoModel }),
   setQuickVideoDuration: (quickVideoDuration) => set({ quickVideoDuration }),
+  setQuickVideoContextIrEnabled: (quickVideoContextIrEnabled) => {
+    const prefs = loadPromptPreferences();
+    savePromptPreferences({ ...prefs, video: { ...prefs.video, contextIrEnabled: quickVideoContextIrEnabled } });
+    set({ quickVideoContextIrEnabled });
+  },
   setQuickVideoResolution: (quickVideoResolution) => set({ quickVideoResolution }),
   setQuickVideoAspectId: (quickVideoAspectId) => set({ quickVideoAspectId }),
   setQuickVideoRefMode: (quickVideoRefMode) => set({ quickVideoRefMode }),

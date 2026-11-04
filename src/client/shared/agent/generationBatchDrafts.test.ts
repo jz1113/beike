@@ -21,6 +21,10 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('saved generation prompt drafts', () => {
+  it('persists explicit Context IR false and the native 768P tier', () => {
+    saveGenerationBatchDraft(source.sourceId, source.entries, { ...settings, videoResolution: '768P', videoContextIrEnabled: false });
+    expect(readGenerationBatchDraft(source)?.settings).toMatchObject({ videoResolution: '768P', videoContextIrEnabled: false });
+  });
   it('round-trips complete edits and settings without altering original source identity', () => {
     const entries: BatchPromptDraft[] = source.entries.map((entry, index) => ({ ...entry,
       title: `编辑标题${index}`, prompt: `编辑后的光影构图 ${index}`, referenceIndexes: [0, 2], aspect: '1:1', duration: 8 }));

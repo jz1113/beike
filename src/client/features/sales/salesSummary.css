@@ -31,24 +31,3 @@
 .sales-selling-copy textarea { min-height: 260px; border-color: var(--sales-line); background: var(--sales-subtle); padding: 14px 16px; }
 .sales-selling-questions { margin-top: 24px; }
 .sales-selling-questions ul { display: grid; gap: 5px; margin-top: 6px; padding-left: 16px; list-style: disc; color: var(--sales-muted); font-size: 12px; line-height: 1.75; }
-
-@container (min-width: 800px) {
-  .sales-selling-body.has-points {
-    display: grid;
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-    align-items: start;
-    gap: 24px 28px;
-  }
-  .sales-selling-body.has-points > .sales-selling-overview,
-  .sales-selling-body.has-points > .sales-selling-questions { grid-column: 1 / -1; }
-  .sales-selling-body.has-points > .sales-selling-points { grid-column: 1; grid-row: 2; margin-top: 0; }
-  .sales-selling-body.has-points > .sales-selling-copy {
-    grid-column: 2;
-    grid-row: 2;
-    margin-top: 0;
-    border-top: 0;
-    padding-top: 0;
-  }
-  .sales-selling-body.has-points > .sales-selling-questions { margin-top: 0; }
-  .sales-selling-copy textarea { min-height: 360px; }
-}

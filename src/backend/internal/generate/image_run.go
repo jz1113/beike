@@ -38,6 +38,13 @@ func buildImagePayloadWithAspect(model, prompt, size, aspectRatio, quality, imag
 		payload["quality"] = sentQuality
 	}
 	switch family {
+	case "seedream":
+		if model == "seedream-v5-pro" {
+			size = seedreamPixelSize(size)
+			payload["size"] = size
+			payload["response_format"] = "url"
+			delete(payload, "n")
+		}
 	case "grok-image":
 		delete(payload, "size")
 		payload["aspect_ratio"] = grokAspectRatio(rawSize, aspectRatio)

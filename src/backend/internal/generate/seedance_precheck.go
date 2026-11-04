@@ -64,6 +64,7 @@ func SeedancePrecheck(cfg config.Config) http.HandlerFunc {
 			items = items[:16]
 		}
 		base, apiKey := videoCredentials(cfg, r, payload)
+		scope := seedanceAssetScope{base: base, apiKey: apiKey, model: videoRequestedModel(payload), workspace: workspaceOf(r)}
 		storeCfg := resolveVideoStorageConfig(r, payload)
 		workspace := workspaceOf(r)
 		production := cfg.Production()
@@ -71,7 +72,7 @@ func SeedancePrecheck(cfg config.Config) http.HandlerFunc {
 		results := make([]seedancePrecheckResultItem, 0, len(items))
 		for index, item := range items {
 			ctx, cancel := context.WithTimeout(r.Context(), 95*time.Second)
-			res := precheckSingleSeedanceAsset(ctx, cfg, base, apiKey, workspace, production, storeCfg, item, index)
+			res := precheckSingleSeedanceAsset(ctx, cfg, scope, workspace, production, storeCfg, item, index)
 			cancel()
 			results = append(results, res)
 		}
@@ -85,7 +86,8 @@ func SeedancePrecheck(cfg config.Config) http.HandlerFunc {
 func precheckSingleSeedanceAsset(
 	ctx context.Context,
 	cfg config.Config,
-	base, apiKey, workspace string,
+	scope seedanceAssetScope,
+	workspace string,
 	production bool,
 	storeCfg *storage.ObjectConfig,
 	item seedancePrecheckRequestItem,
@@ -120,25 +122,16 @@ func precheckSingleSeedanceAsset(
 			}
 		}
 	}
-	assetType := "Image"
-	if kind == "video" {
-		assetType = "Video"
-	}
-	if cached := loadSeedanceCachedURI(base, assetType, ref); cached != "" {
-		out.Status = "passed"
-		out.AssetURI = cached
-		return out
-	}
-	if strings.TrimSpace(base) == "" || strings.TrimSpace(apiKey) == "" {
+	if strings.TrimSpace(scope.base) == "" || strings.TrimSpace(scope.apiKey) == "" {
 		out.Status = "skipped"
 		return out
 	}
 	var resolved string
 	var err error
 	if kind == "video" {
-		resolved, err = resolveSeedanceVideoRef(ctx, base, apiKey, ref, workspace, production, storeCfg)
+		resolved, err = resolveSeedanceVideoRef(ctx, scope, ref, workspace, production, storeCfg)
 	} else {
-		resolved, err = resolveSeedanceImageRef(ctx, base, apiKey, ref, index, workspace, production, storeCfg)
+		resolved, err = resolveSeedanceImageRef(ctx, scope, ref, index, workspace, production, storeCfg)
 	}
 	if err != nil {
 		msg := err.Error()

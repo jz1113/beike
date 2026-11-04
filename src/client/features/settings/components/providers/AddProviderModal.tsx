@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Server } from 'lucide-react';
 import { PROTOCOL_OPTIONS, type ApiProviderProtocol, type ApiProvider } from '../../model/apiProviderTypes';
+import { providerPresets } from '../../model/providerPresets';
 import { isDashScopeBase } from '@shared/domain/media/imageCapabilities';
 
 interface Props {
@@ -33,6 +34,15 @@ export function AddProviderModal({ isOpen, onClose, onAdd }: Props) {
         setBaseUrl('https://maas.qianwenaiapi.com');
       }
     }
+  };
+
+  const selectPreset = (value: string) => {
+    const preset = providerPresets.find(item => item.name === value);
+    if (!preset) return;
+    handleTypeChange(preset.protocol);
+    setBaseUrl(preset.baseUrl);
+    setName(preset.name);
+    setApiKey('');
   };
 
   const handleBaseUrl = (value: string) => {
@@ -81,6 +91,14 @@ export function AddProviderModal({ isOpen, onClose, onAdd }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
+            从服务商预设填写
+            <select value="" onChange={e => selectPreset(e.target.value)}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-white/10 dark:bg-[#24262b]">
+              <option value="">选择预设，或手动填写下方信息</option>
+              {providerPresets.map(preset => <option key={preset.name}>{preset.name}</option>)}
+            </select>
+          </label>
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
               服务商名称 <span className="text-rose-500">*</span>

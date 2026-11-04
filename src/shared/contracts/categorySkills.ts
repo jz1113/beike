@@ -4,7 +4,7 @@ export const outputReviewScoresSchema = z.object({ productFidelity: z.number().i
 export type OutputReviewScores = z.infer<typeof outputReviewScoresSchema>;
 export interface OutputRating { scores: OutputReviewScores; note?: string }
 
-const sample = z.object({ id: z.string(), title: z.string(), fingerprint: z.string(), role: z.enum(['training', 'holdout']) });
+const sample = z.object({ id: z.string(), displayNumber: z.number().int().positive().optional(), title: z.string(), fingerprint: z.string(), role: z.enum(['training', 'holdout']) });
 const memoryNote = z.object({ id: z.string(), kind: z.enum(['prefer', 'avoid']), content: z.string(), createdAt: z.string() });
 const memoryEntry = z.object({
   observations: z.array(z.object({ shot: z.number(), visual: z.string(), replacement: z.string(), purpose: z.string().optional(), promptTemplate: z.string().optional(), promptExample: z.string().optional() })).optional(),

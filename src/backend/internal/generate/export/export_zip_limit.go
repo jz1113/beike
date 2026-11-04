@@ -117,7 +117,7 @@ func matrixShotCount(payload map[string]any) (int, bool) {
 					shot = number
 				}
 			}
-			if shot >= 1 && shot <= 4 {
+			if shot >= 1 && shot <= maxMatrixShot {
 				shots[shot] = struct{}{}
 			}
 		}

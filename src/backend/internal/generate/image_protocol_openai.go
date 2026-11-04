@@ -15,6 +15,16 @@ func (openaiImageProtocol) ID() string { return "openai" }
 
 func (openaiImageProtocol) Submit(req imageRequest) (imageSubmitResult, error) {
 	adapted := buildImagePayloadWithAspect(req.Model, req.Prompt, req.Size, req.AspectRatio, req.Quality, req.ImageQuality, req.Refs)
+	if imageHostIs(req.Base, "comfly.org") {
+		if len(req.Refs) > 0 && comflyJSONEdit(req.Model) {
+			return submitUnifiedImageEdit(req, adapted)
+		}
+		if adapted.family == "gemini-nano" {
+			tier, _ := adapted.payload["image_size"].(string)
+			adapted.modelID = comflyGeminiImageModel(req.Base, req.Model, tier)
+			adapted.payload["model"] = adapted.modelID
+		}
+	}
 	if !adapted.useEdits && len(req.Refs) > 0 {
 		resolved, err := dashscopeImageRefs(req)
 		if err != nil {

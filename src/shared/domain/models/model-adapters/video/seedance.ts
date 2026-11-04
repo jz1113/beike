@@ -20,6 +20,7 @@ export function buildSeedanceOfficialPayload(input: VideoAdapterInput, model: st
     for (const url of images) content.push({ type: 'image_url', image_url: { url }, role: 'reference_image' });
   }
   for (const url of input.videos || []) content.push({ type: 'video_url', video_url: { url }, role: 'reference_video' });
+  for (const url of input.audios || []) content.push({ type: 'audio_url', audio_url: { url }, role: 'reference_audio' });
   const locked = isSeedance25(model) && (framed || mode === 'edit' || mode === 'extend');
   const payload: Record<string, unknown> = {
     model, content,

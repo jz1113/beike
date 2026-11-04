@@ -15,6 +15,10 @@ describe('sales reference confirmation', () => {
     expect(salesReferenceReviewKey({ ...assembled, references: assembled.references.map((slot) => ({ ...slot, url: '/replacement.jpg' })) }, bindings, 'script-1')).not.toBe(key);
     expect(salesReferenceReviewKey(assembled, bindings.map((binding) => ({ ...binding, image: images[1] })), 'script-1')).not.toBe(key);
     expect(salesReferenceReviewKey({ ...assembled, warnings: ['缺少人物参考'] }, bindings, 'script-1')).not.toBe(key);
+    expect(salesReferenceReviewKey({ ...assembled, audios: ['/new-voice.mp3'] }, bindings, 'script-1')).not.toBe(key);
+    expect(salesReferenceReviewKey({ ...assembled, voiceIds: ['eve'] }, bindings, 'script-1')).not.toBe(key);
+    expect(salesReferenceReviewKey({ ...assembled, voiceIds: ['eve'] }, bindings, 'script-1'))
+      .not.toBe(salesReferenceReviewKey({ ...assembled, voiceIds: ['leo'] }, bindings, 'script-1'));
     expect(salesReferenceReviewKey(assembled, bindings, 'script-2')).not.toBe(key);
   });
 

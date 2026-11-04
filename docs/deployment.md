@@ -142,11 +142,13 @@ pnpm run setup:depth-model
 
 `setup:depth-env` 检查 FFmpeg、ffprobe 与 Python 环境，并验证视频编码与探测链路；`setup:depth-model` 准备深度模型。FFmpeg 与 ffprobe 分别由 `@ffmpeg-installer/ffmpeg` 和 `@ffprobe-installer/ffprobe` 按当前操作系统和架构安装，执行权限由安装脚本自动处理。Go 解析安装器的真实目录以兼容 pnpm 链接结构，并转换 Windows、x64 与 ia32 平台名称；内置工具不可用时回退到系统 PATH。部署时在目标机器运行 `pnpm install --frozen-lockfile`，不要跨操作系统复制 node_modules，也不要使用 `--no-optional` 跳过媒体二进制。
 
-推理入口为 `tools/scripts/depth/infer_video_depth.py`，同目录 `depth_runtime.py` 与 `depth_processing.py` 必须一起部署。`setup:depth-model` 一次安装 requirements 中的依赖并检查环境，首次实际推理时下载权重。环境检查可单独执行：
+推理入口为 `tools/scripts/depth/infer_video_depth.py`，同目录 `depth_runtime.py`、`depth_processing.py` 与 `depth_subject.py` 必须一起部署。`setup:depth-model` 一次安装 requirements 中的依赖并检查环境，首次实际推理时下载权重。环境检查可单独执行：
 
 ```bash
 python3 tools/scripts/depth/infer_video_depth.py --check-env
 ```
+
+动作捕捉视频从原始 RGB 帧逐帧提取人物蒙版，使用 `nvidia/segformer-b0-finetuned-ade-512-512`（首次运行自动下载并缓存）。按原片亮度边缘细化蒙版，利用当前帧深度补回与人物相连的漏分区域，保留与背景同深度的肢体间隙，再将人物深度映射为亮白轮廓，保留轻微灰度变化，背景置为纯黑；无人帧输出黑帧。标准档使用 518 像素推理并逐帧估计深度，避免跳帧插值及跨帧中值导致动作边缘模糊。该步骤增加逐帧推理开销；人物分割权重加载失败会使任务报错。原始灰度、伪彩色和深度图片沿用原有处理。已有深度视频无法恢复原片中已丢失的外观细节，建议上传原视频重新生成。
 
 `pnpm run setup:depth-env` 使用 `DEPTH_VIDEO_PYTHON` 指定的解释器；不设置时使用 `python3`。
 

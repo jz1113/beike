@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { prepareGenerationAttempt } from '@client/shared/media/generationAttempt';
+import { isTaskVideoReference } from '@client/shared/media/mediaHelper';
+import { registerRefMediaKind, unregisterRefMedia } from '@client/shared/media/refMediaRegistry';
 import { resolvePromptPlaceholder } from './promptBarDisplay';
 import { buildPromptBarGenerationTasks, buildPromptBarSubjects, canSubmitPromptBar, type PromptBarSubmitInput } from './promptBarSubmit';
 
@@ -33,6 +36,24 @@ function input(currentView: string): PromptBarSubmitInput {
 }
 
 describe('buildPromptBarGenerationTasks session', () => {
+  it('remembers which library reference is a video after its URL registry is gone', () => {
+    const still = '/storage/blue-train.png';
+    const clip = '/storage/library/opaque-clip';
+    registerRefMediaKind(clip, 'video');
+    try {
+      const result = buildPromptBarGenerationTasks({ ...input('home'), quickGenMode: 'video',
+        quickVideoModel: 'doubao-seedance-2.0-mini', quickRefImages: [still, clip] });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const archived = JSON.parse(JSON.stringify(result.tasks[0]));
+      unregisterRefMedia(clip);
+      expect(isTaskVideoReference(archived, clip)).toBe(true);
+      expect(isTaskVideoReference(archived, still)).toBe(false);
+    } finally {
+      unregisterRefMedia(clip);
+    }
+  });
+
   it('keeps later image and video generations in the current conversation or canvas', () => {
     const generate = buildPromptBarGenerationTasks(input('generate'));
     const canvas = buildPromptBarGenerationTasks({ ...input('canvas'), quickGenMode: 'video', quickPrompt: '镜头推进' });
@@ -40,6 +61,20 @@ describe('buildPromptBarGenerationTasks session', () => {
     expect(generate.ok && generate.shouldCreateNewSession).toBe(false);
     expect(canvas.ok && canvas.shouldCreateNewSession).toBe(false);
     expect(home.ok && home.shouldCreateNewSession).toBe(true);
+  });
+
+  it.each(['FAILURE', 'SUCCESS'] as const)('preserves the home prompt and references on a new attempt after %s', async (status) => {
+    const prompt = '杯子向右旋转\n镜头向左平移';
+    const refs = ['/storage/cup.png'];
+    const result = buildPromptBarGenerationTasks({ ...input('home'), quickPrompt: prompt, quickRefImages: refs });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const task = result.tasks[0];
+    expect(task.prompt).toBe(prompt);
+    const retry = await prepareGenerationAttempt({ ...task, status }, 'retry');
+    expect(retry?.id).not.toBe(task.id);
+    expect(retry?.prompt).toBe(prompt);
+    expect(retry?.referenceImages).toEqual(refs);
   });
 
   it('correctly creates audio task when mode is audio', () => {

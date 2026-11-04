@@ -1,4 +1,5 @@
 import { isDeliverableWorkshopResult, isUsableWorkshopResult } from '../../model/generation/workshopReadiness';
+import { contentPlanLabel } from '../../model/analysis/workshopContentPlan';
 import { ZoomIn } from 'lucide-react';
 import LazyProxyImage from '@client/shared/ui/LazyProxyImage';
 import { BatchProductItem } from '../../model/batchTypes';
@@ -23,9 +24,9 @@ export function BatchStage4GalleryView({
   readOnly = false,
 }: BatchStage4GalleryViewProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {successfulItems.map((item) => {
-        const tasks = item.tasks || [];
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,400px),1fr))] gap-4">
+      {successfulItems.map((item, index) => {
+        const tasks = item.tasks.filter(task => task.resultStatus !== 'superseded');
         const successTasks = tasks.filter(isUsableWorkshopResult);
         const previewUrls = successTasks.map(t => t.resultUrl).filter((url): url is string => !!url);
 
@@ -39,12 +40,13 @@ export function BatchStage4GalleryView({
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-bold text-slate-900 truncate dark:text-slate-100">{item.title}</h4>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {item.contentPlan && <span className="block">{contentPlanLabel(item)}</span>}
                   {successTasks.length}/{tasks.length} 张已完成
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setActiveItemIndex(successfulItems.findIndex(i => i.id === item.id))}
+                onClick={() => setActiveItemIndex(index)}
                 className="shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
               >
                 查看详情
@@ -64,7 +66,7 @@ export function BatchStage4GalleryView({
                         setPreviewImageUrl(task.resultUrl!);
                       }
                   };
-                  return <div key={task.id} className="relative aspect-[3/4] rounded-xl overflow-hidden bg-slate-100 group dark:bg-white/10">
+                  return <div key={task.id} style={{ aspectRatio: task.outputSize?.replace('x', ' / ') }} className="relative aspect-[var(--workshop-output-aspect,3/4)] rounded-xl overflow-hidden bg-slate-100 group dark:bg-white/10">
                     <button type="button"
                       aria-label={`分镜 ${task.shot_no}：${canReview ? excluded ? '点击恢复采用' : '点击不采用' : '放大预览'}`}
                       aria-pressed={canReview ? excluded : undefined}
@@ -73,7 +75,7 @@ export function BatchStage4GalleryView({
                       className={`h-full w-full cursor-pointer transition-[filter,opacity] focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-indigo-500 disabled:cursor-wait ${excluded ? 'grayscale opacity-35' : ''}`}>
                     <LazyProxyImage
                       src={task.resultUrl!}
-                      alt={`成图 ${idx + 1}`}
+                      alt={`成图 ${task.shot_no}`}
                       className="w-full h-full !object-contain"
                       thumb={true}
                       width={600}

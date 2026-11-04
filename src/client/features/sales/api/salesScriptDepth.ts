@@ -6,6 +6,7 @@ export async function waitScriptDepth(taskId: string, signal: AbortSignal, onPro
   const deadline = Date.now() + 30 * 60_000;
   while (!signal.aborted && Date.now() < deadline) {
     const result = await pollDepthVideoTask(taskId, signal);
+    signal.throwIfAborted();
     if (result.status === 'FAILURE') throw new ScriptDepthFailed(result.failReason || '深度转换失败');
     if (result.status === 'SUCCESS' && result.resultUrl) return result.resultUrl;
     onProgress(`深度动作视频处理中 ${result.progress || ''}`);

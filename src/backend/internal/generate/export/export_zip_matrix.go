@@ -12,6 +12,8 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+const maxMatrixShot = 8
+
 func buildTextMatrix(cfg config.Config, r *http.Request, payload map[string]any) (string, map[string][]byte, string, int) {
 	products, ok := payload["products"].([]any)
 	if !ok || len(products) == 0 || !matrixTextOnly(cfg, products) {
@@ -25,6 +27,7 @@ func buildTextMatrix(cfg config.Config, r *http.Request, payload map[string]any)
 	var items []matrixSummaryItem
 	succeeded := 0
 	failed := 0
+	linkColumns := 4
 	for index, item := range products {
 		product := item.(map[string]any)
 		productID := strings.TrimSpace(exportString(product, "skuId"))
@@ -45,15 +48,18 @@ func buildTextMatrix(cfg config.Config, r *http.Request, payload map[string]any)
 		if copy != "" {
 			files[joinMatrixPath(folder, "文案.txt")] = []byte(copy)
 		}
-		links := []string{"", "", "", ""}
+		links := make([]string, maxMatrixShot)
 		shots, ok := matrixDataShots(cfg, product["images"].([]any))
 		if !ok {
 			return "", nil, "", 0
 		}
-		for _, shot := range []int{1, 2, 3, 4} {
+		for shot := 1; shot <= maxMatrixShot; shot++ {
 			image, exists := shots[shot]
 			if !exists {
 				continue
+			}
+			if shot > 4 {
+				linkColumns = maxMatrixShot
 			}
 			body, _, err := readExportMedia(cfg, r, image.raw, false)
 			sniffed, sniffedOK := sniffedImageExt(body)
@@ -74,10 +80,8 @@ func buildTextMatrix(cfg config.Config, r *http.Request, payload map[string]any)
 		if name == "" {
 			name = strings.TrimSpace(exportString(product, "productTitle"))
 		}
-		rows = append(rows, []string{
-			name, strings.TrimSpace(exportString(product, "category")), productID,
-			links[0], links[1], links[2], links[3], title, copy, group,
-		})
+		row := append([]string{name, strings.TrimSpace(exportString(product, "category")), productID}, links...)
+		rows = append(rows, append(row, title, copy, group))
 	}
 	if succeeded == 0 {
 		if failed == 0 {
@@ -88,7 +92,7 @@ func buildTextMatrix(cfg config.Config, r *http.Request, payload map[string]any)
 	filename := singleName
 	if !single {
 		filename = sanitizeExportName(exportString(payload, "batchTitle"), "贝壳云图_批量生图矩阵")
-		sheet, err := matrixSheet(rows)
+		sheet, err := matrixSheet(rows, linkColumns)
 		if err != nil {
 			return "", nil, "", 0
 		}
@@ -148,7 +152,7 @@ func matrixDataShots(cfg config.Config, images []any) (map[int]matrixImage, bool
 		default:
 			return nil, false
 		}
-		if shot < 1 || shot > 4 {
+		if shot < 1 || shot > maxMatrixShot {
 			continue
 		}
 		if !matrixImageSource(cfg, raw) {
@@ -240,18 +244,23 @@ func sniffedImageExt(body []byte) (string, bool) {
 	return "", false
 }
 
-func matrixSheet(rows [][]string) ([]byte, error) {
+func matrixSheet(rows [][]string, linkColumns int) ([]byte, error) {
 	file := excelize.NewFile()
 	defer file.Close()
 	const sheet = "生成成果清单"
 	if err := file.SetSheetName("Sheet1", sheet); err != nil {
 		return nil, err
 	}
-	headers := []string{"商品名称", "商品类目", "商品id", "生成图片链接1", "生成图片链接2", "生成图片链接3", "生成图片链接4", "标题", "文案", "对应生成的提示词资产分组组名"}
+	headers := []string{"商品名称", "商品类目", "商品id"}
+	for shot := 1; shot <= linkColumns; shot++ {
+		headers = append(headers, "生成图片链接"+generate.Itoa(shot))
+	}
+	headers = append(headers, "标题", "文案", "对应生成的提示词资产分组组名")
 	if err := file.SetSheetRow(sheet, "A1", &headers); err != nil {
 		return nil, err
 	}
 	for index, row := range rows {
+		row = append(row[:3+linkColumns], row[3+maxMatrixShot:]...)
 		cell, err := excelize.CoordinatesToCellName(1, index+2)
 		if err != nil {
 			return nil, err

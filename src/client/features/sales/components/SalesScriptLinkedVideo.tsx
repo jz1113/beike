@@ -3,7 +3,7 @@ import { Layers, Link2, Loader2, Upload } from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import type { SalesActionCandidate } from '@shared/domain/sales';
 import { fetchSalesStudioAssets } from '../api/salesProduction';
-import { patchSalesScript, uploadScriptVideo, type StoredSalesScript } from '../api/salesScripts';
+import { patchSalesScript, type StoredSalesScript } from '../api/salesScripts';
 import type { SalesScriptDraft } from '../hooks/useSalesScripts';
 import { compareSalesAssetNames } from '../model/salesAssetNames';
 import { salesFocusClass, salesGhostButtonClass } from './salesChrome';
@@ -44,34 +44,28 @@ export function SalesScriptLinkedVideo({ draft, disabled, onSaved, onConvert }: 
     } catch (err) { setError(err instanceof Error ? err.message : '关联失败'); }
     finally { setBusy(false); }
   };
-  const attachSource = async (file: File) => {
-    if (!draft.id) return;
-    setBusy(true); setError('');
-    try {
-      const uploaded = await uploadScriptVideo(file);
-      const saved = await patchSalesScript(draft.id, { videoUrl: uploaded.videoUrl });
-      onSaved(saved);
-      if (!saved.depthVideoUrl) onConvert(saved, file);
-    } catch (err) { setError(err instanceof Error ? err.message : '上传深度转换素材失败'); }
-    finally { setBusy(false); }
-  };
   return <section className="sales-prod-card sales-script-linked-video" aria-label="脚本关联视频">
     <div className="sales-script-linked-previews">
-      {draft.depthVideoUrl && <figure><figcaption><Layers size={13} aria-hidden />深度动作视频</figcaption><video controls playsInline preload="metadata" aria-label="脚本深度动作视频" src={proxyMediaUrl(draft.depthVideoUrl, { asVideo: true })} /></figure>}
+      {draft.depthVideoUrl && <figure><figcaption>深度动作视频</figcaption><video controls playsInline preload="metadata" aria-label="脚本深度动作视频" src={proxyMediaUrl(draft.depthVideoUrl, { asVideo: true })} /></figure>}
     </div>
     {!draft.depthVideoUrl && <p className="sales-card-hint">{pendingDepth
       ? '已有深度处理任务，可查询处理结果。'
       : draft.videoUrl ? '尚未关联深度动作视频，可使用已保存素材补生成，或关联已有深度动作。'
         : '尚未关联深度动作视频。上传源视频生成深度，或关联已有深度动作。'}</p>}
-    <div className="flex flex-wrap gap-2">
-      {canUploadSource && <button type="button" disabled={working} onClick={() => fileInput.current?.click()} className={salesGhostButtonClass}><Upload size={13} />上传视频生成深度</button>}
-      {!draft.depthVideoUrl && (draft.videoUrl || pendingDepth) && <button type="button" disabled={working} onClick={() => onConvert(current)} className={salesGhostButtonClass}><Layers size={13} />{pendingDepth ? '查询关联深度任务' : '补生成深度视频'}</button>}
-      <button type="button" disabled={working} onClick={() => { void loadActions(); }} className={salesGhostButtonClass}>{busy ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />}关联已有深度动作</button>
-    </div>
-    {canUploadSource && <input ref={fileInput} type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" className="hidden" aria-label="上传用于生成深度动作的源视频" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void attachSource(file); }} />}
-    {actions && <div className="flex flex-wrap items-center gap-2">
-      {actions.length ? <><select value={selected} onChange={(e) => setSelected(e.target.value)} disabled={working} aria-label="选择关联深度动作" className={salesFocusClass}><option value="">选择与脚本对应的深度动作</option>{actions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="button" disabled={working || !selected} onClick={() => { void bindAction(); }} className={salesGhostButtonClass}>保存关联</button></> : <p className="sales-card-hint">暂无可关联的深度动作视频，可先补生成。</p>}
-    </div>}
+    <details className="sales-depth-options" open={!draft.depthVideoUrl}>
+      <summary>视频关联与处理</summary>
+      {draft.depthVideoUrl && draft.videoUrl && <p className="sales-card-hint">可从原视频重新处理，新结果完成前保留现有深度视频。</p>}
+      <div className="flex flex-wrap gap-2">
+        {canUploadSource && <button type="button" disabled={working} onClick={() => fileInput.current?.click()} className={salesGhostButtonClass}><Upload size={13} />上传视频生成深度</button>}
+        {!draft.depthVideoUrl && (draft.videoUrl || pendingDepth) && <button type="button" disabled={working} onClick={() => onConvert(current)} className={salesGhostButtonClass}><Layers size={13} />{pendingDepth ? '查询关联深度任务' : '补生成深度视频'}</button>}
+        {draft.depthVideoUrl && draft.videoUrl && <button type="button" disabled={working} onClick={() => onConvert({ ...current, depthVideoUrl: '', depthTaskId: '', depthOperationId: '' })} className={salesGhostButtonClass}><Layers size={13} />从原视频重新生成深度</button>}
+        <button type="button" disabled={working} onClick={() => { void loadActions(); }} className={salesGhostButtonClass}>{busy ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />}关联已有深度动作</button>
+      </div>
+      {canUploadSource && <input ref={fileInput} type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" className="hidden" aria-label="上传用于生成深度动作的源视频" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) onConvert(current,file); }} />}
+      {actions && <div className="flex flex-wrap items-center gap-2">
+        {actions.length ? <><select value={selected} onChange={(e) => setSelected(e.target.value)} disabled={working} aria-label="选择关联深度动作" className={salesFocusClass}><option value="">选择与脚本对应的深度动作</option>{actions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="button" disabled={working || !selected} onClick={() => { void bindAction(); }} className={salesGhostButtonClass}>保存关联</button></> : <p className="sales-card-hint">暂无可关联的深度动作视频，可先补生成。</p>}
+      </div>}
+    </details>
     {error && <p role="alert" className="sales-material-error">{error}</p>}
   </section>;
 }

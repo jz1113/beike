@@ -1,8 +1,9 @@
 import './settingsWorkspace.css';
-import { CANVAS_SETTINGS_PAGES, clearQueuedSettingsSection, peekQueuedSettingsSection, settingsSectionLabel, SETTINGS_NAV_ITEMS, type CanvasSettingsPage, type SettingsNavSection } from './model/settingsNavigation';
+import { CANVAS_SETTINGS_PAGES, clearQueuedSettingsSection, initialCanvasSettingsPage, peekQueuedSettingsSection, settingsSectionLabel, SETTINGS_NAV_ITEMS, type CanvasSettingsPage, type SettingsNavSection } from './model/settingsNavigation';
 import { CanvasPreview } from './components/SettingsPreview';
 import { PetSettingsPanel } from './components/pet/PetSettingsPanel';
 import { LanguageSettingsPanel } from './components/appearance/LanguageSettingsPanel';
+import { LibraryPreferencesPanel } from './components/LibraryPreferencesPanel';
 import { AppearanceSettingsPanel } from './components/appearance/AppearanceSettingsPanel';
 import { useI18n } from '@client/shared/i18n';
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -25,7 +26,17 @@ import { useSettingsConfig } from './hooks/useSettingsConfig';
 import { useCustomModels } from './hooks/useCustomModels';
 import { useGatewayUser } from './hooks/useGatewayUser';
 import { ModalityHubView } from './components/modality/ModalityHubView';
+import { API_PROVIDERS_STORAGE_KEY, API_REMOVED_PROVIDERS_KEY, MODALITY_STORAGE_KEY_PREFIX, readEffectiveModalityModels, readStoredApiProviders, selectableModalityModels } from '@shared/domain/models/modalityStorage';
 import type { ModalityKind } from './model/modalityModelTypes';
+
+function readModalityCounts(): Partial<Record<SettingsNavSection, number>> {
+  const providers = readStoredApiProviders();
+  const kinds: ModalityKind[] = ['chat', 'image', 'video', 'three_d', 'music', 'voice', 'avatar'];
+  return Object.fromEntries(kinds.map(kind => {
+    const {models} = readEffectiveModalityModels(kind);
+    return [kind, selectableModalityModels(models, providers).length];
+  }));
+}
 
 interface Props {
   onBack?: () => void;
@@ -60,7 +71,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   useEffect(() => {
     clearQueuedSettingsSection();
   }, []);
-  const [canvasPage, setCanvasPage] = useState<CanvasSettingsPage>('connections');
+  const [canvasPage, setCanvasPage] = useState<CanvasSettingsPage>(initialCanvasSettingsPage);
   const [showModelBoard, setShowModelBoard] = useState(false);
 
   // 2. 中间选中的 API 接口
@@ -171,14 +182,23 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
     return settingsSectionLabel(navSection, canvasPage);
   }, [showModelBoard, navSection, canvasPage, t]);
 
-  const modalityCounts: Partial<Record<SettingsNavSection, number>> = useMemo(() => ({
-    chat: 48,
-    image: 60,
-    video: 80,
-    three_d: 4,
-    music: 7,
-    voice: 22,
-  }), []);
+  const [modalityCounts, setModalityCounts] = useState(readModalityCounts);
+  useEffect(() => {
+    let active = true;
+    const refresh = () => queueMicrotask(() => {
+      if (active) setModalityCounts(readModalityCounts());
+    });
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === API_PROVIDERS_STORAGE_KEY || event.key === API_REMOVED_PROVIDERS_KEY || event.key.startsWith(MODALITY_STORAGE_KEY_PREFIX)) refresh();
+    };
+    window.addEventListener('models_updated', refresh);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      active = false;
+      window.removeEventListener('models_updated', refresh);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
 
   const gatewayBalanceFormatted = gatewayUser.userInfo?.balanceAvailable === false ? undefined : gatewayUser.userInfo?.quotaFormatted;
   const storageOpen = navSection === 'storage';
@@ -258,7 +278,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
           ) : (
             <div className="flex-1 overflow-y-auto min-h-0 settings-page-scroll p-4 sm:p-6 lg:p-8">
               <div className="settings-page-content w-full min-w-0">
-                {navSection === 'canvas' && <CanvasPreview page={canvasPage} />}
+                {navSection === 'canvas' && (canvasPage === 'pet' ? <PetSettingsPanel /> : <CanvasPreview page={canvasPage} />)}
                 {navSection === 'pet' && <PetSettingsPanel />}
                 {['chat', 'image', 'video', 'three_d', 'music', 'voice', 'avatar'].includes(navSection) && (
                   <ModalityHubView
@@ -267,6 +287,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                   />
                 )}
                 {navSection === 'language' && <LanguageSettingsPanel />}
+                {navSection === 'library' && <LibraryPreferencesPanel />}
                 {navSection === 'profile' && (
                   <UsageTab
                     usageRange={usageRange}

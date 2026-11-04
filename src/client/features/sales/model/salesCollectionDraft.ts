@@ -1,3 +1,4 @@
+import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
 import { readProductVariantMetadata } from '@shared/domain/collection/productVariants';
 import {
   buildSalesImageCatalog,
@@ -118,19 +119,34 @@ export function parseSalesCollection(value: unknown): SalesCollectionState {
   };
 }
 
+// Keep the legacy unscoped draft in place. Only the first local workspace that
+// opens it may migrate it; changing workspace must never reopen the other draft.
+function collectionStorage() {
+  const storage = window.localStorage;
+  const workspace = getWorkspaceSecret();
+  const ownerKey = SALES_COLLECTION_STORAGE_KEY + '.legacy-owner';
+  let owner = storage.getItem(ownerKey);
+  if (!owner) { storage.setItem(ownerKey, workspace); owner = workspace; }
+  return { storage, key: SALES_COLLECTION_STORAGE_KEY + '.' + workspace, allowLegacy: owner === workspace };
+}
+
 export function readSalesCollection(): SalesCollectionState {
   if (typeof window === 'undefined') return emptySalesCollection();
-  for (const key of [SALES_COLLECTION_STORAGE_KEY, ...LEGACY_KEYS]) {
-    try {
-      const saved = window.localStorage.getItem(key);
-      if (saved) return parseSalesCollection(JSON.parse(saved));
-    } catch { /* Try an older draft if this entry is unavailable or corrupt. */ }
-  }
+  try {
+    const {storage, key, allowLegacy} = collectionStorage();
+    for (const candidate of [key, ...(allowLegacy ? [SALES_COLLECTION_STORAGE_KEY, ...LEGACY_KEYS] : [])]) {
+      try {
+        const raw = storage.getItem(candidate);
+        if (raw) return parseSalesCollection(JSON.parse(raw));
+      } catch { /* Continue to the next eligible local version. */ }
+    }
+  } catch { /* A restricted browser can still edit in memory. */ }
   return emptySalesCollection();
 }
 
 export function writeSalesCollection(state: SalesCollectionState): void {
-  window.localStorage.setItem(SALES_COLLECTION_STORAGE_KEY, JSON.stringify(parseSalesCollection(state)));
+  const {storage, key} = collectionStorage();
+  storage.setItem(key, JSON.stringify(parseSalesCollection(state)));
 }
 
 export function hasSalesCollection(state: SalesCollectionState): boolean {

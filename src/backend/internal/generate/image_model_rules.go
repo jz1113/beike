@@ -35,7 +35,7 @@ func imageModelRuleError(payload map[string]json.RawMessage, model string) strin
 		requested = strings.TrimSpace(rawString(payload, "aspectRatio"))
 	}
 	if requested == "" {
-		requested = "2448x3264"
+		requested = "2048x2048"
 	}
 	if regexp.MustCompile(`(?i)^[3-9]k$`).MatchString(requested) {
 		return "seedream-v5-pro 仅支持 1K～2K，请调整分辨率。"
@@ -55,6 +55,23 @@ func imageModelRuleError(payload map[string]json.RawMessage, model string) strin
 		return "seedream-v5-pro 当前比例超出已验证的 1K～2K 尺寸范围，请选择 1:1、3:4、4:3、9:16 或 16:9。"
 	}
 	return ""
+}
+
+func seedreamPixelSize(size string) string {
+	switch strings.ToLower(strings.TrimSpace(size)) {
+	case "1k", "1024":
+		return "1024x1024"
+	case "2k", "2048", "":
+		return "2048x2048"
+	}
+	if strings.Contains(strings.ToLower(size), "x") {
+		return strings.ReplaceAll(strings.ToLower(size), " ", "")
+	}
+	parts := strings.Split(aspectRatioFromSize(size), ":")
+	w, _ := strconv.Atoi(parts[0])
+	h, _ := strconv.Atoi(parts[1])
+	scale := 2048.0 / float64(max(w, h))
+	return strconv.Itoa(int(float64(w)*scale+0.5)) + "x" + strconv.Itoa(int(float64(h)*scale+0.5))
 }
 
 func referenceCount(payload map[string]json.RawMessage) int {

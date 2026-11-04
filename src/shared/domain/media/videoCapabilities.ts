@@ -1,5 +1,7 @@
 import { canonicalModelId } from '@shared/domain/models/modelCatalog';
 import { getVideoModelById } from './video';
+import { isMetasoH3 } from './videoChannels';
+import { grokPresetVoicesAllowed } from './grokVoices';
 
 export const VIDEO_GENERATION_MODES = [
   { id: 'omni', name: '全能参考', desc: '参考图片或视频的主体、场景或动作' },
@@ -13,6 +15,12 @@ export const VIDEO_GENERATION_MODES = [
 export const isSeedance25 = (id: string) => /seedance-2[.-]5/i.test(id);
 export const isSeedance = (id: string) => /seedance/i.test(id);
 
+/** Reference audio input is distinct from a model's generated-audio switch. */
+export function referenceAudioAllowed(model: string) {
+  const id = canonicalModelId(model).toLowerCase();
+  return /seedance-2[.-](?:0|5)(?:\D|$)/.test(id) || /^wan3\.0-video(?:-prime)?$/.test(id) || id === 'viduq4-preview' || id === 'minimax-h3';
+}
+
 const FULL_MODES = ['omni', 'first_frame', 'first_last_frame', 'text'];
 const FRAME_MODES = ['first_frame', 'first_last_frame', 'text'];
 const SEEDANCE_MODES = ['omni', 'first_frame', 'first_last_frame', 'text', 'edit', 'extend'];
@@ -25,7 +33,7 @@ export function videoModeIds(model: string) {
   if (id === 'viduq3-pro') return FRAME_MODES;
   if (id === 'viduq3-turbo') return FULL_MODES;
   if (id === 'viduq4-preview') return ['omni', 'first_frame'];
-  if (/omni[_-]flash|gemini-omni/.test(id)) return SEEDANCE_MODES;
+  if (id === 'omni_flash-10s') return ['omni', 'text', 'edit'];
   if (/^veo3\.1/.test(id)) return FULL_MODES;
   if (/sora/.test(id)) return ['first_frame', 'text'];
   if (/grok/.test(id)) return [...FULL_MODES, 'edit', 'extend'];
@@ -36,12 +44,13 @@ export function videoModeIds(model: string) {
 }
 
 export function videoModes(model: string) {
-  const id = model.toLowerCase();
+  const id = canonicalModelId(model).toLowerCase();
   return VIDEO_GENERATION_MODES.filter(mode => videoModeIds(model).includes(mode.id)).map(mode => {
     if (mode.id !== 'omni') return mode;
-    if (/minimax|hailuo/.test(id) || id === 'h3') return { ...mode, desc: '可混合参考图片与视频，一张参考图也不会被当成首帧' };
+    if (id === 'minimax-h3') return { ...mode, desc: '可混合参考图片、视频与音频，一张参考图也不会被当成首帧' };
+    if (/minimax|hailuo/.test(id)) return { ...mode, desc: '可混合参考图片与视频，一张参考图也不会被当成首帧' };
     if (isSeedance(id)) return { ...mode, desc: '全模态参考图片或视频；一张参考图也不会被当成首帧' };
-    if (/omni[_-]flash|gemini-omni/.test(id)) return { ...mode, desc: '最多 7 张参考图、3 个参考视频，支持多模态参考' };
+    if (/omni[_-]flash|gemini-omni/.test(id)) return { ...mode, desc: '图片和视频合计最多 7 项' };
     if (/^veo3\.1/.test(id)) return { ...mode, desc: '最多 3 张参考图，不能与首尾帧同时使用' };
     if (/grok/.test(id)) return { ...mode, desc: '最多 14 张参考图，不锁定为首帧' };
     return mode;
@@ -63,29 +72,65 @@ export function resolveVideoMode(model: string, mode: string | undefined = undef
   return normalized;
 }
 
-export function videoResolutionLabel(model: string, resolution: string) {
-  return /minimax-h3/i.test(model) ? ({ '720P': '768P', '1080P': '2K' }[resolution] || resolution) : resolution;
+export function videoResolutionLabel(model: string, resolution: string, baseUrl?: string) {
+  return canonicalModelId(model).toLowerCase() === 'minimax-h3' && !isMetasoH3(model, baseUrl)
+    ? ({ '720P': '768P', '1080P': '2K' }[resolution] || resolution) : resolution;
 }
 
 export function videoRatioLocked(model: string, mode: string) {
   return isSeedance25(model) && ['first_frame', 'first_last_frame', 'edit', 'extend'].includes(mode);
 }
 
-export function videoDurationOptions(model: string, resolution: string, mode = 'text') {
+export function videoDurationOptions(model: string, resolution: string, mode = 'text', baseUrl?: string) {
   const canonical = canonicalModelId(model).toLowerCase();
+  if (isMetasoH3(model, baseUrl)) return Array.from({ length: 12 }, (_, index) => index + 4);
   if (/^veo-?3\.1/.test(canonical) && (resolution !== '720P' || mode === 'omni' || mode === 'first_last_frame')) return [8];
   const durations = getVideoModelById(model)?.supportedDurations || [5];
   if (/grok/i.test(model) && mode === 'extend') return durations.filter(value => value >= 2 && value <= 10);
   return /^vidu/.test(model) && mode === 'omni' ? durations.filter(value => value >= 3) : durations;
 }
 
+export function videoResolutionOptions(model: string, mode: string, baseUrl?: string, hasVoiceReferences = false) {
+  const resolutions = getVideoModelById(model, baseUrl)?.supportedResolutions;
+  return /grok/i.test(model) && (['omni', 'first_last_frame'].includes(mode) || hasVoiceReferences)
+    ? resolutions?.filter((resolution) => resolution === '480P' || resolution === '720P') : resolutions;
+}
+
 export function videoInputError(input: {
-  model: string; refMode?: string; images?: string[]; videos?: string[];
-  duration?: number; resolution?: string; aspectRatio?: string;
+  model: string; refMode?: string; images?: string[]; videos?: string[]; audios?: string[]; audio?: boolean;
+  duration?: number; resolution?: string; aspectRatio?: string; baseUrl?: string; voiceIds?: readonly string[];
 }): string | null {
-  const { model, images = [], videos = [], refMode = 'omni' } = input;
-  const config = getVideoModelById(model);
+  const { model, images = [], videos = [], audios = [], refMode = 'omni' } = input;
+  const config = getVideoModelById(model, input.baseUrl);
   const mode = resolveVideoMode(model, refMode, images.length, videos.length);
+  if (/grok/i.test(model) && input.baseUrl) {
+    let host = '';
+    try { host = new URL(input.baseUrl).hostname.toLowerCase(); } catch { /* Gateway URL validation reports malformed addresses. */ }
+    if (host === 'us.api.x.ai') return 'Grok 美国区域端点暂不提供视频接口，请使用官方全球地址 https://api.x.ai/v1';
+    if ((host === 'api.x.ai' || host.endsWith('.api.x.ai')) && grokPresetVoicesAllowed(model) && ['edit', 'extend'].includes(mode)) {
+      return 'Grok 1.5 官方接口暂不支持编辑或延长，请切换生成方式；这两种方式需使用 grok-imagine-video';
+    }
+  }
+  if (input.voiceIds?.length) {
+    if (!grokPresetVoicesAllowed(model)) return '当前模型不支持 Grok 官方预置音色，请切换 Grok 1.5 或重新选择声音';
+    if (['edit', 'extend'].includes(mode)) return 'Grok 视频编辑与延长不支持预置音色，请切换生成方式';
+    if (audios.length) return 'Grok 预置音色不能与音频文件混用，请保留一种声音参考';
+    if (input.voiceIds.length > 3 || input.voiceIds.some((id) => !id.trim() || id.length > 64)) return 'Grok 最多支持 3 个有效预置音色';
+    if (input.audio === false) return 'Grok 预置音色需要开启生成声音';
+  }
+  if (audios.length) {
+    if (/grok/i.test(model)) return 'Grok 官方普通接口仅支持预置音色，自有音频文件需 xAI 合作伙伴权限；请选择 Grok 预置音色，或改用画外旁白后期合成';
+    if (!referenceAudioAllowed(model)) return '当前模型尚未接入参考音频，请切换支持音频参考的 Seedance 2.0 / 2.5、MiniMax-H3、万相 3.0 或 Vidu Q4';
+    if (mode !== 'omni') return '参考音频仅支持全能参考模式，请切换生成方式';
+    if (input.audio === false) return '参考音频需要开启生成声音，不能在无声视频中使用';
+    if (isSeedance(model)) {
+      const maxMaterials = isSeedance25(model) ? 50 : 12;
+      if (images.length + videos.length + audios.length > maxMaterials) return `当前模型的图片、视频与音频合计最多 ${maxMaterials} 个素材`;
+    }
+    const maxAudios = isSeedance25(model) ? 10 : isSeedance(model) || ['viduq4-preview', 'minimax-h3'].includes(canonicalModelId(model).toLowerCase()) ? 3 : 5;
+    if (audios.length > maxAudios) return `当前模型最多支持 ${maxAudios} 个参考音频`;
+    if (isSeedance(model) && !isSeedance25(model) && !images.length && !videos.length) return 'Seedance 2.0 参考音频需要至少搭配一张图片或一段视频';
+  }
   if (!videoModes(model).some(item => item.id === mode)) return '当前模型尚未接入这种生成方式，请切换模式';
   if (mode === 'text' && (images.length || videos.length)) return '文生视频不使用参考素材，请移除素材或切换生成方式';
   if (mode === 'first_frame' && (images.length !== 1 || videos.length)) return '首帧模式需要一张图片';
@@ -99,10 +144,10 @@ export function videoInputError(input: {
     const maxViduImages = canonical === 'viduq4-preview' ? 15 : 7;
     if (images.length > maxViduImages) return `Vidu 最多支持 ${maxViduImages} 张参考图片`;
   }
-  if (/omni[_-]flash|gemini-omni/.test(canonical) && (images.length > 7 || videos.length > 3)) return 'Omni Flash 最多支持 7 张参考图片、3 个参考视频';
+  if (/omni[_-]flash|gemini-omni/.test(canonical) && images.length + videos.length > 7) return 'Omni Flash 最多支持 7 项参考素材（图片与视频合计）';
   if (/^veo-?3\.1/.test(canonical) && mode === 'omni' && images.length > 3) return 'Veo 最多支持 3 张参考图片';
   if (/^wan3/.test(model) && (images.length > 10 || videos.length > 5)) return '万相最多支持 10 张参考图、5 个参考视频';
-  if (/minimax-h3/i.test(model) && (images.length > 9 || videos.length > 3 || images.length + videos.length > 12)) return 'H3 最多支持 9 张参考图、3 个参考视频，合计不超过 12 个素材';
+  if (canonical === 'minimax-h3' && (images.length > 9 || videos.length > 3 || images.length + videos.length > 12)) return 'H3 最多支持 9 张参考图、3 个参考视频，合计不超过 12 个素材';
   if (/grok-imagine-video/i.test(model) && mode === 'omni' && images.length > 14) return 'Grok 最多支持 14 张参考图片';
   if (grokClip && (videos.length !== 1 || images.length)) return '请添加一段需要编辑或延长的视频';
   if (/kling.*omni/.test(model) && images.length > 7) return '可灵 Omni 最多支持 7 张参考图片';
@@ -111,13 +156,20 @@ export function videoInputError(input: {
     const maxVideos = isSeedance25(model) ? 10 : 3;
     if (images.length > maxImages || videos.length > maxVideos) return `当前模型最多支持 ${maxImages} 张参考图、${maxVideos} 个参考视频`;
   }
-  if (input.resolution && config && !config.supportedResolutions.some(value => value === input.resolution!.toUpperCase())) return '当前模型不支持所选清晰度，请重新选择';
+  const resolution = canonical === 'minimax-h3'
+    ? isMetasoH3(model, input.baseUrl)
+      ? input.resolution?.toUpperCase() === '720P' ? '768P' : input.resolution
+      : ({ '768P': '720P', '2K': '1080P' }[input.resolution?.toUpperCase() || ''] || input.resolution)
+    : input.resolution;
+  if (/grok/i.test(model) && (['omni', 'first_last_frame'].includes(mode) || input.voiceIds?.length) && resolution?.toUpperCase() === '1080P') return 'Grok 参考生成与首尾帧最高支持 720P，请调整清晰度';
+  if (resolution && config && !config.supportedResolutions.some(value => value === resolution.toUpperCase())) return '当前模型不支持所选清晰度，请重新选择';
   if (input.aspectRatio && config && !config.supportedAspectRatios.includes(input.aspectRatio)) return '当前模型不支持所选比例，请重新选择';
-  if (input.duration !== undefined && mode !== 'edit' && !(input.duration === -1 && (isSeedance(model) || /^wan3/.test(model)))
-    && !videoDurationOptions(model, input.resolution?.toUpperCase() || '720P', mode).includes(input.duration)) return '当前模型、清晰度与生成方式不支持所选时长，请重新选择';
+  if (input.duration !== undefined && (mode !== 'edit' || canonical === 'omni_flash-10s') && !(input.duration === -1 && (isSeedance(model) || /^wan3/.test(model)))
+    && !videoDurationOptions(model, input.resolution?.toUpperCase() || '720P', mode, input.baseUrl).includes(input.duration)) return '当前模型、清晰度与生成方式不支持所选时长，请重新选择';
   return null;
 }
 
 function referenceVideoAllowed(model: string) {
-  return isSeedance(model) || /^wan3/.test(model) || /minimax-h3/i.test(model) || /omni[_-]flash|gemini-omni/i.test(model);
+  const id = canonicalModelId(model).toLowerCase();
+  return isSeedance(id) || /^wan3/.test(id) || id === 'minimax-h3' || /omni[_-]flash|gemini-omni/i.test(id);
 }

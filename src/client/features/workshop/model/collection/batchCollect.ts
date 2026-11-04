@@ -2,7 +2,7 @@ import { normalizeCollectedProductImages } from '@shared/domain/collection/produ
 import { apiFetch } from '../../../../shared/api/apiClient';
 import type { BatchProductItem, TypedProductImage } from '../batchTypes';
 import { parseWorkshopProduct } from './parseWorkshopProduct';
-import { workshopProductKey } from './workshopTableImport';
+import { MAX_BATCH_CONTENTS, MAX_IMPORT_PRODUCTS, workshopProductKey } from './workshopTableImport';
 
 export interface ParseBatchInputResult {
   newItems: BatchProductItem[];
@@ -10,16 +10,10 @@ export interface ParseBatchInputResult {
   skipped?: number;
 }
 
-/**
- * 解析多行链接/SKU文本为 BatchProductItem 列表（纯函数）
- */
-export function countBatchInputLines(text: string): number {
-  return text.split(/[\n,;]+/).map((line) => line.trim()).filter(Boolean).length;
-}
-
 export function parseBatchInputLines(
   text: string,
-  existingItemIds: Set<string>
+  existingItemIds: Set<string>,
+  existingContentCount = existingItemIds.size
 ): ParseBatchInputResult {
   const lines = text
     .split(/[\n,;]+/)
@@ -41,7 +35,7 @@ export function parseBatchInputLines(
     // Historical Tmall rows used the Taobao platform identifier.
     const dedupeKey = `${platform === 'tmall' ? 'taobao' : platform}:${itemId}`;
     if (seenIds.has(dedupeKey) || seenIds.has(`${platform}:${itemId}`)) { skipped++; return; }
-    if (existingItemIds.size + newItems.length >= 20) { skipped++; return; }
+    if (seenIds.size >= MAX_IMPORT_PRODUCTS || existingContentCount + newItems.length >= MAX_BATCH_CONTENTS) { skipped++; return; }
     seenIds.add(dedupeKey);
     newItems.push({
       id: `batch_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,

@@ -10,6 +10,7 @@ import {
   isDepthGenMode,
 } from '@shared/domain/media/depthVideo';
 import { normalizeVideoReferenceMentions } from '@client/shared/media/videoReferences';
+import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { normalizeSubjectReferences } from './promptSubjectReferences';
 import {
   collectEffectiveImages,
@@ -72,6 +73,7 @@ export function buildPromptBarGenerationTasks(
     quickDepthStyle,
     quickDepthQuality,
     quickVideoGenerateAudio,
+    quickVideoContextIrEnabled,
   } = input;
 
   if (quickGenMode === 'agent') {
@@ -186,7 +188,7 @@ export function buildPromptBarGenerationTasks(
         );
   }
 
-  const cleanedPrompt = stripWorkshopPromptGuards(cleanPromptText(finalPrompt));
+  const cleanedPrompt = stripWorkshopPromptGuards(cleanPromptText(finalPrompt, true), true);
   const batchId = `batch-${Date.now()}`;
   const batchTimestamp = Date.now();
   const countToGen = quickGenMode === 'video' ? quickVideoCount || 1 : quickCount || 1;
@@ -213,8 +215,10 @@ export function buildPromptBarGenerationTasks(
       videoResolution: quickGenMode === 'video' ? quickVideoResolution : undefined,
       videoRefMode: quickGenMode === 'video' ? quickVideoRefMode : undefined,
       generateAudio: quickGenMode === 'video' ? quickVideoGenerateAudio : undefined,
+      videoContextIrEnabled: quickGenMode === 'video' ? quickVideoContextIrEnabled ?? true : undefined,
       referenceImageUrl: refImg,
       referenceImages: effectiveImages,
+      referenceVideoUrls: effectiveImages.length ? effectiveImages.filter(isVideoMediaUrl) : undefined,
       useReferenceImage: effectiveImages.length > 0,
       status: 'IN_PROGRESS',
       progress: '15%',

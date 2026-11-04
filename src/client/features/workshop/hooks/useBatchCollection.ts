@@ -1,7 +1,7 @@
 import { useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { BatchProductItem } from '../model/batchTypes';
 import { parseBatchInputLines, runBatchCollect } from '../model/collection/batchCollect';
-import { buildWorkshopTableItems, type WorkshopImportRow } from '../model/collection/workshopTableImport';
+import { buildWorkshopTableItems, MAX_BATCH_CONTENTS, MAX_IMPORT_PRODUCTS, workshopProductKey, type WorkshopImportRow } from '../model/collection/workshopTableImport';
 
 interface BatchCollectionOptions {
   items: BatchProductItem[];
@@ -23,7 +23,7 @@ export function useBatchCollection({ items, itemsRef, setItems, batchInputText, 
     setItems((prev) => prev.map((item) => (
       item.id === itemId ? { ...item, selected: false } : item
     )));
-    if (target) showToast(`已放弃商品「${target.title || target.itemId}」`);
+    if (target) showToast(`已跳过图文「${target.title || target.itemId}」`);
   };
 
   const handleTableImport = (rows: WorkshopImportRow[]) => {
@@ -38,14 +38,15 @@ export function useBatchCollection({ items, itemsRef, setItems, batchInputText, 
   const handleParseInput = () => {
     if (collectInFlight.current) return [];
     const { newItems: created, error, skipped } = parseBatchInputLines(
-      batchInputText, new Set(itemsRef.current.map((item) => `${item.platform}:${item.itemId}`)),
+      batchInputText, new Set(itemsRef.current.map(workshopProductKey)), itemsRef.current.length,
     );
     if (error === 'EMPTY_INPUT') {
       showToast('请输入至少一条商品链接或 SKU');
       return [];
     }
     if (error === 'NO_NEW_ITEMS' || created.length === 0) {
-      showToast('没有识别到新的不重复商品');
+      showToast(itemsRef.current.length >= MAX_BATCH_CONTENTS || new Set(itemsRef.current.map(workshopProductKey)).size >= MAX_IMPORT_PRODUCTS
+        ? `本批已达上限（${MAX_IMPORT_PRODUCTS} 款商品或 ${MAX_BATCH_CONTENTS} 条图文），请新建批次` : '没有识别到新的不重复商品');
       return [];
     }
     const nextItems = [...itemsRef.current, ...created];

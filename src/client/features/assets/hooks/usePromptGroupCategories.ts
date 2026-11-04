@@ -6,16 +6,22 @@ import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/as
 export function usePromptGroupCategories(active: boolean) {
   const [categories, setCategories] = useState<AssetProductCategory[]>([]);
   const [albums, setAlbums] = useState<PromptAlbum[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const requestId = useRef(0);
 
   const applyOrganization = useCallback((data: { categories: AssetProductCategory[]; albums: PromptAlbum[] }) => {
     requestId.current += 1;
+    setLoading(false);
+    setError('');
     setCategories(data.categories);
     setAlbums(data.albums);
   }, []);
 
   const refresh = useCallback(async () => {
     const currentRequest = ++requestId.current;
+    setLoading(true);
+    setError('');
     try {
       const response = await apiFetch('/api/catalog/assets/library?view=organization');
       const data = await response.json();
@@ -24,8 +30,12 @@ export function usePromptGroupCategories(active: boolean) {
       setCategories(data.categories || []);
       setAlbums(data.albums || []);
     } catch (error) {
+      if (currentRequest !== requestId.current) return;
+      setError(error instanceof Error ? error.message : '品类加载失败');
       console.warn('[assetLibrary] 商品大类加载失败', error);
       throw error;
+    } finally {
+      if (currentRequest === requestId.current) setLoading(false);
     }
   }, []);
 
@@ -36,5 +46,5 @@ export function usePromptGroupCategories(active: boolean) {
     return unsubscribe;
   }, [active, refresh]);
 
-  return { categories, albums, refresh, applyOrganization };
+  return { categories, albums, loading, error, refresh, applyOrganization };
 }

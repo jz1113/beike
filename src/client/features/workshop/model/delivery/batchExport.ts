@@ -23,10 +23,10 @@ export function exportGeneratedTitle(item: BatchProductItem): string {
   return item.copywriting?.title?.trim() || '';
 }
 
-export function exportFourShots(item: BatchProductItem): BatchTaskItem[] {
+export function exportImageTasks(item: BatchProductItem): BatchTaskItem[] {
   const byShot = new Map<number, BatchTaskItem>();
   for (const task of item.tasks || []) {
-    if (task.shot_no >= 1 && task.shot_no <= 4 && isDeliverableWorkshopResult(task)) {
+    if (task.shot_no >= 1 && task.shot_no <= 8 && isDeliverableWorkshopResult(task)) {
       byShot.set(task.shot_no, task);
     }
   }
@@ -48,7 +48,7 @@ export function isPersistedStorageUrl(url: string): boolean {
 }
 
 export function canNativeOfflineExport(items: BatchProductItem[]): boolean {
-  const urls = items.flatMap(item => exportFourShots(item).map(task => task.resultUrl!));
+  const urls = items.flatMap(item => exportImageTasks(item).map(task => task.resultUrl!));
   return urls.length > 0 && urls.every(isPersistedStorageUrl);
 }
 
@@ -56,11 +56,9 @@ export async function tryNativeOfflineZip(
   items: BatchProductItem[],
   filename: string,
   onProgress: (msg: string) => void,
-  singleProductExport = false,
 ): Promise<ExportZipResult> {
   const result = await exportZipDownload({
     offlineMatrix: true,
-    singleProductExport,
     batchTitle: '贝壳云图_批量生图矩阵',
     products: items.map(item => ({
       skuId: exportProductId(item),
@@ -69,7 +67,7 @@ export async function tryNativeOfflineZip(
       promptAssetGroupName: exportPromptGroupName(item),
       copywritingTitle: exportGeneratedTitle(item),
       copywritingContent: item.copywriting?.content,
-      images: exportFourShots(item)
+      images: exportImageTasks(item)
         .map(task => ({
           url: toStoragePath(task.resultUrl!),
           originalUrl: new URL(

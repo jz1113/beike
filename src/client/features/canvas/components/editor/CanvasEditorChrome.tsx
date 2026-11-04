@@ -1,11 +1,12 @@
-import { Plus, Minus, Scan, MousePointer2, Hand, Upload, Image, Video, Undo2, Redo2, Film, LayoutGrid } from 'lucide-react';
+import { Plus, Minus, Scan, MousePointer2, Hand, Upload, Image, Video, Undo2, Redo2, Film } from 'lucide-react';
 import type { RefObject } from 'react';
 import { useI18n } from '@client/shared/i18n';
-import type { CanvasNode, CanvasProject } from '../../model/types';
+import { isStoryboardShot } from '../../model/studioStoryboard';
+import type { CanvasNode } from '../../model/types';
 
 export interface CanvasEditorChromeProps {
-  viewMode?: 'canvas' | 'storyboard';
-  onToggleViewMode?: (mode: 'canvas' | 'storyboard') => void;
+  viewMode: 'canvas' | 'storyboard';
+  onToggleViewMode: (mode: 'canvas' | 'storyboard') => void;
   openNodeMenuAt: (x: number, y: number) => void;
   handTool: boolean;
   setHandTool: (value: boolean) => void;
@@ -22,21 +23,14 @@ export interface CanvasEditorChromeProps {
   handleCancelTitleEdit: () => void;
   displayProjectTitle: string;
   setIsEditingTitle: (value: boolean) => void;
-  createProject: () => void;
-  projects: CanvasProject[];
-  currentProject: CanvasProject;
   selectProject: (id: string | null) => void;
-  nodes: CanvasProject['nodes'];
+  nodes: CanvasNode[];
   handleResetView: () => void;
   handleZoom: (delta: number) => void;
   zoom: number;
-  addNode: (projectId: string, node: Omit<CanvasNode, 'id' | 'createdAt'> & { id?: string; createdAt?: number }) => void;
-  pan: { x: number; y: number };
   canvasViewportRef: RefObject<HTMLDivElement | null>;
   replacementNodeRef: { current: string | null };
   fileInputRef: RefObject<HTMLInputElement | null>;
-  isAssetSubmenuOpen: boolean;
-  setIsAssetSubmenuOpen: (value: boolean | ((prev: boolean) => boolean)) => void;
   handleOpenAssetModal: (type: 'image' | 'video') => void;
 }
 
@@ -49,41 +43,22 @@ export function CanvasEditorChrome(p: CanvasEditorChromeProps) {
     if (rect) p.openNodeMenuAt(rect.left + Math.min(320, rect.width / 2), rect.top + Math.min(180, rect.height / 3));
   };
   return <>
-    <header className={`canvas-fixed-ui absolute left-4 top-4 z-40 flex h-12 max-w-[calc(100%-2rem)] items-center gap-1 px-2 ${surface}`}>
-      <button type="button" className={button} onClick={p.handleBackToHome} title="贝壳云图 · 返回首页"><img src="/app_logo.png" alt="贝壳云图" className="h-8 w-8 object-contain" /></button>
+    <header className={`canvas-fixed-ui ${p.viewMode === 'storyboard' ? 'relative m-2 self-start shrink-0' : 'absolute left-4 top-4'} z-40 flex h-12 max-w-[calc(100%-2rem)] items-center gap-1 px-2 ${surface}`}>
+      <button type="button" className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs hover:bg-black/5 dark:hover:bg-white/10" onClick={p.handleBackToHome} aria-label="返回首页"><img src="/app_logo.png" alt="" className="h-6 w-6 object-contain" />首页</button>
+      <button type="button" onClick={() => p.selectProject(null)} className="shrink-0 rounded-lg px-2 py-1 text-xs hover:bg-black/5 dark:hover:bg-white/10">项目库</button>
       <div className="mx-1 h-5 w-px bg-slate-100 dark:bg-white/10" />
       <div className="relative min-w-0">
         {p.isEditingTitle ? <input ref={p.titleInputRef} aria-label="项目名称" aria-invalid={!!p.titleError} maxLength={40} value={p.tempTitle} onChange={e=>{p.setTempTitle(e.target.value);p.setTitleError('');}} onFocus={e=>e.target.select()} onBlur={()=>{if(p.skipTitleSaveOnBlurRef.current){p.skipTitleSaveOnBlurRef.current=false;return;}p.handleSaveTitle();}} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();if(e.key==='Escape')p.handleCancelTitleEdit();}} className="w-40 rounded-lg bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white px-2 py-1.5 text-sm outline-indigo-300" /> : <button type="button" aria-label="重命名画布" title="双击重命名画布" onDoubleClick={()=>p.setIsEditingTitle(true)} onKeyDown={e=>{if(e.key==='Enter' || e.key==='F2'){e.preventDefault();p.setIsEditingTitle(true);}}} className="flex max-w-56 items-center gap-5 rounded-lg px-2 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10"><span className="truncate">{p.displayProjectTitle}</span></button>}
         {p.titleError && <p role="alert" className="absolute top-full rounded bg-white dark:bg-[#1B1B1E] p-2 text-xs text-red-600 dark:text-rose-400">{p.titleError}</p>}
       </div>
-      <div className="mx-1 h-5 w-px bg-slate-100 dark:bg-white/10" />
-      <div className="flex items-center gap-0.5 p-0.5 rounded-xl bg-slate-100 dark:bg-white/5">
-        <button
-          type="button"
-          onClick={() => p.onToggleViewMode?.('canvas')}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-            p.viewMode !== 'storyboard'
-              ? 'bg-white dark:bg-[#26262B] text-indigo-600 dark:text-indigo-400 shadow-xs'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <LayoutGrid size={13} />
-          <span>画布</span>
+      {p.viewMode === 'canvas' && p.nodes.some(isStoryboardShot) && (
+        <button type="button" onClick={() => p.onToggleViewMode('storyboard')}
+          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">
+          <Film size={13} />故事板
         </button>
-        <button
-          type="button"
-          onClick={() => p.onToggleViewMode?.('storyboard')}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-            p.viewMode === 'storyboard'
-              ? 'bg-purple-600 text-white shadow-xs'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Film size={13} />
-          <span>故事板</span>
-        </button>
-      </div>
+      )}
     </header>
+    {p.viewMode === 'canvas' && <>
     <div role="toolbar" aria-label="画布工具" className={`canvas-fixed-ui absolute left-4 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-1 p-1.5 ${surface}`}>
       <button className={`${button} bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-700 dark:hover:bg-slate-200 hover:text-white dark:hover:text-slate-900`} title="添加节点" aria-label="添加节点" onClick={openPalette}><Plus size={19}/></button>
       <div className="mx-2 my-1 border-t border-slate-100 dark:border-white/10"/>
@@ -103,6 +78,6 @@ export function CanvasEditorChrome(p: CanvasEditorChromeProps) {
       <button className={button} title="撤销 · ⌘/Ctrl Z" disabled={!p.history.canUndo} onClick={p.history.undo}><Undo2 size={16}/></button>
       <button className={button} title="重做 · ⇧ ⌘/Ctrl Z" disabled={!p.history.canRedo} onClick={p.history.redo}><Redo2 size={16}/></button>
     </div>
-
+    </>}
   </>;
 }

@@ -36,7 +36,13 @@ func guardDepth(cfg config.Config, r *http.Request, kind, operation, fingerprint
 	}
 	key := depthReceiptKey(httpx.WorkspaceFrom(r), kind, operation)
 	if existing, ok := depthInflight.Load(key); ok {
-		result := <-existing.(chan depthResult)
+		flight := existing.(*depthFlight)
+		select {
+		case <-flight.done:
+		case <-r.Context().Done():
+			return 408, map[string]any{"success": false, "error": "查询原任务已取消"}
+		}
+		result := flight.result
 		if result.fingerprint != fingerprint {
 			return http.StatusConflict, map[string]any{"success": false, "error": "同一任务标识不能用于不同的生成内容"}
 		}
@@ -62,17 +68,22 @@ func guardDepth(cfg config.Config, r *http.Request, kind, operation, fingerprint
 		}
 		return http.StatusServiceUnavailable, map[string]any{"success": false, "submissionUnknown": true, "error": "深度任务提交记录暂时无法核对，请查询原任务"}
 	}
-	ch := make(chan depthResult, 1)
-	depthInflight.Store(key, ch)
+	flight := &depthFlight{done: make(chan struct{}), result: depthResult{fingerprint: fingerprint, status: 503, body: map[string]any{"success": false, "submissionUnknown": true, "error": "原深度任务中断，请查询原任务"}}}
+	depthInflight.Store(key, flight)
+	defer close(flight.done)
 	defer depthInflight.Delete(key)
 	status, body := submit()
 	raw, _ := json.Marshal(body)
 	claim.Status = status
 	claim.Body = string(raw)
 	_ = writeDepthReceipt(file, claim)
-	result := depthResult{status: status, body: body, fingerprint: fingerprint}
-	ch <- result
+	flight.result = depthResult{status: status, body: body, fingerprint: fingerprint}
 	return status, body
+}
+
+type depthFlight struct {
+	done   chan struct{}
+	result depthResult
 }
 
 type depthResult struct {

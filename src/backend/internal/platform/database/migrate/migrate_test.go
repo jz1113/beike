@@ -10,8 +10,12 @@ import (
 
 func TestChecksumsMatchNodeLedger(t *testing.T) {
 	want := map[string]string{
+		"20261103_03_library_preferences":                      "3ae477a30011696caa2e67383d612bffa8bb2f85fb7bb12760186675740e6f96",
+		"20261103_02_sales_prompt_template_version":            "a986f484fd3d7455a55bb0119de20215aaa0c6c3413d863b2457a69872256d5d",
+		"20261103_01_sales_media_jobs":                         "3b2499942888b499b4bb895d9ffd28b5c99fc831dff4daf8fd8712c61b293faf",
+		"20261102_02_remove_atlas":                             "4ae029ca1c1a74be21ffcffd0f42f8af20b45b56fcc130d1291b32aded3cab1e",
 		"20261102_01_sales_asset_view_jobs":                    "5291ef17d11a41be8bd79b0bee78940ce62bd10e4e459d07bcabe7478a7ef81e",
-		"20261101_04_sales_products":                           "4302ee43d4b71f31bb17a7a359fcff9863688987cbe66e46f7e274404a8e2db3",
+		"20261101_04_sales_products":                           "d4d1662678a00d3637cefdc74d70ac4bfc3e7ce099a9fd12b5f5543916f69c31",
 		"20261101_03_sales_script_media":                       "0e259cdd77c813e2ea1c50f16a9abd0f040f9edf90fb3f2bdfed2639637b8bd5",
 		"20261101_02_sales_grid_prompts":                       "131b7abc0ca82ae007394d63123ae458fd0951b3f1bf1df68bc24da434c8a2ba",
 		"20261101_01_sales_prompts":                            "f41659e85ca8793570d57619e12a27dfdefa08649ad8105c67fd0fa0250e07eb",

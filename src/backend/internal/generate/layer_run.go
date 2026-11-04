@@ -29,7 +29,14 @@ func runLayer(cfg config.Config, w http.ResponseWriter, r *http.Request, payload
 	}
 	body := map[string]any{
 		"model": model, "image": payload["image"], "prompt": payload["prompt"], "size": size,
-		"layer_decomposition": true, "output_format": "png", "response_format": "url", "watermark": false,
+		"output_format": "png", "response_format": "url",
+	}
+	if model != "seedream-v5-pro/layer-decomposition" {
+		body["layer_decomposition"] = true
+		body["watermark"] = false
+	}
+	if body["prompt"] == nil {
+		body["prompt"] = ""
 	}
 	status, raw, err := gateway.PostModel(r.Context(), http.MethodPost, base+"/images/generations", apiKey, body, 300*time.Second)
 	if err != nil {
@@ -85,7 +92,7 @@ func layerTarget(cfg config.Config, r *http.Request, payload map[string]any) (st
 	if model == "" {
 		model = "seedream-v5-pro/layer-decomposition"
 	}
-	return strings.TrimRight(base, "/") + "/v1", HeadlineAPIKey(cfg, r, payload, clientBase), model
+	return gateway.NormalizeGatewayBaseURL(base) + "/v1", HeadlineAPIKey(cfg, r, payload, clientBase), model
 }
 
 func parseLayers(data map[string]any) ([]map[string]any, string) {
@@ -126,6 +133,9 @@ func parseLayers(data map[string]any) ([]map[string]any, string) {
 			}
 		}
 		layer := map[string]any{"url": url, "name": name, "zIndex": int(zIndex), "width": width, "height": height}
+		if box, ok := item["bounding_box"].(map[string]any); ok {
+			layer["bounds"] = box["absolute"]
+		}
 		layers = append(layers, layer)
 	}
 	return layers, ""

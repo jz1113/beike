@@ -188,14 +188,17 @@ export async function extractVideoThumbnailFromFile(file: File): Promise<string>
   });
 }
 
-/** 判断 URL / dataURL / blob 是否为视频参考素材 */
+/** Saved tasks may point to a video whose storage URL has no file extension. */
+export function isTaskVideoReference(task: {referenceVideoUrls?: string[]}, url: string): boolean {
+  return task.referenceVideoUrls?.includes(url) ?? isVideoMediaUrl(url);
+}
+
 export function isVideoMediaUrl(url?: string | null): boolean {
   if (!url || typeof url !== 'string') return false;
   if (url.startsWith('data:video/')) return true;
-  if (url.startsWith('blob:')) {
-    return resolveRefMediaKind(url) === 'video';
-  }
-  if (resolveRefMediaKind(url) === 'video') return true;
+  const kind = resolveRefMediaKind(url);
+  if (kind) return kind === 'video';
+  if (url.startsWith('blob:')) return false;
   return /\.(mp4|webm|mov|m4v|avi)(\?|#|$)/i.test(url)
     || /\/video\//i.test(url)
     || /snssdk\.com|bytecdn\.cn|kwaicdn|kwimgs|v\.kuaishou|yximgs/i.test(url);

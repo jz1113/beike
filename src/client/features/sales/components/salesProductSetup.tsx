@@ -30,6 +30,7 @@ interface Props {
   onConfirmSelection?: () => boolean | void;
   onRecognizeImages?: (urls: string[]) => void;
   galleryId?: string;
+  onEditFaces?: (urls: string[]) => void;
   onResetProduct?: () => void;
 }
 
@@ -50,7 +51,7 @@ export function ProductSetupPanel({
   onConfirmSelection,
   onRecognizeImages,
   galleryId,
-  onResetProduct,
+  onResetProduct, onEditFaces,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
@@ -63,7 +64,7 @@ export function ProductSetupPanel({
   const isCollected = Boolean(state.collectedProductUrl);
   const profile = salesProductProfile({ ...state, images: state.imageCatalog, isCollected });
   const selectionBusy = selectionLocked || isCollecting || isUploading;
-  const thumb = usable[0]?.url || state.imageCatalog[0]?.url || '';
+  const thumb = state.productionPlan.productFaceEdits[usable[0]?.url]?.url || usable[0]?.url || state.imageCatalog[0]?.url || '';
   const hasProductCard = Boolean(state.productName.trim() || profile.hasData || state.imageCatalog.length > 0);
   const [showUrlRow, setShowUrlRow] = useState(!hasProductCard);
 
@@ -189,6 +190,7 @@ export function ProductSetupPanel({
           initialGroup="all"
           onRetryUnavailable={onRetryUnavailable}
           images={state.imageCatalog}
+          edits={state.productionPlan.productFaceEdits} onEditFaces={onEditFaces}
           metadata={state.variantMetadata}
           selection={state.colorSelection}
           ocrImageUrls={state.ocrImageUrls}

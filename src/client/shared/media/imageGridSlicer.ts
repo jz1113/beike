@@ -4,6 +4,7 @@
  */
 
 import { dataUrlToBlob, fetchMediaBlob } from '@client/shared/media/downloadMedia';
+import { findGridSceneSplit, innerDividerTrim } from './gridPanelTrim';
 import { assertOutputDimensions } from '@shared/domain/media/outputDimensions';
 
 export interface SlicedShots {
@@ -174,6 +175,15 @@ export function detectGridDividerBounds(
       splitBottom = Math.min(height, hEnd + 2);
     }
 
+    if (splitLeft === splitRight) {
+      const seam = findGridSceneSplit(imgData, 'x');
+      if (seam !== undefined) { splitLeft = seam - 3; splitRight = seam + 3; }
+    }
+    if (splitTop === splitBottom) {
+      const seam = findGridSceneSplit(imgData, 'y');
+      if (seam !== undefined) { splitTop = seam - 3; splitBottom = seam + 3; }
+    }
+
     // 3. 四周外边框扫描 (外缘 0..3% 范围)
     const maxOuterScanX = Math.min(Math.floor(width * 0.03), 40);
     for (let x = 0; x < maxOuterScanX; x++) {
@@ -316,10 +326,6 @@ export async function sliceGridImage2x2Blobs(
       };
     }
 
-    // 释放检测 Canvas 内存
-    inspectCanvas.width = 0;
-    inspectCanvas.height = 0;
-
     // 根据智能白边检测结果构建 4 个象限的裁剪区域
     const quadrants = [
       // 0: 左上 (Top-Left)
@@ -352,6 +358,19 @@ export async function sliceGridImage2x2Blobs(
       },
     ];
 
+    if (autoTrim && bounds.splitRight > bounds.splitLeft) {
+      for (const [index, q] of quadrants.entries()) {
+        const width = Math.floor(q.sw * 0.15);
+        if (width < 8) continue;
+        const edge = index % 2 === 0 ? 'right' : 'left';
+        const x = edge === 'right' ? q.sx + q.sw - width : q.sx;
+        const trim = innerDividerTrim(inspectCtx.getImageData(x, q.sy, width, q.sh), edge);
+        q.sw -= trim;
+        if (edge === 'left') q.sx += trim;
+      }
+    }
+    inspectCanvas.width = 0;
+    inspectCanvas.height = 0;
     const slicedBlobs: Blob[] = [];
 
     for (let i = 0; i < quadrants.length; i++) {

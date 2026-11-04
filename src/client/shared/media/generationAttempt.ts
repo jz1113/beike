@@ -1,5 +1,4 @@
 import type { GenerationTask } from '@client/store';
-import { cleanPromptText, stripWorkshopPromptGuards } from '@shared/domain/media/drawing';
 import type { DepthQuality, DepthVideoStyle } from '@shared/domain/media/depthVideo';
 import { peekDepthSubmit, registerDepthSubmit, resolveDepthSubmit } from '@client/shared/api/generation/depthGeneration';
 import { registerRefMedia, resolveRefMediaFile } from '@client/shared/media/refMediaRegistry';
@@ -29,7 +28,6 @@ export async function prepareGenerationAttempt(
     dbId: undefined,
     sessionId: task.sessionId,
     sessionTitle: task.sessionTitle,
-    prompt: stripWorkshopPromptGuards(cleanPromptText(task.prompt || '')),
     status: 'IN_PROGRESS',
     progress: '15%',
     resultUrl: undefined,

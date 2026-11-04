@@ -41,17 +41,20 @@ export interface ImageAdapterResult {
 
 export interface VideoAdapterInput {
   model: string;
+  baseUrl?: string;
   prompt: string;
   duration?: number;
   aspectRatio?: string;
   resolution?: string;
   images?: string[];
   videos?: string[];
+  audios?: string[];
   firstFrame?: string;
   lastFrame?: string;
   refMode?: string;
   watermark?: boolean;
   audio?: boolean;
+  contextIrEnabled?: boolean;
   fps?: number;
   seed?: number;
   cameraMotion?: string;

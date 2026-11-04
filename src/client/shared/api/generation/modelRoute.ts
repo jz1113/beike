@@ -32,7 +32,7 @@ export function withModelRoute(input: RequestInfo | URL, init?: RequestInit): Re
   const hasCredentials = body.customBaseUrl || body.customApiKey || headers.get('x-custom-base-url') || headers.get('x-custom-api-key');
   const credentials = hasCredentials ? {} : getMultimodalClientOverrides(selected);
   const textProtocol = selectedTextProtocol(selected, parseTextProtocol(body.textProtocol)
-    || (body.apiFormat === 'openai-responses' ? 'openai' : undefined));
+    || (body.apiFormat === 'openai-responses' ? 'openai' : credentials.textProtocol));
   return { ...init, body: JSON.stringify({ ...credentials, ...body,
     model: isDeepSeekRoute(selected) ? selected : model, textProtocol,
     ...(credentials.customBaseUrl || credentials.customApiKey || hasCredentials ? { fallbackModels: [], fallbackOrder: [] } : {}),

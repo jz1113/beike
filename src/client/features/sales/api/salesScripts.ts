@@ -1,41 +1,15 @@
+import { salesMediaResult } from './salesMediaJobs';
 import { apiRequest } from '@client/shared/api/apiRequest';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { readAssistantReasoningEffort } from '@client/shared/hooks/useAssistantReasoning';
 import { selectedTextModel } from '@shared/domain/models/textModelRoute';
 import { normalizeScriptTemplate, type SalesScriptDomain, type SalesScriptStatus } from '@shared/domain/sales';
 import {
-  salesScriptAnalysisBodySchema, salesScriptNormalizeBodySchema, salesScriptPromptResponseSchema,
+  salesScriptAnalysisBodySchema, salesScriptPromptResponseSchema,
   salesScriptVideoUploadResponseSchema, salesScriptTemplateSchema, saveSalesScriptBodySchema, patchSalesScriptBodySchema,
 } from '@shared/contracts/salesScripts';
-
-export interface StoredSalesScript {
-  id: string;
-  title: string;
-  videoUrl: string;
-  videoHash: string;
-  depthVideoUrl?: string;
-  depthTaskId?: string;
-  depthOperationId?: string;
-  status: SalesScriptStatus;
-  script: SalesScriptDomain;
-  model: string;
-  promptVersion: string;
-  version: number;
-  useCount: number;
-  updatedAt: string;
-  /** Local eligibility from the raw response, before legacy normalization can discard malformed fields. */
-  analysisCacheEligible?: boolean;
-}
-
-export interface SalesScriptDraftResult {
-  saveWarning?: string;
-  script: SalesScriptDomain;
-  model: string;
-  promptVersion: string;
-  videoHash: string;
-  existingId?: string;
-  cached?: boolean;
-}
+import type { SalesScriptDraftResult, StoredSalesScript } from '../model/salesScriptTypes';
+export type { SalesScriptDraftResult, StoredSalesScript } from '../model/salesScriptTypes';
 
 type Json = Record<string, unknown>;
 const record = (value: unknown): Json => value && typeof value === 'object' && !Array.isArray(value) ? value as Json : {};
@@ -59,8 +33,9 @@ function modelFields(selection: string) {
 
 function draftFrom(data: Json): SalesScriptDraftResult {
   const script = normalizeScriptTemplate(data.script);
-  if (!script) throw new Error('返回的脚本缺少镜头时间轴，请重新分析或手动整理后粘贴。');
-  return { script, ...(text(data.saveWarning) ? { saveWarning: text(data.saveWarning) } : {}), model: text(data.model), promptVersion: text(data.promptVersion), videoHash: text(data.videoHash),
+  if (!script) throw new Error('返回的脚本缺少镜头时间轴，请重新分析。');
+  return { script, ...(text(data.depthWarning) ? {depthWarning:text(data.depthWarning)} : {}), ...(text(data.saveWarning) ? { saveWarning: text(data.saveWarning) } : {}), model: text(data.model), promptVersion: text(data.promptVersion), videoHash: text(data.videoHash),
+    ...(Number.isInteger(data.version) ? {version:Number(data.version)} : {}), ...(data.status === 'verified' ? {status:'verified' as const} : {}),
     ...(text(data.existingId) ? { existingId: text(data.existingId) } : {}), ...(typeof data.cached === 'boolean' ? { cached: data.cached } : {}) };
 }
 
@@ -92,22 +67,25 @@ export async function fetchScriptAnalysisPrompt(signal?: AbortSignal) {
   return parsed.data;
 }
 
-export async function analyzeReferenceVideo(videoUrl: string, selection: string, signal: AbortSignal, force = false) {
-  const body = salesScriptAnalysisBodySchema.parse({ videoUrl, force, ...modelFields(selection) });
-  const response = await apiRequest('POST', '/api/sales/script-analysis', { signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  return draftFrom(await readJSON(response, '参考视频拆解失败'));
-}
-
-export async function normalizePastedScript(rawText: string, options: { videoUrl?: string; selection?: string }, signal: AbortSignal) {
-  const body = salesScriptNormalizeBodySchema.parse({ rawText, ...(options.videoUrl ? { videoUrl: options.videoUrl } : {}), ...(options.selection ? modelFields(options.selection) : {}) });
-  const response = await apiRequest('POST', '/api/sales/script-normalize', { signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  return draftFrom(await readJSON(response, '粘贴内容规整失败'));
+export async function analyzeReferenceVideo(videoUrl: string, selection: string, signal: AbortSignal, force = false, includeDepth = false, depthOperationId?: string) {
+  const body = salesScriptAnalysisBodySchema.parse({ videoUrl, force, ...(includeDepth ? {includeDepth, depthOperationId} : {}), ...modelFields(selection) });
+  const response = await apiRequest('POST', '/api/sales/script-analysis', { signal, headers: { 'Content-Type': 'application/json', Prefer: 'respond-async', 'X-Sales-Model': encodeURIComponent(selection) }, body: JSON.stringify(body) });
+  return draftFrom(await salesMediaResult(await readJSON(response, '参考视频拆解失败'), signal));
 }
 
 export async function listSalesScripts(signal?: AbortSignal): Promise<StoredSalesScript[]> {
   const response = await apiRequest('GET', '/api/sales/scripts', { signal });
   const data = await readJSON(response, '读取参考脚本库失败');
   return (Array.isArray(data.items) ? data.items : []).map(storedScriptFrom).filter((item): item is StoredSalesScript => Boolean(item));
+}
+
+export async function fetchSalesScript(id: string, signal?: AbortSignal): Promise<StoredSalesScript | null> {
+  const response = await apiRequest('GET', '/api/sales/scripts', { search: new URLSearchParams({ id }).toString(), signal, cache: 'no-store' });
+  if (response.status === 404) {
+    const data = record(await response.clone().json().catch(() => null));
+    if (data.error === '参考脚本不存在') return null;
+  }
+  return itemFrom(await readJSON(response, '读取参考脚本失败'));
 }
 
 function itemFrom(data: Json): StoredSalesScript {
@@ -122,7 +100,7 @@ export async function saveSalesScript(input: { id?: string; videoUrl: string; vi
   return itemFrom(await readJSON(response, '保存参考脚本失败'));
 }
 
-export async function patchSalesScript(id: string, patch: { status?: SalesScriptStatus; script?: SalesScriptDomain; recordUse?: boolean; videoUrl?: string; depthVideoUrl?: string; depthTaskId?: string; depthOperationId?: string }) {
+export async function patchSalesScript(id: string, patch: { expectedVersion?: number; status?: SalesScriptStatus; script?: SalesScriptDomain; recordUse?: boolean; videoUrl?: string; depthVideoUrl?: string; depthTaskId?: string; depthOperationId?: string }) {
   const body = patchSalesScriptBodySchema.parse({ ...patch, ...(patch.script ? { title: patch.script.title } : {}) });
   const response = await apiRequest('PATCH', '/api/sales/scripts/{id}', { pathParams: { id }, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return itemFrom(await readJSON(response, '更新参考脚本失败'));

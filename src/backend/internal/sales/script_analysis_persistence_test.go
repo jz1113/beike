@@ -13,7 +13,7 @@ import (
 )
 
 func TestAnalysisReturnsCompletedScriptWhenDraftStorageFails(t *testing.T) {
-	cfg := setupSalesTestConfig(t)
+	cfg := setupPromptExecutionTestConfig(t)
 	t.Setenv("AI_DRAWING_API_KEY", "test-key")
 	db, err := sql.Open("sqlite", cfg.SQLiteFile())
 	if err != nil {

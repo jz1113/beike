@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { Clapperboard, Film, X } from 'lucide-react';
 import { StudioSheet } from '@client/shared/ui/studio/StudioSheet';
 import { useSalesScriptTaxonomy } from '../hooks/useSalesScriptTaxonomy';
 import { patchSalesScript } from '../api/salesScripts';
 import type { SalesCollectionState } from '../model/salesCollectionDraft';
 import { planForSelectedScript } from '../model/salesProductionDraft';
+import { salesProductionSummaryIsStale } from '../model/salesPlanSource';
 import { useSalesProduction } from '../hooks/useSalesProduction';
+import { useSalesTextModels } from '../hooks/useSalesTextModels';
 import { salesFocusClass, salesGhostButtonClass, salesPrimaryButtonClass } from './salesChrome';
 import { SalesAssetBindingPanel } from './SalesAssetBindingPanel';
 import { SalesBottomActionBar } from './SalesBottomActionBar';
@@ -14,34 +16,50 @@ import { SalesMusicPicker } from './SalesMusicPicker';
 import { SalesPlanAdaptPanel } from './SalesPlanAdaptPanel';
 import { SalesPresentationModePanel } from './SalesPresentationModePanel';
 import { SalesStoryboardBottomBar } from './SalesStoryboardBottomBar';
-import { AtlasHubDrawer } from './atlas/AtlasHubDrawer';
+import { SalesVideoSettings } from './SalesVideoSettings';
 import type { SalesEditorView } from './SalesEditorNavigation';
 
+import type { SalesLibraryChoice } from '../model/salesWorkspace';
+
+export interface SalesProductionHandle {
+  prepareDelivery: () => Promise<boolean>;
+  checkDeliveryScript: () => boolean;
+}
+
 interface Props {
+  ref?: Ref<SalesProductionHandle>;
+  libraryChoice?: SalesLibraryChoice | null;
+  onChoiceHandled?:(accepted:boolean)=>void;
   active: boolean;
   refreshVersion: number;
   sourceBusy: boolean;
   view: SalesEditorView;
+  deliveryStep?: 'storyboard' | 'script' | null;
   onViewChange: (view: SalesEditorView) => void;
   onBusyChange: (busy: boolean) => void;
   state: SalesCollectionState;
   onChange: (patch: Partial<SalesCollectionState>) => void;
   onOpenStage: (stage: 'scripts' | 'materials', section?: 'persona' | 'scene' | 'sound') => void;
+  onEditFaces?: (urls: string[]) => void;
+  onOpenPrompt?: (id: string) => void;
   onOutputProduced?: () => void;
+  onStoryboardPreview?: (text: string) => void;
 }
 
 export function SalesProductionWorkspace({
-  active, sourceBusy, refreshVersion, view, onViewChange, onBusyChange,
-  state, onChange, onOpenStage, onOutputProduced,
+  ref, libraryChoice, onChoiceHandled, active, sourceBusy, refreshVersion, view, deliveryStep, onViewChange, onBusyChange,
+  state, onChange, onOpenStage, onEditFaces, onOpenPrompt, onOutputProduced, onStoryboardPreview,
 }: Props) {
   const prod = useSalesProduction(state, onChange, refreshVersion, onOutputProduced);
+  const storyboard = prod.assembled?.storyboardPreview || '';
+  useEffect(() => { onStoryboardPreview?.(storyboard); }, [onStoryboardPreview, storyboard]);
+  const { model } = useSalesTextModels(state.summaryModel);
+  const prepareDelivery = prod.prepareDelivery;
+  const checkDeliveryScript = prod.checkDeliveryScript;
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [atlasOpen, setAtlasOpen] = useState(false);
-  const [atlasTab, setAtlasTab] = useState<'face' | 'pose'>('pose');
 
   useEffect(() => {
     setSettingsOpen(false);
-    setAtlasOpen(false);
   }, [view, active]);
 
   const taxonomy = useSalesScriptTaxonomy();
@@ -52,27 +70,50 @@ export function SalesProductionWorkspace({
   }, [refreshVersion, refreshTaxonomy]);
 
   const working = Boolean(prod.busy && prod.busy !== 'loading');
-  const editingLocked = working || sourceBusy;
+  const editingLocked = working || sourceBusy || Boolean(deliveryStep);
   useEffect(() => { onBusyChange(working); }, [onBusyChange, working]);
 
   const effectiveVoice = prod.assembled?.effectiveVoiceMode
     || (state.productionPlan.presentationMode === 'clean_visual' ? 'none' : state.productionPlan.voiceModeOverride || 'speech');
 
-  const selectScriptId = (id: string) => {
+  const selectScriptId = useCallback((id: string) => {
     onChange({ selectedScriptId: id, productionPlan: planForSelectedScript(state.productionPlan, id) });
     if (id && id !== state.selectedScriptId) {
       void patchSalesScript(id, { recordUse: true }).catch(() => { /* 使用次数统计不阻塞主流程 */ });
     }
-  };
+  }, [onChange, state.productionPlan, state.selectedScriptId]);
 
-  const openAtlas = (tab: 'face' | 'pose') => {
-    setAtlasTab(tab);
-    setAtlasOpen(true);
-  };
+  useImperativeHandle(ref, () => ({
+    prepareDelivery: () => sourceBusy ? Promise.resolve(false) : prepareDelivery(model),
+    checkDeliveryScript,
+  }), [model, prepareDelivery, checkDeliveryScript, sourceBusy]);
+
+  const handled = useRef<SalesLibraryChoice | null>(null);
+  const [selectionError, setSelectionError] = useState('');
+  useEffect(() => {
+    if (!libraryChoice) { handled.current = null; return; }
+    if (handled.current === libraryChoice || prod.busy === 'loading') return;
+    handled.current = libraryChoice;
+    if (editingLocked) {
+      setSelectionError('视频制作正在处理任务，本次素材选择未应用。');
+      onChoiceHandled?.(false);
+      return;
+    }
+    const {type, id} = libraryChoice;
+    setSelectionError('');
+    switch (type) {
+      case 'script': selectScriptId(id); break;
+      case 'persona': prod.selectPersona(id); break;
+      case 'scene': prod.patchPlan({sceneId:id, customSceneImageUrl:'', customPrompt:''}); break;
+      case 'voice': prod.patchPlan({voiceId:id, customPrompt:''}); break;
+      case 'bgm': prod.patchPlan({bgmId:id, customBgmUrl:'', mixedVideoUrl:''}); break;
+    }
+    onChoiceHandled?.(true);
+  }, [libraryChoice, editingLocked, prod, onChoiceHandled, selectScriptId]);
 
   const verifiedScripts = prod.scripts.filter((item) => item.status === 'verified');
 
-  const bottomBar = (
+  const storyboardSettings = (
     <SalesStoryboardBottomBar
       scripts={prod.scripts}
       activeScript={prod.activeScript}
@@ -90,6 +131,18 @@ export function SalesProductionWorkspace({
       selectedScene={prod.selectedScene}
       selectedVoice={prod.selectedVoice}
       disabled={editingLocked}
+      videoSettings={prod.activeScript && prod.assembled && (
+        <SalesVideoSettings
+          plan={state.productionPlan}
+          script={prod.activeScript.script}
+          videoModels={prod.videoModels}
+          references={prod.assembled.references}
+          audios={prod.assembled.audios}
+          disabled={editingLocked}
+          planning
+          onPatchPlan={prod.patchPlan}
+        />
+      )}
       onSelectScript={selectScriptId}
       onSelectPersona={prod.selectPersona}
       onPatchPlan={prod.patchPlan}
@@ -103,28 +156,39 @@ export function SalesProductionWorkspace({
       onSmartMatch={() => prod.applySmartDefaults(false)}
       onUploadSlot={(target, file) => { void prod.uploadCustomSlot(target, file); }}
       onOpenStage={onOpenStage}
-      onOpenFaceAtlas={() => openAtlas('face')}
     />
+  );
+
+  const deliveryNotice = view === 'delivery' && Boolean(prod.activeScript && prod.assembled);
+  const notice = prod.notice && !prod.error && (
+    <div role="status" className={deliveryNotice ? 'sales-delivery-info' : 'sales-studio-alert flex shrink-0 items-start gap-3 bg-sky-500/10 px-3.5 py-2 text-xs leading-5 text-sky-700 dark:text-sky-200'}>
+      <p className="min-w-0 flex-1">{prod.notice}</p>
+      <button type="button" aria-label="关闭制作提示" onClick={prod.clearNotice} className={`rounded ${salesFocusClass}`}><X className="h-4 w-4" /></button>
+    </div>
   );
 
   return (
     <>
+      {selectionError && <p role="alert">{selectionError} <button onClick={()=>setSelectionError('')}>关闭</button></p>}
       {prod.error && (
         <div role="alert" className="sales-studio-alert flex shrink-0 items-start gap-3 bg-rose-500/10 px-3.5 py-2 text-xs leading-5 text-rose-700 dark:text-rose-200">
           <p className="min-w-0 flex-1">{prod.error}</p>
+          {prod.errorPromptId && onOpenPrompt && <button type="button" disabled={editingLocked}
+            className={salesGhostButtonClass} onClick={() => onOpenPrompt(prod.errorPromptId)}>去配置提示词</button>}
           <button type="button" aria-label="关闭生产提示" onClick={prod.clearError} className={`rounded ${salesFocusClass}`}><X className="h-4 w-4" /></button>
         </div>
       )}
+      {!deliveryNotice && notice}
 
       <div className="sales-editor-production" hidden={view !== 'storyboard' && view !== 'delivery'}>
         <div className="sales-editor-production-body">
           {sourceBusy && <p className="sales-plan-banner" role="status">商品资料正在处理，完成后即可编辑分镜和生成视频。</p>}
           {!prod.activeScript || !prod.assembled ? (
-            <>
+            <div className={view === 'storyboard' ? 'sales-sb-workbench' : 'sales-editor-delivery'}>
               <div className="sales-editor-empty">
                 <div className="sales-editor-empty-mark">{view === 'delivery' ? <Film size={24} aria-hidden /> : <Clapperboard size={24} aria-hidden />}</div>
                 <h2>{view === 'delivery' ? '选定参考脚本后生成成片' : '选择参考脚本开始编排分镜'}</h2>
-                <p>{verifiedScripts.length > 0 ? '在下方选择一条参考脚本模板，自动搭配匹配当前商品人群的人物与场景。' : '请先前往脚本库导入并确认参考脚本模板。'}</p>
+                <p>{verifiedScripts.length > 0 ? '选择一条参考脚本模板，自动搭配匹配当前商品人群的人物与场景。' : '请先在资产库的「动作」文件夹导入分析参考脚本模板。'}</p>
                 <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
                   {verifiedScripts[0] && (
                     <button type="button" disabled={editingLocked} onClick={() => selectScriptId(verifiedScripts[0].id)} className={salesPrimaryButtonClass}>
@@ -132,33 +196,44 @@ export function SalesProductionWorkspace({
                     </button>
                   )}
                   <button type="button" disabled={editingLocked} onClick={() => onOpenStage('scripts')} className={salesGhostButtonClass}>
-                    去脚本库
+                    打开动作素材
                   </button>
                 </div>
               </div>
-              <SalesBottomActionBar ariaLabel="分镜脚本底部操作栏" left={bottomBar} />
-            </>
+              {view === 'storyboard'
+                ? <aside className="sales-sb-settings" aria-label="分镜制作设置"><h2>制作设置</h2>{storyboardSettings}</aside>
+                : <SalesBottomActionBar ariaLabel="参考脚本选择" left={storyboardSettings} />}
+            </div>
           ) : (
             <>
               <div hidden={view !== 'storyboard'} className="sales-editor-storyboard">
+                {prod.durationPlanning && (
+                  <div className="sales-plan-banner" role={prod.durationPlanning.error ? 'alert' : 'status'} aria-label="成片模型与分镜时长">
+                    原脚本 {prod.durationPlanning.sourceDurationSec} 秒 · 模型最长 {prod.durationPlanning.modelMaxDurationSec} 秒 · 本次生成 {prod.durationPlanning.targetDurationSec} 秒
+                    {(prod.durationPlanning.error || prod.durationPlanning.notice) && <span className="ml-2">{prod.durationPlanning.error || prod.durationPlanning.notice}</span>}
+                  </div>
+                )}
                 <SalesPlanAdaptPanel
                   script={prod.activeScript.script}
                   preferredModel={state.summaryModel}
                   onModelChange={(summaryModel) => onChange({ summaryModel })}
                   selectedImages={prod.selectedImages}
+                  productFaceEdits={state.productionPlan.productFaceEdits}
                   beatBindings={prod.beatBindings}
                   adaptedBeats={state.productionPlan.adaptedBeats}
+                  productSpokenCopy={state.productSummary?.editedCopy ?? state.productSummary?.result.copy ?? ''}
+                  productSpokenCopyStale={salesProductionSummaryIsStale(state)}
                   effectiveVoiceMode={prod.assembled.effectiveVoiceMode}
                   presentationMode={state.productionPlan.presentationMode}
                   hasSceneReplacement={Boolean(prod.selectedScene || state.productionPlan.customSceneImageUrl?.trim())}
                   spokenCharCount={prod.assembled.spokenCharCount}
                   estimatedSpeakSec={prod.assembled.estimatedSpeakSec}
+                  deliveryStep={deliveryStep}
                   adapting={prod.busy === 'adapt'}
                   disabled={sourceBusy || (working && prod.busy !== 'adapt')}
                   actions={prod.catalog.actions}
                   beatActionIds={state.productionPlan.beatActionIds}
                   onBindBeatAction={prod.bindBeatAction}
-                  onOpenActionAtlas={() => openAtlas('pose')}
                   onRunAdapt={(model) => { void prod.runPlanAdapt(model); }}
                   onCancel={prod.cancel}
                   onChangeBeatImage={(beatIndex, imageUrl) => prod.patchPlan({
@@ -166,18 +241,20 @@ export function SalesProductionWorkspace({
                     customPrompt: '',
                   })}
                   onChangeAdaptedBeat={prod.updateAdaptedBeat}
-                  bottomLeft={bottomBar}
+                  settings={storyboardSettings}
                   onNextStep={() => onViewChange('delivery')}
                 />
               </div>
               <div hidden={view !== 'delivery'} className="sales-editor-delivery">
                 <SalesFinalPromptPanel
                   active={active && view === 'delivery'}
+                  notice={deliveryNotice ? notice : undefined}
                   script={prod.activeScript.script}
                   beatBindings={prod.beatBindings}
                   onEditMaterials={() => setSettingsOpen(true)}
+                  onEditFaces={onEditFaces}
                   onEditStoryboard={() => onViewChange('storyboard')}
-                  hasBackgroundMusic={Boolean(prod.selectedBgm)}
+                  backgroundMusicUrl={prod.selectedBgm?.audioUrl}
                   musicPicker={(
                     <SalesMusicPicker
                       plan={state.productionPlan}
@@ -193,12 +270,16 @@ export function SalesProductionWorkspace({
                   plan={state.productionPlan}
                   videoModels={prod.videoModels}
                   voiceModels={prod.voiceModels}
+                  rankedVoices={prod.rankedVoices}
+                  selectedVoice={prod.selectedVoice}
+                  onOpenVoiceMaterials={() => onOpenStage('materials', 'sound')}
                   busy={prod.busy || (sourceBusy ? 'loading' : '')}
                   progressText={prod.progressText}
                   generationSourceError={prod.generationSourceError}
+                  onReadaptStoryboard={model && !prod.durationPlanning?.error ? () => { void prod.runPlanAdapt(model); } : undefined}
                   onPatchPlan={prod.patchPlan}
-                  onSynthesizeVoice={() => { void prod.runSynthesizeVoice(); }}
-                  onGenerateVideo={() => { void prod.runGenerateVideo(); }}
+                  onSynthesizeVoice={() => { void prod.runSynthesizeVoice(model); }}
+                  onGenerateVideo={() => { void prod.runGenerateVideo(model); }}
                   onUploadRawVideo={(file) => { void prod.uploadCustomSlot('rawVideo', file); }}
                   onMixFinal={() => { void prod.runMixFinal(); }}
                   onCancel={prod.cancel}
@@ -209,12 +290,14 @@ export function SalesProductionWorkspace({
         </div>
       </div>
 
-      {working && (
+      {working && view !== 'delivery' && (
         <div className="sales-editor-task-status" role="status">
           <span>
             {prod.progressText || (prod.busy === 'adapt' ? '正在改写分镜…' : prod.busy === 'tts' ? '正在生成配音…' : prod.busy === 'upload' ? '正在上传素材…' : '正在制作视频…')}
           </span>
-          <button type="button" onClick={prod.cancel} className={salesFocusClass}>停止等待</button>
+          {(prod.busy !== 'adapt' || view !== 'storyboard') && (
+            <button type="button" onClick={prod.cancel} className={salesFocusClass}>停止等待</button>
+          )}
         </div>
       )}
 
@@ -268,12 +351,6 @@ export function SalesProductionWorkspace({
         </StudioSheet>
       )}
 
-      <AtlasHubDrawer
-        open={atlasOpen}
-        defaultTab={atlasTab}
-        onClose={() => setAtlasOpen(false)}
-        onImported={() => { void prod.reloadAssets(); }}
-      />
     </>
   );
 }

@@ -1,11 +1,20 @@
 import { buildBoundGroupGridPrompt } from '@shared/domain/workshop/workshop-pipeline';
 import type { BatchProductItem } from '../batchTypes';
 
+function editingLocked(item: BatchProductItem) {
+  return item.isAnalyzing || item.tasks.some(task => task.status === 'IN_PROGRESS' || task.recoveryRequired);
+}
+
+export function editWorkshopGridPrompt(item: BatchProductItem, value: string): BatchProductItem {
+  if (item.gridPrompt === value || editingLocked(item)) return item;
+  return { ...item, gridPrompt: value, masterGridUrl: undefined, copywriting: undefined,
+    tasks: item.tasks.map(task => ({ ...task, resultStatus: 'superseded' })) };
+}
+
 /** A shot edit and its grid projection must change in one state update. */
 export function editWorkshopPrompt(item: BatchProductItem, index: number, value: string): BatchProductItem {
   const shot = item.prompts[index];
-  if (!shot || shot.prompt === value || item.isAnalyzing
-    || item.tasks.some(task => task.status === 'IN_PROGRESS' || task.recoveryRequired)) return item;
+  if (!shot || shot.prompt === value || editingLocked(item)) return item;
   const prompts = item.prompts.map((entry, position) => position === index
     ? { ...entry, prompt: value, revision: ((entry as { revision?: number }).revision || 0) + 1, resultStatus: 'current' as const } : entry);
   const selected = prompts.filter(entry => entry.selected !== false);

@@ -38,6 +38,9 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 	}
 	if size == "" {
 		size = "2448x3264"
+		if model == "seedream-v5-pro" {
+			size = "2048x2048"
+		}
 	}
 	quality := rawString(payload, "quality")
 	if quality == "" {

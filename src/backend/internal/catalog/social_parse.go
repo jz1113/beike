@@ -50,12 +50,12 @@ func parseSocialLink(cfg config.Config, r *http.Request, body map[string]any) (i
 		return http.StatusBadRequest, map[string]any{"success": false, "error": "万邦只解析电商商品链接。社媒内容请切换为自动调度、APIA 或奇云。"}
 	}
 	if !hasQiyun && !hasApia {
-		return http.StatusBadRequest, map[string]any{"success": false, "error": "未配置社媒解析密钥。请前往「设置 -> 服务接口配置」配置「奇云解析 (支持30+主流平台)」或「APIA 解析」。"}
+		return http.StatusBadRequest, map[string]any{"success": false, "error": "未提供社媒解析凭证"}
 	}
 	host := strings.ToLower(parsed.Hostname())
 	needsQiyun := hostIs(host, "weixin.qq.com", "weibo.com", "weibo.cn", "bilibili.com", "b23.tv", "pipix.com", "pipixia.com")
 	if needsQiyun && !hasQiyun {
-		return http.StatusBadRequest, map[string]any{"success": false, "error": "该平台需要奇云解析，请在「设置 -> 服务接口配置」配置奇云 AppId 和 AppKey"}
+		return http.StatusBadRequest, map[string]any{"success": false, "error": "该平台需要奇云解析凭证"}
 	}
 	qiyunFirst := preferred == "qiyun" || needsQiyun || (hasQiyun && !hasApia)
 	order := []string{}

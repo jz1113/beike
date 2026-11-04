@@ -6,7 +6,7 @@
 
 `POST /api/catalog/styles/parse-link` 接收 `url`，也兼容 `text`、`link`、`query`。分享文案会先提取其中的 HTTP(S) 链接；常见图片后缀的直链直接整理为单图素材，不调用解析商。
 
-在“设置 → API 接入”配置 APIA 的接口 ID/密钥，或奇云的 AppId/AppKey。请求可通过 `scraperId` / `scraperSecret`、`qiyunAppId` / `qiyunAppKey` 提供凭证，也支持 `x-apia-client-id` / `x-apia-secret-key`、`x-qiyun-appid` / `x-qiyun-appkey` 请求头。生产解析不回退读取服务器环境中的个人凭证；开发环境才允许环境变量兜底。
+请求可通过 `scraperId` / `scraperSecret`、`qiyunAppId` / `qiyunAppKey` 提供凭证，也支持 `x-apia-client-id` / `x-apia-secret-key`、`x-qiyun-appid` / `x-qiyun-appkey` 请求头。生产解析不回退读取服务器环境中的个人凭证；开发环境才允许环境变量兜底。
 
 成功响应包含 `title`、`description`、`author`、`cover`、`images`、`video`、`videos`，并在 `data` 中提供整理后的素材。经解析商处理时另有 `apiUsed` 和 `attempts`；直链分支没有解析商调用记录。
 
@@ -34,4 +34,4 @@
 
 额度、凭证、作品失效和接口停用应先处理原因，再由用户发起新解析。不要在界面外层无条件循环重试；一次调度本身可能已经访问多个解析商。
 
-实现真源：`src/backend/internal/catalog/social_parse.go`、`social_provider_errors.go`、`style_link.go`；前端调度入口为 `src/client/features/collect/api/collectSourceMedia.ts`。
+实现真源：`src/backend/internal/catalog/social_parse.go`、`social_provider_errors.go`、`style_link.go`。

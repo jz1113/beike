@@ -73,7 +73,7 @@ export async function runGridImageTask(
         productReferenceCandidates.map((img) => compressProductImageIfNeeded(img)),
       );
       const productImageUrl = productReferenceImages[0];
-      const referenceInput = workshopReferenceInput(shots, productReferenceImages.length);
+      const referenceInput = workshopReferenceInput(shots, productReferenceImages.length, item);
       const compositionReferenceImages = await Promise.all(referenceInput.compositionReferenceImages.map(compressProductImageIfNeeded));
       const safeAnchorFaceUrl = !skillOnly && hasHuman && config.anchorFaceUrl
         ? await compressProductImageIfNeeded(config.anchorFaceUrl)

@@ -8,7 +8,7 @@ export type SalesBeatVoiceMode = 'speech' | 'voiceover' | 'none';
 export type SalesBeatPurpose = 'hook' | 'showcase' | 'proof' | 'usage' | 'closing' | 'other';
 export type SalesScriptStatus = 'draft' | 'verified' | 'archived';
 export type SalesBeatRequiredView = SalesProductImageView | 'any';
-export type SalesExclusionType = 'product' | 'brand_signage' | 'person_appearance' | 'accessory' | 'copy_claim';
+export type SalesExclusionType = 'product' | 'brand_signage' | 'person_appearance' | 'accessory' | 'copy_claim' | 'scene';
 
 export interface SalesBeatVoice {
   mode: SalesBeatVoiceMode;
@@ -30,6 +30,7 @@ export interface SalesScriptBeat {
   action: string;
   actionTemplate: string;
   referenceActionRaw: string;
+  productVisible?: boolean;
   expression: string;
   scene: string;
   transition: string;
@@ -37,6 +38,8 @@ export interface SalesScriptBeat {
   voice: SalesBeatVoice;
   subtitle: string;
   shows: string;
+  sectionLabel?: string;
+  cameraLabel?: string;
   inferred: string[];
 }
 
@@ -45,6 +48,7 @@ export interface SalesScriptShot {
   end: number;
   estimated: boolean;
   summary: string;
+  analysis?: Partial<Record<'style' | 'subject' | 'action' | 'camera' | 'expression', string>>;
   beats: SalesScriptBeat[];
 }
 
@@ -93,6 +97,7 @@ export interface SalesScriptDomain {
   format: SalesScriptFormat;
   voiceMode: SalesScriptVoiceMode;
   audioAvailable: boolean;
+  sampleTimesSec?: number[];
   overview: string;
   taxonomy: SalesScriptTaxonomy;
   visualSpec: SalesVisualSpec;
@@ -152,6 +157,7 @@ export function normalizeScriptTemplate(input: unknown): SalesScriptDomain | nul
         action,
         actionTemplate,
         referenceActionRaw: asText(b.referenceActionRaw) || actionRaw,
+        ...(typeof b.productVisible === 'boolean' ? { productVisible: b.productVisible } : {}),
         expression: asText(b.expression),
         scene: asText(b.scene),
         transition: asText(b.transition),
@@ -165,15 +171,22 @@ export function normalizeScriptTemplate(input: unknown): SalesScriptDomain | nul
         },
         subtitle: asText(b.subtitle),
         shows: asText(b.shows),
+        ...(asText(b.sectionLabel) ? { sectionLabel: asText(b.sectionLabel) } : {}),
+        ...(asText(b.cameraLabel) ? { cameraLabel: asText(b.cameraLabel) } : {}),
         inferred: asList(b.inferred),
       };
     });
     if (!beats.length) continue;
+    const analysis = asRecord(s.analysis);
     shots.push({
       start: asNum(s.start, beats[0].start),
       end: asNum(s.end, beats[beats.length - 1].end),
       estimated: Boolean(s.estimated),
       summary: asText(s.summary),
+      ...(s.analysis ? { analysis: {
+        style: asText(analysis.style), subject: asText(analysis.subject), action: asText(analysis.action),
+        camera: asText(analysis.camera), expression: asText(analysis.expression),
+      } } : {}),
       beats,
     });
   }
@@ -206,7 +219,7 @@ export function normalizeScriptTemplate(input: unknown): SalesScriptDomain | nul
       const term = asText(ex.term);
       if (!term) return null;
       return {
-        type: pickEnum(ex.type, ['product', 'brand_signage', 'person_appearance', 'accessory', 'copy_claim'] as const, 'product'),
+        type: pickEnum(ex.type, ['product', 'brand_signage', 'person_appearance', 'accessory', 'copy_claim', 'scene'] as const, 'copy_claim'),
         term,
         replacementRule: asText(ex.replacementRule, '迁移新商品时剔除或替换为当前资产'),
       };
@@ -219,7 +232,7 @@ export function normalizeScriptTemplate(input: unknown): SalesScriptDomain | nul
   }
   const struct = asRecord(raw.structure);
   const tax = asRecord(raw.taxonomy);
-  const styleSummaryText = asText(vis.styleSummary) || asText(shots[0].beats[0]?.scene);
+  const styleSummaryText = asText(vis.styleSummary);
   const oneTakeVal = typeof vis.oneTake === 'boolean' ? vis.oneTake : inferredOneTake;
   const spatialVal = pickEnum(scSlot.spatialType, ['indoor', 'outdoor', 'studio'] as const, 'indoor');
   const reusableCats = asList(reusable.categories);
@@ -239,6 +252,7 @@ export function normalizeScriptTemplate(input: unknown): SalesScriptDomain | nul
     durationSec,
     format,
     voiceMode,
+    ...(Array.isArray(raw.sampleTimesSec) ? { sampleTimesSec: raw.sampleTimesSec.filter((s): s is number => typeof s === 'number' && Number.isFinite(s) && s >= 0).slice(0, 24) } : {}),
     audioAvailable: typeof raw.audioAvailable === 'boolean' ? raw.audioAvailable : true,
     overview: asText(raw.overview),
     taxonomy: {
@@ -251,7 +265,7 @@ export function normalizeScriptTemplate(input: unknown): SalesScriptDomain | nul
     visualSpec: {
       aspectRatio: pickEnum(vis.aspectRatio, ['9:16', '16:9', '3:4', '1:1'] as const, '9:16'),
       oneTake: typeof vis.oneTake === 'boolean' ? vis.oneTake : inferredOneTake,
-      styleSummary: asText(vis.styleSummary) || asText(shots[0].beats[0]?.scene),
+      styleSummary: styleSummaryText,
       lighting: asText(vis.lighting),
       cameraFeel: asText(vis.cameraFeel),
       moodTags: asList(vis.moodTags),

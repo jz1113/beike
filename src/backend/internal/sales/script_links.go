@@ -63,7 +63,7 @@ func trustedDepthVideoURL(ctx context.Context, db *sql.DB, workspace, raw string
 // script, taxonomy or review state that the user may be editing concurrently.
 func patchScriptLinks(w http.ResponseWriter, r *http.Request, db *sql.DB, workspace, id string, body patchScriptBody) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := db.ExecContext(r.Context(), `UPDATE "SalesReferenceScript" SET "videoUrl"=COALESCE(?,"videoUrl"),"depthVideoUrl"=COALESCE(?,"depthVideoUrl"),"depthTaskId"=COALESCE(?,"depthTaskId"),"depthOperationId"=COALESCE(?,"depthOperationId"),"updatedAt"=? WHERE "workspaceId"=? AND "id"=?`, body.VideoURL, body.DepthVideoURL, body.DepthTaskID, body.DepthOperationID, now, workspace, id)
+	_, err := db.ExecContext(r.Context(), `UPDATE "SalesReferenceScript" SET "videoHash"=CASE WHEN COALESCE(?,"videoUrl")!="videoUrl" THEN '' ELSE "videoHash" END,"videoUrl"=COALESCE(?,"videoUrl"),"depthVideoUrl"=COALESCE(?,"depthVideoUrl"),"depthTaskId"=COALESCE(?,"depthTaskId"),"depthOperationId"=COALESCE(?,"depthOperationId"),"updatedAt"=? WHERE "workspaceId"=? AND "id"=?`, body.VideoURL, body.VideoURL, body.DepthVideoURL, body.DepthTaskID, body.DepthOperationID, now, workspace, id)
 	if err != nil {
 		httpx.WriteJSON(w, 500, map[string]any{"success": false, "error": "保存关联视频失败，请保留结果并重试"})
 		return

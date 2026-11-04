@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { editWorkshopPrompt } from './editWorkshopPrompt';
+import { editWorkshopGridPrompt, editWorkshopPrompt } from './editWorkshopPrompt';
 import { checkWorkshopReadiness } from '../generation/workshopReadiness';
 import type { BatchProductItem } from '../batchTypes';
 
@@ -32,6 +32,16 @@ describe('editing confirmed workshop prompts', () => {
     initial.tasks = initial.tasks.map(task => ({ ...task, gridSourceUrl: '/old-grid.jpg' }));
     const next = editWorkshopPrompt(initial, 0, '新镜头');
     expect(next.tasks.every(task => task.resultStatus === 'superseded')).toBe(true);
+  });
+
+  it('clears the cached grid and marks its outputs stale when the group text changes', () => {
+    const initial = product();
+    const edited = editWorkshopGridPrompt(initial, '整组新方案');
+    expect(edited.masterGridUrl).toBeUndefined();
+    expect(edited.tasks.every(task => task.resultStatus === 'superseded')).toBe(true);
+    expect(edited.tasks[0].resultUrl).toBe(initial.tasks[0].resultUrl);
+    initial.tasks[0].recoveryRequired = true;
+    expect(editWorkshopGridPrompt(initial, '整组新方案')).toBe(initial);
   });
 
   it('blocks a cleared prompt until repaired without silently rerunning analysis', () => {

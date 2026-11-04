@@ -5,6 +5,7 @@ import { useAppStore } from '@client/store';
 import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
 import { resolveVideoMode, videoDurationOptions, videoModes, videoRatioLocked } from '@shared/domain/media/videoCapabilities';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
+import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
 
 /** Keep persisted controls valid when changing model, workflow, or output quality. */
 export function useVideoParameterConstraints() {
@@ -13,10 +14,11 @@ export function useVideoParameterConstraints() {
     resolution: s.quickVideoResolution, aspect: s.quickVideoAspectId, duration: s.quickVideoDuration,
     references: s.quickRefImages,
   })));
+  const baseUrl = getGatewayClientBaseUrl(state.model);
   useEffect(() => {
     if (state.mode !== 'video') return;
     const modelId = upstreamModalityModelId('video', state.model);
-    const profile = getVideoModelById(modelId);
+    const profile = getVideoModelById(modelId, baseUrl);
     if (!profile) return;
     const store = useAppStore.getState();
     const resolved = resolveVideoMode(modelId, state.refMode, state.references.filter(url => !isVideoMediaUrl(url)).length, state.references.filter(isVideoMediaUrl).length);
@@ -24,11 +26,11 @@ export function useVideoParameterConstraints() {
     const mode = modes.some(item => item.id === resolved) ? resolved : modes[0].id;
     const resolution = resolveVideoResolution(state.resolution, profile.supportedResolutions);
     const aspect = videoRatioLocked(modelId, mode) ? 'adaptive' : profile.supportedAspectRatios.includes(state.aspect) ? state.aspect : profile.supportedAspectRatios[0];
-    const durations = videoDurationOptions(modelId, resolution, mode);
+    const durations = videoDurationOptions(modelId, resolution, mode, baseUrl);
     const duration = durations.includes(state.duration) ? state.duration : durations.reduce((best, value) => Math.abs(value - state.duration) < Math.abs(best - state.duration) ? value : best);
     if (state.refMode !== mode) store.setQuickVideoRefMode(mode);
     if (state.resolution !== resolution) store.setQuickVideoResolution(resolution);
     if (state.aspect !== aspect) store.setQuickVideoAspectId(aspect);
     if (state.duration !== duration) store.setQuickVideoDuration(duration);
-  }, [state]);
+  }, [state, baseUrl]);
 }

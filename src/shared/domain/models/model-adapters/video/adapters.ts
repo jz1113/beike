@@ -1,5 +1,6 @@
 import { resolveVideoMode, videoInputError } from '@shared/domain/media/videoCapabilities';
 import { buildSeedanceOfficialPayload } from './seedance';
+import { buildMiniMaxH3GatewayPayload } from './minimax';
 import type { VideoAdapterInput, VideoModelAdapter } from '../types';
 import {
   grokImagineVideoEndpoints,
@@ -46,7 +47,7 @@ export const veoVideoAdapter: VideoModelAdapter = {
   id: 'veo',
   match: (modelId) => {
     const m = modelId.toLowerCase();
-    return m.includes('veo') || m.includes('omni_flash') || m.includes('omni-flash') || m.includes('gemini-omni');
+    return m.includes('veo');
   },
   build: (input) => {
     const modelId = normalizeVideoModelId(input.model);
@@ -54,7 +55,7 @@ export const veoVideoAdapter: VideoModelAdapter = {
     assertVideoInput(input, modelId, mode);
     const payload = baseVideoPayload(input, modelId);
     applyExclusiveFrameFields(payload, input, mode);
-    if (mode === 'omni' && !/omni[_-]flash|gemini-omni/i.test(modelId)) {
+    if (mode === 'omni') {
       delete payload.images;
       delete payload.image_urls;
     }
@@ -91,6 +92,7 @@ export const minimaxVideoAdapter: VideoModelAdapter = {
   },
   build: (input) => {
     const modelId = normalizeVideoModelId(input.model);
+    if (modelId === 'MiniMax-H3') return { family: 'minimax', modelId, payload: buildMiniMaxH3GatewayPayload(input, modelId), endpoints: minimaxVideoEndpoints(modelId) };
     const resolution = (input.resolution || '').toUpperCase();
     if (/hailuo-2\.3/i.test(modelId) && resolution.includes('1080') && Number(input.duration) === 10) {
       throw new Error('Hailuo 2.3 在 1080P 下仅支持 6 秒');
@@ -244,6 +246,10 @@ export const viduVideoAdapter: VideoModelAdapter = {
       resolution: viduResolution(input.resolution),
     };
     if (input.audio !== undefined) payload.audio = Boolean(input.audio);
+    if (input.audios?.length) {
+      payload.sounds = input.audios;
+      payload.audio = true;
+    }
     if (mode === 'first_frame') payload.images = images.slice(0, 1);
     else if (mode === 'first_last_frame') payload.images = [images[0], images[images.length - 1]];
     else if (mode === 'text') payload.aspect_ratio = input.aspectRatio || '16:9';

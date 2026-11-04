@@ -1,157 +1,78 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
-import { getVideoDurationBounds } from '@shared/domain/media/video';
+import { useMemo, type KeyboardEvent, type PointerEvent } from 'react';
+import { LockKeyhole } from 'lucide-react';
 
-interface VideoDurationRulerSliderProps {
+interface Props {
   value: number;
-  modelId?: string;
-  min?: number;
-  max?: number;
-  allowedDurations?: number[];
-  onChange: (value: number) => void;
-  className?: string;
+  allowedDurations: number[];
+  onChange: (seconds: number) => void;
 }
 
-function nearest(value: number, allowed: number[]) {
-  return allowed.reduce((best, current) => (
-    Math.abs(current - value) < Math.abs(best - value) ? current : best
-  ), allowed[0]);
-}
-
-const TICKS = 32;
-
-export function VideoDurationRulerSlider({
-  value,
-  modelId,
-  min: minProp,
-  max: maxProp,
-  allowedDurations,
-  onChange,
-  className = '',
-}: VideoDurationRulerSliderProps) {
-  const reduceMotion = useReducedMotion();
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [dragging, setDragging] = useState(false);
-
-  const allowed = useMemo(() => {
-    const bounds = getVideoDurationBounds(modelId);
-    const available = allowedDurations?.length ? allowedDurations : bounds.allowed;
-    const filtered = available.filter((item) => (
-      (minProp === undefined || item >= minProp) && (maxProp === undefined || item <= maxProp)
-    ));
-    return filtered.length ? filtered : available;
-  }, [modelId, minProp, maxProp, allowedDurations]);
+export function VideoDurationRulerSlider({ value, allowedDurations, onChange }: Props) {
+  const allowed = useMemo(() => [...new Set(allowedDurations)].sort((a, b) => a - b), [allowedDurations]);
+  if (!allowed.length) return <p className="text-xs text-amber-600 dark:text-amber-300">当前配置没有可用时长。</p>;
 
   const min = allowed[0];
   const max = allowed[allowed.length - 1];
-  const current = allowed.includes(value) ? value : nearest(value, allowed);
-  const span = Math.max(1, max - min);
-  const pct = ((current - min) / span) * 100;
-
-  useEffect(() => {
-    if (!allowed.includes(value)) onChange(nearest(value, allowed));
-  }, [allowed, onChange, value]);
-
-  const valueFromClientX = (clientX: number) => {
-    const track = trackRef.current;
-    if (!track || allowed.length < 2) return current;
-    const rect = track.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    return nearest(min + ratio * span, allowed);
+  const nearest = (seconds: number) => allowed.reduce((best, next) =>
+    Math.abs(next - seconds) < Math.abs(best - seconds) ? next : best);
+  const current = nearest(value);
+  const position = (seconds: number) => `${100 * (seconds - min) / (max - min)}%`;
+  const select = (seconds: number) => { if (seconds !== value) onChange(seconds); };
+  const pickAt = (event: PointerEvent<HTMLDivElement>) => {
+    const { left, width } = event.currentTarget.getBoundingClientRect();
+    if (width) select(nearest(min + (event.clientX - left) / width * (max - min)));
   };
-
-  const stepAllowed = (direction: 1 | -1) => {
-    const index = Math.max(0, allowed.indexOf(current));
-    return allowed[Math.max(0, Math.min(allowed.length - 1, index + direction))] ?? current;
-  };
-
-  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || allowed.length < 2) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setDragging(true);
-    const next = valueFromClientX(event.clientX);
-    if (next !== current) onChange(next);
-  };
-
-  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (!dragging) return;
-    const next = valueFromClientX(event.clientX);
-    if (next !== current) onChange(next);
-  };
-
-  const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+  const handleKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    const index = allowed.indexOf(current);
+    switch (event.key) {
+      case 'ArrowRight': case 'ArrowUp': select(allowed[Math.min(index + 1, allowed.length - 1)]); break;
+      case 'ArrowLeft': case 'ArrowDown': select(allowed[Math.max(index - 1, 0)]); break;
+      case 'Home': select(min); break;
+      case 'End': select(max); break;
+      default: return;
     }
-    setDragging(false);
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const next = event.key === 'ArrowRight' || event.key === 'ArrowUp'
-      ? stepAllowed(1)
-      : event.key === 'ArrowLeft' || event.key === 'ArrowDown'
-        ? stepAllowed(-1)
-        : event.key === 'Home'
-          ? min
-          : event.key === 'End'
-            ? max
-            : null;
-    if (next == null) return;
     event.preventDefault();
-    if (next !== current) onChange(next);
   };
+  const pill = 'shrink-0 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-900 shadow-xs dark:bg-white/10 dark:text-white';
 
   return (
-    <div className={`flex items-center gap-3 select-none ${className}`}>
-      <span className="shrink-0 whitespace-nowrap text-xs font-medium tabular-nums text-slate-400 dark:text-slate-500">{min}秒</span>
-      <div
-        ref={trackRef}
-        role="slider"
-        tabIndex={allowed.length < 2 ? -1 : 0}
-        aria-label="视频生成时长"
-        aria-valuemin={min}
-        aria-valuemax={max}
-        aria-valuenow={current}
-        aria-valuetext={`${current} 秒`}
-        aria-disabled={allowed.length < 2 || undefined}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onKeyDown={onKeyDown}
-        className="relative h-8 flex-1 cursor-pointer touch-none outline-none"
-      >
-        <div className="pointer-events-none absolute inset-x-0 top-1/2 flex h-4 -translate-y-1/2 items-center justify-between">
-          {Array.from({ length: TICKS }, (_, index) => {
-            const major = index % 4 === 0;
-            return (
-              <span
-                key={index}
-                className={`w-px ${major ? 'h-3.5 bg-slate-400/80 dark:bg-white/45' : 'h-2 bg-slate-300/90 dark:bg-white/20'}`}
-              />
-            );
-          })}
-        </div>
-        <motion.div
-          aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 h-[18px] w-0.5 -translate-y-1/2 rounded-full bg-slate-950 shadow-[0_0_4px_rgba(0,0,0,0.28)] dark:bg-white dark:shadow-[0_0_6px_rgba(255,255,255,0.45)]"
-          initial={false}
-          animate={{ left: `${pct}%`, x: '-50%' }}
-          transition={reduceMotion || dragging ? { duration: 0 } : { type: 'spring', stiffness: 460, damping: 34, mass: 0.6 }}
-        />
-      </div>
-      <span className="shrink-0 whitespace-nowrap text-xs font-medium tabular-nums text-slate-400 dark:text-slate-500">{max}秒</span>
-      <motion.span
-        key={current}
-        initial={reduceMotion ? false : { y: 3, opacity: 0.45 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 500, damping: 30 }}
-        className="inline-flex h-8 min-w-[4.25rem] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-2.5 text-[13px] font-semibold tabular-nums text-slate-900 shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-slate-100"
-      >
-        {current} 秒
-      </motion.span>
+    <div className="flex min-h-10 items-center gap-2.5 rounded-2xl bg-slate-100/80 px-3 text-xs text-slate-600 select-none dark:bg-white/5 dark:text-slate-300">
+      {min === max ? (
+        <span className="flex flex-1 items-center gap-2">
+          <LockKeyhole size={13} aria-hidden />固定时长
+        </span>
+      ) : (
+        <>
+          <span className="shrink-0 tabular-nums">{min}秒</span>
+          <div
+            role="slider" tabIndex={0} aria-label="视频生成时长"
+            aria-valuemin={min} aria-valuemax={max} aria-valuenow={current} aria-valuetext={`${current} 秒`}
+            onPointerDown={(event) => {
+              if (!event.isPrimary || event.button !== 0) return;
+              event.currentTarget.focus();
+              event.currentTarget.setPointerCapture(event.pointerId);
+              pickAt(event);
+            }}
+            onPointerMove={(event) => {
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) pickAt(event);
+            }}
+            onKeyDown={handleKey}
+            className="relative h-10 min-w-0 flex-1 cursor-pointer touch-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          >
+            <span aria-hidden className="absolute inset-x-0 top-1/2 h-px bg-slate-300 dark:bg-white/15" />
+            <span aria-hidden className="absolute left-0 top-1/2 h-px bg-slate-500 dark:bg-white/55" style={{ width: position(current) }} />
+            {allowed.map((seconds) => (
+              <span key={seconds} aria-hidden style={{ left: position(seconds) }}
+                className={`pointer-events-none absolute top-1/2 w-px -translate-x-1/2 -translate-y-1/2 ${seconds % 5 === 0 || seconds === min || seconds === max ? 'h-3' : 'h-2'} ${seconds <= current ? 'bg-slate-500 dark:bg-white/55' : 'bg-slate-300 dark:bg-white/25'}`} />
+            ))}
+            <span aria-hidden style={{ left: position(current) }} className="pointer-events-none absolute top-1/2 h-5 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-900 shadow-sm dark:bg-white" />
+          </div>
+          <span className="shrink-0 tabular-nums">{max}秒</span>
+        </>
+      )}
+      {value === current
+        ? <span className={pill}>{current} 秒</span>
+        : <button type="button" className={pill} onClick={() => select(current)}>采用 {current} 秒</button>}
     </div>
   );
 }
-
-export default VideoDurationRulerSlider;

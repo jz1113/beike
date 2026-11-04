@@ -5,8 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { assembleSalesVideoPrompt, bindBeatProductImages, normalizeScriptTemplate } from '@shared/domain/sales';
 import SalesStudio from './SalesStudio';
 import { ProductSetupPanel } from './components/salesProductSetup';
-import { SalesScriptLibrary } from './components/SalesScriptLibrary';
-import { SalesScriptReviewer } from './components/SalesScriptReviewer';
 import { SalesScriptTaxonomyDialog } from './components/SalesScriptTaxonomyDialog';
 import { SalesFinalPromptPanel } from './components/SalesFinalPromptPanel';
 import { emptySalesCollection } from './model/salesCollectionDraft';
@@ -14,11 +12,10 @@ import { emptySalesProductionPlan } from './model/salesProductionDraft';
 
 describe('single-screen ecommerce image workspace', () => {
   it('keeps product selection beside a single tabbed editor without numbered workflow blocks', () => {
-    const html = renderToStaticMarkup(createElement(SalesStudio, { onBack: () => {} }));
-    for (const label of ['视频制作', '资产库', '编辑内容', '商品卖点', '识别文字', '分镜脚本', '生成成片', '商品图片', '商品链接', '上传商品图片', '商品卖点工作区', '制作设置']) expect(html).toContain(label);
-    const workspaceTabs = html.match(/aria-label="切换功能板块">([\s\S]*?)<\/div>/)?.[1] ?? '';
-    expect(workspaceTabs.match(/role="tab"/g)).toHaveLength(2);
-    expect(workspaceTabs).not.toContain('提示词管理');
+    const html = renderToStaticMarkup(createElement(SalesStudio, { onBack: () => {}, onOpenLibrary: () => {} }));
+    for (const label of ['视频制作', '打开资产库', '编辑内容', '商品卖点', '识别文字', '分镜脚本', '生成成片', '商品图片', '商品链接', '上传商品图片', '商品卖点工作区', '制作设置']) expect(html).toContain(label);
+    expect(html).toContain('打开资产库');
+    expect(html).not.toContain('切换功能板块');
     const editorTabs = html.match(/aria-label="编辑内容">([\s\S]*?)<\/div>/)?.[1] ?? '';
     expect(editorTabs.match(/role="tab"/g)).toHaveLength(3);
     expect(editorTabs).not.toContain('卖点文案');
@@ -61,50 +58,7 @@ describe('single-screen ecommerce image workspace', () => {
     expect(html).not.toContain('aspect-square');
   });
 
-  it('renders compact reference script covers without expanded storyboard details', () => {
-    const script = normalizeScriptTemplate({
-      title: '法式室内松弛感穿搭',
-      durationSec: 9,
-      format: 'presenter',
-      voiceMode: 'voiceover',
-      shots: [{ start: 0, end: 9, beats: [{ start: 0, end: 4, actionTemplate: '迎面走来', requiredView: 'front' }, { start: 4, end: 9, actionTemplate: '转身展示背部', requiredView: 'back' }] }],
-    })!;
-    const html = renderToStaticMarkup(createElement(SalesScriptLibrary, {
-      items: [{ id: 's1', title: script.title, videoUrl: '/reference.mp4', depthVideoUrl: '/depth.mp4', videoHash: '', status: 'verified', script, model: '', promptVersion: '', version: 1, useCount: 2, updatedAt: '' }],
-      taxonomyItems: [], taxonomyLoading: false, onManageTaxonomy: () => {},
-      loading: false,
-      onReview: () => {},
-      onArchive: () => {},
-      onDelete: () => {},
-      onRefresh: () => {},
-    }));
-    expect(html).toContain('法式室内松弛感穿搭');
-    expect(html).not.toContain('当前商品缺：背面');
-    expect(html).not.toContain('sales-script-card-outline');
-    expect(html).not.toContain('sales-card-filmstrip');
-    expect(html.match(/<video/g)).toHaveLength(1);
-    expect(html).toContain('preload="metadata"');
-    expect(html).not.toMatch(/<video\b[^>]*\scontrols=/);
-    expect(html).toContain('已确认');
-    for (const label of ['当前已选用', '已选用', '选用此脚本', 'is-selected']) expect(html).not.toContain(label);
-
-    const emptyHtml = renderToStaticMarkup(createElement(SalesScriptLibrary, {
-      items: [],
-      taxonomyItems: [], taxonomyLoading: false, onManageTaxonomy: () => {},
-      loading: false,
-      onReview: () => {},
-      onArchive: () => {},
-      onDelete: () => {},
-      onRefresh: () => {},
-      onOpenImport: () => {},
-    }));
-    expect(emptyHtml).toContain('上传参考视频');
-    expect(emptyHtml).not.toContain('新增脚本');
-    expect(emptyHtml).not.toContain('暂无参考脚本');
-    expect(emptyHtml).not.toContain('粘贴拆解导入');
-  });
-
-  it('opens the requested management list with search, usage counts and safe row actions', () => {
+  it('opens the requested management list with compact controls, usage counts and safe row actions', () => {
     const html = renderToStaticMarkup(createElement(SalesScriptTaxonomyDialog, {
       initialKind: 'style',
       items: [{ id: 'cat-1', kind: 'category', name: '女装穿搭' }, { id: 'sty-1', kind: 'style', name: '口播讲解' }],
@@ -122,46 +76,12 @@ describe('single-screen ecommerce image workspace', () => {
     expect(html).toContain('拍摄风格');
     expect(html).not.toContain('女装穿搭');
     expect(html).toContain('口播讲解');
-    expect(html).toContain('aria-label="搜索风格"');
-    expect(html).toContain('3 组');
+    expect(html).not.toContain('aria-label="搜索风格"');
+    expect(html).toContain('已关联 3 组');
     expect(html).toContain('aria-label="重命名风格 口播讲解"');
-    expect(html).toContain('aria-label="口播讲解 更多操作"');
-    expect(html).toContain('移除分类或风格不会删除素材');
+    expect(html).toContain('aria-label="移除风格 口播讲解"');
+    expect(html).toContain('>关闭</button>');
     expect(html).not.toContain('推荐速建：');
-  });
-
-  it('renders script reviewer with global settings and exclusion leak detection', () => {
-    const script = normalizeScriptTemplate({
-      title: '街拍一镜到底推拉',
-      durationSec: 6,
-      format: 'presenter',
-      voiceMode: 'speech',
-      shots: [{ start: 0, end: 6, beats: [{ start: 0, end: 6, actionTemplate: '抚摸蓝色冲锋衣胸口门襟', requiredView: 'worn' }] }],
-      sourceExclusions: [{ type: 'product', term: '蓝色冲锋衣', replacementRule: '替换为当前商品' }],
-      review: ['请核对第 2 秒切点'],
-    })!;
-    const html = renderToStaticMarkup(createElement(SalesScriptReviewer, {
-      draft: { status: 'draft', script, model: 'gemini-2.5-pro', promptVersion: 'v3' },
-      taxonomyItems: [], taxonomyLoading: false, onManageTaxonomy: () => {},
-      saving: false,
-      onChange: () => {},
-      onBack: () => {},
-      onSaveDraft: () => {},
-      onConfirm: () => {},
-    }));
-    expect(html).toContain('脚本设定');
-    expect(html).toContain('确认入库');
-    expect(html).not.toContain('确认并选用');
-    expect(html).not.toContain('确认入库并选用');
-    expect(html).not.toContain('脚本总时长秒数');
-    expect(html).not.toContain('原片专属剥离清单');
-    expect(html).not.toContain('后续所需资产槽位汇总');
-    expect(html).not.toContain('复制提示词骨架');
-    expect(html).toContain('检测到原片专属词残留：蓝色冲锋衣');
-    expect(html).toContain('请核对第 2 秒切点');
-    expect(html).not.toContain('<video');
-    expect(html).not.toContain('编辑此段分镜与时间');
-    expect(html).not.toContain('播放此段');
   });
 
   it('requires reference review before video generation and puts music composition last', () => {
@@ -191,6 +111,9 @@ describe('single-screen ecommerce image workspace', () => {
       plan: emptySalesProductionPlan(),
       videoModels: [],
       voiceModels: [],
+      rankedVoices: [],
+      selectedVoice: null,
+      onOpenVoiceMaterials: () => {},
       busy: '',
       progressText: '',
       onPatchPlan: () => {},
@@ -204,17 +127,24 @@ describe('single-screen ecommerce image workspace', () => {
     expect(html).not.toContain('{{Mixed');
     expect(html).not.toContain('最终视频生成提示词');
     expect(html).not.toContain('即梦格式');
-    expect(html).toContain('我已核对以上素材，确认使用');
-    expect(html).toContain('用于第 1 段');
+    expect(html).toContain('确认使用素材');
+    expect(html).toContain('导入已有视频');
+    expect(html).toContain('aria-label="视频生成模型"');
+    expect(html).toContain('aria-label="视频生成参数"');
+    expect(html).toMatch(/sales-reference-slot-tag[^>]*>1<\/em>/);
     expect(html).toContain('商品主图（#2）');
-    expect(html).toContain('全片商品补充参考');
+    expect(html).not.toContain('全片商品补充参考');
     const buttons = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)];
     const generate = buttons.find(([, , body]) => body.replace(/<[^>]*>/g, '') === '生成视频');
-    const compose = buttons.find(([, , body]) => body.replace(/<[^>]*>/g, '') === '合成成片');
+    const review = buttons.find(([, , body]) => body.replace(/<[^>]*>/g, '') === '音频视频核查');
     expect(generate?.[1]).toContain('disabled=""');
-    expect(compose?.[1]).toContain('disabled=""');
-    expect(html.indexOf('核对引用素材')).toBeLessThan(html.indexOf('aria-label="生成视频"'));
-    expect(html.indexOf('aria-label="生成视频"')).toBeLessThan(html.indexOf('aria-label="配乐与导出"'));
+    expect(review?.[1]).toContain('disabled=""');
+    const order = ['视频预览与下载', '<summary>提示词', '<strong>使用素材', '本次异步任务 ID', '模型选择', '模型设置', '<strong>最终 BGM', 'aria-label="成片操作"'];
+    order.forEach((label, index) => {
+      expect(html).toContain(label);
+      if (index) expect(html.indexOf(label)).toBeGreaterThan(html.indexOf(order[index - 1]));
+    });
+    expect(html).toContain('<details open="" class="sales-final-prompt-preview">');
     expect(html).toContain('画外旁白');
     expect(html).toContain('视频预览与下载');
     expect(html).toContain('download="ecommerce-subtitles.srt"');
@@ -224,16 +154,20 @@ describe('single-screen ecommerce image workspace', () => {
     expect(decodeURIComponent(subtitleLink!.slice(subtitleLink!.indexOf(',') + 1)))
       .toContain('00:00:00,000 --> 00:00:08,000\r\n自带松弛感');
     const withVideo = { ...props, assembled: { ...assembled, effectiveVoiceMode: 'none' as const }, plan: { ...props.plan, generatedVideoUrl: '/raw-video.mp4' } };
+    const rendering = renderToStaticMarkup(createElement(SalesFinalPromptPanel, {
+      ...withVideo, busy: 'video', progressText: '渠道生成中 32%',
+      plan: { ...withVideo.plan, pendingVideoTask: { taskId: 'sales_media_local', channelTaskId: 'channel-42', model: 'video', modelSelection: 'video', sourceKey: 'inputs' } },
+    }));
+    expect(rendering).toContain('sales-render-frame');
+    expect(rendering).toContain('渠道生成中 32%');
+    expect(rendering).toContain('<code>channel-42</code>');
+    expect(rendering).not.toContain('sales_media_local');
     const noAudio = renderToStaticMarkup(createElement(SalesFinalPromptPanel, withVideo));
-    const noAudioCompose = [...noAudio.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)]
-      .find(([, , body]) => body.replace(/<[^>]*>/g, '') === '合成成片');
-    expect(noAudioCompose?.[1]).toContain('disabled=""');
-    expect(noAudio).toContain('无需配乐可直接下载原视频');
-    const withAudio = renderToStaticMarkup(createElement(SalesFinalPromptPanel, { ...withVideo, hasBackgroundMusic: true }));
-    const withAudioCompose = [...withAudio.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)]
-      .find(([, , body]) => body.replace(/<[^>]*>/g, '') === '合成成片');
-    expect(withAudioCompose).toBeDefined();
-    expect(withAudioCompose?.[1]).not.toContain('disabled=""');
+    const reviewWithVideo = [...noAudio.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)]
+      .find(([, , body]) => body.replace(/<[^>]*>/g, '') === '音频视频核查');
+    expect(reviewWithVideo).toBeDefined();
+    expect(reviewWithVideo?.[1]).not.toContain('disabled=""');
+    expect(noAudio).not.toContain('无需配乐可直接下载原视频');
   });
 });
 
@@ -265,7 +199,7 @@ describe('presentation mode, depth imitation and storyboard adaptation panels', 
     { hasScript: true, depthUrl: undefined, disabled: false, scriptDisabled: false, hint: '当前脚本尚未关联深度视频' },
     { hasScript: true, depthUrl: '   ', disabled: false, scriptDisabled: false, hint: '当前脚本尚未关联深度视频' },
     { hasScript: false, depthUrl: '/depth.mp4', disabled: false, scriptDisabled: true, hint: '先选用参考脚本' },
-    { hasScript: true, depthUrl: '/depth.mp4', disabled: true, scriptDisabled: true, hint: '深度视频仅参考动作与运镜' },
+    { hasScript: true, depthUrl: '/depth.mp4', disabled: true, scriptDisabled: true, hint: '深度视频仅参考动作，运镜、景别与表情按分镜执行' },
   ])('prevents unavailable action selections: $hasScript / $depthUrl / $disabled', async ({ hasScript, depthUrl, disabled, scriptDisabled, hint }) => {
     const { SalesPresentationModePanel } = await import('./components/SalesPresentationModePanel');
     const html = renderToStaticMarkup(createElement(SalesPresentationModePanel, {

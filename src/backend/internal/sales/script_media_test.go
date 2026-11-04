@@ -16,8 +16,7 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/gateway"
-	"beike.local/cloud/src/backend/internal/platform/storage"
+
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -38,7 +37,7 @@ func TestEnrichScriptMediaHonorsCancellation(t *testing.T) {
 	}
 }
 
-func TestScriptVideoUploadProbesAndEnrichesBeatFrames(t *testing.T) {
+func TestScriptVideoUploadProbesWithoutStoringSourceFrames(t *testing.T) {
 	root, _ := filepath.Abs(filepath.Join("..", "..", "..", ".."))
 	ffmpeg, ok := system.FFmpegBinary(root)
 	if !ok {
@@ -81,9 +80,8 @@ func TestScriptVideoUploadProbesAndEnrichesBeatFrames(t *testing.T) {
 		t.Fatalf("measured media should replace model guesses: %#v", script)
 	}
 	beat := script["shots"].([]any)[0].(map[string]any)["beats"].([]any)[1].(map[string]any)
-	frame, _ := beat["previewFrameUrl"].(string)
-	if frame == "" || storage.StoredFile(strings.TrimPrefix(frame, "/storage/")) == "" {
-		t.Fatalf("preview frame missing: %#v", beat)
+	if beat["previewFrameUrl"] != nil {
+		t.Fatal("original video frames must not be stored")
 	}
 }
 
@@ -99,47 +97,5 @@ func TestScriptVideoUploadRejectsUnsupportedFiles(t *testing.T) {
 	ScriptVideoUpload(config.Config{}).ServeHTTP(recorder, request)
 	if recorder.Code != 400 {
 		t.Fatalf("gif should be rejected: %d", recorder.Code)
-	}
-}
-
-func runNormalize(t *testing.T, body string, complete summaryCompleter) (*httptest.ResponseRecorder, map[string]any) {
-	t.Helper()
-	t.Setenv("AI_DRAWING_API_KEY", "test-key")
-	recorder := httptest.NewRecorder()
-	scriptNormalizeHandler(setupSalesTestConfig(t), complete).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/sales/script-normalize", strings.NewReader(body)))
-	var data map[string]any
-	_ = json.Unmarshal(recorder.Body.Bytes(), &data)
-	return recorder, data
-}
-
-func TestScriptNormalizeAcceptsPastedJSONWithoutModel(t *testing.T) {
-	pasted := strings.Replace(validScript, `"durationSec":6,`, "", 1)
-	raw, _ := json.Marshal(map[string]any{"rawText": "结果：\n```json\n{\"script\":" + pasted + "}\n```"})
-	recorder, data := runNormalize(t, string(raw), func(context.Context, gateway.TextRequest, bool) (int, map[string]any, error) {
-		t.Fatal("complete JSON must not call a model")
-		return 0, nil, nil
-	})
-	script, _ := data["script"].(map[string]any)
-	if recorder.Code != 200 || script["durationSec"] != 6.0 {
-		t.Fatalf("pasted JSON %d %#v", recorder.Code, data)
-	}
-}
-
-func TestScriptNormalizeUsesModelForFreeText(t *testing.T) {
-	recorder, data := runNormalize(t, `{"rawText":"镜头一（00:00-00:02）：她坐在桌前看镜头"}`, func(context.Context, gateway.TextRequest, bool) (int, map[string]any, error) {
-		t.Fatal("model is required before calling upstream")
-		return 0, nil, nil
-	})
-	if recorder.Code != 400 || !strings.Contains(data["error"].(string), "文本模型") {
-		t.Fatalf("free text without model: %d %#v", recorder.Code, data)
-	}
-	var sent gateway.TextRequest
-	recorder, data = runNormalize(t, `{"rawText":"镜头一（00:00-00:02）：她坐在桌前看镜头","model":"gpt-4o"}`, func(_ context.Context, req gateway.TextRequest, _ bool) (int, map[string]any, error) {
-		sent = req
-		return 200, scriptCompletion(validScript, "stop"), nil
-	})
-	payload, _ := json.Marshal(sent.Payload)
-	if recorder.Code != 200 || data["script"] == nil || !strings.Contains(string(payload), "规整外部拆解结果") {
-		t.Fatalf("free text normalize %d %#v %s", recorder.Code, data, payload)
 	}
 }

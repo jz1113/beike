@@ -63,7 +63,7 @@ function BatchProductImageGrid({
 
   return (
     <div className="space-y-3 pb-4">
-      <div className="grid grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3.5 sm:gap-4">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,140px),1fr))] gap-3.5 sm:gap-4">
         {visibleImages.map((imgObj, imgIdx) => {
           const isChecked = selectedSet.has(imgObj.url);
           const selectedOrder = isChecked ? selectedImages.indexOf(imgObj.url) : -1;

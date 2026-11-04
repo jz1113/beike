@@ -249,9 +249,9 @@ export const grokImageAdapter: ImageModelAdapter = {
     return {
       family: 'grok-image',
       modelId: apiModel,
-      useEdits: false,
+      useEdits: refs.length > 0,
       payload,
-      endpoints: (baseUrl) => dalleEndpoints(baseUrl, false),
+      endpoints: (baseUrl) => dalleEndpoints(baseUrl, refs.length > 0),
     };
   },
 };

@@ -16,7 +16,7 @@ export function salesAdaptationScriptKey(script?: SalesScriptDomain): string {
     script.shots.map((shot) => [shot.start, shot.end, shot.beats.map((beat) => [
       beat.start, beat.end, beat.purpose, beat.shotSize, beat.camera, beat.subject,
       beat.action, beat.actionTemplate, beat.expression, beat.scene, beat.transition,
-      beat.requiredView, beat.voice, beat.subtitle,
+      beat.requiredView, beat.voice, beat.subtitle, ...(beat.productVisible === undefined ? [] : [beat.productVisible]),
     ])]),
   ]);
   let first = 0x811c9dc5;

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Music, Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { StudioAudioPlayer } from '@client/shared/ui/studio/StudioAudioPlayer';
 import type { RankedAsset, SalesBgmCandidate } from '@shared/domain/sales';
@@ -47,14 +47,14 @@ export function SalesMusicPicker({ active = true, plan, rankedBgms, selectedBgm,
       </div>
       {audioUrl && (
         <StudioAudioPlayer
-          src={proxyMediaUrl(audioUrl)}
+          src={proxyMediaUrl(audioUrl, { asAudio: true })}
+          preload="metadata"
           label={plan.customBgmUrl ? '上传配乐试听' : selectedBgm?.title || '配乐试听'}
           durationHintSec={plan.customBgmUrl ? undefined : selectedBgm?.durationSec}
           compact
         />
       )}
       <div className="sales-bgm-meta">
-        <span><Music size={11} aria-hidden />{plan.customBgmUrl ? '使用上传的音乐' : selectedBgm?.license || '可上传音乐，为视频添加氛围'}</span>
         <input ref={inputRef} type="file" accept="audio/*" className="hidden" onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = '';

@@ -23,7 +23,7 @@ vi.mock('react', async (original) => ({
     }];
   },
 }));
-vi.mock('../hooks/useSalesSummaryModels', () => ({ useSalesSummaryModels: () => ({ model: 'vision', options: [{ id: 'vision', name: '测试模型' }] }) }));
+vi.mock('../hooks/useSalesTextModels', () => ({ useSalesTextModels: () => ({ model: 'vision', options: [{ id: 'vision', name: '测试模型' }] }) }));
 
 type Props = ComponentProps<typeof SalesOCRWorkspace>;
 function props(): Props {
@@ -69,12 +69,12 @@ describe('single product selling point workspace', () => {
     value.state = { ...value.state, ocrImageUrls: [], ocrImages: [] };
     const { html } = render(value);
     expect(html.match(/<h2>商品卖点<\/h2>/g)).toHaveLength(1);
-    expect(html).toContain('默认添加前 1 张详情图，可调整');
-    expect(html).toContain('从商品图片中添加，或将图片拖入此处。');
-    expect(html).toContain('aria-label="补充商品文字"');
+    expect(html).toContain('默认添加前 1 张详情图');
+    expect(html).toContain('输入商品资料，或添加详情图后识别文字。');
+    expect(html).toContain('id="sales-product-text"');
     expect(html).toContain('跳过，进入分镜');
-    expect(button(html, '跳过，进入分镜')).toContain('sales-storyboard-skip');
-    expect(html.indexOf('跳过，进入分镜')).toBeLessThan(html.indexOf('aria-label="补充商品文字"'));
+    expect(button(html, '跳过，进入分镜')).toContain('sales-text-button');
+    expect(html.indexOf('跳过，进入分镜')).toBeGreaterThan(html.indexOf('商品资料底部操作栏'));
     expect(html).toContain('aria-label="卖点提炼模型"');
     expect(html).not.toContain('生成设置');
     expect(button(html, '添加详情图')).not.toContain('sales-collect-primary');
@@ -88,6 +88,8 @@ describe('single product selling point workspace', () => {
     const { html } = render(props());
     expect(html).toContain('用户校正后的棉质面料');
     expect(html).toContain('aria-label="识别文字编辑"');
+    expect(html.match(/<textarea\b/g)).toHaveLength(1);
+    expect(html.indexOf('文字识别队列')).toBeLessThan(html.indexOf('id="sales-product-text"'));
     expect(html).not.toContain('aria-label="最终卖点编辑"');
     expect(html).toContain('>待提炼</span>');
     expect(button(html, '提炼卖点')).toContain('sales-collect-primary');
@@ -153,7 +155,7 @@ describe('single product selling point workspace', () => {
     expect(value.state.ocrImages[0].editedText).toBe('用户校正后的棉质面料');
   });
 
-  it('allows pasted product text to advance without an OCR image', () => {
+  it('allows supplementary product facts before optional OCR', () => {
     const value = props();
     value.state = { ...emptySalesCollection(), sellingPoints: '棉质面料，柔软亲肤' };
     const { html } = render(value);
@@ -161,7 +163,7 @@ describe('single product selling point workspace', () => {
     expect(html).toContain('>待提炼</span>');
     expect(button(html, '提炼卖点')).toContain('sales-collect-primary');
     expect(button(html, '提炼卖点')).not.toContain('disabled=""');
-    expect(html).not.toContain('class="sales-ocr-empty"');
+    expect(html.match(/<textarea\b/g)).toHaveLength(1);
     expect(html).toContain('添加详情图');
     expect(html).toContain('maxLength="20000"');
   });
@@ -189,6 +191,7 @@ describe('single product selling point workspace', () => {
     expect(value.onRecognize).toHaveBeenCalledWith('/detail.png', false);
     expect(button(render(value).html, 'OCR 识别')).not.toContain('disabled=""');
     expect(button(render(value).html, '提炼卖点')).toContain('sales-collect-primary');
+    expect(button(render(value).html, '提炼卖点')).not.toContain('disabled=""');
     value.state.ocrImages = [{ imageUrl: '/detail.png', editedText: '', error: '识别失败' }];
     expect(button(render(value).html, '重试识别')).not.toContain('disabled=""');
     findButton(SalesOCRQueueStrip(value), '重试识别图片 #1')!.props.onClick();

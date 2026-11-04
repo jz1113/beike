@@ -13,17 +13,18 @@ import (
 )
 
 type assetViewJob struct {
-	ID         string            `json:"id"`
-	Key        string            `json:"key"`
-	Kind       string            `json:"kind"`
-	AssetID    string            `json:"assetId"`
-	Model      string            `json:"model"`
-	Name       string            `json:"name"`
-	Status     string            `json:"status"`
-	Error      string            `json:"error"`
-	Images     map[string]string `json:"images"`
-	CreatedAt  string            `json:"createdAt"`
-	UpdatedAt  string            `json:"updatedAt"`
+	ID         string               `json:"id"`
+	Key        string               `json:"key"`
+	Kind       string               `json:"kind"`
+	AssetID    string               `json:"assetId"`
+	Model      string               `json:"model"`
+	Name       string               `json:"name"`
+	Status     string               `json:"status"`
+	Error      string               `json:"error"`
+	Images     map[string]string    `json:"images"`
+	CreatedAt  string               `json:"createdAt"`
+	UpdatedAt  string               `json:"updatedAt"`
+	Creation   *assetCreationResult `json:"creation,omitempty"`
 	checkpoint generate.ImageTaskCheckpoint
 	generation map[string]any
 	assetData  map[string]any
@@ -49,6 +50,7 @@ func scanAssetViewJob(row interface{ Scan(...any) error }) (assetViewJob, error)
 	if json.Unmarshal([]byte(images), &job.Images) != nil || json.Unmarshal([]byte(generation), &job.generation) != nil || json.Unmarshal([]byte(assetData), &job.assetData) != nil {
 		return job, errors.New("invalid saved asset generation")
 	}
+	job.Creation = assetCreationResultFor(job.generation)
 	job.Name, _ = job.assetData["name"].(string)
 	if job.Name == "" {
 		job.Name, _ = job.assetData["title"].(string)
@@ -64,6 +66,7 @@ func loadAssetViewJob(ctx context.Context, db *sql.DB, workspace, column, value 
 }
 
 func persistAssetViewJob(ctx context.Context, db *sql.DB, workspace string, job *assetViewJob) error {
+	job.Creation = assetCreationResultFor(job.generation)
 	job.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	images, err := json.Marshal(job.Images)
 	if err != nil {
@@ -85,7 +88,7 @@ func safeAssetViewGeneration(payload map[string]any) map[string]any {
 	// Only generation settings needed for recovery are persisted. Credentials stay
 	// in the detached request and must be provided again after a service restart.
 	out := map[string]any{}
-	for _, key := range []string{"model", "modelSelection", "prompt", "size", "quality", "imageQuality", "aspectRatio", "customBaseUrl", "customProtocol", "requestTemplate", "imageProtocol", "imageProtocolTemplate", "useReferenceImage", "referenceImageUrl", "referenceImages", "source", "metadata", "allowInsecureHttp"} {
+	for _, key := range []string{"model", "modelSelection", "prompt", "size", "quality", "imageQuality", "aspectRatio", "customBaseUrl", "customProtocol", "requestTemplate", "imageProtocol", "imageProtocolTemplate", "useReferenceImage", "referenceImageUrl", "referenceImages", "source", "metadata", "allowInsecureHttp", "assetCreation"} {
 		if value, ok := payload[key]; ok {
 			out[key] = withoutAssetViewSecrets(value)
 		}

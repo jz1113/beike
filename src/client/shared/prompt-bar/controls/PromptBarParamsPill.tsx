@@ -4,7 +4,7 @@ import { ChevronDown } from 'lucide-react';
 import { usePromptBarPopoverLayout } from '../hooks/usePromptBarPopoverLayout';
 import { EXTENDED_IMAGE_RATIO_ITEMS } from '../promptBarConstants';
 import {
-  loadPromptPreferences,
+  loadPromptPreferences, promptPreferencesChanged,
   savePromptPreferences,
   type ImageInferenceStrength,
   type ImageQualityTier,
@@ -17,9 +17,10 @@ import { PromptBarImageTab, imageQualityLabel, imageResolutionLabel, promptRewri
 import { PromptBarAudioTab } from './preferences/PromptBarAudioTab';
 import { videoParamModeLabel } from './preferences/PromptBarVideoTab';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
-import { resolveVideoResolution } from '@shared/domain/media/video';
+import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
 import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
-import { getModelCredentials } from '@client/shared/api/gatewayClient';
+import { getGatewayClientBaseUrl, getModelCredentials } from '@client/shared/api/gatewayClient';
+import { useAppStore } from '@client/store';
 
 interface PromptBarParamsPillProps {
   isUp: boolean;
@@ -31,9 +32,11 @@ interface PromptBarParamsPillProps {
   quickVideoAspectId: string;
   quickVideoResolution: string;
   quickVideoDuration: number;
+  quickVideoContextIrEnabled?: boolean;
+  setQuickVideoContextIrEnabled?: (enabled: boolean) => void;
   setQuickVideoRefMode: (mode: string) => void;
   setQuickVideoAspectId: (aspect: string) => void;
-  setQuickVideoResolution: (resolution: '480P' | '540P' | '720P' | '1080P' | '2K' | '4K') => void;
+  setQuickVideoResolution: (resolution: '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K') => void;
   setQuickVideoDuration: (seconds: number) => void;
   quickAspectId: string;
   quickQuality: string;
@@ -54,7 +57,7 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
     props.setQuickQuality(qualityForResolution(saved.image.resolution));
     const videoAspect = saved.video.aspect === 'smart' ? 'adaptive' : saved.video.aspect;
     if (videoAspect) props.setQuickVideoAspectId(videoAspect);
-    if (saved.video.resolution) props.setQuickVideoResolution(resolveVideoResolution(saved.video.resolution, props.supportedResolutions));
+    if (saved.video.resolution) props.setQuickVideoResolution(resolveVideoResolution(saved.video.resolution, videoProfile?.supportedResolutions || props.supportedResolutions));
     if (saved.video.customDurationSec) props.setQuickVideoDuration(saved.video.customDurationSec);
     // 只在输入栏挂载时把已保存的参数同步进当前创作状态。
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -71,9 +74,15 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [open, panelRef]);
 
+  useEffect(() => {
+    const sync = () => setPrefs(loadPromptPreferences());
+    window.addEventListener(promptPreferencesChanged, sync);
+    return () => window.removeEventListener(promptPreferencesChanged, sync);
+  }, []);
+
   const persist = (next: PromptComposerPreferences) => {
-    setPrefs(next);
-    savePromptPreferences(next);
+    const current = { ...next, video: { ...next.video, contextIrEnabled: useAppStore.getState().quickVideoContextIrEnabled ?? true } };
+    savePromptPreferences(current);
   };
 
   const onOpenChange = props.onOpenChange;
@@ -81,6 +90,8 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
   const credentials = getModelCredentials(props.modelId);
   const resolvedImageModelId = upstreamModalityModelId('image', props.modelId);
   const resolvedVideoModelId = upstreamModalityModelId('video', props.modelId);
+  const videoBaseUrl = getGatewayClientBaseUrl(props.modelId);
+  const videoProfile = getVideoModelById(resolvedVideoModelId, videoBaseUrl);
   const imageCaps = imageCapabilities(resolvedImageModelId, credentials.protocol, credentials.baseUrl);
   const allowedResolutions = imageCaps.resolutions;
   const allowedAspectRatios = imageCaps.aspectRatios;
@@ -148,12 +159,15 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
           ) : isVideo ? (
             <PromptBarVideoTab
               modelId={resolvedVideoModelId}
-              supportedAspectRatios={props.supportedAspectRatios}
-              supportedResolutions={props.supportedResolutions}
+              baseUrl={videoBaseUrl}
+              supportedAspectRatios={videoProfile?.supportedAspectRatios || props.supportedAspectRatios}
+              supportedResolutions={videoProfile?.supportedResolutions || props.supportedResolutions}
               mode={props.quickVideoRefMode}
               aspect={props.quickVideoAspectId}
               resolution={props.quickVideoResolution}
               duration={props.quickVideoDuration}
+              contextIrEnabled={props.quickVideoContextIrEnabled ?? true}
+              onContextIrEnabled={props.setQuickVideoContextIrEnabled}
               onMode={props.setQuickVideoRefMode}
               onAspect={(aspect) => {
                 props.setQuickVideoAspectId(aspect);

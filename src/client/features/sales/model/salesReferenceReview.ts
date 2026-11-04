@@ -5,6 +5,8 @@ export function salesReferenceReviewKey(assembled: AssembledSalesPrompt, binding
   return JSON.stringify([
     scriptId,
     assembled.references,
+    assembled.audios || [],
+    ...(assembled.voiceIds?.length ? [assembled.voiceIds] : []),
     bindings.map(({ beatIndex, image, requiredView, assignedView }) => [beatIndex, image?.url, requiredView, assignedView]),
     assembled.warnings,
     assembled.imitationMode,

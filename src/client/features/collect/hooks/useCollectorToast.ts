@@ -3,7 +3,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 const TOAST_DURATION_MS = 2800;
 
 /**
- * 采集模块专用 Toast hook。
  * 统一管理 Toast 消息的显示，自动清理 setTimeout，避免组件卸载后仍触发 setState。
  */
 export function useCollectorToast() {

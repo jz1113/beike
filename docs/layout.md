@@ -13,7 +13,7 @@
 | `src/shared/data` | 前后端共用的 JSON 数据与官方种子 |
 | `database` | 可选的已有本地数据库和备份，整目录不提交 |
 | `tools/configs` | 本地环境模板、Vite、TypeScript、Vitest、ESLint、依赖边界与质量基线 |
-| `tools/scripts` | `common` 工具链查找、`web` 构建/启动/产物清理、`quality` 检查、`depth` 推理与环境、`atlas` 开源人像与姿态图鉴同步、`db-maintenance` 数据维护 |
+| `tools/scripts` | `common` 工具链查找、`web` 构建/启动/产物清理、`quality` 检查、`depth` 推理与环境、`db-maintenance` 数据维护 |
 | `tools/launchers` | Windows PowerShell 启动器实现，由根目录 `.bat` 调用 |
 | `tools/deploy` | 服务与反向代理模板、服务器安装入口 |
 | `tools/build` | 自动生成的 API 可执行文件和 `ui` 前端产物 |
@@ -71,9 +71,8 @@ src/client/
 | `workshop` | `stage` / `product` | 各流程阶段 / 商品选择与参考图展示 |
 | `workshop` | `settings` / `delivery` / `history` | 生成配置 / 成图、进度、审核与交付 / 历史批次 |
 | `assistant` | `message` / `panels` / `brand-kit` / `document` / `skill` | 对话消息 / 功能面板 / 品牌 / 文档 / 技能 |
-| `sales` | `atlas` | 开源人像与多视角姿态图鉴抽屉、虚拟化网格、筛选工具栏与高清灯箱 |
 
-资产中心 `AssetCenter`、电商图文组装组件 `BatchWorkshopView`、设置通用的 `SettingsControls / SettingsSidebar / SettingsPreview` 留在各自 components 根目录。只在本功能使用的共用组件无需提升到全局 shared。
+生成历史 `AssetCenter`、电商图文组装组件 `BatchWorkshopView`、设置通用的 `SettingsControls / SettingsSidebar / SettingsPreview` 留在各自 components 根目录。只在本功能使用的共用组件无需提升到全局 shared。
 
 素材库的平铺列表、项目计数与项目详情使用相同的素材合并和来源筛选规则。画布封面与空项目占位不作为独立素材；文字备注不计入素材数。“我上传的”只展示带独立上传标记的记录，生成任务的参考图字段不改变生成结果的来源。历史素材逐页加载并显示加载或重试状态；历史未完整读取时不能删除对话项目。批量操作只作用于当前可见的勾选项，筛选切换和删除后清理失效勾选。项目归属使用精确标识匹配，服务端确认素材删除成功后才移除本地对话项目；删除、下载与项目清理共享操作锁。
 
@@ -97,19 +96,19 @@ src/client/
 | 首页 | `home` | `catalog` |
 | AI 生成 | `generate` | `generate` |
 | 画布 | `canvas` | `generate`、`catalog` |
-| 资产库 | `assets` | `assets`、`library`、`catalog` |
+| 资产库（独立页面 `asset_library`） | `app/media-library`、`assets` | `assets`、`library`、`catalog` |
 | 设置 | `settings` | `system` |
 | AI 助手 | `assistant` | `assistant` |
 | 电商图文 | `workshop` | `workshop`、`catalog`、`platform/database/learning` |
 | 封面 | `poster` | `generate/poster` |
 | 词包 | `keywords` | `keywords` |
-| 采集 | `collect` | `catalog`、`platform/collect` |
+| OSS 视频下载 | `collect` | `system` |
 | 电商视频 | `sales` | `sales`、`catalog`（共用采集） |
 | 技能 | `skills` | `catalog`、`platform/database` |
 
 页面入口统一为 `PosterStudio / KeywordsStudio / SalesStudio`。商品采集的目录与选图规则位于 `src/shared/domain/sales`，模型协议适配位于后端 `gateway`。
 
-数字人与 PPT 功能重建中，首页仅保留入口占位，旧视图参数回到首页。旧工作室、专属契约与生成接口已移除；数字人历史数据库迁移、用户数据和模型线路配置保留。`generate/export` 继续服务电商图文等功能的通用 ZIP 导出。
+数字人与 PPT 功能重建中，旧视图参数回到首页。旧工作室、专属契约与生成接口已移除；数字人历史数据库迁移、用户数据和模型线路配置保留。`generate/export` 继续服务电商图文等功能的通用 ZIP 导出。
 
 目录名用于源码定位。浏览器视图参数、HTTP 接口地址、草稿存储键与数据库标识保持原有兼容形式，已有链接和工作记录继续可用。
 
@@ -196,9 +195,9 @@ GitHub CI 额外运行 Gitleaks，配置位于 `tools/configs/gitleaks.toml`，�
 
 - `check:root-layout` 限定根目录归属，检查 HTML/Vite/OpenAPI 的唯一位置、docs 平铺和组件实际分类。
 - `check:structure` 禁止嵌套 package.json、workspace 依赖和未声明的外部依赖。
-- `lint:boundaries` 校验静态导入、re-export、类型导入、字面量动态 import 和 require，并阻止 feature model 反向依赖功能界面。
+- `lint:boundaries` 校验静态导入、re-export、类型导入、字面量动态 import 和 require，并阻止 feature model 反向依赖功能界面。对画布发行包中的 Node 原生模块，按浏览器环境核对引用，浏览器分支中仍可执行的导入会报错。
 - `lint:deps` 检查孤立模块与依赖循环；`typecheck:client` 不加载 Node 全局类型。
-- `check:reachability` 从浏览器入口、HTML 引用的初始化脚本、正式测试和显式契约入口遍历完整引用图，拦截无人消费的导出文件及其依赖；仅由测试消费的实现会在通过信息中单独计数。
+- `check:reachability` 从浏览器入口、HTML 引用的初始化脚本、正式测试和显式契约入口遍历完整引用图，画布 iframe 按 HTML 基地址连接宿主脚本，并沿动态导入和浏览器解析的 Worker、模块 URL 继续追踪。检查拦截无人消费的导出文件及其依赖；仅由测试消费的实现会在通过信息中单独计数。
 - 文件有效代码预算为 400 行。第三方背景组件仍有已审查的长度基线；未使用、显式 any、文件长度和依赖边界基线只允许收紧，目录迁移只更新对应路径。
 - 正式测试留在源码旁，使用 `*.test.ts` 和 Go `*_test.go`。QA fixture、截图、一次性报告和 Agent 计划放项目外。
 - `.env*`、`.local`、数据库及 WAL/SHM、备份、上传素材、迁移与种子具有运行和恢复用途；不能按忽略状态或 import 数量删除。

@@ -1,14 +1,13 @@
 import type { BatchProductItem, GenerationStrategy } from '../batchTypes';
 import { checkWorkshopReadiness, summarizeWorkshopResults } from '../generation/workshopReadiness';
 
+// Persisted steps 1 and 2 are the import and selection states of 商品资料.
+export type WorkshopStage = 1 | 2 | 3 | 4;
 export const workshopSteps = [
-  { stage: 1, title: '添加商品', description: '粘贴链接或 SKU，采集商品' },
-  { stage: 2, title: '选图与配置', description: '确认商品图、创作技能和生成设置' },
-  { stage: 3, title: '分析与确认', description: '生成分镜，核对提示词后再生图' },
-  { stage: 4, title: '成图与交付', description: '检查图片、补充文案并导出' },
+  { stage: 2, title: '商品资料', description: '导入商品，逐条选择参考图' },
+  { stage: 3, title: '配图方案', description: '按创作技能分析并确认每张配图' },
+  { stage: 4, title: '图文交付', description: '核对成图和发布文案，导出本批内容' },
 ] as const;
-
-export type WorkshopStage = typeof workshopSteps[number]['stage'];
 
 export function getWorkshopFlow(items: BatchProductItem[], config: {
   generationStrategy: GenerationStrategy;
@@ -42,8 +41,8 @@ export function getWorkshopFlow(items: BatchProductItem[], config: {
     if (busy) return '任务执行中，请等待当前任务结束后切换步骤';
     if (stage === 1) return null;
     if (stage === 2) return products.length > 0 ? null : '请先添加并采集商品';
-    if (stage === 3) return imagesReady ? null : '请先为每款商品选择至少一张商品图';
-    if (stage === 4) return hasResults ? null : '请先在「分析与确认」中确认提示词并开始生图';
+    if (stage === 3) return imagesReady ? null : '请先为每条图文选择至少一张商品图';
+    if (stage === 4) return hasResults ? null : '请先在「配图方案」确认方案并开始生图';
     return '无效的电商图文步骤';
   };
 

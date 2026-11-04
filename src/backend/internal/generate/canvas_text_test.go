@@ -66,3 +66,25 @@ func TestCanvasTextReadsResponsesAPI(t *testing.T) {
 		t.Fatalf("status %d path %s body %s", response.Code, path, response.Body.String())
 	}
 }
+
+func TestCanvasChatKeepsToolCallsOnHostGateway(t *testing.T) {
+	t.Setenv("AI_API_KEY", "host-test")
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer host-test" || r.URL.Path != "/v1/chat/completions" {
+			t.Error("wrong route or credentials")
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"call_1","type":"function","function":{"name":"create_node","arguments":"{}"}}]}}]}`))
+	}))
+	defer upstream.Close()
+	t.Setenv("AI_DRAWING_API_KEY", "")
+	t.Setenv("AI_DRAWING_BASE_URL", upstream.URL)
+	prev := canvasHTTP
+	canvasHTTP = func() *http.Client { return upstream.Client() }
+	t.Cleanup(func() { canvasHTTP = prev })
+	r := httptest.NewRequest("POST", "/api/generate/canvas-text", strings.NewReader(`{"model":"host-chat","messages":[{"role":"user","content":"创建节点"}],"tools":[{"type":"function","function":{"name":"create_node"}}]}`))
+	w := httptest.NewRecorder()
+	CanvasText(config.Config{}).ServeHTTP(w, r)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "create_node") || strings.Contains(w.Body.String(), "host-test") {
+		t.Fatalf("unexpected response: %d %s", w.Code, w.Body.String())
+	}
+}

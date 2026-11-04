@@ -1,4 +1,5 @@
 export type SettingsNavSection =
+  | 'library'
   | 'appearance'
   | 'profile'
   | 'api'
@@ -18,7 +19,8 @@ export type CanvasSettingsPage =
   | 'connections'
   | 'board'
   | 'nodes'
-  | 'actions';
+  | 'actions'
+  | 'pet';
 
 interface NavItem {
   id: SettingsNavSection;
@@ -27,16 +29,18 @@ interface NavItem {
 }
 
 export const CANVAS_SETTINGS_PAGES: { id: CanvasSettingsPage; label: string; count?: number; keywords: string[] }[] = [
-  { id: 'connections', label: '连线', count: 8, keywords: ['连线', '跑马灯', '流光', '粗细'] },
-  { id: 'board', label: '画布', count: 10, keywords: ['网格', '吸附', '导航', '光晕'] },
+  { id: 'connections', label: '连线', count: 9, keywords: ['连线', '跑马灯', '流光', '粗细'] },
+  { id: 'board', label: '画布', count: 9, keywords: ['网格', '吸附', '导航', '光晕'] },
   { id: 'nodes', label: '节点', count: 5, keywords: ['节点', '秒表', '开始'] },
   { id: 'actions', label: '操作', count: 1, keywords: ['删除', '确认'] },
+  { id: 'pet', label: '桌宠', keywords: ['桌宠', '画布联动', '视线'] },
 ];
 
 export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'profile', label: '创作档案', keywords: ['用量', '额度', '余额', '统计', '消耗', 'token', '足迹'] },
+  { id: 'library', label: '资产库', keywords: ['素材', '共享', '工作区', '入口', '侧栏'] },
   { id: 'appearance', label: '外观与主题', keywords: ['外观', '深色', '浅色', '主题', '暗黑', '模式', '背景', '夜间', '白天'] },
-  { id: 'api', label: 'API 接入', keywords: ['api', 'comfly', 'openai', 'deepseek', '联池', '网关', 'key', '渠道', '万邦', '奇云'] },
+  { id: 'api', label: 'API 接入', keywords: ['api', 'comfly', 'openai', 'deepseek', '联池', '网关', 'key', '渠道', '万邦'] },
   { id: 'chat', label: '多模态', keywords: ['多模态', '对话', '视觉', '默认', '助手'] },
   { id: 'image', label: '绘画', keywords: ['绘画', '生图', '默认'] },
   { id: 'video', label: '视频', keywords: ['视频', '默认'] },
@@ -69,6 +73,11 @@ export function queueSettingsSection(section: SettingsNavSection) {
 
 export function peekQueuedSettingsSection(): SettingsNavSection | null {
   const value = peekStorageSection();
+  if (value === 'canvas:pet') return 'canvas';
   if (value && SETTINGS_NAV_ITEMS.some((item) => item.id === value)) return value as SettingsNavSection;
   return null;
+}
+
+export function initialCanvasSettingsPage(): CanvasSettingsPage {
+  return peekStorageSection() === 'canvas:pet' ? 'pet' : 'connections';
 }

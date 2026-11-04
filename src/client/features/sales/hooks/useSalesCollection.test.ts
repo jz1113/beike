@@ -260,7 +260,7 @@ describe('edited product selling points workflow', () => {
   it('requires usable text, uses current edits, blocks duplicate summaries and saves a separate result', async () => {
     await Render().summarize('vision');
     expect(summarizeProduct).not.toHaveBeenCalled();
-    expect(Render().summaryError).toContain('识别文字');
+    expect(Render().summaryError).toContain('OCR');
     ready();
     let finish!: (value: typeof summaryResponse) => void;
     vi.mocked(summarizeProduct).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
@@ -269,21 +269,21 @@ describe('edited product selling points workflow', () => {
     await Render().summarize('vision');
     expect(collectEcommerceProduct).not.toHaveBeenCalled();
     expect(summarizeProduct).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(summarizeProduct).mock.calls[0][0].textImages[0].text).toBe('用户修正的识别文字');
+    expect(vi.mocked(summarizeProduct).mock.calls[0][0]).toEqual({ textSources: [{ index: 3, text: '用户修正的识别文字' }] });
     expect(Render().state.colorSelection.confirmedImageUrls).toEqual(['/a.png']);
     finish(summaryResponse); await run;
     expect(Render().state.productSummary).toMatchObject({ result: summaryResponse.result, model: 'vision' });
     expect(Render().state.sellingPoints).toBe('');
     expect(Render().isSummarizing).toBe(false);
   });
-  it('extracts pasted text without OCR and preserves it and the last final result on failure', async () => {
+  it('extracts from supplied facts and retains the revised result after a failed retry', async () => {
     Render().updateState({ ocrImageUrls: [], sellingPoints: '手动补充的棉质上衣' });
     vi.mocked(summarizeProduct).mockResolvedValueOnce(summaryResponse);
-    await Render().summarize('vision');
-    expect(vi.mocked(summarizeProduct).mock.calls[0][0]).toMatchObject({ facts: '手动补充的棉质上衣', textImages: [] });
+    await Render().summarize('text');
+    expect(vi.mocked(summarizeProduct).mock.calls[0][0]).toEqual({textSources:[],productFacts:'手动补充的棉质上衣'});
     const saved = Render().state.productSummary;
     vi.mocked(summarizeProduct).mockRejectedValueOnce(new Error('网络中断'));
-    await Render().summarize('vision');
+    await Render().summarize('text');
     expect(Render().state.sellingPoints).toBe('手动补充的棉质上衣');
     expect(Render().state.productSummary).toEqual(saved);
     expect(Render().summaryError).toBe('网络中断');
@@ -323,14 +323,29 @@ describe('edited product selling points workflow', () => {
     fail(new Error('重新识别失败')); await run;
     expect(Render().state.ocrImages[0]).toMatchObject({ result, editedText: previous.editedText, error: '重新识别失败' });
   });
-  it('does not attach a response when source images become unavailable', async () => {
+  it('keeps pending text extraction valid when original images become unavailable', async () => {
     ready();
     let finish!: (value: typeof summaryResponse) => void;
     vi.mocked(summarizeProduct).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
     const run = Render().summarize('vision');
     Render().markImageUnavailable(3); finish(summaryResponse); await run;
+    expect(Render().state.productSummary?.result).toEqual(summaryResponse.result);
+    expect(Render().summaryError).toBeNull();
+    expect(vi.mocked(summarizeProduct).mock.calls[0][2].aborted).toBe(false);
+  });
+  it('keeps reference selection independent and invalidates pending copy when product evidence changes', async () => {
+    ready();
+    let finish!: (value: typeof summaryResponse) => void;
+    vi.mocked(summarizeProduct).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const run = Render().summarize('text');
+    Render().updateState({ colorSelection: { colorLabel: '', confirmedImageUrls: ['/b.png'], excludedImageUrls: [] } });
+    expect(Render().isSummarizing).toBe(true);
+    Render().updateState({ productName: '修改商品名称', brand: '修改品牌', props: { 成分: '亚麻' }, sellingPoints: '修改补充文字' });
+    expect(Render().isSummarizing).toBe(false);
+    expect(vi.mocked(summarizeProduct).mock.calls[0][2].aborted).toBe(true);
+    expect(vi.mocked(summarizeProduct).mock.calls[0][0]).toEqual({ textSources: [{ index: 3, text: '用户修正的识别文字' }] });
+    finish(summaryResponse); await run;
     expect(Render().state.productSummary).toBeUndefined();
-    expect(Render().summaryError).toContain('资料已更新');
   });
   it('allows source changes while a model is pending, cancels stale work and protects the next request', async () => {
     ready();
@@ -338,17 +353,18 @@ describe('edited product selling points workflow', () => {
     let newDone!: (value: typeof summaryResponse) => void;
     vi.mocked(summarizeProduct).mockReturnValueOnce(new Promise((resolve) => { oldDone = resolve; })).mockReturnValueOnce(new Promise((resolve) => { newDone = resolve; }));
     const oldRun = Render().summarize('vision');
-    Render().updateState({ colorSelection: { colorLabel: '', confirmedImageUrls: ['/b.png'], excludedImageUrls: [] } });
-    expect(Render().state.colorSelection.confirmedImageUrls).toEqual(['/b.png']);
+    Render().updateState({ ocrImages: [{ ...Render().state.ocrImages[0], editedText: '更新后的 OCR 文字' }] });
+    expect(Render().state.ocrImages[0].editedText).toBe('更新后的 OCR 文字');
     expect(Render().isSummarizing).toBe(false);
     expect(vi.mocked(summarizeProduct).mock.calls[0][2].aborted).toBe(true);
     const newRun = Render().summarize('vision');
     oldDone(summaryResponse); await oldRun;
     expect(Render().isSummarizing).toBe(true);
     expect(Render().state.productSummary).toBeUndefined();
-    newDone({ ...summaryResponse, result: { ...summaryResponse.result, summary: '新选图的结果' } }); await newRun;
+    newDone({ ...summaryResponse, result: { ...summaryResponse.result, summary: '新文字的结果' } }); await newRun;
     expect(Render().isSummarizing).toBe(false);
-    expect(Render().state.productSummary?.result.summary).toBe('新选图的结果');
-    expect(Render().state.productSummary?.inputKey).toContain('/b.png');
+    expect(Render().state.productSummary?.result.summary).toBe('新文字的结果');
+    expect(Render().state.productSummary?.inputKey).toContain('更新后的 OCR 文字');
+    expect(Render().state.productSummary?.inputKey).not.toContain('/a.png');
   });
 });

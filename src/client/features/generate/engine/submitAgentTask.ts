@@ -1,7 +1,5 @@
-import { selectedTextModel, selectedTextProtocol } from '@shared/domain/models/textModelRoute';
 import { useAppStore, type GenerationTask } from '@client/store';
 import { apiFetch } from '@client/shared/api/apiClient';
-import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { readSseEvents } from '@client/shared/api/sseStream';
 import { applyItemEvent, deriveTurnView, finishInterruptedItems } from '@client/shared/agent/turnItems';
 import type { AssistantItem } from '@shared/domain/assistant/types';
@@ -83,8 +81,6 @@ export async function submitAgentTask(
     if (attachments.length) updateGenerationTask(task.id, { referenceImages: attachments.map((item, index) => item.url || task.referenceImages?.[index] || '') });
     const skillRuntime = composeSkillRuntime(store.getActiveAssistantSkill());
     const prefs = loadPromptPreferences();
-    const { modelId: upstream, textProtocol } = selectedTextModel(model);
-    const routeOptions = getMultimodalClientOverrides(model);
     const messages = [
       ...priorAgentMessages([...new Map([...store.sessions.flatMap((session) => session.tasks), ...store.generationTasks].map((item) => [item.id, item])).values()], task),
       { role: 'user', content: currentPrompt || (attachments.length ? '请分析上传的素材。' : '你好'), attachments },
@@ -93,15 +89,13 @@ export async function submitAgentTask(
     const requestBody: Record<string, unknown> = {
       turnId,
       threadId,
-      model: model.startsWith('deepseek-official:') ? model : upstream,
-      textProtocol: textProtocol && textProtocol !== 'auto' ? textProtocol : selectedTextProtocol(model),
+      model,
       messages,
       enableAgentTools: !directVideo,
       systemPrompt: [resolveAgentSystemPrompt(), skillRuntime?.systemPrompt || ''].filter(Boolean).join('\n\n'),
       generationMode: 'auto',
       clientContext: { currentView: 'generate', generationBatches: generationBatchContext(generationPromptSources(store, 'agent', threadId, task.id)) },
       reasoningEffort: prefs.reasoning?.reasoningEffort || 'medium',
-      ...routeOptions,
     };
     if (skillRuntime) {
       requestBody.skillId = skillRuntime.skillId;

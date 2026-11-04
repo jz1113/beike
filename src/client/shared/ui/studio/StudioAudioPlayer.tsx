@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState, type SyntheticEvent } from 'react';
-import { Pause, Play, Volume2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
+import { Loader2, Pause, Play, Volume2 } from 'lucide-react';
+import { describeMediaPlaybackError } from '@client/shared/media/mediaPlayback';
 
 export interface StudioAudioPlayerProps {
   src: string;
@@ -42,7 +43,11 @@ function formatClock(sec: number): string {
  * 工作室定制音频波形播放器（Studio Audio Player）
  * 彻底替换裸露的浏览器原生 <audio controls>，同时在内部保留隐藏 <audio> 元素以确保播放兼容性与测试可观测性。
  */
-export function StudioAudioPlayer({
+export function StudioAudioPlayer(props: StudioAudioPlayerProps) {
+  return <StudioAudioPlayerContent key={props.src} {...props} />;
+}
+
+function StudioAudioPlayerContent({
   src,
   label = '试听音频',
   durationHintSec = 0,
@@ -53,7 +58,12 @@ export function StudioAudioPlayer({
   onTimeUpdate,
 }: StudioAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const playAttempt = useRef(0);
+  const failureAttempt = useRef(-1);
+  const diagnosis = useRef<AbortController | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [currentSec, setCurrentSec] = useState(0);
   const [durationSec, setDurationSec] = useState(durationHintSec);
 
@@ -62,11 +72,40 @@ export function StudioAudioPlayer({
   const totalSec = durationSec > 0 ? durationSec : durationHintSec;
   const progressRatio = totalSec > 0 ? Math.min(1, Math.max(0, currentSec / totalSec)) : 0;
 
+  useEffect(() => {
+    const audio = audioRef.current;
+    return () => { playAttempt.current += 1; diagnosis.current?.abort(); audio?.pause(); };
+  }, []);
+
+  const reportError = (el: HTMLAudioElement) => {
+    const attempt = playAttempt.current;
+    if (failureAttempt.current === attempt) return;
+    failureAttempt.current = attempt;
+    setPlaying(false);
+    setLoading(false);
+    setError('音频加载失败，正在检查播放连接…');
+    diagnosis.current?.abort();
+    const controller = new AbortController();
+    diagnosis.current = controller;
+    void describeMediaPlaybackError(src, el.error?.code, controller.signal).then((message) => {
+      if (attempt === playAttempt.current) setError(message);
+    });
+  };
+
   const togglePlay = () => {
     const el = audioRef.current;
     if (!el || !src) return;
+    const attempt = ++playAttempt.current;
+    diagnosis.current?.abort();
     if (el.paused) {
-      void el.play().catch(() => setPlaying(false));
+      setError('');
+      setLoading(true);
+      if (el.error) el.load();
+      void el.play().catch((reason: unknown) => {
+        if (attempt !== playAttempt.current) return;
+        if (reason instanceof DOMException && reason.name === 'AbortError') { setLoading(false); return; }
+        reportError(el);
+      });
     } else {
       el.pause();
     }
@@ -81,21 +120,29 @@ export function StudioAudioPlayer({
   };
 
   return (
-    <div
-      className={`group/audio flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/90 px-2.5 py-1.5 transition-colors hover:border-indigo-300/70 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-indigo-400/40 ${className}`.trim()}
-    >
+    <div className={`min-w-0 ${className}`.trim()}>
+    <div className="group/audio flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/90 px-2.5 py-1.5 transition-colors hover:border-indigo-300/70 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-indigo-400/40">
       <audio
         ref={audioRef}
         src={src}
         preload={preload}
+        aria-label={label}
         className="sr-only"
         onPlay={(event) => {
           setPlaying(true);
+          setError('');
+          event.currentTarget.ownerDocument.querySelectorAll('audio').forEach((other) => {
+            if (other !== event.currentTarget) other.pause();
+          });
           onPlay?.(event);
         }}
-        onPause={() => setPlaying(false)}
+        onPlaying={() => setLoading(false)}
+        onWaiting={() => setLoading(true)}
+        onPause={() => { setPlaying(false); setLoading(false); }}
+        onError={(event) => reportError(event.currentTarget)}
         onEnded={() => {
           setPlaying(false);
+          setLoading(false);
           setCurrentSec(0);
         }}
         onLoadedMetadata={(event) => {
@@ -116,7 +163,7 @@ export function StudioAudioPlayer({
         aria-label={playing ? `暂停${label}` : `播放${label}`}
         className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xs transition-transform hover:bg-indigo-500 active:scale-95 disabled:opacity-40 dark:bg-indigo-500 dark:hover:bg-indigo-400"
       >
-        {playing ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />}
+        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : playing ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />}
       </button>
 
       <div className="flex h-6 min-w-0 flex-1 items-center gap-[2px]" aria-hidden="true">
@@ -145,8 +192,12 @@ export function StudioAudioPlayer({
 
       <span className="inline-flex shrink-0 items-center gap-1 font-mono-nums text-[11px] font-medium text-slate-500 tabular-nums dark:text-slate-400">
         <Volume2 className="h-3 w-3 opacity-65" />
-        {playing || currentSec > 0 ? formatClock(currentSec) : totalSec > 0 ? formatClock(totalSec) : '试听'}
+        {loading ? '加载中' : playing || currentSec > 0 ? formatClock(currentSec) : totalSec > 0 ? formatClock(totalSec) : '试听'}
       </span>
+    </div>
+    {error && <div role="status" className="mt-1.5 text-xs text-amber-700 dark:text-amber-300">
+      {error}<button type="button" onClick={togglePlay} aria-label={`重试${label}`} className="ml-1 underline underline-offset-2">重试试听</button>
+    </div>}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, FolderClosed, Images, Search, Settings2, Sparkles, X } from 'lucide-react';
+import { ChevronDown, FolderClosed, Images, Search, Settings2, X } from 'lucide-react';
 import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 import { buildPromptLibraryNavigation, filterPromptLibraryNavigation, populatedPromptLibraryNavigation } from '../../model/promptLibraryNavigation';
@@ -12,10 +12,9 @@ interface Props {
   subcategory: string;
   onSelect: (category: string, subcategory?: string) => void;
   onManage: () => void;
-  onOpenSkills?: () => void;
 }
 
-export function PromptLibrarySidebar({ items, categories, albums, category, subcategory, onSelect, onManage, onOpenSkills }: Props) {
+export function PromptLibrarySidebar({ items, categories, albums, category, subcategory, onSelect, onManage }: Props) {
   const folders = useMemo(() => buildPromptLibraryNavigation(items, categories, albums), [items, categories, albums]);
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const [query, setQuery] = useState('');
@@ -30,7 +29,7 @@ export function PromptLibrarySidebar({ items, categories, albums, category, subc
     <div className="asset-category-caption"><h2>商品分类</h2><button type="button" onClick={onManage} className="asset-category-settings" aria-label="分类与规则" title="分类与规则"><Settings2 size={14} strokeWidth={1.6} /></button></div>
     {showSearch && <label className="asset-category-search"><Search size={13} /><input aria-label="查找商品分类" placeholder="查找分类" value={query} onChange={event => setQuery(event.target.value)} />{query && <button type="button" onClick={() => setQuery('')} aria-label="清除分类查找"><X size={12} /></button>}</label>}
     <nav className="asset-category-tree" aria-label="按商品分类筛选">
-      <button type="button" aria-current={category === 'all' ? 'true' : undefined} onClick={() => onSelect('all')} className="asset-category-row"><Images size={15} strokeWidth={1.6} /><span>全部母本</span><small>{items.length}</small></button>
+      <button type="button" aria-current={category === 'all' ? 'true' : undefined} onClick={() => onSelect('all')} className="asset-category-row"><Images size={15} strokeWidth={1.6} /><span>全部参考图组</span><small>{items.length}</small></button>
       <div className="asset-category-divider" />
       {visible.map(folder => <div key={folder.id} className="asset-category-branch">
         <div className="asset-category-parent">
@@ -43,6 +42,5 @@ export function PromptLibrarySidebar({ items, categories, albums, category, subc
       </div>)}
       {query && !visible.length && <p className="asset-category-no-results">没有匹配的分类</p>}
     </nav>
-    {onOpenSkills && <button type="button" onClick={onOpenSkills} className="asset-category-skills"><Sparkles size={15} strokeWidth={1.6} /><span>创作技能</span></button>}
   </aside>;
 }

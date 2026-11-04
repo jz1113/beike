@@ -25,7 +25,8 @@ func validateAssetViewJobData(kind string, data map[string]any) error {
 	}
 	name, _ := data[nameKey].(string)
 	cover, _ := data[coverKey].(string)
-	if strings.TrimSpace(name) == "" || len([]rune(name)) > 80 || strings.TrimSpace(cover) == "" {
+	creation := assetCreationFromData(data)
+	if strings.TrimSpace(name) == "" || len([]rune(name)) > 80 || strings.TrimSpace(cover) == "" && (creation == nil || strings.TrimSpace(creation.ReferenceImageURL) == "") {
 		return assetViewJobClientError{400, "请填写资产名称并上传参考主图"}
 	}
 	for key, value := range data {
@@ -125,23 +126,39 @@ func saveAssetViewJobImages(ctx context.Context, db *sql.DB, workspace string, j
 	if len(views) == 0 {
 		views["main"] = cover
 	}
+	creation := assetCreationResultFor(job.generation)
+	if creation != nil {
+		current := assetCreationFromData(map[string]any{"dimensions": rawDimensions})
+		applied := current != nil && current.ImageURL == creation.ImageURL && current.Prompt == creation.Prompt && assetCreationText(views["main"]) == creation.ImageURL
+		if current == nil || current.ReferenceImageURL != creation.ReferenceImageURL || !applied && assetCreationText(views["main"]) != assetViewJobMain(job.Kind, job.assetData) {
+			return errors.New("资产参考图或主图已更改，生成结果已保留，请重新生成")
+		}
+		if creation.ImageURL == "" || creation.Prompt == "" {
+			return errors.New("资产主图或绘图提示词尚未生成")
+		}
+		if !applied && !(job.gridKind() == personaStrip && creation.ImageURL == views["main"]) {
+			views = map[string]any{"main": creation.ImageURL}
+		}
+		cover = creation.ImageURL
+		dimensions["assetCreation"] = creation
+	}
 	if expected := assetViewJobMain(job.Kind, job.assetData); expected != "" {
 		current, _ := views["main"].(string)
-		if current != expected {
-			return errors.New("参考主图已更改，原九宫格已保留，请使用当前主图重新生成")
+		if creation == nil && current != expected {
+			return errors.New("参考主图已更改，原视角图已保留，请使用当前主图重新生成")
 		}
 	}
-	for _, view := range assetGridViews[job.Kind] {
+	for _, view := range job.outputViews() {
 		existing, _ := views[view].(string)
 		if strings.TrimSpace(existing) == "" {
 			if job.Images[view] == "" {
-				return errors.New("九宫格裁片不完整")
+				return errors.New("视角图裁片不完整")
 			}
 			views[view] = job.Images[view]
 		}
 	}
 	dimensions[viewField] = views
-	if job.Kind == "persona" {
+	if job.Kind == "persona" && creation == nil {
 		if face, _ := views["face"].(string); face != "" {
 			cover = face
 		}
@@ -155,12 +172,14 @@ func saveAssetViewJobImages(ctx context.Context, db *sql.DB, workspace string, j
 	}
 	main, _ := views["main"].(string)
 	add(main)
-	for _, view := range assetGridViews[job.Kind] {
+	for _, view := range job.outputViews() {
 		text, _ := views[view].(string)
 		add(text)
 	}
-	for _, value := range parseSourceImageList(rawSources, cover) {
-		add(value)
+	if creation == nil || job.gridKind() == personaStrip && creation.ImageURL == assetViewJobMain(job.Kind, job.assetData) {
+		for _, value := range parseSourceImageList(rawSources, cover) {
+			add(value)
+		}
 	}
 	encodedDimensions, err := json.Marshal(dimensions)
 	if err != nil {
@@ -190,7 +209,7 @@ func assetViewJobMain(kind string, data map[string]any) string {
 	raw, _ := data["dimensions"].(string)
 	if json.Unmarshal([]byte(raw), &dimensions) == nil {
 		if views, ok := dimensions[viewField].(map[string]any); ok {
-			if main, ok := views["main"].(string); ok && main != "" {
+			if main, ok := views["main"].(string); ok && (main != "" || dimensions["assetCreation"] != nil) {
 				return main
 			}
 		}

@@ -1,3 +1,4 @@
+import { PERSONA_CATEGORIES, personaGender, type PersonaCategory, personaGroupToDimensions } from '../model/salesPersonaClassification';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Loader2, Plus, X } from 'lucide-react';
 import { runSeedancePrecheck } from '@client/shared/api/generation/seedancePrecheck';
@@ -7,8 +8,8 @@ import { createSalesMaterial, createSalesSound, type EditableSalesMaterial } fro
 import { uploadSalesCustomAsset } from '../api/salesProduction';
 import { DEPTH_ACTION_LABELS, depthFileError, isActionVideo, seedanceVideoDurationError, type DepthActionKind } from '../model/salesActionMedia';
 import {
-  cleanActionTags, mergeGroupTag, PERSONA_GROUP_LABELS, personaGroupToDimensions, SCENE_SPACE_LABELS,
-  type SalesPersonaGroup, type SalesSceneSpace,
+  cleanActionTags, mergeGroupTag, SCENE_SPACE_LABELS,
+  type SalesSceneSpace,
 } from '../model/salesMaterialCatalog';
 import { salesFocusClass, salesGhostButtonClass, salesInputClass } from './salesChrome';
 import { SalesMaterialUploadField } from './SalesMaterialUploadField';
@@ -25,11 +26,11 @@ const LABELS = {
 interface Props {
   type: EditableSalesMaterial | 'sound';
   defaultName?: string;
-  defaultPersonaGroup?: SalesPersonaGroup;
+  defaultPersonaGroup?: PersonaCategory;
   defaultSceneSpace?: SalesSceneSpace;
   defaultActionCategoryId?: string;
   defaultSoundType?: 'voice' | 'bgm';
-  defaultVoiceGroup?: SalesPersonaGroup;
+  defaultVoiceGroup?: PersonaCategory;
   actionCategories?: readonly ScriptTaxonomyItem[];
   onCreateActionCategory?: (name: string) => Promise<ScriptTaxonomyItem | null>;
   onClose: () => void;
@@ -54,14 +55,15 @@ export function SalesMaterialCreateDialog({
   const [name, setName] = useState(defaultName);
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState('');
-  const [personaGroup, setPersonaGroup] = useState<SalesPersonaGroup>(defaultPersonaGroup);
+  const [personaGroup, setPersonaGroup] = useState<PersonaCategory>(defaultPersonaGroup);
   const [sceneSpace, setSceneSpace] = useState<SalesSceneSpace>(defaultSceneSpace);
   const [actionCategoryId, setActionCategoryId] = useState(defaultActionCategoryId);
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryBusy, setCategoryBusy] = useState(false);
   const [soundType, setSoundType] = useState<'voice' | 'bgm'>(defaultSoundType);
-  const [voiceGroup, setVoiceGroup] = useState<SalesPersonaGroup>(defaultVoiceGroup);
+  const [voiceGroup, setVoiceGroup] = useState<PersonaCategory>(defaultVoiceGroup);
+  const [voiceId, setVoiceId] = useState('');
   const [bpm, setBpm] = useState(100);
   const [mediaType, setMediaType] = useState<DepthActionKind>('depth-video');
   const [primary, setPrimary] = useState<File | null>(null);
@@ -127,7 +129,8 @@ export function SalesMaterialCreateDialog({
           description: description.trim(),
           promptText: description.trim(),
           voiceGroup: soundType === 'voice' ? voiceGroup : undefined,
-          gender: soundType === 'voice' && voiceGroup === 'male' ? 'male' : 'female',
+          voiceId: soundType === 'voice' ? voiceId.trim() : undefined,
+          gender: soundType === 'voice' ? personaGender(voiceGroup) : undefined,
           audioUrl,
           tags: tagList,
           moodTags: tagList,
@@ -143,7 +146,7 @@ export function SalesMaterialCreateDialog({
       if (controller.signal.aborted) return;
 
       const finalTags = type === 'persona'
-        ? mergeGroupTag(tags, PERSONA_GROUP_LABELS[personaGroup], ['男', '女', '老', '儿童'])
+        ? mergeGroupTag(tags, PERSONA_CATEGORIES[personaGroup], Object.values(PERSONA_CATEGORIES))
         : type === 'scene'
           ? mergeGroupTag(tags, SCENE_SPACE_LABELS[sceneSpace], ['室内', '户外'])
           : cleanActionTags(tags).join('，');
@@ -196,8 +199,8 @@ export function SalesMaterialCreateDialog({
               </div>
             </div>
             {soundType === 'voice' && <div className="sales-dialog-field sales-asset-select-field"><span>人声细分</span>
-              <SalesLibrarySelect label="人声细分" value={voiceGroup} disabled={pending} onChange={(value) => setVoiceGroup(value as SalesPersonaGroup)}
-                options={Object.entries(PERSONA_GROUP_LABELS).map(([value, label]) => ({ value, label }))} />
+              <SalesLibrarySelect label="人声细分" value={voiceGroup} disabled={pending} onChange={(value) => setVoiceGroup(value as PersonaCategory)}
+                options={Object.entries(PERSONA_CATEGORIES).map(([value, label]) => ({ value, label }))} />
             </div>}
           </div>}
           {type === 'action' && <div className="sales-dialog-field sales-asset-select-field"><span>动作媒体类型</span>
@@ -214,7 +217,7 @@ export function SalesMaterialCreateDialog({
               required={requiresPrimary}
               disabled={pending}
               label={type === 'persona' ? '上传全身参考图' : type === 'scene' ? '上传场景参考图' : type === 'action' ? `上传${DEPTH_ACTION_LABELS[mediaType]}` : soundType === 'bgm' ? '上传 BGM 音频文件' : '上传人声试听样本'}
-              hint={type === 'sound' ? 'MP3、WAV、M4A 等音频格式' : type === 'action' && isActionVideo(mediaType) ? 'MP4、WebM、MOV、M4V · 2–30 秒 · 最大 35MB' : '上传已有参考图片'}
+              hint={type === 'sound' ? soundType === 'voice' ? '建议上传清晰人声，单个不超过 32 MiB；超过 15 秒会自动保留前 15 秒，原文件保留。' : 'MP3、WAV、M4A 等音频格式' : type === 'action' && isActionVideo(mediaType) ? 'MP4、WebM、MOV、M4V · 2–30 秒 · 最大 35MB' : '上传已有参考图片'}
             />
             {type === 'persona' && <SalesMaterialUploadField file={face} onChange={setFace} kind="image" accept="image/*" disabled={pending} label="上传人脸参考图" hint="清晰的面部近景" />}
           </div>
@@ -226,8 +229,8 @@ export function SalesMaterialCreateDialog({
                 placeholder={type === 'action' ? '默认按 1、2、3 序号命名' : type === 'sound' ? (soundType === 'bgm' ? '例如：轻快都市街拍 BGM' : '例如：元气女声口播') : `给${LABELS[type]}起个名字`} />
             </label>
             {type === 'persona' && <div className="sales-dialog-field sales-asset-select-field"><span>人物分类</span>
-              <SalesLibrarySelect label="人物分类" value={personaGroup} disabled={pending} onChange={(value) => setPersonaGroup(value as SalesPersonaGroup)}
-                options={Object.entries(PERSONA_GROUP_LABELS).map(([value, label]) => ({ value, label }))} />
+              <SalesLibrarySelect label="人物分类" value={personaGroup} disabled={pending} onChange={(value) => setPersonaGroup(value as PersonaCategory)}
+                options={Object.entries(PERSONA_CATEGORIES).map(([value, label]) => ({ value, label }))} />
             </div>}
             {type === 'scene' && <div className="sales-dialog-field sales-asset-select-field"><span>空间分类</span>
               <SalesLibrarySelect label="空间分类" value={sceneSpace} disabled={pending} onChange={(value) => setSceneSpace(value as SalesSceneSpace)}
@@ -235,6 +238,10 @@ export function SalesMaterialCreateDialog({
             </div>}
             {type === 'sound' && soundType === 'bgm' && <label>节奏速度（BPM）
               <input type="number" min={40} max={220} value={bpm} onChange={(e) => setBpm(Number(e.target.value) || 100)} className={salesInputClass} disabled={pending} />
+            </label>}
+            {type === 'sound' && soundType === 'voice' && <label className="sales-asset-field-wide">合成音色编号（选填）
+              <input aria-label="合成音色编号" maxLength={200} value={voiceId} onChange={(event) => setVoiceId(event.target.value)} placeholder="填写语音服务商提供的音色编号" className={salesInputClass} disabled={pending} />
+              <small>用于合成口播音色参考或旁白。只上传声音样本时可留空用于口播参考，留空不代表 TTS 已克隆该样本；没有样本且留空时沿用默认合成音色。</small>
             </label>}
             {type === 'action' && (
               <div className="sales-dialog-field sales-asset-select-field">

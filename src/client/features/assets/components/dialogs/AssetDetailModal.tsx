@@ -83,7 +83,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-slate-900 dark:text-white font-bold text-sm">
               {activeSubTab === 'full_prompt'
-                ? '内容图组母本详情'
+                ? '参考图组详情'
                 : activeSubTab === 'scene'
                 ? '场景空间资产详情'
                 : activeSubTab === 'action'

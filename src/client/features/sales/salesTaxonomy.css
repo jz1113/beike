@@ -63,47 +63,39 @@
 .sales-classify-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
 .sales-classify-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 8px 16px; }
 .sales-classify-dialog .sales-taxonomy-error { margin-top: 16px; }
-.sales-taxonomy-dialog.sales-taxonomy-manager { width: min(820px, calc(100vw - 40px)); height: min(570px, calc(100dvh - 40px)); max-height: calc(100dvh - 40px); overflow: visible; padding: 0; border-radius: 12px; background: var(--sales-surface); }
+.sales-taxonomy-dialog.sales-taxonomy-manager { width: min(620px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 0; border-radius: 12px; background: var(--sales-surface); }
 .sales-taxonomy-manager[open] { display: flex; flex-direction: column; }
-.sales-taxonomy-manager > .sales-taxonomy-manager-header { flex-shrink: 0; align-items: flex-start; margin: 0; border-bottom: 1px solid var(--sales-line); padding: 21px 24px 19px; }
+.sales-taxonomy-manager > .sales-taxonomy-manager-header { flex-shrink: 0; align-items: center; margin: 0; padding: 16px 20px 8px; }
 .sales-taxonomy-manager-header h2 { font-size: 16px; line-height: 24px; }
-.sales-taxonomy-manager-header p { margin-top: 5px; color: var(--sales-muted); font-size: 12px; line-height: 18px; }
-.sales-taxonomy-manager-body { display: grid; grid-template-columns: 166px minmax(0, 1fr); flex: 1; min-height: 0; }
-.sales-taxonomy-manager-nav { display: flex; flex-direction: column; gap: 5px; border-right: 1px solid var(--sales-line); padding: 18px 12px; background: var(--sales-subtle); }
-.sales-taxonomy-manager-nav > button { display: flex; align-items: center; gap: 9px; min-height: 39px; border: 1px solid transparent; border-radius: 6px; padding: 8px 10px; color: var(--sales-muted); text-align: left; font-size: 12px; }
+.sales-taxonomy-manager-toolbar { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 0 20px 12px; }
+.sales-taxonomy-manager-nav { display: flex; gap: 2px; border-radius: 8px; padding: 3px; background: var(--sales-subtle); }
+.sales-taxonomy-manager-nav > button { display: flex; align-items: center; gap: 6px; min-height: 32px; border: 1px solid transparent; border-radius: 6px; padding: 5px 8px; color: var(--sales-muted); text-align: left; font-size: 12px; }
 .sales-taxonomy-manager-nav > button:hover { color: var(--sales-ink); background: var(--sales-line); }
 .sales-taxonomy-manager-nav > button[aria-selected="true"] { border-color: var(--sales-line); background: var(--sales-surface); color: var(--sales-ink); font-weight: 600; }
 .sales-taxonomy-manager-nav small { margin-left: auto; color: var(--sales-muted); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; }
-.sales-taxonomy-manager-content { display: flex; min-width: 0; min-height: 0; flex-direction: column; padding: 23px 24px 14px; }
-.sales-taxonomy-manager-heading { display: flex; flex-shrink: 0; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 19px; }
-.sales-taxonomy-manager-heading h3 { font-size: 14px; font-weight: 600; line-height: 20px; }
-.sales-taxonomy-manager-heading p { margin-top: 5px; color: var(--sales-muted); font-size: 11px; line-height: 18px; }
-.sales-taxonomy-manager-heading > button { flex-shrink: 0; min-height: 33px; white-space: nowrap; }
+.sales-taxonomy-manager-content { display: flex; min-height: 0; flex-direction: column; gap: 8px; padding: 0 20px 10px; }
 .sales-taxonomy-manager-search { display: flex; flex-shrink: 0; align-items: center; gap: 9px; min-height: 36px; border: 1px solid var(--sales-line); border-radius: 6px; padding: 0 10px; color: var(--sales-muted); background: var(--sales-subtle); }
 .sales-taxonomy-manager-search:focus-within { border-color: var(--sales-muted); }
 .sales-taxonomy-manager-search input { flex: 1; width: 0; min-width: 0; height: 34px; margin: 0; border: 0; border-radius: 0; padding: 0; background: transparent; color: var(--sales-ink); font-size: 12px; outline: none; box-shadow: none; }
 .sales-taxonomy-manager-search input::-webkit-search-cancel-button { display: none; }
 .sales-taxonomy-manager-search > button { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; }
 .sales-taxonomy-manager-search > button:hover { color: var(--sales-ink); background: var(--sales-line); }
-.sales-taxonomy-manager-create { flex-shrink: 0; margin-top: 12px; border: 1px solid var(--sales-line); border-radius: 6px; padding: 12px; background: var(--sales-subtle); }
+.sales-taxonomy-manager-create { flex-shrink: 0; border: 1px solid var(--sales-line); border-radius: 6px; padding: 12px; background: var(--sales-subtle); }
 .sales-taxonomy-manager-create label { display: block; margin-bottom: 7px; color: var(--sales-ink); font-size: 11px; font-weight: 500; }
 .sales-taxonomy-manager-create > div { display: flex; gap: 6px; align-items: center; }
 .sales-taxonomy-manager-create input, .sales-taxonomy-manager-edit input { flex: 1; width: 0; min-width: 0; height: 33px; margin: 0; font-size: 12px; }
 .sales-taxonomy-manager-create button, .sales-taxonomy-manager-edit button { flex-shrink: 0; min-height: 33px; padding-right: 10px; padding-left: 10px; white-space: nowrap; }
 .sales-taxonomy-manager-create p, .sales-taxonomy-manager-edit p { margin-top: 7px; color: #c55d50; font-size: 11px; }
-.sales-taxonomy-manager-columns, .sales-taxonomy-manager-row { display: grid; grid-template-columns: minmax(0, 1fr) 100px 64px; align-items: center; gap: 12px; }
-.sales-taxonomy-manager-columns { flex-shrink: 0; margin-top: 15px; border-bottom: 1px solid var(--sales-line); padding: 0 8px 9px; color: var(--sales-muted); font-size: 10px; }
-.sales-taxonomy-manager-columns > :last-child { text-align: right; padding-right: 8px; }
-.sales-taxonomy-manager-list { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.sales-taxonomy-manager-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .sales-taxonomy-manager-list > ul { margin: 0; padding: 0; list-style: none; }
-.sales-taxonomy-manager-row { min-height: 56px; border-bottom: 1px solid var(--sales-line); padding: 9px 8px; }
+.sales-taxonomy-manager-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px; min-height: 46px; border-top: 1px solid var(--sales-line); padding: 6px 0; }
 .sales-taxonomy-manager-row:hover, .sales-taxonomy-manager-row.is-editing { background: var(--sales-subtle); }
 .sales-taxonomy-manager-name { display: flex; min-width: 0; align-items: center; gap: 10px; color: var(--sales-ink); font-size: 12px; line-height: 20px; }
 .sales-taxonomy-manager-name > svg { flex-shrink: 0; color: var(--sales-muted); }
 .sales-taxonomy-manager-name > span { min-width: 0; overflow-wrap: anywhere; }
 .sales-taxonomy-manager-usage { color: var(--sales-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .sales-taxonomy-manager-actions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
-.sales-taxonomy-manager-actions > button { display: flex; width: 28px; height: 28px; align-items: center; justify-content: center; border-radius: 5px; color: var(--sales-muted); }
+.sales-taxonomy-manager-actions > button { display: flex; padding: 4px 7px; min-height: 32px; font-size: 12px; align-items: center; justify-content: center; border-radius: 5px; color: var(--sales-muted); }
 .sales-taxonomy-manager-actions > button:hover { color: var(--sales-ink); background: var(--sales-line); }
 .sales-taxonomy-manager-edit { display: flex; grid-column: 1 / -1; flex-wrap: wrap; align-items: center; gap: 6px; }
 .sales-taxonomy-manager-edit p { flex-basis: 100%; margin: 0; }
@@ -113,7 +105,7 @@
 .sales-taxonomy-manager-remove > div:last-child { display: flex; align-items: center; gap: 7px; }
 .sales-taxonomy-manager .sales-taxonomy-danger { min-height: 31px; border: 1px solid #c55d5050; border-radius: 5px; padding: 5px 10px; color: #c55d50; font-size: 12px; }
 .sales-taxonomy-manager .sales-taxonomy-danger:hover { background: #c55d5010; }
-.sales-taxonomy-manager-empty { display: flex; min-height: 184px; align-items: center; justify-content: center; flex-direction: column; gap: 9px; padding: 24px 12px; text-align: center; color: var(--sales-muted); }
+.sales-taxonomy-manager-empty { display: flex; min-height: 130px; align-items: center; justify-content: center; flex-direction: column; gap: 9px; padding: 24px 12px; text-align: center; color: var(--sales-muted); }
 .sales-taxonomy-manager-empty > svg { margin-bottom: 4px; opacity: .55; }
 .sales-taxonomy-manager-empty strong { color: var(--sales-ink); font-size: 12px; font-weight: 500; }
 .sales-taxonomy-manager-empty p { font-size: 11px; line-height: 18px; }
@@ -129,15 +121,13 @@
 .sales-taxonomy-manager-menu > button:hover, .sales-taxonomy-manager-menu > button:focus-visible { background: var(--sales-subtle); outline: none; }
 .sales-taxonomy-manager-menu > button.is-danger { color: #c55d50; }
 .sales-taxonomy-manager button:disabled { cursor: default; opacity: .45; }
-@media (max-width: 680px) {
-  .sales-taxonomy-dialog.sales-taxonomy-manager { width: calc(100vw - 24px); height: min(620px, calc(100dvh - 24px)); max-height: calc(100dvh - 24px); }
-  .sales-taxonomy-manager > .sales-taxonomy-manager-header { padding: 17px 18px; }
-  .sales-taxonomy-manager-body { display: flex; flex-direction: column; }
-  .sales-taxonomy-manager-nav { flex-direction: row; flex-shrink: 0; gap: 7px; border-right: 0; border-bottom: 1px solid var(--sales-line); padding: 9px 14px; }
-  .sales-taxonomy-manager-nav > button { flex: 1; min-height: 35px; }
-  .sales-taxonomy-manager-content { flex: 1; padding: 18px 16px 12px; }
-  .sales-taxonomy-manager-heading { gap: 9px; margin-bottom: 14px; }
-  .sales-taxonomy-manager-heading p { max-width: 190px; }
-  .sales-taxonomy-manager-columns, .sales-taxonomy-manager-row { grid-template-columns: minmax(0, 1fr) 78px 60px; gap: 8px; }
-  .sales-taxonomy-manager-footer { gap: 10px; padding: 11px 16px; }
+@media (max-width: 460px) {
+  .sales-taxonomy-manager-toolbar { padding-inline: 12px; }
+  .sales-taxonomy-manager-content { padding-inline: 12px; }
+  .sales-taxonomy-manager-row { grid-template-columns: minmax(0, 1fr) auto; gap: 0 6px; }
+  .sales-taxonomy-manager-usage { grid-column: 1; }
+  .sales-taxonomy-manager-actions { grid-column: 2; grid-row: 1 / span 2; }
+}
+@media (max-height: 440px) {
+  .sales-taxonomy-manager-content { flex-shrink: 0; }
 }

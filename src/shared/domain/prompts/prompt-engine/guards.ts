@@ -8,7 +8,7 @@ import { enforceProductGeometry } from './productGeometry';
 /**
  * 清洗提示词文本，去除 Markdown 标题、分镜前缀、会话对话废话及外层包裹引号等残留字符
  */
-export function cleanPromptText(rawPrompt: string): string {
+export function cleanPromptText(rawPrompt: string, preserveLineBreaks = false): string {
   if (!rawPrompt) return '';
   let text = rawPrompt.trim();
 
@@ -76,7 +76,7 @@ export function cleanPromptText(rawPrompt: string): string {
   text = text.replace(/[；;]{2,}/g, '；');
   text = text.replace(/^[，,。.；;\s]+/, '');
   text = text.replace(/[，,；;\s]+$/, '');
-  text = text.replace(/\s+/g, ' ');
+  text = text.replace(preserveLineBreaks ? /[^\S\r\n]+/g : /\s+/g, ' ');
 
   // 10. 再次清理首尾标点与多余空格
   text = text.replace(/^["'“‘]+/, '').replace(/["'”’]+$/, '').trim();
@@ -88,7 +88,7 @@ export function cleanPromptText(rawPrompt: string): string {
  * 剥离电商图文注入的守卫文案与尾部追加句（Hub/快速生图 plain 模式使用）。
  * 仅剥离真正的守卫标签，保留业务正文前缀。
  */
-export function stripWorkshopPromptGuards(prompt: string): string {
+export function stripWorkshopPromptGuards(prompt: string, preserveLineBreaks = false): string {
   if (!prompt) return prompt;
   const text = prompt
     // 仅匹配历史守卫标签，避免误删业务正文。
@@ -103,7 +103,7 @@ export function stripWorkshopPromptGuards(prompt: string): string {
     .replace(/构图机位与肢体姿势以 @图片\s*2 为准[^。]*。?/g, ' ')
     .replace(/场景空间以 @图片\s*[23] 定桩[^。]*。?/g, ' ')
     .replace(/表情关键词：[^。]+。?/g, ' ');
-  return text.replace(/\s+/g, ' ').trim();
+  return text.replace(preserveLineBreaks ? /[^\S\r\n]+/g : /\s+/g, ' ').trim();
 }
 
 /** Hub 快速生图：精简负向词，避免电商图文长列表污染创意请求 */

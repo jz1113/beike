@@ -96,24 +96,27 @@ func TestAnalyzedScriptPersistsAndReusesWithoutOverwritingReview(t *testing.T) {
 	cfg := setupSalesTestConfig(t)
 	var script map[string]any
 	_ = json.Unmarshal([]byte(validScript), &script)
-	first, err := persistAnalyzedScript(cfg, "local", "/storage/local/source.mp4", "hash", "model", "prompt", script, false)
+	first, err := persistAnalyzedScript(cfg, "local", "/storage/local/source.mp4", "hash", "model", "prompt", "route", script, false)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if first.Status != "verified" {
+		t.Fatalf("new analysis is not ready for use: %s", first.Status)
 	}
 	db, err := sql.Open("sqlite", cfg.SQLiteFile())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.Exec(`UPDATE "SalesReferenceScript" SET "title"='人工确认',"status"='verified' WHERE "id"=?`, first.ID); err != nil {
+	if _, err := db.Exec(`UPDATE "SalesReferenceScript" SET "title"='手动草稿',"status"='draft' WHERE "id"=?`, first.ID); err != nil {
 		t.Fatal(err)
 	}
-	second, err := persistAnalyzedScript(cfg, "local", "/storage/local/source.mp4", "hash", "model", "prompt", script, false)
-	if err != nil || second.ID != first.ID || second.Status != "verified" || second.Title != "人工确认" {
+	second, err := persistAnalyzedScript(cfg, "local", "/storage/local/source.mp4", "hash", "model", "prompt", "route", script, false)
+	if err != nil || second.ID != first.ID || second.Status != "draft" || second.Title != "手动草稿" {
 		t.Fatalf("repeat analysis overwrote review: %+v %v", second, err)
 	}
-	forced, err := persistAnalyzedScript(cfg, "local", "/storage/local/source.mp4", "hash", "model", "prompt", script, true)
-	if err != nil || forced.ID == first.ID || forced.Status != "draft" {
-		t.Fatalf("forced reanalysis must save a fresh draft: %+v %v", forced, err)
+	forced, err := persistAnalyzedScript(cfg, "local", "/storage/local/source.mp4", "hash", "model", "prompt", "route", script, true)
+	if err != nil || forced.ID == first.ID || forced.Status != "verified" {
+		t.Fatalf("forced reanalysis must save a fresh verified script: %+v %v", forced, err)
 	}
 }

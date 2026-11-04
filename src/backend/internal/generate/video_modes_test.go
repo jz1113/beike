@@ -39,8 +39,8 @@ func TestVideoModeTableMatchesOfficialCapabilities(t *testing.T) {
 		{"viduq4", []string{"omni", "first_frame"}},
 		{"veo3.1", full},
 		{"veo3.1-fast", full},
-		{"omni_flash-10s", seedance},
-		{"gemini-omni-1.1-flash", seedance},
+		{"omni_flash-10s", []string{"omni", "text", "edit"}},
+		{"gemini-omni-1.1-flash", []string{"omni", "text", "edit"}},
 		{"grok-imagine-video-1.5", []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}},
 		{"sora-2", []string{"first_frame", "text"}},
 	}

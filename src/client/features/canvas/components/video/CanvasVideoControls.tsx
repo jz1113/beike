@@ -4,14 +4,18 @@ import { videoModeLabel, videoRatioLocked, videoResolutionLabel } from '@shared/
 import type { CanvasNode } from '../../model/types';
 import { CanvasVideoSettings } from './CanvasVideoSettings';
 import { CanvasVideoPopover } from './CanvasVideoPopover';
+import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
+import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
 
 type Config = NonNullable<CanvasNode['drawing']>;
 type Panel = 'aspect' | 'duration' | 'quality' | 'reference' | 'audio' | 'count';
 
-export function CanvasVideoControls({ config, model, onChange }: { config: Config; model: string; onChange: (patch: Partial<Config>) => void }) {
+export function CanvasVideoControls({ config, model: selection, onChange }: { config: Config; model: string; onChange: (patch: Partial<Config>) => void }) {
   const [panel, setPanel] = useState<Panel | null>(null);
   const anchor = useRef<HTMLButtonElement | null>(null);
-  const profile = getVideoModelById(model);
+  const model = upstreamModalityModelId('video', selection);
+  const baseUrl = getGatewayClientBaseUrl(selection);
+  const profile = getVideoModelById(model, baseUrl);
   const mode = config.refMode || 'omni';
   const locked = videoRatioLocked(model, mode);
   useEffect(() => {
@@ -25,7 +29,7 @@ export function CanvasVideoControls({ config, model, onChange }: { config: Confi
   const items: { id: Panel; label: string; value: string }[] = [
     { id: 'aspect', label: '视频比例', value: locked || config.aspect === 'adaptive' ? '自动' : config.aspect },
     { id: 'duration', label: '视频时长', value: mode === 'edit' ? '原时长' : `${config.duration ?? 5}s` },
-    { id: 'quality', label: '视频分辨率', value: videoResolutionLabel(model, config.quality) },
+    { id: 'quality', label: '视频分辨率', value: videoResolutionLabel(model, config.quality, baseUrl) },
     { id: 'reference', label: '视频参考方式', value: videoModeLabel(mode) },
     ...(profile?.audioSupport === 'controllable' ? [{ id: 'audio' as const, label: '视频声音', value: `声音 ${(config.audio ?? true) ? '开' : '关'}` }] : []),
     { id: 'count', label: '视频数量', value: `${config.count} 个` },
@@ -35,7 +39,7 @@ export function CanvasVideoControls({ config, model, onChange }: { config: Confi
       {item.value}
     </button>)}
     {panel && <CanvasVideoPopover key={panel} anchor={anchor} width={panel === 'aspect' ? 312 : panel === 'reference' ? 280 : panel === 'count' ? 176 : 136}><div data-video-control>
-      <CanvasVideoSettings config={config} model={model} modesOnly={panel === 'reference'} section={panel === 'reference' ? undefined : panel} onChange={patch => { onChange(patch); setPanel(null); anchor.current?.focus(); }} />
+      <CanvasVideoSettings config={config} model={model} baseUrl={baseUrl} modesOnly={panel === 'reference'} section={panel === 'reference' ? undefined : panel} onChange={patch => { onChange(patch); setPanel(null); anchor.current?.focus(); }} />
     </div></CanvasVideoPopover>}
   </>;
 }

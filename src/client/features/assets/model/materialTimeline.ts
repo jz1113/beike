@@ -39,7 +39,7 @@ export function filterMaterialTasks(tasks: Task[], opts: MaterialFilterOptions):
   list = list.filter((task) => matchesAssetTime(task.createdAt, opts.timeFilter || 'all'));
   const kw = opts.searchInput.trim().toLowerCase();
   if (kw) {
-    list = list.filter((t) => (t.title || t.prompt || '').toLowerCase().includes(kw));
+    list = list.filter((t) => [t.title, t.prompt].some(text => text?.toLowerCase().includes(kw)));
   }
   return list.sort((a, b) => {
     if (opts.sortOrder === 'name') {

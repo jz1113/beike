@@ -43,6 +43,10 @@ export function registerRefMedia(url: string, file: File, origName?: string): vo
   }
 }
 
+export function registerRefMediaKind(url: string, kind: RefMediaKind): void {
+  kinds.set(url, kind);
+}
+
 export function registerRefMediaName(url: string, name: string): void {
   const cleanName = (name || '').replace(/\.[^/.]+$/, '').trim();
   if (cleanName) {

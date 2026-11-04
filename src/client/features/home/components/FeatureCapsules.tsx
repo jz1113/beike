@@ -1,13 +1,12 @@
-import { Brush, ShoppingBag, FilePen, Download, ScanFace, Captions, FileType } from 'lucide-react';
+import { Brush, ShoppingBag, FilePen, Download, Captions } from 'lucide-react';
 import { SpotlightCard } from '@client/shared/ui/SpotlightCard';
 
 interface Props {
   onEnterWorkshop: () => void;
   onOpenHeadlinePoster: () => void;
   onOpenKeywordReview: () => void;
-  onOpenVideoSales?: () => void;
-  onOpenCollectorHub?: () => void;
-  onPlaceholderClick?: (title: string) => void;
+  onOpenVideoSales: () => void;
+  onOpenCollectorHub: () => void;
 }
 
 const capsules = [
@@ -15,9 +14,7 @@ const capsules = [
   { id: 'workshop', title: '电商图文', hint: '从商品到批量图文的一站式创作', icon: ShoppingBag },
   { id: 'headline_poster', title: '封面', hint: '商品与标题，一次生成吸睛封面', icon: Brush },
   { id: 'keyword_review', title: '词包', hint: '批量语义分类，审核内容是否值得制作', icon: FilePen },
-  { id: 'digital_human', title: '数字人', hint: '功能重建中', icon: ScanFace },
-  { id: 'ppt_generator', title: 'PPT', hint: '功能重建中', icon: FileType },
-  { id: 'collector_hub', title: '采集', hint: '聚合商品与社媒内容，沉淀可用素材库', icon: Download },
+  { id: 'collector_hub', title: 'OSS 视频下载', hint: '导入视频链接表格，按标题下载视频', icon: Download },
 ] as const;
 
 export default function FeatureCapsules({
@@ -26,20 +23,13 @@ export default function FeatureCapsules({
   onOpenKeywordReview,
   onOpenVideoSales,
   onOpenCollectorHub,
-  onPlaceholderClick,
 }: Props) {
-  const handlePlaceholder = (title: string) => {
-    onPlaceholderClick?.(title);
-  };
-
   const actions: Record<(typeof capsules)[number]['id'], () => void> = {
     headline_poster: onOpenHeadlinePoster,
     workshop: onEnterWorkshop,
     keyword_review: onOpenKeywordReview,
-    ppt_generator: () => handlePlaceholder('PPT'),
-    collector_hub: onOpenCollectorHub || (() => handlePlaceholder('采集')),
-    digital_human: () => handlePlaceholder('数字人'),
-    video_sales: onOpenVideoSales || (() => handlePlaceholder('电商视频')),
+    collector_hub: onOpenCollectorHub,
+    video_sales: onOpenVideoSales,
   };
 
   return (

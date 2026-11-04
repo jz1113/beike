@@ -33,7 +33,8 @@ vi.mock('@client/shared/api/assetLibraryCache', () => ({ invalidateGlobalAssetCa
 
 type Node = ReactElement<Record<string, unknown>>;
 const onSaved = vi.fn();
-function Render() { hooks.index = 0; return SalesAssetJobsPanel({ onSaved }); }
+let scope: Partial<Parameters<typeof SalesAssetJobsPanel>[0]> = {};
+function Render() { hooks.index = 0; return SalesAssetJobsPanel({ onSaved, ...scope }); }
 function findAll(predicate: (node: Node) => boolean): Node[] {
   const root = Render(); const queue: Node[] = root ? [root as Node] : []; const found: Node[] = [];
   while (queue.length) {
@@ -51,6 +52,7 @@ function job(patch: Partial<SalesAssetViewJob> = {}): SalesAssetViewJob {
 
 beforeEach(() => {
   hooks.index = 0; hooks.slots = []; hooks.effects.clear(); vi.clearAllMocks(); vi.useFakeTimers();
+  scope = {};
 });
 afterEach(() => { hooks.effects.forEach(({ cleanup }) => cleanup?.()); vi.useRealTimers(); });
 
@@ -63,7 +65,7 @@ it('refreshes assets and invalidates their cache once when polling observes a co
   expect(onSaved).not.toHaveBeenCalled(); expect(invalidateGlobalAssetCache).not.toHaveBeenCalled();
   await vi.advanceTimersByTimeAsync(3000);
   expect(onSaved).toHaveBeenCalledOnce(); expect(invalidateGlobalAssetCache).toHaveBeenCalledOnce();
-  expect(findAll((node) => node.type === 'span' && Children.toArray(node.props.children as ReactNode).includes('已自动保存到资产库'))).toHaveLength(1);
+  expect(Render()).toBeNull();
   await vi.advanceTimersByTimeAsync(6000);
   expect(listSalesAssetJobs).toHaveBeenCalledTimes(4);
   expect(onSaved).toHaveBeenCalledOnce(); expect(invalidateGlobalAssetCache).toHaveBeenCalledOnce();
@@ -84,6 +86,19 @@ it('resumes a failed task with its original key, model and existing asset withou
   expect(onSaved).not.toHaveBeenCalled();
 });
 
+it('restores the selected vision route when retrying asset creation after a service restart', async () => {
+  const creation = { referenceImageUrl: '/reference.jpg', promptModel: 'vision-channel:model', imageModel: 'image-channel:model' };
+  const failed = job({ status: 'failed', creation, error: '任务已中断' });
+  vi.mocked(listSalesAssetJobs).mockResolvedValue([failed]);
+  vi.mocked(submitSalesAssetJob).mockResolvedValue(job({ creation }));
+  Render(); await vi.advanceTimersByTimeAsync(0);
+  (button('继续处理原任务').props.onClick as () => void)();
+  expect(submitSalesAssetJob).toHaveBeenCalledWith('persona', {
+    key: failed.key, model: failed.model, assetId: failed.assetId, references: [],
+    creation, analysisModel: 'vision-channel:model',
+  }, {}, failed.assetId);
+});
+
 it('expands a batch of fifty tasks beyond the default eight and can collapse it again', async () => {
   const jobs = Array.from({ length: 50 }, (_, index) => job({ id: `job-${index}`, assetId: `persona-${index}`, name: `人物${index + 1}` }));
   vi.mocked(listSalesAssetJobs).mockResolvedValue(jobs);
@@ -94,4 +109,31 @@ it('expands a batch of fifty tasks beyond the default eight and can collapse it 
   expect(findAll((node) => node.type === 'span' && Children.toArray(node.props.children as ReactNode).includes('人物50'))).toHaveLength(1);
   (button('收起任务').props.onClick as () => void)();
   expect(statusRows()).toHaveLength(8);
+});
+
+it.each([['analyzing', '准备提示词中'], ['creating', '生成主图中']] as const)('shows the %s stage in the asset task list', async (status, label) => {
+  vi.mocked(listSalesAssetJobs).mockResolvedValue([job({ status })]);
+  Render(); await vi.advanceTimersByTimeAsync(0);
+  expect(findAll((node) => node.type === 'section' && node.props['aria-label'] === '资产生成任务')).toHaveLength(1);
+  expect(findAll((node) => node.type === 'span' && Children.toArray(node.props.children as ReactNode).includes(label))).toHaveLength(1);
+});
+
+it('scopes visible jobs to the current kind and removes completed history for deleted assets', async () => {
+  const jobs = [job({ status: 'failed' }), job({ id: 'deleted', status: 'completed', assetId: 'deleted-persona' }),
+    job({ id: 'scene', kind: 'scene', status: 'queued', assetId: 'scene-1' })];
+  const onJobsLoaded = vi.fn();
+  scope = { kind: 'persona', assetIds: new Set(['existing-persona-1']), onJobsLoaded };
+  vi.mocked(listSalesAssetJobs).mockResolvedValue(jobs);
+  Render(); await vi.advanceTimersByTimeAsync(0);
+  expect(statusRows()).toHaveLength(1);
+  expect(onJobsLoaded).toHaveBeenCalledWith(jobs);
+  scope = { kind: 'persona', assetIds: new Set() };
+  expect(Render()).toBeNull();
+});
+
+it('keeps active jobs visible before their newly created assets appear in a refreshed catalog', async () => {
+  scope = { kind: 'persona', assetIds: new Set() };
+  vi.mocked(listSalesAssetJobs).mockResolvedValue([job()]);
+  Render(); await vi.advanceTimersByTimeAsync(0);
+  expect(statusRows()).toHaveLength(1);
 });

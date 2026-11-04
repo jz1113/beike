@@ -1,26 +1,24 @@
 import { useCanvasHydrated } from './hooks/useCanvasHydrated';
 import React from 'react';
 import { useCanvasStore } from './store/useCanvasStore';
-import { CanvasHomeFeed } from './components/projects/CanvasHomeFeed';
+import { StudioWorkspace } from './components/editor/StudioWorkspace';
 import { InfiniteCanvasEditor } from './components/editor/InfiniteCanvasEditor';
-import { submitCanvasPrompt } from './hooks/useCanvasPromptSubmit';
 
-export const CanvasWorkspaceView: React.FC = () => {
+export const CanvasWorkspaceView: React.FC<{onHome: () => void}> = ({onHome}) => {
   const hydrated = useCanvasHydrated();
   const { activeProjectId } = useCanvasStore();
 
   if (!hydrated) return <div role="status" className="p-8 text-sm text-slate-400">正在读取画布…</div>;
 
   if (activeProjectId) {
-    return <InfiniteCanvasEditor key={activeProjectId} projectId={activeProjectId} />;
+    const project = useCanvasStore.getState().projects.find(item => item.id === activeProjectId);
+    if (project && (project.studioScene || !project.nodes.length)) {
+      return <StudioWorkspace key={activeProjectId} projectId={activeProjectId} onHome={onHome} />;
+    }
+    return <InfiniteCanvasEditor key={activeProjectId} projectId={activeProjectId} onHome={onHome} />;
   }
 
-  return <CanvasHomeFeed onSubmitSuccess={info => {
-    if (!info.tasks.length) return;
-    const project = useCanvasStore.getState().createProject(info.prompt.trim().slice(0, 30) || 'AI 画布创作');
-    submitCanvasPrompt({ projectId: project.id, pan: { x: 0, y: 0 }, zoom: 1, viewport: null,
-      promptText: info.prompt, refImage: info.refImages[0], mode: info.mode, tasks: info.tasks });
-  }} />;
+  return null;
 };
 
 export default CanvasWorkspaceView;

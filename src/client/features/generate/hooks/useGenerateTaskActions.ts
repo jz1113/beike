@@ -2,10 +2,12 @@ import { useCallback, useRef } from 'react';
 import { useAppStore, type GenerationTask } from '@client/store';
 import { cleanPromptText, getAspectRatioFromSize, stripWorkshopPromptGuards } from '@shared/domain/media/drawing';
 import { peekDepthSubmit } from '@client/shared/api/generation/depthGeneration';
-import { registerRefMedia } from '@client/shared/media/refMediaRegistry';
+import { registerRefMedia, registerRefMediaKind } from '@client/shared/media/refMediaRegistry';
 import { createGenerationAttemptId, prepareGenerationAttempt } from '@client/shared/media/generationAttempt';
 import { isDepthImageTask, isDepthVideoTask } from '@client/shared/media/generationTaskMedia';
+import { restoreImagePromptOptions } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 import { isGenerateVideoTask } from '../model/generateWorkspaceLayout';
+import { restoreVideoTaskSettings } from '../model/videoTaskSettings';
 
 function getLiveTask(task: GenerationTask): GenerationTask {
   const store = useAppStore.getState();
@@ -28,7 +30,10 @@ export function useGenerateTaskActions(onShowToast: (message: string) => void) {
     const video = isGenerateVideoTask(task);
     let references = task.referenceImages?.length ? task.referenceImages : task.images?.length ? task.images :
       [task.referenceImageUrl || task.sourceImageUrl || task.productImageUrl].filter((url): url is string => Boolean(url));
-    store.setQuickPrompt(stripWorkshopPromptGuards(cleanPromptText(task.prompt || '')));
+    if (task.referenceVideoUrls) {
+      for (const url of references) registerRefMediaKind(url, task.referenceVideoUrls.includes(url) ? 'video' : 'image');
+    }
+    store.setQuickPrompt(stripWorkshopPromptGuards(cleanPromptText(task.prompt || '', true), true));
     store.setQuickGenMode(depthVideo ? 'depth-video' : depthImage ? 'depth-image' : video ? 'video' : 'image');
     store.setQuickCount(1);
     store.setQuickVideoCount(1);
@@ -48,12 +53,7 @@ export function useGenerateTaskActions(onShowToast: (message: string) => void) {
       }
       onShowToast(payload?.file ? '已恢复深度生成参数和参考文件' : '已恢复深度生成参数，请确认参考文件后生成');
     } else if (video) {
-      if (task.model) store.setQuickVideoModel(task.model);
-      store.setQuickVideoAspectId(getAspectRatioFromSize(task.size));
-      store.setQuickVideoDuration(task.videoDuration || 5);
-      const resolution = task.videoResolution || task.quality;
-      store.setQuickVideoResolution(['480P', '720P', '1080P', '4K'].includes(resolution)
-        ? resolution as '480P' | '540P' | '720P' | '1080P' | '2K' | '4K' : '720P');
+      restoreVideoTaskSettings(store, task);
       const refMode = task.videoRefMode || 'omni';
       store.setQuickVideoRefMode(refMode);
       if (refMode === 'first_last_frame') {
@@ -63,12 +63,18 @@ export function useGenerateTaskActions(onShowToast: (message: string) => void) {
         store.setQuickVideoMultiFrames(references);
       }
     } else {
-      if (task.model) store.setQuickModel(task.model);
+      const selection = task.modelRouteKey || task.model;
+      if (selection) store.setQuickModel(selection);
+      restoreImagePromptOptions(task.imageQuality, task.inferenceStrength);
       store.setQuickAspectId(getAspectRatioFromSize(task.size));
       store.setQuickQuality(['high', 'medium', 'low'].includes(task.quality)
         ? task.quality as 'high' | 'medium' | 'low' : 'high');
     }
     store.setQuickRefImages([...new Set(references)]);
+    requestAnimationFrame(() => {
+      const editors = document.querySelectorAll<HTMLElement>('[data-prompt-composer] [contenteditable="true"]');
+      Array.from(editors).find(editor => editor.getClientRects().length)?.focus();
+    });
   }, [onShowToast]);
 
   const startAttempts = useCallback(async (tasks: GenerationTask[], file?: File) => {

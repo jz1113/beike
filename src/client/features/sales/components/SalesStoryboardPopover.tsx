@@ -8,7 +8,7 @@ interface Props {
   label: string;
   disabled: boolean;
   align?: 'left' | 'right';
-  children: ReactNode;
+  children: ReactNode | (() => ReactNode);
 }
 
 /** A single active cell editor stays inside the visible storyboard scroll area. */
@@ -108,7 +108,7 @@ export function SalesStoryboardPopover({
         }}>
         {trigger}
       </summary>
-      <div id={panelId} role="dialog" aria-label={label}>{children}</div>
+      <div id={panelId} role="dialog" aria-label={label}>{typeof children === 'function' ? isOpen && children() : children}</div>
     </details>
   );
 }

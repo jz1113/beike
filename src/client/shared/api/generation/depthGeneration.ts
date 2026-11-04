@@ -211,14 +211,14 @@ interface DepthSubmitResponse {
   submissionRejected?: boolean;
 }
 
-async function postDepthFile(endpoint: string, form: FormData, signal?: AbortSignal, operationId?: string): Promise<DepthSubmitResponse> {
+async function postDepthFile(endpoint: string, form: FormData | string, signal?: AbortSignal, operationId?: string): Promise<DepthSubmitResponse> {
   throwIfGenerationAborted(() => Boolean(signal?.aborted));
-  if (operationId) form.append('clientTaskId', operationId);
+  if (operationId && typeof form !== 'string') form.append('clientTaskId', operationId);
   let res: Response;
   try {
     res = await apiFetch(endpoint, {
       method: 'POST', body: form, signal,
-      headers: { ...storageConfigHeaders(), ...(operationId ? { 'x-idempotency-key': operationId } : {}) },
+      headers: { ...storageConfigHeaders(), ...(typeof form === 'string' ? { 'Content-Type': 'application/json' } : {}), ...(operationId ? { 'x-idempotency-key': operationId } : {}) },
     });
   } catch (error) {
     throw generationRecoveryError(formatUserError(error, SUBMISSION_RECOVERY_HINT));
@@ -259,17 +259,17 @@ export async function submitDepthImage(
 }
 
 export async function submitDepthVideo(
-  file: File,
+  file: File | string,
   style: DepthVideoStyle,
   quality: DepthQuality,
   signal?: AbortSignal,
   operationId?: string,
 ): Promise<{ taskId: string; recordId?: string }> {
   throwIfGenerationAborted(() => Boolean(signal?.aborted));
-  const form = new FormData();
-  form.append('video', file);
-  form.append('style', style);
-  form.append('quality', quality);
+  const form = typeof file === 'string' ? JSON.stringify({videoUrl: file, style, quality}) : new FormData();
+  if (form instanceof FormData && typeof file !== 'string') {
+    form.append('video', file); form.append('style', style); form.append('quality', quality);
+  }
   const data = await postDepthFile('/api/generate/depth-video', form, signal, operationId);
   if (!data.taskId) throw generationRecoveryError(SUBMISSION_RECOVERY_HINT);
   recordModelUsage({

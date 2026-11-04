@@ -142,12 +142,16 @@ describe('keyword review models', () => {
     });
   });
 
-  it('refuses a chat model whose gateway was removed', () => {
+  it.each(['disabled', 'removed'])('refuses a previously selected chat model after its gateway is %s', (state) => {
+    const provider = { id: 'missing', name: '测试渠道', enabled: true };
+    memory.set(API_PROVIDERS_STORAGE_KEY, JSON.stringify([provider]));
     memory.set(getModalityStorageKey('chat'), JSON.stringify([
       { id: 'gone', name: 'Gemini', modality: 'chat', modelId: 'gemini-3-flash', channelId: 'missing' },
     ]));
     const model = loadKeywordReviewModels().find((option) => option.routeId === 'gone');
     expect(model).toBeDefined();
-    expect(() => resolveKeywordReviewRoute(model!)).toThrow('所选模型的渠道已移除，请重新选择');
+    memory.set(API_PROVIDERS_STORAGE_KEY, JSON.stringify(state === 'disabled' ? [{...provider, enabled: false}] : []));
+    expect(loadKeywordReviewModels().some(option => option.routeId === 'gone')).toBe(false);
+    expect(() => resolveKeywordReviewRoute(model!)).toThrow('所选模型的渠道已停用或移除，请重新选择');
   });
 });

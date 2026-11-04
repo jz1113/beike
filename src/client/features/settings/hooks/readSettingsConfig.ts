@@ -12,8 +12,6 @@ export async function readSettingsConfig() {
   const metadata = {
     baseUrl: read('ai_base_url', 'https://ai.comfly.org'),
     isWanbangEnabled: read('wanbang_enabled') !== 'false',
-    isApiaEnabled: read('apia_enabled') !== 'false',
-    isQiyunEnabled: read('qiyun_enabled') !== 'false',
     appAccessToken: read('app_access_token', 'azhuo-local-dev'),
     storageEnabled: read('storage_enabled') === 'true',
     storageProvider: (providers.includes(rawProvider) ? rawProvider : 'oss') as StorageProvider,
@@ -27,14 +25,12 @@ export async function readSettingsConfig() {
     storageCloudName: read('storage_cloud_name'),
     storageZone: read('storage_zone', 'z2'),
   };
-  const [apiKey, deepSeekApiKey, wanbangKey, wanbangSecret, scraperId, scraperSecret, qiyunAppId, qiyunAppKey, storageSecretAccessKey] = await Promise.all([
+  const [apiKey, deepSeekApiKey, wanbangKey, wanbangSecret, storageSecretAccessKey] = await Promise.all([
     credentialGet('ai_api_key', true), credentialGet('deepseek_api_key', true),
     credentialGet('wanbang_api_key', true), credentialGet('wanbang_api_secret', true),
-    credentialGet('external_scraper_id', true), credentialGet('external_scraper_secret', true),
-    credentialGet('qiyun_app_id', true), credentialGet('qiyun_app_key', true),
     credentialGet('storage_secret_access_key', true),
   ]);
-  return { ...metadata, apiKey, deepSeekApiKey, wanbangKey, wanbangSecret, scraperId, scraperSecret, qiyunAppId, qiyunAppKey, storageSecretAccessKey };
+  return { ...metadata, apiKey, deepSeekApiKey, wanbangKey, wanbangSecret, storageSecretAccessKey };
 }
 
 export type SettingsConfigSnapshot = Awaited<ReturnType<typeof readSettingsConfig>>;

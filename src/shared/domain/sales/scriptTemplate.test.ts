@@ -36,6 +36,18 @@ describe('sales reference script template', () => {
     expect(detectExclusionLeaks(script)).toEqual([{ label: '镜头 1-1 动作模板', term: '黑色菱格纹链条包' }]);
   });
 
+  it('keeps source locations separate from photographic style and never labels unknown exclusions as products', () => {
+    const script = normalizeScriptTemplate({ ...legacy, shots: [{ beats: [{ start: 0, end: 6, action: '抬手展示商品', scene: '旧服装店的红色试衣帘前' }] }],
+      sourceExclusions: [{ type: 'scene', term: '旧服装店', replacementRule: '用当前场景' }, { type: 'future_type', term: '旧专属元素' }],
+    })!;
+    expect(script.visualSpec.styleSummary).toBe('');
+    expect(script.shots[0].beats[0].scene).toBe('旧服装店的红色试衣帘前');
+    expect(script.sourceExclusions.map((item) => item.type)).toEqual(['scene', 'copy_claim']);
+    const parsed = salesScriptTemplateSchema.parse(script);
+    expect(parsed.sourceExclusions[0].type).toBe('scene');
+    expect(salesScriptTemplateSchema.parse({ ...script, sourceExclusions: [{ type: 'future_type', term: '旧元素' }] }).sourceExclusions[0].type).toBe('copy_claim');
+  });
+
   it('reports missing product views from tagged selected images', () => {
     const script = normalizeScriptTemplate(legacy)!;
     const images = setSalesImageView([{ index: 0, url: 'a', role: 'main' }, { index: 1, url: 'b', role: 'detail' }], 'a', 'worn');
@@ -46,14 +58,16 @@ describe('sales reference script template', () => {
     expect(readiness.missingViews).toEqual(['back']);
   });
 
-  it('parses fenced external JSON and builds Mixed slots without original appearance', () => {
+  it('parses fenced external JSON and exports recorded source data without invented reference slots', () => {
     const script = tryParsePastedScriptJson('结果如下：\n```json\n' + JSON.stringify({ script: legacy }) + '\n```')!;
     const prompt = previewSeedancePromptSkeleton(script);
-    expect(prompt).toContain('出镜人物主体 {{Mixed 1}}');
-    expect(prompt).toContain('人脸参考 {{Mixed 2}}');
-    expect(prompt).toContain('背面参考 {{Mixed 4}}');
+    expect(prompt).toContain('分镜资料：开衫穿搭');
+    expect(prompt).toContain('商品视角记录：');
+    expect(prompt).toContain('背面');
     expect(prompt).toContain('动作段 2');
-    expect(prompt).toContain('不张嘴说话');
+    expect(prompt).toContain('声音模式记录：none');
+    expect(prompt).not.toContain('{{Mixed');
+    expect(prompt).not.toContain('不张嘴说话');
     expect(tryParsePastedScriptJson('镜头一：她坐在桌前')).toBeNull();
   });
 });

@@ -27,44 +27,78 @@ describe('product selling points sources and persistence', () => {
     expect(restored.productSummary?.editedCopy).toBe('手动修改的旧稿');
     expect(restored.productSummary?.inputKey).not.toBe(salesSummarySource(restored).inputKey);
   });
-  it('uses selected references and current text with exact percentages, excludes historical notes', () => {
-    const source = salesSummarySource(product());
+  it('submits current product facts and OCR edits, excluding old text and image URLs', () => {
+    const state = { ...product(), brand: '不应发送的品牌', sellingPoints: '不应发送的补充文字' };
+    const source = salesSummarySource(state);
     expect(source.error).toBe('');
-    expect(source.input.referenceImages).toEqual([{ index: 0, url: '/a.png' }]);
-    expect(source.input.textImages).toEqual([{ index: 5, url: '/b.png', text: ocr.text }]);
-    expect(source.inputKey).not.toContain('旧文字');
+    expect(source.input.textSources).toEqual([{ index: 5, text: ocr.text }]);
+    expect(source.input.productFacts).toContain(state.sellingPoints);
+    for (const excluded of ['旧文字', '/a.png', '/b.png']) {
+      expect(source.inputKey).not.toContain(excluded);
+    }
+  });
+  it.each([27, 65])('retains all %i OCR text sources without an image-count limit or URLs', (count) => {
+    const imageCatalog = Array.from({ length: count }, (_, index) => ({ index, url: `/detail-${index}.png`, role: 'detail' as const }));
+    const state = { ...emptySalesCollection(), imageCatalog,
+      colorSelection: { colorLabel: '', confirmedImageUrls: imageCatalog.map((image) => image.url), excludedImageUrls: [] },
+      ocrImageUrls: imageCatalog.map((image) => image.url),
+      ocrImages: imageCatalog.map((image) => ({ imageUrl: image.url, editedText: `商品资料 ${image.index}`, result: ocr })),
+    };
+    const source = salesSummarySource(state);
+    expect(source.error).toBe('');
+    expect(source.input.textSources).toHaveLength(count);
+    expect(source.input.textSources[count - 1]).toEqual({ index: count - 1, text: `商品资料 ${count - 1}` });
+    expect(JSON.stringify(source.input)).not.toContain('/detail-');
+    expect(parseSalesCollection(state).ocrImageUrls).toHaveLength(count);
+  });
+  it('retains OCR text when its original image becomes unavailable', () => {
+    const state = product();
+    state.imageCatalog = state.imageCatalog.map((image) => ({ ...image, unavailable: true }));
+    expect(salesSummarySource(state).input.textSources).toEqual([{ index: 5, text: ocr.text }]);
+    expect(salesSummarySource(state).error).toBe('');
+  });
+  it('rejects overlong OCR text without truncating it', () => {
+    const state = product();
+    state.ocrImageUrls = ['/b.png', '/old.png'];
+    state.ocrImages[0].editedText = '字'.repeat(40_000);
+    state.ocrImages[1].editedText = '字'.repeat(20_000);
+    expect(salesSummarySource(state).error).toBe('');
+    state.ocrImages[1].editedText += '字';
+    const source = salesSummarySource(state);
+    expect(source.error).toContain('60000');
+    expect(source.input.textSources[1].text).toHaveLength(20_001);
   });
   it('uses available current edits even when recognition is pending or a retry failed', () => {
     const state = product(); state.ocrImages[0].editedText = '羊毛8.5%';
     expect(salesSummarySource(state).error).toBe('');
-    expect(salesSummarySource(state).input.textImages[0].text).toBe('羊毛8.5%');
+    expect(salesSummarySource(state).input.textSources[0].text).toBe('羊毛8.5%');
     expect(state.ocrImages[0].confirmedText).toBe(ocr.text);
     expect(salesSummarySource({ ...state, ocrImages: state.ocrImages.map((entry) => ({ ...entry, error: '重新识别失败' })) }).error).toBe('');
-    expect(salesSummarySource({ ...state, ocrImageUrls: ['/b.png', '/old.png'], ocrImages: [state.ocrImages[0]] }).input.textImages).toEqual([{ index: 5, url: '/b.png', text: '羊毛8.5%' }]);
+    expect(salesSummarySource({ ...state, ocrImageUrls: ['/b.png', '/old.png'], ocrImages: [state.ocrImages[0]] }).input.textSources).toEqual([{ index: 5, text: '羊毛8.5%' }]);
     state.ocrImages = [];
-    expect(salesSummarySource(state).error).toContain('识别文字');
-    expect(salesSummarySource({ ...product(), ocrImageUrls: [] }).error).toContain('识别文字');
+    expect(salesSummarySource(state).error).toBe('');
+    expect(salesSummarySource({ ...product(), ocrImageUrls: [] }).error).toBe('');
     expect(salesSummarySource({ ...emptySalesCollection(), imageCatalog: state.imageCatalog }).error).toContain('识别文字');
     expect(salesSummarySource({ ...product(), ocrImages: [{ imageUrl: '/b.png', editedText: ocr.text, result: ocr }] }).error).toBe('');
   });
-  it('accepts pasted product text without OCR or reference images and persists it separately', () => {
+  it('keeps supplementary product evidence separate from OCR', () => {
     const state = { ...emptySalesCollection(), sellingPoints: '用户补充的棉质面料，支持机洗' };
     const source = salesSummarySource(state);
     expect(source.error).toBe('');
-    expect(source.input.facts).toBe(state.sellingPoints);
-    expect(source.input.referenceImages).toEqual([]);
-    expect(source.input.textImages).toEqual([]);
+    expect(source.input).toEqual({ textSources: [],productFacts:state.sellingPoints });
     expect(parseSalesCollection(state).sellingPoints).toBe(state.sellingPoints);
-    expect(salesSummarySource({ ...state, sellingPoints: '   ' }).error).toContain('补充商品文字');
   });
-  it('detects changed images/text and retains source key on copy edits', () => {
+  it('invalidates the summary for product or OCR edits and retains previous image-based results', () => {
     const state = product(); const source = salesSummarySource(state);
     state.colorSelection.confirmedImageUrls = ['/b.png'];
+    state.productName = '新名称'; state.props = { 面料: '其他成分' }; state.sellingPoints = '新补充';
     expect(salesSummarySource(state).inputKey).not.toBe(source.inputKey);
-    const saved = { result, model: 'vision', skillVersion: 'product-selling-points:1', inputKey: source.inputKey, generatedAt: '2026-10-30T12:00:00.000Z', editedCopy: '' };
+    state.ocrImages[0].editedText = '新 OCR 文字';
+    expect(salesSummarySource(state).inputKey).not.toBe(source.inputKey);
+    const saved = { result, model: 'vision', skillVersion: 'product-selling-points:1', inputKey: JSON.stringify({ rulesVersion: 3, input: { referenceImages: [{ index: 0, url: '/a.png' }], textImages: [] } }), generatedAt: '2026-10-30T12:00:00.000Z', editedCopy: '' };
     const parsed = parseSalesCollection({ ...product(), productSummary: saved });
     expect(parsed.productSummary).toEqual(saved);
-    expect(salesSummarySource(parsed).inputKey).toBe(source.inputKey);
+    expect(salesSummarySource(parsed).inputKey).not.toBe(saved.inputKey);
     expect(parseSalesCollection({ productSummary: { ...saved, result: { summary: '残缺结果' } } }).productSummary).toBeUndefined();
     expect(mergeSalesCollection(parsed, emptySalesCollection(), 'another').productSummary).toBeUndefined();
   });

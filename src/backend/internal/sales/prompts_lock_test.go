@@ -149,11 +149,11 @@ func TestPromptSaveRechecksVersionAfterWriterLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
+	d, _ := findPromptDefinition("summary")
 	first := "另一个页面已保存的版本"
-	if _, err := tx.Exec(`INSERT INTO "SalesPromptOverride" ("workspaceId","promptId","prompt","updatedAt") VALUES ('local','summary',?,'now')`, first); err != nil {
+	if _, err := tx.Exec(`INSERT INTO "SalesPromptOverride" ("workspaceId","promptId","prompt","updatedAt","templateVersion") VALUES ('local','summary',?,'now',?)`, first, d.resolve(nil).Version); err != nil {
 		t.Fatal(err)
 	}
-	d, _ := findPromptDefinition("summary")
 	second := "不能覆盖先保存的版本"
 	_, err = trySaveSalesPrompt(t.Context(), cfg, "local", d, &second, d.resolve(nil).Version)
 	var sqliteErr *sqlite.Error

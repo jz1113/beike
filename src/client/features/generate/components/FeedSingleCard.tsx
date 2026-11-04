@@ -158,31 +158,29 @@ export default function FeedSingleCard({
                   preload="metadata"
                 />
               </div>
-            ) : isBatchVideo ? (
-              <div
-                className="w-full h-full cursor-pointer bg-black"
+            ) : (
+              <button
+                type="button"
+                aria-label={isBatchVideo ? '预览生成视频' : '预览生成图片'}
+                className="block w-full h-full cursor-pointer focus-visible:outline-offset-[-3px]"
                 onClick={() => onPreview(primaryTask, batchTasks)}
                 title="点击全屏放大查看"
               >
-                <LazyVideoCover src={proxyMediaUrl(primaryTask.resultUrl!)} />
-              </div>
-            ) : (
-              <img
-                src={getFeedImageUrl(primaryTask.resultUrl, { thumb: true, width: 960 })}
-                alt={primaryTask.title || '生成结果'}
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  if (!target.dataset.hasRetried && primaryTask.resultUrl) {
-                    target.dataset.hasRetried = 'true';
-                    target.src = proxyMediaUrl(primaryTask.resultUrl);
-                  }
-                }}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover/media:scale-102 cursor-pointer select-none"
-                onClick={() => onPreview(primaryTask, batchTasks)}
-                title="点击全屏放大查看"
-              />
+                {isBatchVideo ? <LazyVideoCover src={proxyMediaUrl(primaryTask.resultUrl!)} /> : <img
+                  src={getFeedImageUrl(primaryTask.resultUrl, { thumb: true, width: 960 })}
+                  alt={primaryTask.title || '生成结果'}
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (!target.dataset.hasRetried && primaryTask.resultUrl) {
+                      target.dataset.hasRetried = 'true';
+                      target.src = proxyMediaUrl(primaryTask.resultUrl);
+                    }
+                  }}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover/media:scale-102 cursor-pointer select-none"
+                />}
+              </button>
             )}
 
             {/* 左上角轻量透光「✦ AI生成」微胶囊 */}

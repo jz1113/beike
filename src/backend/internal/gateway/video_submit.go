@@ -1,9 +1,11 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
@@ -23,6 +25,7 @@ const (
 )
 
 type SubmitResult struct {
+	Data             map[string]any
 	Outcome          SubmitOutcome
 	TaskID           string
 	Error            string
@@ -31,10 +34,19 @@ type SubmitResult struct {
 	UpstreamStatus   int
 }
 
+// VideoForm holds a prepared multipart body containing binary reference files.
+type VideoForm struct {
+	Body        []byte
+	ContentType string
+}
+
 type SubmitCommand struct {
+	EndpointBodies      map[string]string
+	Form                *VideoForm
 	Endpoints           []string
 	APIKey              string
 	PayloadJSON         string
+	MultipartFields     map[string][]string
 	Headers             map[string]string
 	ReadTaskID          func(map[string]any) string
 	Client              *http.Client
@@ -70,6 +82,7 @@ func SubmitVideo(ctx context.Context, command SubmitCommand) SubmitResult {
 		if status >= 200 && status < 300 && taskID != "" {
 			result.Outcome = Accepted
 			result.TaskID = taskID
+			result.Data = data
 			result.Error = ""
 			return result
 		}
@@ -95,11 +108,36 @@ func SubmitVideo(ctx context.Context, command SubmitCommand) SubmitResult {
 }
 
 func postJSON(ctx context.Context, client *http.Client, endpoint string, command SubmitCommand) (int, map[string]any, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(command.PayloadJSON))
+	payload := command.PayloadJSON
+	if alternate, ok := command.EndpointBodies[endpoint]; ok {
+		payload = alternate
+	}
+	var body io.Reader = strings.NewReader(payload)
+	contentType := "application/json"
+	if command.Form != nil {
+		body = bytes.NewReader(command.Form.Body)
+		contentType = command.Form.ContentType
+	} else if len(command.MultipartFields) > 0 {
+		var buffer bytes.Buffer
+		writer := multipart.NewWriter(&buffer)
+		for key, values := range command.MultipartFields {
+			for _, value := range values {
+				if err := writer.WriteField(key, value); err != nil {
+					return 0, nil, err
+				}
+			}
+		}
+		if err := writer.Close(); err != nil {
+			return 0, nil, err
+		}
+		body = &buffer
+		contentType = writer.FormDataContentType()
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, body)
 	if err != nil {
 		return 0, nil, err
 	}
-	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Type", contentType)
 	request.Header.Set("Authorization", "Bearer "+command.APIKey)
 	if strings.Contains(endpoint, "/video-generation/") || strings.Contains(endpoint, "/qwen/") {
 		request.Header.Set("X-DashScope-Async", "enable")

@@ -76,6 +76,18 @@ it('keeps an existing source available for depth conversion without exposing it 
   expect(patchSalesScript).not.toHaveBeenCalled();
 });
 
+it('starts an explicit fresh conversion of an existing depth without deleting its saved result or source', () => {
+  const root = render({ depthVideoUrl: '/old-depth.mp4', depthTaskId: 'old-task', depthOperationId: 'old-operation' });
+  const html = renderToStaticMarkup(root);
+  expect(html).toContain('src="/old-depth.mp4"');
+  expect(html).toContain('新结果完成前保留现有深度视频');
+  click(button(root, '从原视频重新生成深度'));
+  expect(onConvert).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+    id: 'script-1', videoUrl: '/source.mp4', depthVideoUrl: '', depthTaskId: '', depthOperationId: '',
+  }));
+  expect(patchSalesScript).not.toHaveBeenCalled();
+});
+
 it('queries an existing depth receipt even when its source is unavailable', () => {
   const root = render({ videoUrl: '', depthOperationId: 'operation-1', depthTaskId: 'task-1' });
   expect(renderToStaticMarkup(root)).not.toContain('上传视频生成深度');
@@ -83,7 +95,7 @@ it('queries an existing depth receipt even when its source is unavailable', () =
   expect(onConvert).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ depthOperationId: 'operation-1', depthTaskId: 'task-1' }));
 });
 
-it('uploads a source only to generate a missing depth video and keeps the saved receipt', async () => {
+it('passes the chosen file directly to depth processing without saving a source attachment', async () => {
   const file = new File(['video'], 'source.mp4', { type: 'video/mp4' });
   vi.mocked(uploadScriptVideo).mockResolvedValue({ success: true, videoUrl: '/source.mp4', videoHash: 'source-hash', durationSec: 3,
     aspectRatio: '9:16', hasAudio: true, sizeBytes: 5 });
@@ -92,10 +104,10 @@ it('uploads a source only to generate a missing depth video and keeps the saved 
   expect(renderToStaticMarkup(root)).toContain('上传视频生成深度');
   const input = find(root, (node) => node.type === 'input' && node.props.type === 'file');
   (input.props.onChange as (event: { target: { files: File[]; value: string } }) => void)({ target: { files: [file], value: 'source.mp4' } });
-  await vi.waitFor(() => expect(onConvert).toHaveBeenCalledExactlyOnceWith(saved, file));
-  expect(uploadScriptVideo).toHaveBeenCalledExactlyOnceWith(file);
-  expect(patchSalesScript).toHaveBeenCalledExactlyOnceWith('script-1', { videoUrl: '/source.mp4' });
-  expect(onSaved).toHaveBeenCalledExactlyOnceWith(saved);
+  expect(onConvert).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({id:'script-1',videoUrl:''}),file);
+  expect(uploadScriptVideo).not.toHaveBeenCalled();
+  expect(patchSalesScript).not.toHaveBeenCalled();
+  expect(onSaved).not.toHaveBeenCalled();
 });
 
 it('does not request a new source when a depth video is already available', () => {

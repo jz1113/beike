@@ -38,5 +38,5 @@ export function uploadSalesPersonaReference(plan: PersonaBinding, target: 'perso
 
 export function salesPersonaDescription(plan: PersonaBinding, persona: SalesPersonaCandidate | null): string {
   if (hasCustomSalesPersona(plan)) return '用户上传的自定义出镜人物，身份和外貌以本次上传的人物参考图为准';
-  return persona ? `${persona.name}（${persona.description}）` : '尚未绑定出镜人物参考';
+  return persona ? [persona.name, persona.description.trim(), persona.tags.trim() ? `人物风格标签：${persona.tags.trim()}` : ''].filter(Boolean).join('；') : '尚未绑定出镜人物参考';
 }

@@ -17,9 +17,7 @@ import { agentPromptSource } from '@client/shared/agent/generationBatchSources';
 import { apiFetch } from '@client/shared/api/apiClient';
 import ThoughtLine from '@client/shared/ui/ThoughtLine';
 import MarkdownBody from '@client/shared/ui/markdown/MarkdownBody';
-import { getApprovedModel } from '@shared/domain/models/modelCatalog';
-import { findConfiguredModalityModel } from '@shared/domain/models/modalityStorage';
-import { selectedTextModel } from '@shared/domain/models/textModelRoute';
+import { agentModelName } from '../model/agentModelName';
 import type { ApprovalRequestItem, AssistantItem } from '@shared/domain/assistant/types';
 import { stopAgentTask } from '../engine/submitAgentTask';
 import { parseAgentAttachments, visibleAgentPrompt, type ParsedAttachment } from '@client/shared/media/agentArtifact';
@@ -45,17 +43,6 @@ function relativeTime(createdAt: number | undefined, now: number): string {
   if (hours < 24) return `${hours} 小时前`;
   const days = Math.floor(hours / 24);
   return `${days} 天前`;
-}
-
-function usedModelName(task: GenerationTask): string {
-  for (const id of [task.agentTurn?.modelUsed, task.model, task.modelRouteKey]) {
-    if (!id) continue;
-    const configured = findConfiguredModalityModel(id);
-    const modelId = configured?.modelId || selectedTextModel(id).modelId;
-    if (!modelId || modelId.startsWith('chat_sync_')) continue;
-    return configured?.name?.trim() || getApprovedModel(modelId)?.shortName || modelId;
-  }
-  return '';
 }
 
 function AttachmentPill({ item }: { item: ParsedAttachment }) {
@@ -104,7 +91,7 @@ export default function AgentTurn({ task, onRegenerate, onDelete }: Props) {
   const statusText = task.agentTurn?.statusText?.trim();
   const failure = task.status === 'FAILURE' ? task.failReason : '';
   const stamp = relativeTime(task.createdAt, now);
-  const modelName = usedModelName(task);
+  const modelName = agentModelName(task);
 
   const copyReply = async () => {
     try {

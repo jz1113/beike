@@ -79,20 +79,27 @@ beforeEach(() => {
 
 it('keeps category and style searches independent and retains their queries when switching', () => {
   expect(rowIds()).toEqual(['fashion', 'home']);
-  change(labeled('搜索分类'), '服');
-  expect(rowIds()).toEqual(['fashion']);
-  expect(text(render())).toContain('3 组');
+  const items = [fashion, home, dance, speech];
+  for (const item of [fashion, dance]) {
+    for (let i = 1; i <= 7; i++) items.push({ ...item, id: item.id + i, name: '其他' + i });
+  }
+  const full = () => render({ items });
+  const search = (label: string) => labeled(label, full());
+  expect(() => labeled('搜索分类', render({ items: items.filter((item) => item.id !== 'fashion7') }))).toThrow('Control not found');
+  change(search('搜索分类'), '服');
+  expect(rowIds(full())).toEqual(['fashion']);
+  expect(text(full())).toContain('已关联 3 组');
   click(tab('拍摄风格'));
-  expect(rowIds()).toEqual(['dance', 'speech']);
-  change(labeled('搜索风格'), '舞');
-  expect(rowIds()).toEqual(['dance']);
+  change(search('搜索风格'), '舞');
+  expect(rowIds(full())).toEqual(['dance']);
   click(tab('素材分类'));
-  expect(labeled('搜索分类').props.value).toBe('服');
+  expect(search('搜索分类').props.value).toBe('服');
   expect(rowIds()).toEqual(['fashion']);
   click(tab('拍摄风格'));
-  expect(labeled('搜索风格').props.value).toBe('舞');
+  expect(search('搜索风格').props.value).toBe('舞');
   click(labeled('清除风格搜索'));
   expect(rowIds()).toEqual(['dance', 'speech']);
+  expect(() => labeled('搜索风格')).toThrow('Control not found');
 });
 
 it('does not submit a duplicate category and allows the same name in another kind', async () => {
@@ -152,7 +159,7 @@ it('does not write an unchanged name and leaves the rest of the dialog open', ()
 });
 
 it('requires explicit confirmation before removing a category and allows cancellation', () => {
-  openRemoval();
+  click(labeled('移除分类 服饰'));
   expect(remove).not.toHaveBeenCalled();
   expect(text(render())).toContain('素材、分镜和其他分类保留');
   click(button('取消'));

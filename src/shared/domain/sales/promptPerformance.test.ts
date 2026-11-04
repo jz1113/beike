@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { assembleSalesVideoPrompt, type SalesAdaptedBeat } from './promptAssembler';
+import { assembleSalesVideoPrompt as renderSalesPrompt, type SalesAdaptedBeat } from './promptAssembler';
 import { normalizeScriptTemplate } from './scriptTemplate';
+
+const assembleSalesVideoPrompt = (input: Parameters<typeof renderSalesPrompt>[0]) => renderSalesPrompt({
+  finalVideoTemplate: '{{referenceFacts}}\n{{photographyFacts}}\n{{timelineFacts}}\n{{audioFacts}}', ...input,
+});
 
 const script = normalizeScriptTemplate({
   title: '单镜展示', durationSec: 5.6, voiceMode: 'none', visualSpec: { oneTake: true },
@@ -61,13 +65,14 @@ describe('adapted facial performance and ending continuity', () => {
     expect(result.warnings.join(' ')).toContain('旧改编未独立记录表情或衔接');
   });
 
-  it('honors explicitly cleared performance and describes padding without inventing a new ending', () => {
+  it('keeps explicitly cleared performance as facts without appending ending or mouth rules', () => {
     const result = assemble([{ ...adapted, expression: '', transition: '' }]);
-    expect(result.enginePrompt).not.toContain('• 眼神表情：');
+    expect(result.enginePrompt).not.toContain('眼神表情：');
+    expect(result.enginePrompt).not.toContain('段落衔接：');
     expect(result.enginePrompt).not.toContain('旧窗边');
-    expect(result.enginePrompt).toContain('若生成时长超过脚本 00:05.6');
-    expect(result.enginePrompt).toContain('仅延续末姿势、呼吸和材质自然回落');
-    expect(result.enginePrompt).toContain('不强制全程闭嘴');
-    expect(result.enginePrompt).toContain('不新增连续说话式口型');
+    expect(result.enginePrompt).toContain('生成时长：5.6 秒');
+    expect(result.enginePrompt).not.toContain('结束衔接');
+    expect(result.enginePrompt).not.toContain('不强制全程闭嘴');
+    expect(result.enginePrompt).not.toContain('不新增连续说话式口型');
   });
 });

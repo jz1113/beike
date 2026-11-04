@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { appendSalesImages, markSalesImageUnavailable } from '@shared/domain/sales';
+import { appendSalesImages, eligibleSalesImages, markSalesImageUnavailable } from '@shared/domain/sales';
+import type { ProductFaceEdit } from '../model/salesProductFaces';
+import { useSalesAutoProductFaces } from './useSalesAutoProductFaces';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import { collectEcommerceProduct } from '../api/collectProduct';
 import { uploadSalesImages } from '../api/uploadSalesImages';
@@ -77,13 +79,20 @@ export function useSalesCollection() {
     if (next === stateRef.current) return;
     if (summaryRef.current) {
       const source = salesSummarySource(next);
-      if (source.error || source.inputKey !== summaryRef.current.inputKey) cancelSummary('资料已更新，本次提炼已停止，可使用新资料重新提炼。');
+      if (next.activeProductId !== stateRef.current.activeProductId || next.collectedProductUrl !== stateRef.current.collectedProductUrl || next.productSummary !== stateRef.current.productSummary || source.error || source.inputKey !== summaryRef.current.inputKey) cancelSummary('资料已更新，本次提炼已停止，可使用新资料重新提炼。');
     }
     stateRef.current = next;
     setState(next);
     setSaveStatus('saving');
     saverRef.current?.queue(next);
   }, [cancelSummary]);
+  const autoFaces = useSalesAutoProductFaces(state, commit);
+  const applyFaceEdit = (url: string, edit: ProductFaceEdit) => commit((current) => {
+    if (current.activeProductId !== state.activeProductId || current.collectedProductUrl !== state.collectedProductUrl
+      || !eligibleSalesImages(current.imageCatalog, current.colorSelection, current.variantMetadata).some((image) => image.url === url)) return current;
+    const plan = current.productionPlan;
+    return { ...current, productionPlan: { ...plan, productFaceEdits: { ...plan.productFaceEdits, [url]: edit } } };
+  });
   const updateState = useCallback((patch: Partial<SalesCollectionState>) => {
     const keys = Object.keys(patch);
     const productionOnly = keys.every((key) => key === 'selectedScriptId' || key === 'productionPlan' || key === 'summaryModel' || key === 'activeProductId');
@@ -221,7 +230,7 @@ export function useSalesCollection() {
   const summarize = useCallback(async (model: string) => {
     if (busyRef.current || summaryRef.current) return;
     const source = salesSummarySource(stateRef.current);
-    if (source.error || !model) { setSummaryError(source.error || '请先选择多模态模型'); return; }
+    if (source.error || !model) { setSummaryError(source.error || '请先选择文字模型'); return; }
     const controller = new AbortController();
     summaryRef.current = { controller, inputKey: source.inputKey };
     setIsSummarizing(true);
@@ -230,6 +239,7 @@ export function useSalesCollection() {
       const response = await summarizeProduct(source.input, model, controller.signal);
       if (controller.signal.aborted) return;
       if (salesSummarySource(stateRef.current).inputKey !== source.inputKey) { setSummaryError('商品资料已变化，请重新提炼卖点。'); return; }
+      summaryRef.current = null; setIsSummarizing(false);
       commit((previous) => ({ ...previous, productSummary: { result: response.result, model: response.model, skillVersion: response.skillVersion, inputKey: source.inputKey, generatedAt: new Date().toISOString() } }));
     } catch (err) {
       if (!controller.signal.aborted) setSummaryError(err instanceof Error ? err.message : '卖点提炼失败，请重试');
@@ -247,7 +257,7 @@ export function useSalesCollection() {
     } finally { resetRef.current = false; }
   }, [commit, cancelSummary]);
 
-  return { state, updateState, error, clearError: () => setError(null), isCollecting, isUploading, ocrProgress, ocrReport, saveStatus, flushDraft,
+  return { state, updateState, autoFaces, applyFaceEdit, error, clearError: () => setError(null), isCollecting, isUploading, ocrProgress, ocrReport, saveStatus, flushDraft,
     recognizeImages, addOCRImages, retryFailedImages: () => recognizeImages(undefined, false, true), cancelOCR: () => abortRef.current?.abort(), runProductCollect, addProductImages, markImageUnavailable, retryUnavailableImages, resetProduct,
     isSummarizing, summaryError, summarize, cancelSummary };
 }

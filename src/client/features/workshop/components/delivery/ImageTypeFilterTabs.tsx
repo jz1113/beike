@@ -32,13 +32,14 @@ export default function ImageTypeFilterTabs({
   return (
     <div className={`flex items-center justify-between gap-2 ${className}`}>
       {/* 现代分段胶囊控制栏 */}
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 shrink-0">
+      <div className="flex max-w-full flex-wrap items-center gap-1 p-1 rounded-xl bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 shrink-0">
         {tabs.map(tab => {
           const isActive = activeFilter === tab.key;
           return (
             <button
               key={tab.key}
               type="button"
+              aria-pressed={isActive}
               onClick={() => onFilterChange(tab.key)}
               className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
                 isActive

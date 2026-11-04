@@ -3,6 +3,7 @@ import { createContext, useContext, useState, type Dispatch, type ReactNode, typ
 export interface WorkshopBatchDockActions {
   onCreate: () => void;
   onHistory: () => void;
+  onRename: () => void;
   disabled: boolean;
   createDisabled: boolean;
 }

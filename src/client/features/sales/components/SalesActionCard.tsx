@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Film, Image, Link2, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Film, Image, Link2, Trash2 } from 'lucide-react';
+import { SalesCardMenu } from './SalesCardMenu';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import type { SalesMaterialCard } from '../model/salesMaterialCatalog';
 import { useSalesReferencePreview } from '../hooks/useSalesReferencePreview';
@@ -69,13 +70,10 @@ export function SalesActionCard({ card, disabled, onReview, onLink, onDelete }: 
           </div>
         ) : null}
       </div>
-      <details className="sales-script-card-menu">
-        <summary aria-label={`素材操作 ${card.title}`} title="素材操作"><MoreHorizontal size={16} aria-hidden /></summary>
-        <div className="sales-script-card-menu-panel">
-          <button type="button" disabled={disabled || card.editable === false} onClick={onDelete}
+      {card.editable !== false && <SalesCardMenu title="素材操作" label={`素材操作 ${card.title}`}>
+          <button type="button" disabled={disabled} onClick={onDelete}
             aria-label={`删除动作素材 ${card.title}`} className={`is-danger ${salesGhostButtonClass}`}><Trash2 size={13} />删除</button>
-        </div>
-      </details>
+      </SalesCardMenu>}
       <div className="sales-reference-card-info">
         <h3><button type="button" title={card.title} onClick={onReview} className={salesFocusClass}>{card.title}</button></h3>
         <p>{card.video ? '独立视频 · 未关联脚本' : currentAngleEntry ? `机位：${currentAngleEntry.label}` : '独立动作图片'}</p>

@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SalesPrompt } from '@shared/contracts/salesPrompts';
 import { listSalesPrompts, SalesPromptRequestError, saveSalesPrompt } from '../api/salesPrompts';
 
-const managedPromptIds = new Set(['summary', 'script-analysis', 'script-normalize', 'plan-adapt', 'persona-grid', 'scene-grid']);
+const managedPromptIds = new Set(['summary', 'script-analysis', 'plan-adapt', 'spoken-copy', 'spoken-review', 'final-video', 'final-video-depth', 'persona-design', 'scene-design', 'persona-grid', 'scene-grid']);
+const editorText = (item: SalesPrompt) => item.configured ? item.prompt : item.defaultPrompt;
 
-export function useSalesPrompts(enabled: boolean) {
+export function useSalesPrompts(enabled: boolean, scope?: readonly string[]) {
   const [items, setItems] = useState<SalesPrompt[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [selectedId, setSelectedId] = useState('');
+  const [selectedId, setSelectedId] = useState(scope?.[0] ?? '');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -15,14 +16,13 @@ export function useSalesPrompts(enabled: boolean) {
   const [notice, setNotice] = useState('');
   const [verified, setVerified] = useState(false);
   const busyRef = useRef(false);
-  const loadedRef = useRef(false);
   const refreshAfterSaveRef = useRef(false);
   const requestRef = useRef<AbortController | null>(null);
   const dirty = (item: SalesPrompt) => {
     const draft = drafts[item.id];
-    return draft !== undefined && draft !== item.prompt;
+    return !item.configured || (draft !== undefined && draft !== item.prompt);
   };
-  const hasUnsaved = items.some(dirty);
+  const hasUnsaved = items.some((item) => drafts[item.id] !== undefined && drafts[item.id] !== item.prompt);
   const selected = items.find((item) => item.id === selectedId) ?? items[0];
 
   const refresh = useCallback(async () => {
@@ -31,12 +31,13 @@ export function useSalesPrompts(enabled: boolean) {
     const abort = new AbortController();
     requestRef.current = abort;
     setLoading(true);
+    setNotice('');
     setVerified(false);
     setError('');
     try {
       const rows = await listSalesPrompts(abort.signal);
       if (abort.signal.aborted) return;
-      setItems(rows.filter((item) => managedPromptIds.has(item.id)));
+      setItems(rows.filter((item) => managedPromptIds.has(item.id) && (!scope || scope.includes(item.id))));
       setDrafts((previous) => {
         const next = { ...previous };
         for (const item of rows) if (next[item.id] === item.prompt) delete next[item.id];
@@ -44,8 +45,6 @@ export function useSalesPrompts(enabled: boolean) {
       });
       setVerified(true);
       setConflict(false);
-      setNotice(loadedRef.current ? '已读取最新保存内容；未保存的编辑仍保留，核对后可继续保存。' : '');
-      loadedRef.current = true;
     } catch (err) {
       if (!abort.signal.aborted) setError(err instanceof Error ? err.message : '读取提示词失败');
     } finally {
@@ -54,7 +53,7 @@ export function useSalesPrompts(enabled: boolean) {
         setLoading(false);
       }
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     if (!enabled) {
@@ -66,6 +65,12 @@ export function useSalesPrompts(enabled: boolean) {
     return () => requestRef.current?.abort();
   }, [enabled, refresh]);
   useEffect(() => {
+    if (!enabled || hasUnsaved) return;
+    const onFocus = () => { if (!busyRef.current && !requestRef.current) void refresh(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [enabled, hasUnsaved, refresh]);
+  useEffect(() => {
     if (!hasUnsaved) return;
     const preventUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
     window.addEventListener('beforeunload', preventUnload);
@@ -76,7 +81,7 @@ export function useSalesPrompts(enabled: boolean) {
     if (!selected || busyRef.current || requestRef.current || saving || loading) return;
     setDrafts((previous) => {
       const next = { ...previous };
-      if (text === selected.prompt) delete next[selected.id];
+      if (text === editorText(selected)) delete next[selected.id];
       else next[selected.id] = text;
       return next;
     });
@@ -89,7 +94,7 @@ export function useSalesPrompts(enabled: boolean) {
   };
   const save = async () => {
     if (!selected || !dirty(selected) || busyRef.current || requestRef.current || loading || !verified) return;
-    const draft = drafts[selected.id];
+    const draft = drafts[selected.id] ?? editorText(selected);
     if (!draft.trim()) { setError('提示词不能为空，请填写内容。'); return; }
     busyRef.current = true;
     setSaving(true);
@@ -105,7 +110,7 @@ export function useSalesPrompts(enabled: boolean) {
       });
       setVerified(true);
       setConflict(false);
-      setNotice(`「${saved.title}」已更新为系统当前提示词，后续执行使用此内容。`);
+      setNotice(`「${saved.title}」已保存，后续执行只使用此内容。`);
     } catch (err) {
       setVerified(false);
       setError(err instanceof Error ? err.message : '保存提示词失败');
@@ -120,7 +125,7 @@ export function useSalesPrompts(enabled: boolean) {
   return {
     items, selected, selectedId: selected?.id ?? '',
     select: (id: string) => { setSelectedId(id); setNotice(''); },
-    text: selected ? (drafts[selected.id] ?? selected.prompt) : '',
+    text: selected ? (drafts[selected.id] ?? editorText(selected)) : '',
     dirty, hasUnsaved, loading, saving, verified, error, conflict, notice,
     refresh, updateDraft, discardDraft, save,
   };

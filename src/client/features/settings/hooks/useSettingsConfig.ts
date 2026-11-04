@@ -4,8 +4,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   persistAiGatewayConfig,
   persistDeepSeekConfig,
-  persistExternalScraperConfig,
-  persistQiyunConfig,
   persistStorageConfig,
   persistWanbangConfig,
 } from '@client/shared/api/persistCredentials';
@@ -13,7 +11,7 @@ import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@client/shared/
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { useIndependentModelProviders } from './useIndependentModelProviders';
 import { useConnectionChecks } from './useConnectionChecks';
-import { testModelConnection, testScraperConnection, testQiyunConnection, testWanbangConnection } from '../model/settingsConnectionChecks';
+import { testModelConnection, testWanbangConnection } from '../model/settingsConnectionChecks';
 import { readSettingsConfig, settingsConfigFingerprint, type SettingsConfigSnapshot } from './readSettingsConfig';
 import { useConfigSaveState } from './useConfigSaveState';
 
@@ -41,16 +39,8 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   const [wanbangSecret, setWanbangSecret] = useState('');
   const [isWanbangEnabled, setIsWanbangEnabled] = useState(true);
 
-  // 社媒解析 (APIA)
-  const [scraperId, setScraperId] = useState('');
-  const [scraperSecret, setScraperSecret] = useState('');
-  const [isApiaEnabled, setIsApiaEnabled] = useState(true);
   const [appAccessToken, setAppAccessToken] = useState('');
 
-  // 奇云多平台去水印解析
-  const [qiyunAppId, setQiyunAppId] = useState('');
-  const [qiyunAppKey, setQiyunAppKey] = useState('');
-  const [isQiyunEnabled, setIsQiyunEnabled] = useState(true);
 
   // 云端永久对象存储
   const [storageEnabled, setStorageEnabled] = useState(false);
@@ -113,8 +103,6 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
       setBaseUrl(config.baseUrl); setApiKey(config.apiKey); setDeepSeekApiKey(config.deepSeekApiKey);
       setClientGatewayApiKey(config.apiKey); setClientGatewayBaseUrl(config.baseUrl);
       setWanbangKey(config.wanbangKey); setWanbangSecret(config.wanbangSecret); setIsWanbangEnabled(config.isWanbangEnabled);
-      setScraperId(config.scraperId); setScraperSecret(config.scraperSecret); setIsApiaEnabled(config.isApiaEnabled);
-      setQiyunAppId(config.qiyunAppId); setQiyunAppKey(config.qiyunAppKey); setIsQiyunEnabled(config.isQiyunEnabled);
       setAppAccessToken(config.appAccessToken);
       setStorageEnabled(config.storageEnabled); setStorageProvider(config.storageProvider);
       setStorageAccountId(config.storageAccountId); setStorageEndpoint(config.storageEndpoint);
@@ -153,8 +141,6 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     comfly_gateway: [baseUrl.trim(), apiKey.trim()],
     deepseek_official: [deepSeekApiKey.trim()],
     wanbang_ecommerce: [wanbangKey.trim(), wanbangSecret.trim(), isWanbangEnabled],
-    apia_parser: [scraperId.trim(), scraperSecret.trim(), isApiaEnabled],
-    qiyun_parser: [qiyunAppId.trim(), qiyunAppKey.trim(), isQiyunEnabled],
   }, showToast, isOpen && mainConfigLoaded);
   const isTestingStorage = Boolean(connectionChecks.testing.cloud_storage);
   const handleTestStorage = () => connectionChecks.run('cloud_storage', async () => {
@@ -184,8 +170,6 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
   const isTesting = Boolean(connectionChecks.testing.comfly_gateway);
   const isTestingDeepSeek = Boolean(connectionChecks.testing.deepseek_official);
   const isTestingWanbang = Boolean(connectionChecks.testing.wanbang_ecommerce);
-  const isTestingScraper = Boolean(connectionChecks.testing.apia_parser);
-  const isTestingQiyun = Boolean(connectionChecks.testing.qiyun_parser);
   const handleTestPing = () => connectionChecks.run('comfly_gateway', () => testModelConnection('Comfly', { baseUrl: baseUrl.trim(), apiKey: apiKey.trim() }));
   const handleTestDeepSeek = () => connectionChecks.run('deepseek_official', () => testModelConnection('DeepSeek', {
     baseUrl: 'https://api.deepseek.com', apiKey: deepSeekApiKey.trim(),
@@ -215,20 +199,6 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     const snapshot = { wanbangKey: wanbangKey.trim(), wanbangSecret: wanbangSecret.trim(), isWanbangEnabled };
     await saves.save('wanbang_ecommerce', snapshot, () => persistWanbangConfig(snapshot.wanbangKey, snapshot.wanbangSecret, snapshot.isWanbangEnabled), '万邦采集配置已保存');
   };
-
-  const handleSaveScraperConfig = async () => {
-    const snapshot = { scraperId: scraperId.trim(), scraperSecret: scraperSecret.trim(), isApiaEnabled };
-    await saves.save('apia_parser', snapshot, () => persistExternalScraperConfig(snapshot.scraperId, snapshot.scraperSecret, snapshot.isApiaEnabled), '社媒解析配置已保存');
-  };
-
-  const handleTestScraper = () => connectionChecks.run('apia_parser', () => testScraperConnection(scraperId, scraperSecret));
-
-  const handleSaveQiyunConfig = async () => {
-    const snapshot = { qiyunAppId: qiyunAppId.trim(), qiyunAppKey: qiyunAppKey.trim(), isQiyunEnabled };
-    await saves.save('qiyun_parser', snapshot, () => persistQiyunConfig(snapshot.qiyunAppId, snapshot.qiyunAppKey, snapshot.isQiyunEnabled), '奇云解析配置已保存');
-  };
-
-  const handleTestQiyun = () => connectionChecks.run('qiyun_parser', () => testQiyunConnection(qiyunAppId, qiyunAppKey));
 
   const handleSaveStorageConfig = async () => {
     let endpoint = currentStorageDraft.endpoint;
@@ -262,7 +232,7 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
 
   const currentConfig: SettingsConfigSnapshot = {
     apiKey, baseUrl, deepSeekApiKey, wanbangKey, wanbangSecret, isWanbangEnabled,
-    scraperId, scraperSecret, isApiaEnabled, qiyunAppId, qiyunAppKey, isQiyunEnabled, appAccessToken, storageEnabled,
+    appAccessToken, storageEnabled,
     storageProvider, storageAccountId, storageEndpoint, storageAccessKeyId, storageSecretAccessKey, storageBucketName, storagePublicDomain,
     storageApiPrefix, storageMaterialsPrefix, storageCloudName, storageZone,
   };
@@ -284,8 +254,6 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     isSavingGateway: saves.states.comfly_gateway === 'saving',
     isSavingDeepSeek: saves.states.deepseek_official === 'saving',
     isSavingWanbang: saves.states.wanbang_ecommerce === 'saving',
-    isSavingScraper: saves.states.apia_parser === 'saving',
-    isSavingQiyun: saves.states.qiyun_parser === 'saving',
     isSavingStorage: saves.states.cloud_storage === 'saving',
     apiKey,
     setApiKey,
@@ -316,24 +284,6 @@ export function useSettingsConfig({ isOpen, showToast }: UseSettingsConfigOption
     isTestingWanbang,
     handleSaveWanbangConfig,
     handleTestWanbang,
-    scraperId,
-    setScraperId,
-    scraperSecret,
-    setScraperSecret,
-    isApiaEnabled,
-    setIsApiaEnabled,
-    isTestingScraper,
-    handleSaveScraperConfig,
-    handleTestScraper,
-    qiyunAppId,
-    setQiyunAppId,
-    qiyunAppKey,
-    setQiyunAppKey,
-    isQiyunEnabled,
-    setIsQiyunEnabled,
-    isTestingQiyun,
-    handleSaveQiyunConfig,
-    handleTestQiyun,
     storageEnabled,
     setStorageEnabled,
     storageProvider,

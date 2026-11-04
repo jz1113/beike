@@ -2,7 +2,7 @@ import React from 'react';
 import { Search, Plus, Globe } from 'lucide-react';
 import { type ApiProvider } from '../../model/apiProviderTypes';
 import { ModelIcon } from '@client/shared/ui/ModelIcons';
-import { ComflyLogo, LianchiLogo, OpenAILogo, DeepSeekLogo, OneBoundLogo, ApiaLogo, QiyunLogo } from '@client/shared/icons';
+import { ComflyLogo, LianchiLogo, OpenAILogo, DeepSeekLogo, OneBoundLogo } from '@client/shared/icons';
 
 interface Props {
   providers: ApiProvider[];
@@ -157,8 +157,6 @@ export function ApiProvidersNavList({
           <div className="space-y-1">
             {[
               { id: 'wanbang_ecommerce', name: '万邦电商采集', icon: <OneBoundLogo className="w-4 h-4" /> },
-              { id: 'apia_parser', name: 'APIA 图集解析', icon: <ApiaLogo className="w-4 h-4" /> },
-              { id: 'qiyun_parser', name: '奇云解析', icon: <QiyunLogo className="w-4 h-4" /> },
             ].map(svc => {
               const active = selectedId === svc.id;
               return (

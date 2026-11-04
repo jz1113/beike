@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache';
-import { createSalesMaterial, createSalesSound } from './salesMaterials';
+import { createSalesMaterial, createSalesSound, updateSalesSound } from './salesMaterials';
 import { importSalesBgm } from './salesBgm';
 vi.mock('@client/shared/api/apiClient', () => ({ apiFetch: vi.fn() }));
 vi.mock('@client/shared/api/assetLibraryCache', () => ({ invalidateGlobalAssetCache: vi.fn() }));
@@ -30,5 +30,19 @@ describe('save reusable sales materials', () => {
     expect(apiFetch).toHaveBeenCalledOnce();
     expect(apiFetch).toHaveBeenCalledWith('/api/sales/studio-sounds/bgm_custom_new', expect.objectContaining({ method: 'PATCH' }));
     expect(JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body))).toEqual({ soundType: 'bgm', title: '短配乐', moodTags: ['轻快'] });
+  });
+
+  it('preserves an explicitly empty synthesis ID when creating a sample-only voice', async () => {
+    vi.mocked(apiFetch).mockResolvedValue(new Response(JSON.stringify({ success: true })));
+    await createSalesSound({ soundType: 'voice', name: '声音样本', audioUrl: '/sample.mp3', voiceId: '' });
+    expect(apiFetch).toHaveBeenCalledWith('/api/sales/studio-sounds', expect.objectContaining({ method: 'POST' }));
+    expect(JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body))).toMatchObject({ audioUrl: '/sample.mp3', voiceId: '' });
+  });
+
+  it('transports edited synthesis IDs through the existing sound PATCH endpoint', async () => {
+    vi.mocked(apiFetch).mockResolvedValue(new Response(JSON.stringify({ success: true })));
+    await updateSalesSound('chosen', { soundType: 'voice', voiceId: 'provider-voice-code' });
+    expect(apiFetch).toHaveBeenCalledWith('/api/sales/studio-sounds/chosen', expect.objectContaining({ method: 'PATCH' }));
+    expect(JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body))).toEqual({ soundType: 'voice', voiceId: 'provider-voice-code' });
   });
 });

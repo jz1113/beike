@@ -252,6 +252,14 @@ func resolveTtsVoice(voiceID, gender string, tags []string) string {
 	return "zh-female-commercial"
 }
 
+// A sample is a voice reference, not a registered TTS voice or a clone result.
+func resolveStudioTtsVoice(voiceID, sampleAudioURL, gender string, tags []string) string {
+	if strings.TrimSpace(voiceID) == "" && strings.TrimSpace(sampleAudioURL) != "" {
+		return ""
+	}
+	return resolveTtsVoice(voiceID, gender, tags)
+}
+
 func queryStudioVoices(ctx context.Context, db *sql.DB, workspace string) ([]studioVoice, error) {
 	out := []studioVoice{}
 	rows, err := db.QueryContext(ctx, `SELECT "id","name","voiceId","gender",COALESCE("tags",'[]'),COALESCE("sampleAudioUrl",''),COALESCE("promptText",'') FROM "AvatarVoice" WHERE "workspaceId" = ? AND "status"=1 ORDER BY "createdAt" DESC`, workspace)
@@ -271,7 +279,7 @@ func queryStudioVoices(ctx context.Context, db *sql.DB, workspace string) ([]stu
 				item.Tags = []string{}
 			}
 			item.VoiceGroup = normalizeVoiceGroup(item.Gender, "", item.Tags, item.Name, item.PromptText)
-			item.TtsVoice = resolveTtsVoice(item.VoiceID, item.Gender, item.Tags)
+			item.TtsVoice = resolveStudioTtsVoice(item.VoiceID, item.SampleAudioURL, item.Gender, item.Tags)
 			item.Source = "voice_library"
 			out = append(out, item)
 		}

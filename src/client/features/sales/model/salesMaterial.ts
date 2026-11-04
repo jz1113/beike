@@ -2,6 +2,7 @@ import type { SalesActionCandidate, SalesMaterialCatalog, SalesScriptDomain } fr
 import { actionMedia } from './salesActionMedia';
 import type { SalesProductionPlanState } from './salesProductionDraft';
 import { hasCustomSalesPersona } from './salesPersonaBinding';
+import { updateSalesManualPerformance } from './salesPerformanceEdits';
 
 /** 将分镜已绑定的动作/姿态资产映射为提示词组装所需的引用表 */
 export function buildSalesBeatActionReferences(
@@ -42,20 +43,20 @@ export function applyMaterialAction(
         index, subject: beat.subject, action: beat.actionTemplate || beat.action,
         spokenLine: '', subtitle: '',
       };
-      return index === beatIndex && asset.action.trim() ? { ...current, action: asset.action } : current;
+      return index === beatIndex && asset.action.trim() ? updateSalesManualPerformance(plan, current, { action: asset.action }) : current;
     }),
     customPrompt: '',
   };
 }
 
-/** Preserve chosen identities and scenes so a refresh cannot silently replace them. */
+/** Preserve chosen identities, scenes and voices so a refresh cannot silently replace them. */
 export function reconcileSalesMaterialBindings(
   plan: SalesProductionPlanState,
   catalog: SalesMaterialCatalog,
 ): SalesProductionPlanState {
   const personaId = hasCustomSalesPersona(plan) ? '' : plan.personaId;
   const sceneId = plan.customSceneImageUrl.trim() ? '' : plan.sceneId;
-  const voiceId = catalog.voices.some((item) => item.id === plan.voiceId) ? plan.voiceId : '';
+  const voiceId = plan.voiceId;
   const bgmId = catalog.bgms.some((item) => item.id === plan.bgmId) ? plan.bgmId : '';
   const beatActionIds = Object.fromEntries(Object.entries(plan.beatActionIds).filter(([, id]) => catalog.actions.some((item) => item.id === id)));
   if (personaId === plan.personaId && sceneId === plan.sceneId && voiceId === plan.voiceId && bgmId === plan.bgmId && Object.keys(beatActionIds).length === Object.keys(plan.beatActionIds).length) return plan;

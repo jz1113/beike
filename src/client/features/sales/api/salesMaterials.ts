@@ -1,3 +1,4 @@
+import type { PersonaCategory } from '../model/salesPersonaClassification';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache';
 import { importSalesBgm } from './salesBgm';
@@ -24,13 +25,14 @@ export async function updateSalesMaterial(assetType: EditableSalesMaterial, id: 
   invalidateGlobalAssetCache();
 }
 
-export async function deleteSalesMaterial(assetType: EditableSalesMaterial, id: string, signal?: AbortSignal): Promise<void> {
+export async function deleteSalesMaterial(assetType: EditableSalesMaterial | 'outfit', id: string, signal?: AbortSignal): Promise<void> {
   const response = await apiFetch(`/api/catalog/assets/library?type=${encodeURIComponent(assetType)}&id=${encodeURIComponent(id)}`, {
     method: 'DELETE', signal,
   });
   const result = await response.json().catch(() => null);
   if (!response.ok || result?.success !== true) throw new Error(result?.error || '删除素材资产失败');
   invalidateGlobalAssetCache();
+  if (!result.count) throw new Error('未删除资产：记录已移除或不属于当前工作区');
 }
 
 export interface StudioSoundInput {
@@ -40,7 +42,7 @@ export interface StudioSoundInput {
   description?: string;
   promptText?: string;
   gender?: string;
-  voiceGroup?: 'male' | 'female' | 'senior' | 'child';
+  voiceGroup?: PersonaCategory;
   voiceId?: string;
   audioUrl?: string;
   tags?: string[];

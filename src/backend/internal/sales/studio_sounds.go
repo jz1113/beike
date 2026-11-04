@@ -12,6 +12,7 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/database"
+	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
 const customBgmPresetCategory = "studio_bgm_asset"
@@ -24,7 +25,7 @@ type studioSoundMutation struct {
 	PromptText  *string  `json:"promptText"`
 	Gender      string   `json:"gender"`
 	VoiceGroup  string   `json:"voiceGroup"`
-	VoiceID     string   `json:"voiceId"`
+	VoiceID     *string  `json:"voiceId"`
 	AudioURL    string   `json:"audioUrl"`
 	Tags        []string `json:"tags"`
 	MoodTags    []string `json:"moodTags"`
@@ -40,41 +41,64 @@ func soundText(value *string) string {
 	return strings.TrimSpace(*value)
 }
 
-func normalizeVoiceGroup(gender, voiceGroup string, tags []string, name, prompt string) string {
-	switch strings.TrimSpace(voiceGroup) {
-	case "male", "female", "senior", "child":
-		return strings.TrimSpace(voiceGroup)
-	}
-	text := strings.ToLower(name + " " + prompt + " " + strings.Join(tags, " "))
-	if strings.Contains(text, "儿童") || strings.Contains(text, "童声") || strings.Contains(text, "小孩") || strings.Contains(text, "男孩") || strings.Contains(text, "女孩") {
-		return "child"
-	}
-	if strings.Contains(text, "老年") || strings.Contains(text, "老人") || strings.Contains(text, "长者") || strings.Contains(text, "老爷爷") || strings.Contains(text, "老奶奶") || strings.Contains(text, "银发") {
-		return "senior"
-	}
-	if strings.TrimSpace(gender) == "male" || strings.Contains(text, "男声") || strings.Contains(text, "男士") || strings.Contains(text, "男神") {
+var voiceGroupLabels = map[string]string{
+	"male": "青年男", "female": "青年女", "middle_male": "中年男", "middle_female": "中年女",
+	"senior_male": "老年男", "senior_female": "老年女", "child_male": "幼年男", "child_female": "幼年女",
+}
+
+func voiceGroupGender(group string) string {
+	if group == "male" || strings.HasSuffix(group, "_male") {
 		return "male"
 	}
 	return "female"
 }
 
-func voiceGroupTag(group string) string {
-	switch group {
-	case "male":
-		return "男声"
-	case "senior":
-		return "老年"
-	case "child":
-		return "儿童"
-	default:
-		return "女声"
+func normalizeVoiceGroup(gender, group string, tags []string, name, prompt string) string {
+	group = strings.TrimSpace(group)
+	if _, ok := voiceGroupLabels[group]; ok {
+		return group
 	}
+	text := strings.Join(tags, " ") + " " + name + " " + prompt
+	if gender != "male" && gender != "female" {
+		gender = "female"
+		if strings.Contains(text, "男") || strings.Contains(text, "爷爷") {
+			gender = "male"
+		}
+	}
+	if group == "senior" || group == "child" {
+		return group + "_" + gender
+	}
+	for _, tag := range tags {
+		for key, label := range voiceGroupLabels {
+			if strings.TrimSpace(tag) == label {
+				return key
+			}
+		}
+	}
+	for _, item := range []struct {
+		age   string
+		words []string
+	}{
+		{"child", []string{"幼年", "儿童", "童声", "小孩", "男孩", "女孩", "少儿"}},
+		{"senior", []string{"老年", "老人", "长者", "爷爷", "奶奶", "银发"}},
+		{"middle", []string{"中年"}},
+	} {
+		for _, word := range item.words {
+			if strings.Contains(text, word) {
+				return item.age + "_" + gender
+			}
+		}
+	}
+	return gender
 }
 
 func mergeVoiceTags(group string, tags []string) []string {
-	label := voiceGroupTag(group)
+	label := voiceGroupLabels[group]
 	out := []string{label}
 	seen := map[string]bool{label: true, "男声": true, "女声": true, "老年": true, "儿童": true}
+	for _, category := range voiceGroupLabels {
+		seen[category] = true
+	}
 	for _, raw := range tags {
 		trimmed := strings.TrimSpace(raw)
 		if trimmed != "" && !seen[trimmed] {
@@ -169,11 +193,11 @@ func StudioSounds(cfg config.Config) http.HandlerFunc {
 			createStudioBgm(w, r, db, workspace, body)
 			return
 		}
-		createStudioVoice(w, r, db, workspace, body)
+		createStudioVoice(cfg, w, r, db, workspace, body)
 	}
 }
 
-func createStudioVoice(w http.ResponseWriter, r *http.Request, db *sql.DB, workspace string, body studioSoundMutation) {
+func createStudioVoice(cfg config.Config, w http.ResponseWriter, r *http.Request, db *sql.DB, workspace string, body studioSoundMutation) {
 	name := strings.TrimSpace(body.Name)
 	if name == "" {
 		name = strings.TrimSpace(body.Title)
@@ -183,32 +207,44 @@ func createStudioVoice(w http.ResponseWriter, r *http.Request, db *sql.DB, works
 		return
 	}
 	group := normalizeVoiceGroup(body.Gender, body.VoiceGroup, body.Tags, name, soundText(body.PromptText))
-	gender := "female"
-	if group == "male" {
-		gender = "male"
-	}
+	gender := voiceGroupGender(group)
 	tags := mergeVoiceTags(group, body.Tags)
 	rawTags, _ := json.Marshal(tags)
 	prompt := soundText(body.PromptText)
 	if prompt == "" {
 		prompt = soundText(body.Description)
 	}
-	audio := strings.TrimSpace(body.AudioURL)
-	voiceID := strings.TrimSpace(body.VoiceID)
-	if voiceID == "" {
+	audio, discard, err := prepareStudioVoiceSample(r.Context(), cfg, workspace, body.AudioURL, network.SafeClient())
+	if err != nil {
+		httpx.WriteJSON(w, 400, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	saved := false
+	defer func() {
+		if !saved {
+			discard()
+		}
+	}()
+	voiceID := soundText(body.VoiceID)
+	if voiceID == "" && audio == "" {
 		voiceID = resolveTtsVoice("", gender, tags)
 	}
 	id := "voice_" + httpx.RequestID()
 	now := time.Now().UTC().Format(time.RFC3339)
-	if _, err := db.ExecContext(r.Context(), `INSERT INTO "AvatarVoice" ("id","workspaceId","name","type","status","statusMsg","audioUrl","promptNpyUrl","promptText","sampleAudioUrl","voiceId","gender","tags","createdAt") VALUES (?,?,?,1,1,'可用',?,'',?,?,?,?,?,?)`,
-		id, workspace, name, audio, prompt, audio, voiceID, gender, string(rawTags), now); err != nil {
+	result, err := db.ExecContext(r.Context(), `INSERT INTO "AvatarVoice" ("id","workspaceId","name","type","status","statusMsg","audioUrl","promptNpyUrl","promptText","sampleAudioUrl","voiceId","gender","tags","createdAt") VALUES (?,?,?,1,1,'可用',?,'',?,?,?,?,?,?)`,
+		id, workspace, name, audio, prompt, audio, voiceID, gender, string(rawTags), now)
+	if err == nil {
+		affected, affectedErr := result.RowsAffected()
+		saved = affectedErr == nil && affected == 1
+	}
+	if !saved {
 		httpx.WriteJSON(w, 500, map[string]any{"success": false, "error": "保存人声资产失败"})
 		return
 	}
 	httpx.WriteJSON(w, 200, map[string]any{
 		"success": true,
 		"voice": studioVoice{
-			ID: id, Name: name, VoiceID: voiceID, TtsVoice: resolveTtsVoice(voiceID, gender, tags),
+			ID: id, Name: name, VoiceID: voiceID, TtsVoice: resolveStudioTtsVoice(voiceID, audio, gender, tags),
 			Gender: gender, VoiceGroup: group, Tags: tags, SampleAudioURL: audio, PromptText: prompt, Source: "voice_library",
 		},
 	})
@@ -299,7 +335,7 @@ func StudioSoundByID(cfg config.Config) http.HandlerFunc {
 				httpx.WriteJSON(w, 400, map[string]any{"success": false, "error": "更新声音资产请求格式错误"})
 				return
 			}
-			updateStudioSound(w, r, db, workspace, id, body)
+			updateStudioSound(cfg, w, r, db, workspace, id, body)
 		default:
 			httpx.WriteJSON(w, 405, map[string]any{"success": false, "error": "不支持的请求方式"})
 		}

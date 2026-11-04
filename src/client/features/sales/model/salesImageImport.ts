@@ -1,5 +1,6 @@
+import { PERSONA_CATEGORIES, type PersonaCategory } from './salesPersonaClassification';
 import { audienceDimensions } from '@shared/domain/assets/appearanceAudience';
-import { PERSONA_GROUP_LABELS, SCENE_SPACE_LABELS, type SalesPersonaGroup, type SalesSceneSpace } from './salesMaterialCatalog';
+import { SCENE_SPACE_LABELS, type SalesSceneSpace } from './salesMaterialCatalog';
 import { personaImageFields, readPersonaViews } from './salesPersonaViews';
 import { readSceneViews, sceneImageFields } from './salesSceneViews';
 import { nextSequentialSalesAssetName, salesAssetNumber } from './salesAssetNames';
@@ -15,7 +16,7 @@ export interface SalesImageImportItem {
   error?: string;
 }
 export interface ImportedImageAsset { name: string; dimensions?: string }
-export interface SalesImageImportCategory { personaGroup: SalesPersonaGroup; sceneSpace: SalesSceneSpace }
+export interface SalesImageImportCategory { personaGroup: PersonaCategory; sceneSpace: SalesSceneSpace }
 export const MAX_IMAGE_IMPORT_FILES = 50;
 
 export const nextSalesImageImportName = nextSequentialSalesAssetName;
@@ -44,7 +45,7 @@ export function salesImageImportData(kind: SalesImageImportKind, item: SalesImag
   const dimensions = JSON.stringify({ salesImageImportKey: item.key });
   if (kind === 'persona') {
     const { views } = readPersonaViews(); views.main = imageUrl;
-    return { name: item.name, tags: PERSONA_GROUP_LABELS[category.personaGroup], ...personaImageFields(views, [], dimensions, category.personaGroup, '') };
+    return { name: item.name, tags: PERSONA_CATEGORIES[category.personaGroup], ...personaImageFields(views, [], dimensions, category.personaGroup, '') };
   }
   const { views } = readSceneViews(); views.main = imageUrl;
   return { title: item.name, tags: SCENE_SPACE_LABELS[category.sceneSpace], spatialType: category.sceneSpace === 'outdoor' ? 'outdoor' : 'indoor_room', ...sceneImageFields(views, [], dimensions) };

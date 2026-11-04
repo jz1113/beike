@@ -79,7 +79,7 @@ export async function executeSingleImageTask(
     productReferenceCandidates.map((img) => config.io.compressReference(img)),
   );
   const safeProductImg = safeProductImages[0];
-  const referenceInput = workshopReferenceInput([shot], safeProductImages.length);
+  const referenceInput = workshopReferenceInput([shot], safeProductImages.length, item);
   const compositionReferenceImages = await Promise.all(referenceInput.compositionReferenceImages.map(image => config.io.compressReference(image)));
   promptText = [promptText, referenceInput.instruction].filter(Boolean).join('\n\n');
   const safeAnchorFaceUrl = !skipFace && anchorFaceUrl

@@ -2,7 +2,7 @@ import { apiRequest } from '@client/shared/api/apiRequest';
 import { salesPromptListSchema, salesPromptResultSchema } from '@shared/contracts/salesPrompts';
 
 export class SalesPromptRequestError extends Error {
-  constructor(message: string, readonly status: number) { super(message); }
+  constructor(message: string, readonly status: number, readonly promptId = '') { super(message); }
 }
 
 async function responseJSON(response: Response): Promise<unknown> {
@@ -27,6 +27,6 @@ export async function saveSalesPrompt(id: string, prompt: string, expectedVersio
     body: JSON.stringify({ prompt, expectedVersion }),
   });
   const saved = salesPromptResultSchema.parse(await responseJSON(response)).prompt;
-  if (saved.id !== id || saved.prompt !== prompt) throw new Error('后台返回的提示词与本次保存不一致，请刷新核对；编辑内容已保留。');
+  if (saved.id !== id || saved.prompt !== prompt || !saved.configured) throw new Error('后台返回的提示词与本次保存不一致，请刷新核对；编辑内容已保留。');
   return saved;
 }

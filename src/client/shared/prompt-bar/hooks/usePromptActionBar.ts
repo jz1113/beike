@@ -5,9 +5,10 @@ import { useScrollLock } from '@client/shared/hooks/useScrollLock';
 import { useDropdownMenu } from '@client/shared/hooks/useDropdownMenu';
 import { 
   VIDEO_ASPECT_RATIOS, 
-  VIDEO_REF_MODES, 
-  getVideoDurationBounds
+  VIDEO_REF_MODES,
 } from '@shared/domain/media/video';
+import { videoDurationOptions } from '@shared/domain/media/videoCapabilities';
+import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
 import { useVideoParameterConstraints } from './useVideoParameterConstraints';
 import { matchesStoredModel, usePromptBarWorkflowModels } from './usePromptBarWorkflowModels';
 import { usePromptBarStoreState } from './usePromptBarStoreState';
@@ -72,6 +73,7 @@ export function usePromptActionBar({
     quickAudioModel,
     setQuickAudioModel,
     quickVideoDuration,
+    quickVideoContextIrEnabled,
     quickVideoResolution,
     quickVideoAspectId,
     quickVideoRefMode,
@@ -120,7 +122,8 @@ export function usePromptActionBar({
   const activeVideoRefModeObj = VIDEO_REF_MODES.find(m => m.id === quickVideoRefMode) || VIDEO_REF_MODES[0];
   const activeVideoRatioObj = VIDEO_ASPECT_RATIOS.find(r => r.id === quickVideoAspectId) || VIDEO_ASPECT_RATIOS.find(item => item.id === '16:9')!;
   const videoModelId = ('upstreamId' in activeVideoModelObj ? activeVideoModelObj.upstreamId : undefined) || activeVideoModelObj.id || quickVideoModel;
-  const videoDurationBounds = getVideoDurationBounds(videoModelId);
+  const videoDurations = videoDurationOptions(videoModelId, quickVideoResolution, quickVideoRefMode, getGatewayClientBaseUrl(quickVideoModel));
+  const videoDurationBounds = { min: videoDurations[0], max: videoDurations.at(-1) || videoDurations[0] };
 
   useVideoParameterConstraints();
 
@@ -156,6 +159,7 @@ export function usePromptActionBar({
   });
 
   const videoFrames = usePromptBarVideoFrames({
+    showToast: showToastBridge,
     setQuickVideoFirstFrame,
     setQuickVideoLastFrame,
     addQuickVideoMultiFrame,
@@ -166,6 +170,7 @@ export function usePromptActionBar({
     toastMsg,
     showToast,
     canSend,
+    readingAttachments,
     handleSendPrompt,
     handleComposerKeyDown,
   } = usePromptBarSubmit({
@@ -189,6 +194,7 @@ export function usePromptActionBar({
     quickVideoAspectId,
     quickVideoResolution,
     quickVideoDuration,
+    quickVideoContextIrEnabled,
     currentView,
     availableImageModelsLength: availableImageModels.length,
     availableVideoModelsLength: currentView === 'canvas' ? Math.max(availableVideoModels.length, 1) : availableVideoModels.length,
@@ -223,16 +229,13 @@ export function usePromptActionBar({
   );
 
   const handleModeSwitch = useCallback((next: QuickGenMode) => {
-    if (next !== quickGenMode) {
-      media.clearComposerMedia();
-      if (next !== 'agent') {
-        const activeSkill = useAppStore.getState().getActiveAssistantSkill();
-        if (activeSkill && resolveSkillKind(activeSkill) === 'creation') useAppStore.getState().setActiveAssistantSkillId(null);
-      }
+    if (next !== quickGenMode && next !== 'agent') {
+      const activeSkill = useAppStore.getState().getActiveAssistantSkill();
+      if (activeSkill && resolveSkillKind(activeSkill) === 'creation') useAppStore.getState().setActiveAssistantSkillId(null);
     }
     setQuickGenMode(next);
     modeMenu.close();
-  }, [media, quickGenMode, setQuickGenMode, modeMenu]);
+  }, [quickGenMode, setQuickGenMode, modeMenu]);
 
   const isGenerateDock = currentView === 'generate';
   const isCollapsible = collapsible ?? isGenerateDock;
@@ -355,6 +358,7 @@ export function usePromptActionBar({
     videoDurationBounds,
     handleSendPrompt,
     canSend,
+    readingAttachments,
     isSubmitting,
     fileAccept,
     toastMsg,

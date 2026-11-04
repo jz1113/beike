@@ -13,6 +13,7 @@ from depth_runtime import (
     resolve_inference_size, resolve_quality_profile,
 )
 from depth_processing import apply_style
+from depth_subject import PersonSegmenter
 
 
 def _temporal_median(window_maps: list["np.ndarray"]) -> "np.ndarray":
@@ -61,15 +62,16 @@ def infer_frames(
 
     resolved_device = resolve_device(device)
     runtime = load_depth_runtime(device, model_id, inference_size)
+    segmenter = PersonSegmenter(runtime.device) if style == "mocap" else None
     emit_meta(model_id, inference_size, resolved_device, quality)
 
     # Keep only the temporal window in memory.
-    # For non-CUDA devices (MPS/CPU) with >=24 frames in fast/standard quality,
+    # For non-CUDA devices (MPS/CPU) with >=24 frames in fast quality,
     # infer key frames with stride=2 and linearly interpolate odd frames before
     # temporal median smoothing, cutting neural inference time in half while
     # preserving motion-capture continuity.
     total = len(frame_files)
-    stride = 2 if (quality in ("fast", "standard") and resolved_device != "cuda" and total >= 24) else 1
+    stride = 2 if (quality == "fast" and resolved_device != "cuda" and total >= 24) else 1
     half_window = max(0, cfg.temporal_window // 2)
     recent_depths: dict[int, np.ndarray] = {}
     prev_key_index = -1
@@ -106,7 +108,13 @@ def infer_frames(
             stable_depth = _temporal_median(window_maps)
 
             output_frame = frame_files[next_output_index]
-            vis = apply_style(stable_depth, style, invert_depth=invert_depth, post_process=cfg)
+            subject_mask = None
+            if segmenter is not None:
+                source = cv2.imread(str(output_frame))
+                if source is None:
+                    raise RuntimeError(f"无法读取帧: {output_frame}")
+                subject_mask = segmenter.mask(Image.fromarray(cv2.cvtColor(source, cv2.COLOR_BGR2RGB)))
+            vis = apply_style(stable_depth, style, invert_depth=invert_depth, post_process=cfg, subject_mask=subject_mask)
             cv2.imwrite(str(output_dir / output_frame.name), vis)
             emit_progress(next_output_index + 1, total)
             next_output_index += 1

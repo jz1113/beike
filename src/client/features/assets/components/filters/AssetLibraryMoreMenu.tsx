@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject, type ChangeEvent } from 'react';
-import { Download, MoreHorizontal, RefreshCw, Sparkles, Upload } from 'lucide-react';
+import { Download, MoreHorizontal, RefreshCw, Upload } from 'lucide-react';
 
 export interface AssetLibraryMoreMenuProps {
   showMoreMenu: boolean;
@@ -9,10 +9,9 @@ export interface AssetLibraryMoreMenuProps {
   onExportJsonBackup: () => void;
   onRefresh: () => void;
   isLoading: boolean;
-  onOpenSkills?: () => void;
 }
 
-export function AssetLibraryMoreMenu({ showMoreMenu, setShowMoreMenu, importJsonRef, onImportJsonBackup, onExportJsonBackup, onRefresh, isLoading, onOpenSkills }: AssetLibraryMoreMenuProps) {
+export function AssetLibraryMoreMenu({ showMoreMenu, setShowMoreMenu, importJsonRef, onImportJsonBackup, onExportJsonBackup, onRefresh, isLoading }: AssetLibraryMoreMenuProps) {
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -28,7 +27,6 @@ export function AssetLibraryMoreMenu({ showMoreMenu, setShowMoreMenu, importJson
     <button ref={button} type="button" onClick={() => setShowMoreMenu(!showMoreMenu)} aria-label="更多素材操作" title="更多素材操作" aria-expanded={showMoreMenu} className="asset-library-more"><MoreHorizontal size={16} /></button>
     {showMoreMenu && <div aria-label="素材备份与维护" className="absolute right-0 top-11 z-50 w-60 rounded-2xl border border-slate-200 bg-white py-2 text-slate-700 shadow-xl dark:border-white/10 dark:bg-[#1B1B1E] dark:text-slate-300">
       <button type="button" className={item} disabled={isLoading} onClick={() => { setShowMoreMenu(false); onRefresh(); }}><RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />{isLoading ? '正在刷新…' : '刷新素材'}</button>
-      {onOpenSkills && <button type="button" className={item} onClick={() => { setShowMoreMenu(false); onOpenSkills(); }}><Sparkles size={14} />管理创作技能</button>}
       <div className="mx-3 my-1 border-t border-slate-100 dark:border-white/10" />
       <button type="button" className={item} onClick={() => { setShowMoreMenu(false); onExportJsonBackup(); }}><Download size={14} />导出素材备份</button>
       <button type="button" className={item} onClick={() => { setShowMoreMenu(false); importJsonRef.current?.click(); }}><Upload size={14} />恢复素材备份</button>

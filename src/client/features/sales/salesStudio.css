@@ -13,7 +13,7 @@
   --sales-accent: #1c1917;
   --sales-accent-bg: rgba(28, 25, 23, 0.06);
   --sales-accent-line: #1c1917;
-  --sales-ocr-accent: #2563eb;
+  --sales-ocr-accent: #0f766e;
   --sales-warn: #d9480f;
   --sales-warn-bg: #fff4e6;
   --sales-ok: #15803d;
@@ -39,7 +39,7 @@
   --sales-accent: #f0f0ee;
   --sales-accent-bg: rgba(255, 255, 255, 0.08);
   --sales-accent-line: #ececec;
-  --sales-ocr-accent: #60a5fa;
+  --sales-ocr-accent: #5eead4;
   --sales-warn: #f76707;
   --sales-warn-bg: rgba(247, 103, 7, 0.14);
   --sales-ok: #22c55e;
@@ -360,15 +360,10 @@
 }
 
 /* 资产库容器通用灰阶框线 */
-.sales-library-shell,
 .sales-prod-card {
   border-radius: 0;
   background: var(--sales-surface);
   box-shadow: none;
-}
-
-.sales-library-shell {
-  grid-template-columns: 188px minmax(0, 1fr);
 }
 
 .sales-cat-sidebar {
@@ -442,11 +437,6 @@
     height: auto;
     flex-wrap: wrap;
     padding: 6px 12px;
-  }
-  .sales-library-shell {
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
   }
   .sales-cat-sidebar {
     border-right: 0;

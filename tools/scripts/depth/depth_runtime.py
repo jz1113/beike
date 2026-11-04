@@ -44,8 +44,8 @@ QUALITY_PROFILES: dict[str, tuple[str, PostProcessConfig, dict[str, int]]] = {
     ),
     "standard": (
         "depth-anything/Depth-Anything-V2-Small-hf",
-        PostProcessConfig(bilateral_d=5, bilateral_sigma=12, temporal_window=3),
-        {"default": 350, "cuda": 518, "mps": 350, "cpu": 350},
+        PostProcessConfig(bilateral_d=5, bilateral_sigma=12, temporal_window=1),
+        {"default": 518, "cuda": 518, "mps": 518, "cpu": 518},
     ),
     "high": (
         "depth-anything/Depth-Anything-V2-Large-hf",

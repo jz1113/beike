@@ -98,7 +98,6 @@ export function useBatchWorkshopRunner() {
 
   // 批量生图与进度
   const [isExportingZip, setIsExportingZip] = useState(false);
-  const [exportingSingleItemId, setExportingSingleItemId] = useState<string | null>(null);
 
   // 预览画廊与 Toast
   const {
@@ -221,7 +220,7 @@ export function useBatchWorkshopRunner() {
     createCheckpoint: () => workspace.createCheckpoint(),
   });
 
-  const delivery = useBatchExport(itemsRef, showToast, setIsExportingZip, setExportingSingleItemId);
+  const delivery = useBatchExport(itemsRef, showToast, setIsExportingZip);
 
   const { reviewTask, reviewBatch, isReviewingOutputs } = useBatchReview(itemsRef, setItems, retrySingleShotTask, showToast, () => workspace.flush());
 
@@ -284,7 +283,9 @@ export function useBatchWorkshopRunner() {
     setWorkspaceReady(workspace.ready);
   }, [workspace.ready]);
 
-  useWorkspaceSnapshotSync(workspace.ready, currentStage, setCurrentStage, itemsRef);
+  const flow = getWorkshopFlow(items, { generationStrategy, selectedShotCount,
+    collecting: isCollecting, analyzing: isAnalyzingAll, generating: isGeneratingBatch });
+  useWorkspaceSnapshotSync(workspace.ready, currentStage, setCurrentStage, flow.reasonForStage);
 
   const whenIdle = async (action: () => Promise<void>) => {
     if (collectInFlight.current || analysisInFlight.current || isGeneratingBatch || isAutoPilotRunning || isReviewingOutputs || itemsRef.current.some(item => item.isAnalyzing || item.isCopywritingGenerating || item.tasks.some(task => task.status === 'IN_PROGRESS'))) {
@@ -294,8 +295,6 @@ export function useBatchWorkshopRunner() {
   };
 
   const enteringFreshBatch = useFreshWorkshopEntry(workspace.ready, () => whenIdle(workspace.startFreshEntry), showToast);
-  const flow = getWorkshopFlow(items, { generationStrategy, selectedShotCount,
-    collecting: isCollecting, analyzing: isAnalyzingAll, generating: isGeneratingBatch });
   const pendingAnalysis = new Set(flow.pendingAnalysisIds);
 
   return {
@@ -358,7 +357,6 @@ export function useBatchWorkshopRunner() {
     updateItemCopywriting,
     generateAllCopywriting,
     isExportingZip,
-    exportingSingleItemId,
     ...delivery,
     generationStrategy,
     setGenerationStrategy: changeGenerationStrategy,

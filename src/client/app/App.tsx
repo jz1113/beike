@@ -1,3 +1,6 @@
+import type { OpenSalesLibrary, SalesAssetSection, SalesLibraryChoice } from '@client/features/sales/model/salesWorkspace';
+import CanvasMediaLibraryHost from './media-library/CanvasMediaLibraryHost';
+import type { PendingMediaInsert } from './media-library/mediaIndex';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore, clearWorkshopStudioDraft } from '@client/store';
@@ -29,7 +32,7 @@ import { lazyWithRetry } from './lazyWithRetry';
 
 const HomePage = lazyWithRetry(() => import('@client/features/home/HomePage'));
 const SettingsWorkspaceView = lazyWithRetry(() => import('@client/features/settings/SettingsWorkspaceView'));
-const UniversalCollectorModal = lazyWithRetry(() => import('@client/features/collect/components/UniversalCollectorModal'));
+const VideoDownloadModal = lazyWithRetry(() => import('@client/features/collect/components/VideoDownloadModal'));
 const AIAssistantDrawer = lazyWithRetry(() => import('@client/features/assistant/components/AIAssistantDrawer'));
 const ImageLightboxModal = lazyWithRetry(() => import('@client/app/lightbox/ImageLightboxModal'));
 const CanvasWorkspaceView = lazyWithRetry(() => import('@client/features/canvas/CanvasWorkspaceView'));
@@ -40,7 +43,8 @@ const PosterStudio = lazyWithRetry(() => import('@client/features/poster/PosterS
 const KeywordsStudio = lazyWithRetry(() => import('@client/features/keywords/KeywordsStudio'));
 const SalesStudio = lazyWithRetry(() => import('@client/features/sales/SalesStudio'));
 const AssetCenter = lazyWithRetry(() => import('@client/features/assets/components/AssetCenter'));
-const AssetPromptLibrary = lazyWithRetry(() => import('@client/features/assets/components/library/AssetPromptLibrary'));
+const WorkshopAssetTools = lazyWithRetry(() => import('@client/features/assets/components/library/WorkshopAssetTools'));
+const ProjectMediaLibrary = lazyWithRetry(() => import('./media-library/ProjectMediaLibrary'));
 const SkillsWorkspaceView = lazyWithRetry(() => import('@client/features/skills/SkillsWorkspaceView'));
 
 function AssetCenterWithCanvas() {
@@ -57,7 +61,11 @@ const CanvasRecentProjects = lazyWithRetry(() => import('@client/features/canvas
 const GlobalDynamicBackground = lazyWithRetry(() => import('@client/shared/media/widgets/GlobalDynamicBackground'));
 
 export default function App() {
+  const [libraryVisit, setLibraryVisit] = useState<{ section?: SalesAssetSection } | null>(null);
+  const [salesChoice, setSalesChoice] = useState<SalesLibraryChoice | null>(null);
+  const [pendingMedia, setPendingMedia] = useState<PendingMediaInsert|null>(null);
   const [isCollectorOpen, setIsCollectorOpen] = useState(false);
+  const [homeMode, setHomeMode] = useState<'generate' | 'canvas'>('generate');
   const [routeReady, setRouteReady] = useState(false);
   const initialSearch = useRef(typeof window === 'undefined' ? '' : window.location.search);
   const mountAssistant = useMountedAfterFirstOpen(useAppStore((s) => s.isAssistantOpen));
@@ -84,6 +92,14 @@ export default function App() {
       backFromSettings: s.backFromSettings,
     })),
   );
+  const openSalesLibrary: OpenSalesLibrary = (section) => {
+    setLibraryVisit({ section });
+    setCurrentView('asset_library');
+  };
+  const returnToProduction = () => {
+    setLibraryVisit(null);
+    setCurrentView('video_sales');
+  };
   const pageView = currentView === 'settings' ? (previousView && previousView !== 'settings' ? previousView : 'home') : currentView;
   const density = useViewportDensity();
   const { ref: mainContentRef } = useCompactLayout();
@@ -116,12 +132,22 @@ export default function App() {
     const params = new URLSearchParams(initialSearch.current);
     const step = params.get('step');
     const project = params.get('project');
+    if (view === 'canvas') {
+      const openCanvasRoute = () => {
+        const store = useCanvasStore.getState();
+        const selected = store.projects.find(item => item.id === project);
+        store.selectProject(selected?.id ?? null);
+        setHomeMode('canvas');
+        setCurrentView(selected ? 'canvas' : 'home');
+        setRouteReady(true);
+      };
+      if (!useCanvasStore.persist.hasHydrated()) return useCanvasStore.persist.onFinishHydration(openCanvasRoute);
+      openCanvasRoute();
+      return;
+    }
     setCurrentView(view);
     if (view === 'workshop') {
       useAppStore.getState().setActiveWorkshopTab(parseWorkshopTabFromSearchParams(initialSearch.current));
-    }
-    if (view === 'canvas' && project) {
-      useCanvasStore.getState().selectProject(project);
     }
     if (view === 'workshop' && step) {
       const n = parseInt(step, 10);
@@ -143,6 +169,16 @@ export default function App() {
 
   // 🌟 画布独立全屏工作台：进入项目后隐藏全局 Sidebar，呈现完全独立的画板创作界面
   const activeCanvasProjectId = useCanvasStore((s) => s.activeProjectId);
+  useEffect(() => {
+    if (routeReady && currentView === 'canvas' && !activeCanvasProjectId) {
+      setHomeMode('canvas');
+      setCurrentView('home');
+    }
+  }, [routeReady, currentView, activeCanvasProjectId, setCurrentView]);
+  useEffect(() => {
+    if (pendingMedia && (currentView !== 'canvas' || activeCanvasProjectId !== pendingMedia.projectId)) setPendingMedia(null);
+  }, [pendingMedia,currentView,activeCanvasProjectId]);
+  const studioProject = useCanvasStore(s => s.projects.some(p => p.id === s.activeProjectId && (p.studioScene || !p.nodes.length)));
   const isCanvasFullscreen = currentView === 'canvas' && !!activeCanvasProjectId;
   const isWorkshopFullscreen = currentView === 'workshop' || currentView === 'headline_poster' || currentView === 'keyword_review' || currentView === 'video_sales';
   const isDedicatedFullscreen = isCanvasFullscreen || isWorkshopFullscreen;
@@ -157,10 +193,10 @@ export default function App() {
       extra.project = activeCanvasProjectId;
     }
     syncViewToUrl(
-      currentView,
+      currentView === 'home' && homeMode === 'canvas' ? 'canvas' : currentView,
       Object.keys(extra).length > 0 ? extra : undefined,
     );
-  }, [routeReady, currentView, batchStage, activeWorkshopTab, activeCanvasProjectId]);
+  }, [routeReady, currentView, homeMode, batchStage, activeWorkshopTab, activeCanvasProjectId]);
 
   // 🌟 AI 助手仅在画布视图开放，离开画布时自动收起助手抽屉
   useEffect(() => {
@@ -168,6 +204,12 @@ export default function App() {
       useAppStore.getState().setIsAssistantOpen(false);
     }
   }, [currentView]);
+
+  const returnToCreativeHome = () => {
+    setHomeMode('generate');
+    setCurrentView('home');
+    useCanvasStore.getState().selectProject(null);
+  };
 
   const enterOriginalWorkshop = () => {
     const store = useAppStore.getState();
@@ -200,7 +242,7 @@ export default function App() {
         <div className="flex-1 min-w-0 flex overflow-hidden relative">
           {/* 🌟 全局轻奢自适应动态背景（首页右上角流体粒子 + 工作区交互式点阵微澜 + 智能降级兜底） */}
           <Suspense fallback={null}>
-            {(!isDedicatedFullscreen || isWorkshopFullscreen) && !isCollectorOpen && <GlobalDynamicBackground />}
+            {(!isDedicatedFullscreen || isWorkshopFullscreen) && currentView !== 'workshop' && !isCollectorOpen && <GlobalDynamicBackground />}
           </Suspense>
 
           {!isDedicatedFullscreen && (
@@ -208,6 +250,7 @@ export default function App() {
               currentView={currentView}
               onNavigateHub={() => setCurrentView('home')}
               onNavigateAssets={() => setCurrentView('assets')}
+              onNavigateLibrary={() => { setLibraryVisit(null); setCurrentView('asset_library'); }}
               onNavigateSkills={() => setCurrentView('skills')}
               onOpenSettings={navigateToSettings}
               onOpenSession={(id) => {
@@ -239,7 +282,8 @@ export default function App() {
                       onOpenKeywordReview={() => setCurrentView('keyword_review')}
                       onOpenVideoSales={() => setCurrentView('video_sales')}
                       onOpenCollectorHub={() => setIsCollectorOpen(true)}
-                      recentProjects={<CanvasRecentProjects lead="square" onEnterCanvas={() => setCurrentView('canvas')} />}
+                      homeMode={homeMode} setHomeMode={setHomeMode}
+                      recentProjects={<CanvasRecentProjects onEnterCanvas={() => setCurrentView('canvas')} />}
                     />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
@@ -256,14 +300,14 @@ export default function App() {
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="assets" currentView={pageView}>
-                  <AppErrorBoundary title="资产中心异常" resetLabel="重新加载" onReset={() => { if (typeof window !== 'undefined') window.location.reload(); }}>
+                  <AppErrorBoundary title="生成历史异常" resetLabel="重新加载" onReset={() => { if (typeof window !== 'undefined') window.location.reload(); }}>
                     <AssetCenterWithCanvas />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
                 <ViewKeepAlivePanel view="canvas" currentView={pageView}>
                   <AppErrorBoundary title="画布异常" resetLabel="重新加载" onReset={() => { if (typeof window !== 'undefined') window.location.reload(); }}>
-                    <CanvasWorkspaceView />
+                    <CanvasWorkspaceView onHome={returnToCreativeHome} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
@@ -275,7 +319,7 @@ export default function App() {
 
                 <ViewKeepAlivePanel view="workshop" currentView={pageView}>
                   <AppErrorBoundary title="电商图文异常" resetLabel="重置电商图文" onReset={() => { clearWorkshopStudioDraft(); useAppStore.getState().resetModeSession('storyboard_generate'); }}>
-                    <WorkshopStudio onOpenSettings={navigateToSettings} AssetPromptLibraryComponent={AssetPromptLibrary} />
+                    <WorkshopStudio AssetTools={WorkshopAssetTools} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
@@ -291,9 +335,20 @@ export default function App() {
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
+                <ViewKeepAlivePanel view="asset_library" currentView={pageView}>
+                  <AppErrorBoundary title="资产库异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
+                    <ProjectMediaLibrary visit={libraryVisit} onOpenHome={returnToCreativeHome} onReturn={returnToProduction} onSelectSales={choice => {
+                      setSalesChoice(choice); returnToProduction();
+                    }} onOpenProject={(projectId,{name,kind,url})=>{
+                      setPendingMedia({projectId,item:{name,kind,url},requestId:crypto.randomUUID()});
+                      useCanvasStore.getState().selectProject(projectId);
+                      setCurrentView('canvas');
+                    }}/>
+                  </AppErrorBoundary>
+                </ViewKeepAlivePanel>
                 <ViewKeepAlivePanel view="video_sales" currentView={pageView}>
                   <AppErrorBoundary title="电商视频异常" resetLabel="返回首页" onReset={() => setCurrentView('home')}>
-                    <SalesStudio onBack={() => setCurrentView('home')} />
+                    <SalesStudio libraryChoice={salesChoice} onChoiceHandled={()=>setSalesChoice(null)} onOpenLibrary={openSalesLibrary} onBack={() => setCurrentView('home')} />
                   </AppErrorBoundary>
                 </ViewKeepAlivePanel>
 
@@ -309,12 +364,13 @@ export default function App() {
 
       {/* 🌟 全局桌面级上下文右键菜单（接管图片/视频快捷操作，彻底消除检查元素与冗余项） */}
       <GlobalContextMenu />
-      <AppPetHost />
+      {pageView !== "workshop" && <AppPetHost key={isCanvasFullscreen ? "canvas" : "app"} canvas={isCanvasFullscreen} />}
       <DeconstructJobsHost />
       <ConfirmDialogHost />
 
       {/* 🌟 仅在无限画布视图中常驻多模态 AI 问答助手与抽屉面板 */}
-      {currentView === 'canvas' && <AIAssistantButton />}
+      {isCanvasFullscreen && studioProject && activeCanvasProjectId && <CanvasMediaLibraryHost key={activeCanvasProjectId} projectId={activeCanvasProjectId} pending={pendingMedia} onDelivered={setPendingMedia}/>}
+      {isCanvasFullscreen && !studioProject && <AIAssistantButton />}
       <AgentDocumentHost />
       <Suspense fallback={null}>
         {currentView === 'canvas' && mountAssistant && <AppErrorBoundary
@@ -328,16 +384,12 @@ export default function App() {
         </AppErrorBoundary>}
       </Suspense>
 
-      {/* 🌟 全渠道智能采集与资产汇总中心 */}
+      {/* OSS 视频下载 */}
       <Suspense fallback={null}>
         {isCollectorOpen && (
-          <UniversalCollectorModal
+          <VideoDownloadModal
             isOpen={isCollectorOpen}
             onClose={() => setIsCollectorOpen(false)}
-            onEnterWorkshop={() => {
-              setIsCollectorOpen(false);
-              enterOriginalWorkshop();
-            }}
           />
         )}
       </Suspense>

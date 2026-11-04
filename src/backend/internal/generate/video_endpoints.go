@@ -28,6 +28,9 @@ func videoEndpointSet(family, model, mode string, images []string) ([]string, []
 	var submit, query []string
 	headers := map[string]string{}
 	switch family {
+	case "omni-flash":
+		submit = []string{root + "/v1/videos"}
+		query = []string{root + "/v1/videos/{taskId}"}
 	case "seedance":
 		submit = []string{root + "/seedance/v3/contents/generations/tasks", root + "/v2/videos/generations"}
 		query = []string{root + "/seedance/v3/contents/generations/tasks/{taskId}", root + "/v2/videos/generations/{taskId}"}
@@ -60,7 +63,10 @@ func videoEndpointSet(family, model, mode string, images []string) ([]string, []
 		submit = []string{root + "/xai/v1/videos/" + grokSubmitPath(mode)}
 		query = []string{root + "/xai/v1/videos/{taskId}"}
 	case "minimax":
-		if strings.Contains(strings.ToLower(model), "t2v-01") {
+		if minimaxH3(model) {
+			submit = []string{root + "/v2/video_generation"}
+			query = []string{root + "/v2/query/video_generation/{taskId}"}
+		} else if strings.Contains(strings.ToLower(model), "t2v-01") {
 			submit = []string{root + "/minimax/v1/video_generation"}
 			query = []string{root + "/minimax/v1/query/video_generation?task_id={taskId}"}
 		} else {

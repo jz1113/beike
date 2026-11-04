@@ -58,7 +58,7 @@ func runScriptHandler(t *testing.T, body string, complete summaryCompleter, read
 	t.Setenv("AI_DRAWING_API_KEY", "test-key")
 	request := httptest.NewRequest(http.MethodPost, "/api/sales/script-analysis", strings.NewReader(body))
 	recorder := httptest.NewRecorder()
-	scriptAnalysisHandler(setupSalesTestConfig(t), complete, read).ServeHTTP(recorder, request)
+	scriptAnalysisHandler(setupPromptExecutionTestConfig(t), complete, read).ServeHTTP(recorder, request)
 	var data map[string]any
 	_ = json.Unmarshal(recorder.Body.Bytes(), &data)
 	return recorder, data
@@ -88,7 +88,7 @@ func TestScriptAnalysisExtractsFramesForNonGeminiProtocols(t *testing.T) {
 	uploadReq := httptest.NewRequest(http.MethodPost, "/api/sales/script-video", &formBody)
 	uploadReq.Header.Set("Content-Type", form.FormDataContentType())
 	uploadRec := httptest.NewRecorder()
-	cfg := setupSalesTestConfig(t)
+	cfg := setupPromptExecutionTestConfig(t)
 	cfg.Root = root
 	ScriptVideoUpload(cfg).ServeHTTP(uploadRec, uploadReq)
 	var uploaded struct {
@@ -108,19 +108,26 @@ func TestScriptAnalysisExtractsFramesForNonGeminiProtocols(t *testing.T) {
 	if invalidRec.Code != 502 || !strings.Contains(invalidRec.Body.String(), "实测时长") {
 		t.Fatalf("six-second script must not succeed for a two-second video: %d %s", invalidRec.Code, invalidRec.Body.String())
 	}
-	if _, err := localScriptVideoFile(uploaded.VideoURL, "local"); err != nil {
-		t.Fatalf("failed analysis must preserve the source for retry: %v", err)
+	if _, err := localScriptVideoFile(uploaded.VideoURL, "local"); err == nil {
+		t.Fatal("failed analysis retained original")
 	}
-
-	normalizeBody, _ := json.Marshal(map[string]any{"rawText": validScript, "videoUrl": uploaded.VideoURL})
-	normalizeRec := httptest.NewRecorder()
-	scriptNormalizeHandler(cfg, complete).ServeHTTP(normalizeRec, httptest.NewRequest(http.MethodPost, "/api/sales/script-normalize", bytes.NewReader(normalizeBody)))
-	if normalizeRec.Code != 422 || !strings.Contains(normalizeRec.Body.String(), "实测时长") {
-		t.Fatalf("pasted timeline must match the measured video too: %d %s", normalizeRec.Code, normalizeRec.Body.String())
+	// Retry with a fresh upload; neither attempt may retain video bytes.
+	formBody.Reset()
+	form = multipart.NewWriter(&formBody)
+	part, _ = form.CreateFormFile("file", "ref.mp4")
+	_, _ = part.Write(raw)
+	form.Close()
+	uploadReq = httptest.NewRequest(http.MethodPost, "/api/sales/script-video", &formBody)
+	uploadReq.Header.Set("Content-Type", form.FormDataContentType())
+	uploadRec = httptest.NewRecorder()
+	ScriptVideoUpload(cfg).ServeHTTP(uploadRec, uploadReq)
+	var retry struct {
+		VideoURL string `json:"videoUrl"`
 	}
-	if _, err := localScriptVideoFile(uploaded.VideoURL, "local"); err != nil {
-		t.Fatalf("failed import must preserve the source for retry: %v", err)
+	if json.Unmarshal(uploadRec.Body.Bytes(), &retry) != nil || retry.VideoURL == "" {
+		t.Fatal("retry upload failed")
 	}
+	body = strings.Replace(body, uploaded.VideoURL, retry.VideoURL, 1)
 
 	completion = `{"durationSec":2,"shots":[{"start":0,"end":2,"beats":[{"start":0,"end":2,"action":"展示商品"}]}]}`
 	request := httptest.NewRequest(http.MethodPost, "/api/sales/script-analysis", strings.NewReader(body))
@@ -136,8 +143,8 @@ func TestScriptAnalysisExtractsFramesForNonGeminiProtocols(t *testing.T) {
 	if _, err := validateScriptObject(response.Script); err != nil {
 		t.Fatalf("successful analysis must remain saveable: %v", err)
 	}
-	if _, err := localScriptVideoFile(uploaded.VideoURL, "local"); err != nil {
-		t.Fatalf("reference video must stay available after analysis: %v", err)
+	if _, err := localScriptVideoFile(retry.VideoURL, "local"); err == nil {
+		t.Fatal("successful analysis retained original")
 	}
 	payloadRaw, _ := json.Marshal(sent.Payload)
 	if !strings.Contains(string(payloadRaw), "image_url") || strings.Contains(string(payloadRaw), "video_url") || sent.Payload["reasoning_effort"] != "high" {
@@ -154,6 +161,12 @@ func TestScriptAnalysisSendsVideoAndReturnsScript(t *testing.T) {
 	recorder, data := runScriptHandler(t, `{"videoUrl":"/storage/local/a.mp4","model":"gemini-2.5-pro","textProtocol":"gemini","reasoningEffort":"medium"}`, complete, func(string, string) (string, error) { return "data:video/mp4;base64,AA==", nil })
 	if recorder.Code != 200 || data["success"] != true || data["script"] == nil {
 		t.Fatalf("unexpected response %d %#v", recorder.Code, data)
+	}
+	assertRequestPrompt(t, sent, scriptAnalysisPrompt)
+	messages := sent.Payload["messages"].([]any)
+	parts := messages[1].(map[string]any)["content"].([]any)
+	if parts[len(parts)-1].(map[string]any)["text"] != scriptOutputFields {
+		t.Fatal("in-app analysis needs the storyboard format alongside the media")
 	}
 	raw, _ := json.Marshal(sent.Payload)
 	if !strings.Contains(string(raw), "video_url") || sent.Protocol != "gemini" || sent.Payload["reasoning_effort"] != "medium" {
@@ -188,5 +201,14 @@ func TestReadScriptVideoRejectsUnsafeSources(t *testing.T) {
 		if _, err := readScriptVideo(source, "default"); err == nil {
 			t.Fatalf("%s should be rejected", source)
 		}
+	}
+}
+
+func TestSampledAnalysisCannotPublishAnUnheardTranscript(t *testing.T) {
+	voice := map[string]any{"text": "虚构原话", "linePattern": "原片保证的效果"}
+	script := map[string]any{"shots": []any{map[string]any{"beats": []any{map[string]any{"voice": voice, "subtitle": "可见字幕"}}}}}
+	recordScriptObservations([]any{map[string]any{"text": `{"mediaType":"sampled_frames","sampleTimesSec":[0,1.5],"audioProvided":false}`}}, script)
+	if voice["text"] != "" || voice["linePattern"] != "" || voice["uncertain"] != true || len(script["sampleTimesSec"].([]float64)) != 2 {
+		t.Fatal(script)
 	}
 }

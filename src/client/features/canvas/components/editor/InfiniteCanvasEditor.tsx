@@ -16,11 +16,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { useAppStore } from '@client/store';
 interface InfiniteCanvasEditorProps {
+  onHome: () => void;
   projectId: string;
 }
 
-export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ projectId }) => {
-  const { projects, selectProject, selectNode, createProject, updateProjectTitle, addNode, updateNode, deleteNode } =
+export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ projectId, onHome }) => {
+  const { projects, selectProject, selectNode, updateProjectTitle, addNode, updateNode, deleteNode } =
     useCanvasStore();
   const currentProject = projects.find((p) => p.id === projectId);
   const canvasViewportRef = useRef<HTMLDivElement>(null);
@@ -34,7 +35,6 @@ export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ proj
     handleZoom, handleResetView, handleWheel, handleMouseDownCanvas, handleNodeDragStart, handleNodeClick,
     handTool, setHandTool, selectedNodeIds, setSelectedNodeIds, dragPositions, selectionBox, alignmentGuides,
   } = useCanvasGestures(currentProject, updateNode, () => {
-    setIsAssetSubmenuOpen(false);
     setEditingDrawingId(null);
   }, canvasViewportRef);
 
@@ -70,7 +70,7 @@ export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ proj
     currentProject, pan, zoom, canvasViewportRef, selectedNodeId, setSelectedNodeId,
     draggingNodeId, isEditingTitle, addNode, updateNode, deleteNode, generationTasks,
   });
-  const { setIsAssetSubmenuOpen, setEditingDrawingId } = actions;
+  const { setEditingDrawingId } = actions;
   useEffect(() => {
     if (selectedNodeIds.length > 1) setEditingDrawingId(null);
   }, [selectedNodeIds.length, setEditingDrawingId]);
@@ -79,17 +79,13 @@ export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ proj
     actions.closeComposer();
   };
 
-  const handleBackToHome = () => {
-    selectProject(null);
-    useAppStore.getState().setCurrentView('home');
-  };
 
   if (!currentProject) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-slate-500 dark:text-slate-400">
         <p className="text-base font-semibold mb-3">未找到对应画布项目</p>
         <button
-          onClick={handleBackToHome}
+          onClick={onHome}
           className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 cursor-pointer dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
         >
           返回首页
@@ -116,7 +112,7 @@ export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ proj
         onToggleViewMode={setViewMode}
         openNodeMenuAt={actions.openNodeMenuAt}
         handTool={handTool} setHandTool={setHandTool} history={history}
-        handleBackToHome={handleBackToHome}
+        handleBackToHome={onHome}
         isEditingTitle={isEditingTitle}
         titleInputRef={titleInputRef}
         tempTitle={tempTitle}
@@ -128,21 +124,14 @@ export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ proj
         handleCancelTitleEdit={handleCancelTitleEdit}
         displayProjectTitle={actions.displayProjectTitle}
         setIsEditingTitle={setIsEditingTitle}
-        createProject={createProject}
-        projects={projects}
-        currentProject={currentProject}
         selectProject={selectProject}
         nodes={actions.nodes}
         handleResetView={handleResetView}
         handleZoom={handleZoom}
         zoom={zoom}
-        addNode={addNode}
-        pan={pan}
         canvasViewportRef={canvasViewportRef}
         replacementNodeRef={actions.replacementNodeRef}
         fileInputRef={actions.fileInputRef}
-        isAssetSubmenuOpen={actions.isAssetSubmenuOpen}
-        setIsAssetSubmenuOpen={actions.setIsAssetSubmenuOpen}
         handleOpenAssetModal={actions.handleOpenAssetModal}
       />
       {viewMode === 'storyboard' && currentProject ? (

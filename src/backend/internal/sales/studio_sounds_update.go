@@ -7,7 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
 // Both sound kinds share one delete endpoint. Roll back if either write fails.
@@ -66,7 +68,7 @@ func writeStudioSoundMutation(w http.ResponseWriter, result sql.Result, err erro
 	httpx.WriteJSON(w, 200, map[string]any{"success": true})
 }
 
-func updateStudioSound(w http.ResponseWriter, r *http.Request, db *sql.DB, workspace, id string, body studioSoundMutation) {
+func updateStudioSound(cfg config.Config, w http.ResponseWriter, r *http.Request, db *sql.DB, workspace, id string, body studioSoundMutation) {
 	if strings.HasPrefix(id, "bgm_") || strings.TrimSpace(body.SoundType) == "bgm" {
 		var raw string
 		var curName string
@@ -142,23 +144,36 @@ func updateStudioSound(w http.ResponseWriter, r *http.Request, db *sql.DB, works
 		inputGender = curGender
 	}
 	group := normalizeVoiceGroup(inputGender, body.VoiceGroup, inputTags, name, prompt)
-	gender := curGender
-	if group == "male" {
-		gender = "male"
-	} else if group == "female" {
-		gender = "female"
-	}
+	gender := voiceGroupGender(group)
 	tags := mergeVoiceTags(group, inputTags)
 	tagsJSON, _ := json.Marshal(tags)
 	audio := strings.TrimSpace(body.AudioURL)
+	discard := func() {}
 	if audio == "" {
 		audio = curAudio
+	} else {
+		var err error
+		audio, discard, err = prepareStudioVoiceSample(r.Context(), cfg, workspace, audio, network.SafeClient())
+		if err != nil {
+			httpx.WriteJSON(w, 400, map[string]any{"success": false, "error": err.Error()})
+			return
+		}
 	}
-	voiceID := strings.TrimSpace(body.VoiceID)
-	if voiceID == "" {
-		voiceID = curVoiceID
+	saved := false
+	defer func() {
+		if !saved {
+			discard()
+		}
+	}()
+	voiceID := curVoiceID
+	if body.VoiceID != nil {
+		voiceID = soundText(body.VoiceID)
 	}
 	result, err := db.ExecContext(r.Context(), `UPDATE "AvatarVoice" SET "name"=?,"gender"=?,"tags"=?,"promptText"=?,"sampleAudioUrl"=?,"audioUrl"=?,"voiceId"=? WHERE "workspaceId"=? AND "id"=?`,
 		name, gender, string(tagsJSON), prompt, audio, audio, voiceID, workspace, id)
+	if err == nil {
+		affected, affectedErr := result.RowsAffected()
+		saved = affectedErr == nil && affected > 0
+	}
 	writeStudioSoundMutation(w, result, err)
 }

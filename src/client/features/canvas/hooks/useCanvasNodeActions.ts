@@ -56,7 +56,6 @@ export function useCanvasNodeActions(options: {
   const [multiAngleModalNode, setMultiAngleModalNode] = useState<CanvasNode | null>(null);
   const [composerReference, setComposerReference] = useState<{ name: string; url: string; type: 'image' | 'video'; timestamp: number; attachOnly: boolean } | null>(null);
   useEffect(() => { if (editingDrawingId) setComposerReference(null); }, [editingDrawingId]);
-  const [isAssetSubmenuOpen, setIsAssetSubmenuOpen] = useState(false);
   const [showAssetModal, setShowAssetModal] = useState(false);
   const [assetModalTab, setAssetModalTab] = useState<'image' | 'video'>('image');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -108,7 +107,6 @@ export function useCanvasNodeActions(options: {
   const handleOpenAssetModal = useCallback((type: 'image' | 'video') => {
     setAssetModalTab(type);
     setShowAssetModal(true);
-    setIsAssetSubmenuOpen(false);
   }, []);
 
   const closeNodeMenu = useCallback(() => setNodeMenu(null), []);
@@ -310,8 +308,6 @@ export function useCanvasNodeActions(options: {
     setMultiAngleModalNode,
     composerReference,
     closeComposer: () => setComposerReference(null),
-    isAssetSubmenuOpen,
-    setIsAssetSubmenuOpen,
     showAssetModal,
     setShowAssetModal,
     assetModalTab,

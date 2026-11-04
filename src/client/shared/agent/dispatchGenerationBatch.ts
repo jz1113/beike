@@ -11,7 +11,7 @@ export function currentBatchSettings(): BatchGenerationSettings {
   const state = useAppStore.getState();
   return { imageModel: state.quickModel, imageAspect: state.quickAspectId, imageQuality: state.quickQuality,
     videoModel: state.quickVideoModel, videoAspect: state.quickVideoAspectId, videoResolution: state.quickVideoResolution,
-    videoDuration: state.quickVideoDuration, videoRefMode: state.quickVideoRefMode };
+    videoDuration: state.quickVideoDuration, videoRefMode: state.quickVideoRefMode, videoContextIrEnabled: state.quickVideoContextIrEnabled ?? true };
 }
 
 export interface GenerationBatchRequest {

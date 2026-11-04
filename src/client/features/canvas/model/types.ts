@@ -53,7 +53,7 @@ export interface CanvasNode {
   previewFit?: 'contain' | 'cover';
   previewAutoPlay?: boolean;
   generationKind?: 'image' | 'video';
-  drawing?: { duration?: number; refMode?: string; model: string; quality: string; aspect: string; count: number; references: string[]; audio?: boolean };
+  drawing?: { duration?: number; refMode?: string; model: string; quality: string; aspect: string; count: number; references: string[]; audio?: boolean; contextIrEnabled?: boolean };
   audioUrl?: string;
   title?: string;
   content?: string;
@@ -75,7 +75,17 @@ export interface CanvasNode {
   createdAt: number;
 }
 
+export interface StudioScene {
+  nodes: Array<{ id: string; type: string; [field: string]: unknown }>;
+  connections: Array<{ id: string; from: string; to: string; [field: string]: unknown }>;
+  groups: unknown[];
+  textBoxes: unknown[];
+  strokes: unknown[];
+  view: { x: number; y: number; zoom: number };
+}
+
 export interface CanvasProject {
+  studioScene?: StudioScene;
   draft?: boolean;
   id: string;
   title: string;

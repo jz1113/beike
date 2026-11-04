@@ -72,8 +72,13 @@ func mustMigrations() []migration {
 		{version: "20261101_01_sales_prompts", checksum: file("sales_prompts.sql"), apply: script("sales_prompts.sql", false)},
 		{version: "20261101_02_sales_grid_prompts", checksum: file("sales_grid_prompts.sql"), apply: script("sales_grid_prompts.sql", false)},
 		{version: "20261101_03_sales_script_media", checksum: file("sales_script_media.sql"), apply: script("sales_script_media.sql", false)},
-		{version: "20261101_04_sales_products", checksum: file("sales_products.sql"), apply: script("sales_products.sql", false)},
+		// The published SQL also shipped without its final blank line; both schemas are identical.
+		{version: "20261101_04_sales_products", checksum: file("sales_products.sql"), compatible: []string{"4302ee43d4b71f31bb17a7a359fcff9863688987cbe66e46f7e274404a8e2db3"}, apply: script("sales_products.sql", false)},
 		{version: "20261102_01_sales_asset_view_jobs", checksum: file("sales_asset_view_jobs.sql"), apply: script("sales_asset_view_jobs.sql", false)},
+		{version: "20261102_02_remove_atlas", checksum: label("remove-imported-atlas-assets-and-saved-references-v1"), apply: applyRemoveAtlas},
+		{version: "20261103_01_sales_media_jobs", checksum: file("sales_media_jobs.sql"), apply: script("sales_media_jobs.sql", false)},
+		{version: "20261103_02_sales_prompt_template_version", checksum: file("sales_prompt_template_version.sql"), apply: script("sales_prompt_template_version.sql", false)},
+		{version: "20261103_03_library_preferences", checksum: file("library_preferences.sql"), apply: script("library_preferences.sql", false)},
 	}
 }
 

@@ -32,7 +32,7 @@ describe('workshop production settings', () => {
 
   it('uses skill status without reference inventory or replacement controls, even for old batches', () => {
     const automatic = render(WorkshopContentSettings);
-    expect(automatic).toContain('根据商品图与创作技能设计分镜');
+    expect(automatic).toContain('管理创作技能');
     expect(automatic).toContain('基础创作技能');
     expect(automatic).not.toContain('高级素材设置');
     expect(automatic).not.toContain('组完整参考图');

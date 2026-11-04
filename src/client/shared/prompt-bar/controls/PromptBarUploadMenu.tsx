@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, type RefObject } from 'react';
+import React, { useState, useEffect, type RefObject } from 'react';
+import { usePromptBarPopoverLayout } from '../hooks/usePromptBarPopoverLayout';
 import { Info } from 'lucide-react';
 
 interface PromptBarUploadMenuProps {
@@ -20,10 +21,12 @@ export default function PromptBarUploadMenu({
   onSubmitVideoUrl,
   isUp = true,
 }: PromptBarUploadMenuProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-
   // 状态模式：主菜单 | 视频链接气泡
   const [activeView, setActiveView] = useState<'main' | 'videoUrl'>('main');
+
+  const { panelRef: menuRef, panelStyle, opensUp } = usePromptBarPopoverLayout(
+    isOpen, isUp, triggerRef, activeView === 'videoUrl' ? 400 : 176,
+  );
 
   // 视频链接输入状态
   const [videoUrlText, setVideoUrlText] = useState('');
@@ -50,7 +53,9 @@ export default function PromptBarUploadMenu({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault();
         onClose();
+        triggerRef.current?.focus();
       }
     };
 
@@ -60,7 +65,7 @@ export default function PromptBarUploadMenu({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose, triggerRef]);
+  }, [isOpen, onClose, triggerRef, menuRef]);
 
   if (!isOpen) return null;
 
@@ -69,6 +74,7 @@ export default function PromptBarUploadMenu({
       onSubmitVideoUrl(videoUrlText.trim());
       setVideoUrlText('');
       onClose();
+      triggerRef.current?.focus();
     }
   };
 
@@ -77,9 +83,10 @@ export default function PromptBarUploadMenu({
     return (
       <div
         ref={menuRef}
+        style={panelStyle}
         className={`absolute left-0 ${
-          isUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
-        } w-[360px] sm:w-[400px] rounded-[22px] bg-white dark:bg-[#18191c] border border-slate-200/80 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.45)] p-4 z-50 animate-fade-in text-left select-none`}
+          opensUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
+        } overflow-y-auto rounded-[22px] bg-white dark:bg-[#18191c] border border-slate-200/80 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.45)] p-4 z-50 animate-fade-in text-left select-none`}
       >
         <div className="text-[13px] text-slate-700 dark:text-slate-200 pb-3 flex items-center flex-wrap gap-1">
           <span>你也可以</span>
@@ -103,10 +110,9 @@ export default function PromptBarUploadMenu({
             value={videoUrlText}
             onChange={(e) => setVideoUrlText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleConfirmUrl();
-              if (e.key === 'Escape') setActiveView('main');
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleConfirmUrl();
             }}
-            className="flex-1 px-4 py-2 rounded-full border border-slate-300 dark:border-white/15 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-slate-500 dark:focus:border-white/30 focus:ring-1 focus:ring-slate-400 transition-all bg-white dark:bg-white/5"
+            className="min-w-0 flex-1 px-4 py-2 rounded-full border border-slate-300 dark:border-white/15 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-slate-500 dark:focus:border-white/30 focus:ring-1 focus:ring-slate-400 transition-all bg-white dark:bg-white/5"
             autoFocus
           />
           <button
@@ -130,9 +136,10 @@ export default function PromptBarUploadMenu({
   return (
     <div
       ref={menuRef}
+      style={panelStyle}
       className={`absolute left-0 ${
-        isUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
-      } w-[168px] sm:w-[176px] rounded-[22px] bg-white dark:bg-[#18191c] border border-slate-200/80 dark:border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.45)] p-1.5 z-50 animate-fade-in text-left select-none`}
+        opensUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
+      } overflow-y-auto rounded-[22px] bg-white dark:bg-[#18191c] border border-slate-200/80 dark:border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.45)] p-1.5 z-50 animate-fade-in text-left select-none`}
     >
       <button
         type="button"

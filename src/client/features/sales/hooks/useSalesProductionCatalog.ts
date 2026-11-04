@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchSalesStudioAssets, type SalesStudioAssetCatalog } from '../api/salesProduction';
 import { listSalesScripts, type StoredSalesScript } from '../api/salesScripts';
+import { listSalesPrompts } from '../api/salesPrompts';
+import type { SalesPrompt } from '@shared/contracts/salesPrompts';
 
 /** Refresh library choices after editing assets without interrupting production work. */
 export function useSalesProductionCatalog(
@@ -10,8 +12,9 @@ export function useSalesProductionCatalog(
 ) {
   const [scripts, setScripts] = useState<StoredSalesScript[]>([]);
   const [catalog, setCatalog] = useState<SalesStudioAssetCatalog>({ personas: [], scenes: [], actions: [], voices: [], bgms: [] });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [finalVideoPrompts, setFinalVideoPrompts] = useState<SalesPrompt[]>([]);
   const [reloadTick, setReloadTick] = useState(0);
   const settledRevision = useRef<string | null>(null);
   const reloadAssets = useCallback(() => setReloadTick((version) => version + 1), []);
@@ -22,11 +25,13 @@ export function useSalesProductionCatalog(
     if (settledRevision.current === revision) return;
     const controller = new AbortController();
     setLoading(true);
-    Promise.all([listSalesScripts(controller.signal), fetchSalesStudioAssets(controller.signal)])
-      .then(([loadedScripts, loadedCatalog]) => {
+    setFinalVideoPrompts([]);
+    Promise.all([listSalesScripts(controller.signal), fetchSalesStudioAssets(controller.signal), listSalesPrompts(controller.signal)])
+      .then(([loadedScripts, loadedCatalog, prompts]) => {
         if (controller.signal.aborted) return;
         setScripts(loadedScripts);
         setCatalog(loadedCatalog);
+        setFinalVideoPrompts(prompts.filter((item) => (item.id === 'final-video' || item.id === 'final-video-depth') && item.configured));
         onLoaded(loadedCatalog);
         setError('');
       })
@@ -42,5 +47,5 @@ export function useSalesProductionCatalog(
     return () => controller.abort();
   }, [onLoaded, refreshVersion, reloadTick, taskBusy]);
 
-  return { scripts, catalog, loading, error, reloadAssets, clearError: () => setError('') };
+  return { scripts, catalog, finalVideoPrompts, loading, error, reloadAssets, clearError: () => setError('') };
 }

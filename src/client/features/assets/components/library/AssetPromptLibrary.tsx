@@ -18,8 +18,7 @@ import { getAssetPreviewText as getAssetPreviewTextHelper } from '../../model/as
 import { AssetLifecycleFilter } from '../filters/assetLibraryFilters';
 import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 import { buildAssetGalleryLabels, type GalleryAtomType } from '../../model/assetGalleryLabels';
-import { buildPromptGroupFolders, buildPromptGroupSubcategoryFolders, promptGroupSubcategoryOptions } from '../../model/promptGroupFolders';
-import { CategorySkillsDialog } from '../folders/CategorySkillsDialog';
+import { buildPromptGroupFolders, buildPromptGroupSubcategoryFolders } from '../../model/promptGroupFolders';
 import { MovePromptGroupsDialog } from '../folders/MovePromptGroupsDialog';
 import { PromptAssetContextMenu } from '../folders/PromptAssetContextMenu';
 import { invalidateGlobalAssetCache } from '@client/shared/api/assetLibraryCache';
@@ -29,9 +28,9 @@ import { AssetLibrarySelectionBar } from './AssetLibrarySelectionBar';
 import './assetLibrary.css';
 import './assetLibraryWorkspace.css';
 
+export type ReferenceTarget = { category: string; subcategory: string } | { previewId: string };
 interface Props {
-  initialSubTab?: PromptAssetType;
-  initialSkillsOpen?: boolean;
+  initialTarget?: ReferenceTarget | null;
   navigationTarget?: HTMLElement | null;
 }
 
@@ -40,8 +39,8 @@ function libraryItem(item: Record<string, unknown>): AssetLibrarySlim | null {
   return { ...item, id: item.id } as AssetLibrarySlim;
 }
 
-export default function AssetPromptLibrary({ initialSubTab = 'full_prompt', initialSkillsOpen = false, navigationTarget }: Props) {
-  const [activeSubTab, setActiveSubTab] = useState<PromptAssetType>(initialSubTab);
+export default function AssetPromptLibrary({ initialTarget, navigationTarget }: Props) {
+  const [activeSubTab, setActiveSubTab] = useState<PromptAssetType>('full_prompt');
 
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);
 
@@ -120,7 +119,7 @@ export default function AssetPromptLibrary({ initialSubTab = 'full_prompt', init
     [items, promptGroupCategories, promptGroupAlbums, promptGroupCategoryFilter],
   );
   const currentFolderName = promptGroupCategoryFilter === 'all'
-    ? '全部图组母本'
+    ? '全部参考图组'
     : categoryFolders.find(folder => folder.id === promptGroupCategoryFilter)?.name
       || promptGroupCategories.find(category => category.id === promptGroupCategoryFilter)?.name
       || '待分类';
@@ -202,19 +201,27 @@ export default function AssetPromptLibrary({ initialSubTab = 'full_prompt', init
   const xhsImport = useXhsBatchImport({ queueApi, showToast, onRefreshAssets: refreshAssets });
   const { folderInputRef, setShowDeconstructModal, processFilesOrFolders } = queueApi;
 
-  const [skillsOpen, setSkillsOpen] = useState(initialSkillsOpen);
-  const [browseTarget, setBrowseTarget] = useState<{ category: string; subcategory: string } | null>(null);
-  useEffect(() => {
-    if (!browseTarget || activeSubTab !== 'full_prompt') return;
-    setPromptGroupCategoryFilter(browseTarget.category);
-    setPromptGroupSubcategoryFilter(browseTarget.subcategory);
-    setBrowseTarget(null);
-  }, [browseTarget, activeSubTab, setPromptGroupCategoryFilter, setPromptGroupSubcategoryFilter]);
   const [groupPreview, setGroupPreview] = useState<{
     item: AssetLibrarySlim;
     listPosition?: number;
     initialIndex?: number;
   } | null>(null);
+  useEffect(() => {
+    if (!initialTarget) return;
+    if ('category' in initialTarget) {
+      setPromptGroupCategoryFilter(initialTarget.category);
+      setPromptGroupSubcategoryFilter(initialTarget.subcategory);
+      return;
+    }
+    let active = true;
+    void fetchAssetDetail('full_prompt', initialTarget.previewId).then(detail => {
+      if (!active) return;
+      const item = detail && libraryItem(detail);
+      if (!item) { showToast('来源图组不可用'); return; }
+      setGroupPreview({ item, listPosition: item.displayNumber ?? undefined });
+    }).catch(() => { if (active) showToast('来源图组读取失败'); });
+    return () => { active = false; };
+  }, [initialTarget, setPromptGroupCategoryFilter, setPromptGroupSubcategoryFilter, showToast]);
   const [atomicPreview, setAtomicPreview] = useState<{
     item: AssetLibrarySlim;
     type: GalleryAtomType;
@@ -316,7 +323,6 @@ export default function AssetPromptLibrary({ initialSubTab = 'full_prompt', init
         importJsonRef={importJsonRef}
         onImportJsonBackup={handleImportJsonBackup}
         onExportJsonBackup={handleExportJsonBackup}
-        onOpenSkills={() => setSkillsOpen(true)}
         onRefresh={refreshAssets} isLoading={isLoading}
         dynamicTagList={dynamicTagList}
         selectedTag={selectedTag}
@@ -352,7 +358,6 @@ export default function AssetPromptLibrary({ initialSubTab = 'full_prompt', init
 
       <AssetPromptLibraryGrid
         onActionsTarget={setActionsTarget}
-        onOpenSkills={() => setSkillsOpen(true)}
         audienceFilters={(activeSubTab === 'persona' || activeSubTab === 'outfit') && <AppearanceAudienceFilter type={activeSubTab} value={audienceFilter} onChange={setAudienceFilter} items={items} />}
         activeSubTab={activeSubTab} items={items} displayedItems={displayedItems}
         promptGroupCategories={promptGroupCategories} promptGroupAlbums={promptGroupAlbums}
@@ -387,12 +392,6 @@ export default function AssetPromptLibrary({ initialSubTab = 'full_prompt', init
         onClose={() => setAssetContextMenu(null)}
       />}
 
-      {skillsOpen && <CategorySkillsDialog categories={promptGroupCategories} albums={promptGroupAlbums}
-        initialFolder={promptGroupSubcategoryOptions(promptGroupCategories, promptGroupCategoryFilter).find(option => option.id === promptGroupSubcategoryFilter)?.folderId}
-        onBrowse={(category, subcategory) => { setSkillsOpen(false); setActiveSubTab('full_prompt'); setBrowseTarget({ category, subcategory }); }}
-        onClose={() => setSkillsOpen(false)} onPreview={id => {
-          void fetchAssetDetail('full_prompt', id).then(detail => { const item = detail && libraryItem(detail); if (!item) throw new Error('来源图组不可用'); setSkillsOpen(false); openGroupPreview(item, item.displayNumber ?? undefined); }).catch(error => showToast(error instanceof Error ? error.message : '图组读取失败'));
-        }} />}
       <AssetLibraryDialogs
         activeSubTab={activeSubTab} copiedId={copiedId}
         promptGroupCategories={promptGroupCategories} promptGroupAlbums={promptGroupAlbums}

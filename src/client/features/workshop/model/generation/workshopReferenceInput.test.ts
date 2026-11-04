@@ -32,6 +32,14 @@ describe('workshop skill production images', () => {
     expect(result.instruction).toContain('当前同款商品');
   });
 
+  it('carries the same handset geometry into single and grid requests without applying it to cases', () => {
+    const phone = { title: '华为 nova 15 Pro【赠手机支架】智能手机', productFingerprint: '左黑圆盘内三点，右圆环内一处横窗' };
+    for (const shots of [[skillShot], Array.from({ length: 4 }, (_, i) => ({ ...skillShot, shot_no: i + 1 }))]) {
+      expect(workshopReferenceInput(shots, 2, phone).instruction).toContain(phone.productFingerprint);
+    }
+    expect(workshopReferenceInput([skillShot], 1, { ...phone, title: 'nova 15 Pro 手机壳' }).instruction).not.toContain(phone.productFingerprint);
+  });
+
   it('uses the model image capacity for product views without reserving sample slots', () => {
     expect(workshopReferenceBudget('gemini-2.5-flash-image', [skillShot], false)).toBe(3);
     expect(workshopReferenceBudget('qwen-image-3.0', [skillShot], false)).toBe(3);

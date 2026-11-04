@@ -36,10 +36,6 @@ function BatchProductImageTile({
       ? 'border-amber-500 ring-2 ring-amber-500/90 shadow-[0_0_18px_rgba(245,158,11,0.25)] dark:shadow-[0_0_22px_rgba(245,158,11,0.2)]'
       : 'border-indigo-600 ring-2 ring-indigo-500/90 shadow-[0_0_16px_rgba(99,102,241,0.2)] dark:shadow-[0_0_20px_rgba(99,102,241,0.15)]'
     : 'border-slate-200/80 hover:border-indigo-400/80 hover:shadow-lg hover:-translate-y-0.5 dark:border-white/10 dark:hover:border-indigo-500/60 dark:hover:shadow-black/50';
-  const imageTone = isChecked
-    ? 'opacity-100 saturate-100 brightness-100'
-    : 'opacity-55 saturate-50 brightness-75 group-hover:opacity-90 group-hover:saturate-100 group-hover:brightness-100';
-
   return (
     <div
       className={`group relative aspect-square rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 select-none border ${cardBorderAndShadow} bg-slate-50/70 dark:bg-[#131417]`}
@@ -57,7 +53,7 @@ function BatchProductImageTile({
           thumb={true}
           width={380}
           wrapperClassName="w-full h-full relative flex items-center justify-center bg-transparent"
-          className={`max-w-full max-h-full object-contain transition-[filter,opacity,transform] duration-200 ease-out group-hover:scale-105 ${imageTone}`}
+          className="max-w-full max-h-full !object-contain"
           alt={`${typeLabel}，商品图 ${imgIdx + 1}`}
         />
       </div>
@@ -117,14 +113,14 @@ function BatchProductImageTile({
       </div>
 
       {/* 底部悬浮快捷工具条 */}
-      <div className="absolute bottom-2 inset-x-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-all duration-200 z-20 pointer-events-auto">
+      <div className="absolute bottom-2 inset-x-2 flex items-center justify-between opacity-100 [@media(hover:hover)]:opacity-0 group-hover:!opacity-100 group-focus-within:!opacity-100 transition-opacity duration-200 z-20 pointer-events-none">
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onPreview();
           }}
-          className="px-2 py-1 rounded-lg bg-black/75 hover:bg-black/95 text-white text-[10px] font-medium flex items-center gap-1 backdrop-blur-md shadow-xs transition-colors cursor-zoom-in"
+          className="pointer-events-auto px-2 py-1 rounded-lg bg-black/75 hover:bg-black/95 text-white text-[10px] font-medium flex items-center gap-1 backdrop-blur-md shadow-xs transition-colors cursor-zoom-in"
           title="查看高清原图"
         >
           <ZoomIn className="w-3 h-3" />
@@ -138,7 +134,7 @@ function BatchProductImageTile({
               e.stopPropagation();
               onSetPrimary();
             }}
-            className="px-2 py-1 rounded-lg bg-amber-500/90 hover:bg-amber-500 text-white text-[10px] font-bold flex items-center gap-1 backdrop-blur-md shadow-xs transition-colors cursor-pointer"
+            className="pointer-events-auto px-2 py-1 rounded-lg bg-amber-500/90 hover:bg-amber-500 text-white text-[10px] font-bold flex items-center gap-1 backdrop-blur-md shadow-xs transition-colors cursor-pointer"
             title="设为生图 #1 第一主基准"
           >
             <Star className="w-3 h-3 fill-current" />

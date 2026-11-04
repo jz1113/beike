@@ -34,7 +34,9 @@ func setupAssetViewJobs(t *testing.T) (config.Config, *sql.DB) {
 	}
 	t.Cleanup(func() { db.Close() })
 	t.Setenv("AZHUO_CACHE_DIR", t.TempDir())
-	return config.Config{DatabaseURL: "file:" + file}, db
+	cfg := config.Config{DatabaseURL: "file:" + file}
+	seedPromptTemplates(t, cfg, "mine")
+	return cfg, db
 }
 
 func postAssetViewJob(t *testing.T, cfg config.Config, body map[string]any) assetViewJob {
@@ -217,6 +219,10 @@ func TestAssetViewJobInterruptedStateAndMarkerRecoverWithoutDuplicateAsset(t *te
 
 func TestAssetViewJobRunsConfiguredTemplateThenAutomaticallySaves(t *testing.T) {
 	cfg, db := setupAssetViewJobs(t)
+	savedPrompt := "只执行用户保存的场景九宫格规则，保持此文本原样。"
+	if _, err := db.Exec(`UPDATE "SalesPromptOverride" SET "prompt"=? WHERE "workspaceId"='mine' AND "promptId"='scene-grid'`, savedPrompt); err != nil {
+		t.Fatal(err)
+	}
 	grid := "data:image/png;base64," + base64.StdEncoding.EncodeToString(assetGridFixture(t, 1200, 900))
 	var submissions atomic.Int32
 	previous := gateway.ModelHTTP
@@ -227,7 +233,7 @@ func TestAssetViewJobRunsConfiguredTemplateThenAutomaticallySaves(t *testing.T) 
 				t.Errorf("wrong template route or credentials: %s %s", request.Method, request.URL)
 			}
 			var payload map[string]any
-			if json.NewDecoder(request.Body).Decode(&payload) != nil || payload["model"] != "gpt-image-1" || payload["prompt"] == "user-supplied-ignored" {
+			if json.NewDecoder(request.Body).Decode(&payload) != nil || payload["model"] != "gpt-image-1" || payload["prompt"] != savedPrompt {
 				t.Errorf("wrong grid generation payload: %+v", payload)
 			}
 			body, _ := json.Marshal(map[string]any{"image": grid})

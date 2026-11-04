@@ -34,8 +34,8 @@ func summaryCredentials(cfg config.Config, r *http.Request, body summaryRequest)
 	base = gateway.NormalizeGatewayBaseURL(base)
 	thirdParty := clientBase != "" && base != gateway.NormalizeGatewayBaseURL(defaults)
 	if strings.HasPrefix(model, "deepseek-official:") {
-		if model != "deepseek-official:deepseek-flash" {
-			return "", "", "", "请选择支持图片的多模态模型"
+		if model != "deepseek-official:deepseek-flash" && model != "deepseek-official:deepseek-v4-pro" {
+			return "", "", "", "请选择可用的文字模型"
 		}
 		if clientBase != "" && base != "https://api.deepseek.com" {
 			return "", "", "", "DeepSeek 官方模型只能使用官方接口地址"
@@ -51,7 +51,7 @@ func summaryCredentials(cfg config.Config, r *http.Request, body summaryRequest)
 		}
 	}
 	if key == "" {
-		return "", "", "", "请先在设置中配置所选多模态模型的 API Key"
+		return "", "", "", "请先在设置中配置所选文字模型的 API Key"
 	}
 	return base, key, model, ""
 }

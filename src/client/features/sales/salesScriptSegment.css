@@ -41,6 +41,13 @@
 .sales-storyboard-segment .sales-storyboard-analysis > div { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 14px; }
 .sales-storyboard-segment .sales-storyboard-analysis dt { color: var(--sales-muted); font-size: 12px; font-weight: 400; }
 .sales-storyboard-segment .sales-storyboard-analysis dd { margin: 0; color: var(--sales-ink); font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sales-storyboard-source-voice { display: grid; gap: 10px; margin-top: 22px; border-top: 1px solid var(--sales-line); padding-top: 18px; }
+.sales-storyboard-source-voice > strong { font-size: 13px; }
+.sales-storyboard-source-voice > p { margin: 0; color: var(--sales-muted); font-size: 12px; line-height: 1.6; }
+.sales-storyboard-source-voice > label:not(.sales-storyboard-source-uncertain) { display: grid; gap: 5px; color: var(--sales-muted); font-size: 12px; }
+.sales-storyboard-source-voice textarea { width: 100%; min-height: 56px; resize: vertical; border: 1px solid var(--sales-line); border-radius: 7px; background: var(--sales-surface); padding: 8px; color: var(--sales-ink); font-size: 13px; line-height: 1.6; }
+.sales-storyboard-source-voice textarea:focus-visible { outline: 2px solid var(--sales-accent); outline-offset: 1px; }
+.sales-storyboard-source-uncertain { display: flex; align-items: center; gap: 6px; color: var(--sales-muted); font-size: 12px; }
 .sales-storyboard-segment .sales-beat-leak { margin-top: 18px; }
 .sales-storyboard-segment .sales-storyboard-prompt-panel { margin-top: 22px; border: 1px solid var(--sales-line); border-radius: 10px; background: var(--sales-subtle); padding: 16px; }
 .sales-storyboard-segment .sales-storyboard-prompt-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
@@ -61,4 +68,22 @@
   .sales-storyboard-segment { padding: 15px; }
   .sales-storyboard-segment .sales-storyboard-analysis > div { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   .sales-storyboard-segment .sales-storyboard-prompt-heading { align-items: flex-start; flex-direction: column; }
+}
+
+.sales-storyboard-segments > h2 { margin: 4px 0 0; font-size: 18px; }
+.sales-shot-records { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--sales-line); }
+.sales-shot-records > summary { cursor: pointer; color: var(--sales-muted); font-size: 12px; }
+.sales-shot-records > section { margin-top: 16px; }
+
+.sales-beat-timeline-heading { margin: 0 0 8px; font-size: 14px; }
+.sales-beat-timeline-heading small { margin-inline-start: 6px; color: var(--sales-muted); font-weight: 400; }
+.sales-beat-timeline { list-style: none; margin: 0; padding: 0; }
+.sales-beat-timeline li { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 12px; border-top: 1px solid var(--sales-line); padding: 10px 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.sales-beat-timeline small { display: block; }
+.sales-shot-observations > summary { cursor: pointer; color: var(--sales-muted); font-size: 13px; }
+.sales-shot-observations[open] > summary { margin-bottom: 12px; }
+.sales-beat-timeline + .sales-shot-observations { border-top: 1px solid var(--sales-line); padding-top: 10px; }
+@media (max-width: 600px) {
+  .sales-beat-timeline li { grid-template-columns: 1fr; gap: 2px; }
+  .sales-beat-timeline small { display: inline; margin-inline-start: 6px; }
 }

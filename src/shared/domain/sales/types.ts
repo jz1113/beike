@@ -3,6 +3,18 @@ export type VideoSalesCategory = 'beauty' | 'food' | 'home' | 'fashion' | 'tech'
 
 export type SalesProductImageView = 'front' | 'back' | 'detail' | 'worn' | 'flat';
 
+export interface SalesReferenceSlot {
+  slotIndex: number;
+  mixedToken: string;
+  apiToken: string;
+  kind: 'persona_identity' | 'persona_body' | 'persona_face' | 'product' | 'scene' | 'action';
+  roles?: Array<SalesReferenceSlot['kind']>;
+  mediaType?: 'image' | 'video';
+  label: string;
+  url: string;
+  view?: SalesProductImageView;
+}
+
 export const SALES_PRODUCT_IMAGE_VIEWS: readonly SalesProductImageView[] = ['front', 'back', 'detail', 'worn', 'flat'];
 
 export const SALES_IMAGE_VIEW_LABELS: Record<SalesProductImageView, string> = {
@@ -44,6 +56,6 @@ export const SALES_IMITATION_MODE_LABELS: Record<SalesImitationMode, { title: st
   },
   depth_imitation: {
     title: '脚本＋深度视频',
-    subtitle: '结合脚本关联的深度视频参考动作与运镜，人物、商品与场景以所选图片为准。',
+    subtitle: '深度视频仅参考动作与节奏；运镜、景别和表情按分镜，人物、商品与场景按所选图片。',
   },
 };

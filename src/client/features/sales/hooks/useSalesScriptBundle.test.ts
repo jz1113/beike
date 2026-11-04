@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeScriptTemplate } from '@shared/domain/sales';
 import { submitDepthVideo, pollDepthVideoTask } from '@client/shared/api/generation/depthGeneration';
-import { analyzeReferenceVideo, fetchScriptAnalysisPrompt, listSalesScripts, patchSalesScript, saveSalesScript, type StoredSalesScript } from '../api/salesScripts';
+import { analyzeReferenceVideo, fetchScriptAnalysisPrompt, listSalesScripts, patchSalesScript, saveSalesScript, type SalesScriptDraftResult, type StoredSalesScript } from '../api/salesScripts';
 import { readSalesDepthReceipt } from '../api/salesDepth';
 import { readScriptBundleJob, saveScriptBundleJob, type SalesScriptBundleJob } from '../model/salesScriptBundle';
 import { useSalesScriptBundle } from './useSalesScriptBundle';
 
-const hooks = vi.hoisted(() => ({ index: 0, slots: [] as unknown[], effects: [] as (() => unknown)[], paused: [] as unknown[] }));
+const hooks = vi.hoisted(() => ({ index: 0, slots: [] as unknown[], effects: [] as (() => unknown)[], paused: [] as SalesScriptBundleJob[], removed: [] as SalesScriptBundleJob[] }));
 vi.mock('react', () => ({
   useRef: (initial: unknown) => {
     const index = hooks.index++;
@@ -23,7 +23,11 @@ vi.mock('react', () => ({
     return [hooks.slots[index], (next: T) => { hooks.slots[index] = next; }];
   },
 }));
-vi.mock('../model/salesScriptBundle', () => ({ readScriptBundleJob: vi.fn(), saveScriptBundleJob: vi.fn(), readPausedScriptBundles: () => hooks.paused, savePausedScriptBundles: (jobs: unknown[]) => { hooks.paused = jobs; } }));
+vi.mock('../model/salesScriptBundle', () => ({ readScriptBundleJob: vi.fn(), saveScriptBundleJob: vi.fn(), readPausedScriptBundles: () => hooks.paused, readRemovedScriptBundles: () => hooks.removed, savePausedScriptBundles: (jobs: SalesScriptBundleJob[]) => { hooks.paused = jobs; },
+  moveScriptBundleProgress: (record: string | SalesScriptBundleJob, undo = false) => { const id = typeof record === 'string' ? record : record.operationId; const source = undo ? hooks.removed : hooks.paused; const item = typeof record === 'string' ? source.find((entry) => entry.operationId === id) : record;
+    hooks.paused = hooks.paused.filter((entry) => entry.operationId !== id); hooks.removed = hooks.removed.filter((entry) => entry.operationId !== id);
+    if (item) (undo ? hooks.paused : hooks.removed).push(item); return { jobs: hooks.paused, removed: hooks.removed }; },
+  purgeRemovedScriptBundles: (ids: string[]) => { hooks.removed = hooks.removed.filter((entry) => !ids.includes(entry.operationId)); return hooks.removed; } }));
 vi.mock('../api/salesScripts', () => ({ analyzeReferenceVideo: vi.fn(), fetchScriptAnalysisPrompt: vi.fn(), listSalesScripts: vi.fn(), patchSalesScript: vi.fn(), saveSalesScript: vi.fn() }));
 vi.mock('../api/salesDepth', () => ({ readSalesDepthReceipt: vi.fn(), fetchSalesActionFile: vi.fn() }));
 vi.mock('@client/shared/api/generation/depthGeneration', () => ({ submitDepthVideo: vi.fn(), pollDepthVideoTask: vi.fn() }));
@@ -41,7 +45,7 @@ function useHarness() {
 }
 async function settle() { for (let i = 0; i < 40; i += 1) await Promise.resolve(); }
 beforeEach(() => {
-  hooks.index = 0; hooks.slots = []; hooks.effects = []; hooks.paused = [];
+  hooks.index = 0; hooks.slots = []; hooks.effects = []; hooks.paused = []; hooks.removed = [];
   vi.resetAllMocks();
   vi.mocked(readScriptBundleJob).mockReturnValue(null);
   vi.mocked(listSalesScripts).mockResolvedValue([]);
@@ -55,8 +59,9 @@ beforeEach(() => {
 describe('combined script and depth import', () => {
   it('reuses a recovered response only when its analysis prompt version is current', async () => {
     vi.mocked(listSalesScripts).mockResolvedValue([{ ...item, id: 'old-script', promptVersion: 'v0', status: 'verified' }, item]);
+    vi.mocked(analyzeReferenceVideo).mockResolvedValueOnce({script, existingId: item.id, model: 'model', promptVersion:'v1', videoHash:'hash', cached:true});
     useHarness().start(item.videoUrl, '转身', 'model', file); await settle();
-    expect(analyzeReferenceVideo).not.toHaveBeenCalled();
+    expect(analyzeReferenceVideo).toHaveBeenCalledTimes(1);
     expect(onAnalysis).toHaveBeenCalledWith(expect.objectContaining({ existingId: item.id, promptVersion: 'v1', cached: true }), item.videoUrl);
     expect(patchSalesScript).not.toHaveBeenCalledWith('old-script', expect.anything());
   });
@@ -69,9 +74,9 @@ describe('combined script and depth import', () => {
   });
   it('does not fall back to an existing script when current prompt settings cannot be read', async () => {
     vi.mocked(listSalesScripts).mockResolvedValue([item]);
-    vi.mocked(fetchScriptAnalysisPrompt).mockRejectedValue(new Error('提示词设置暂不可用'));
+    vi.mocked(analyzeReferenceVideo).mockRejectedValue(new Error('提示词设置暂不可用'));
     useHarness().start(item.videoUrl, '转身', 'model', file); await settle();
-    expect(analyzeReferenceVideo).not.toHaveBeenCalled();
+    expect(analyzeReferenceVideo).toHaveBeenCalledTimes(1);
     expect(onAnalysis).not.toHaveBeenCalled();
     expect(useHarness().job).toMatchObject({ scriptId: '', analysisError: '提示词设置暂不可用' });
   });
@@ -81,7 +86,7 @@ describe('combined script and depth import', () => {
       { ...item, id: 'unvalidated-script', analysisCacheEligible: undefined, status: 'verified' },
     ]);
     useHarness().start(item.videoUrl, '转身', 'model', file); await settle();
-    expect(analyzeReferenceVideo).toHaveBeenCalledExactlyOnceWith(item.videoUrl, 'model', expect.any(AbortSignal));
+    expect(analyzeReferenceVideo).toHaveBeenCalledExactlyOnceWith(item.videoUrl, 'model', expect.any(AbortSignal), false, true, expect.any(String));
     expect(onAnalysis).toHaveBeenCalledWith(expect.objectContaining({ existingId: item.id }), item.videoUrl);
     expect(patchSalesScript).not.toHaveBeenCalledWith('malformed-script', expect.anything());
     expect(patchSalesScript).not.toHaveBeenCalledWith('unvalidated-script', expect.anything());
@@ -95,6 +100,22 @@ describe('combined script and depth import', () => {
     expect(submitDepthVideo).toHaveBeenCalledTimes(1);
     expect(patchSalesScript).toHaveBeenCalledWith(item.id, expect.objectContaining({ depthVideoUrl: '/storage/depth.mp4' }));
     expect(vi.mocked(patchSalesScript).mock.calls.every(([, patch]) => !patch.script && !patch.status)).toBe(true);
+  });
+  it('keeps an old linked depth visible until an explicitly restarted conversion succeeds', async () => {
+    let stored = { ...item, depthVideoUrl: '/storage/old-depth.mp4', depthTaskId: 'old-task', depthOperationId: 'old-operation' };
+    vi.mocked(patchSalesScript).mockImplementation(async (_id, patch) => { stored = { ...stored, ...patch }; return stored; });
+    let finish!: (value: Awaited<ReturnType<typeof pollDepthVideoTask>>) => void;
+    vi.mocked(pollDepthVideoTask).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    useHarness().start(stored.videoUrl, stored.title, stored.model, file,
+      { ...stored, depthVideoUrl: '', depthTaskId: '', depthOperationId: '' });
+    await settle();
+    expect(submitDepthVideo).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(submitDepthVideo).mock.calls[0][4]).not.toBe('old-operation');
+    expect(onSaved).toHaveBeenLastCalledWith(expect.objectContaining({ depthVideoUrl: '/storage/old-depth.mp4' }));
+    expect(patchSalesScript).not.toHaveBeenCalledWith(item.id, expect.objectContaining({ depthVideoUrl: '' }));
+    finish({ status: 'SUCCESS', resultUrl: '/storage/new-depth.mp4' }); await settle();
+    expect(onSaved).toHaveBeenLastCalledWith(expect.objectContaining({ depthVideoUrl: '/storage/new-depth.mp4' }));
+    expect(analyzeReferenceVideo).not.toHaveBeenCalled();
   });
   it('starts both tasks once and links completed results without waiting to review the script', async () => {
     let finish!: (value: Awaited<ReturnType<typeof pollDepthVideoTask>>) => void;
@@ -177,9 +198,9 @@ describe('combined script and depth import', () => {
     vi.mocked(fetchScriptAnalysisPrompt).mockResolvedValue({ success: true, prompt: '新规则', promptVersion: 'v2' });
     await useHarness().retryAnalysis(); await settle();
     expect(analyzeReferenceVideo).toHaveBeenCalledTimes(1);
-    expect(fetchScriptAnalysisPrompt).toHaveBeenCalledTimes(1);
+    expect(fetchScriptAnalysisPrompt).not.toHaveBeenCalled();
     expect(saveSalesScript).toHaveBeenCalledTimes(2);
-    expect(vi.mocked(saveSalesScript).mock.calls[1][0].id).toBe(saveId);
+    expect(vi.mocked(saveSalesScript).mock.calls[1][0]).toMatchObject({ id: saveId, status: 'verified' });
     expect(vi.mocked(saveSalesScript).mock.calls[1][0].promptVersion).toBe('v1');
     expect(useHarness().job).toBeNull();
   });
@@ -212,6 +233,53 @@ describe('combined script and depth import', () => {
     expect(submitDepthVideo).toHaveBeenCalledTimes(1);
     expect(useHarness().job).toBeNull();
     expect(useHarness().paused).toEqual([]);
+  });
+  it('retains the active job when clearing its checkpoint during pause fails', () => {
+    const pending = { ...checkpoint, depthState: 'prepared' as const, scriptId: '' };
+    vi.mocked(readScriptBundleJob).mockReturnValue(pending);
+    vi.mocked(saveScriptBundleJob).mockImplementation((job) => { if (!job) throw new Error('quota'); });
+    useHarness().pause();
+    expect(useHarness().job).toEqual(pending);
+    expect(useHarness().error).toContain('无法暂存进度');
+    expect(useHarness().paused).toEqual([]);
+  });
+  it('removes active progress, ignores late analysis, and restores the checkpoint on undo', async () => {
+    let finish!: (value: SalesScriptDraftResult) => void;
+    vi.mocked(analyzeReferenceVideo).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    useHarness().start(item.videoUrl, '转身', 'model', file);
+    await settle();
+    const snapshot = useHarness().job!;
+    useHarness().removeCurrent(snapshot.operationId);
+    expect(saveScriptBundleJob).toHaveBeenLastCalledWith(null);
+    finish({ script, existingId: item.id, model: 'model', promptVersion: 'v1', videoHash: 'hash' });
+    await settle();
+    expect(useHarness().job).toBeNull();
+    expect(useHarness().removed).toEqual([snapshot]);
+    expect(onAnalysis).not.toHaveBeenCalled();
+    useHarness().undoRemovePaused(snapshot.operationId);
+    expect(useHarness().paused).toEqual([snapshot]);
+  });
+  it('removes only the selected paused job and allows undo without touching saved scripts', () => {
+    const other = { ...checkpoint, operationId: 'other-operation', name: '另一个' };
+    hooks.paused = [checkpoint, other];
+    useHarness().removePaused(checkpoint.operationId);
+    expect(useHarness().paused).toEqual([other]);
+    expect(useHarness().removed).toEqual([checkpoint]);
+    expect(patchSalesScript).not.toHaveBeenCalled();
+    useHarness().undoRemovePaused(checkpoint.operationId);
+    expect(useHarness().paused).toEqual([other, checkpoint]);
+    expect(useHarness().removed).toEqual([]);
+  });
+  it('does not restore a paused job deleted while its script lookup is pending', async () => {
+    hooks.paused = [checkpoint];
+    let resolveList!: (items: StoredSalesScript[]) => void;
+    vi.mocked(listSalesScripts).mockReturnValueOnce(new Promise((resolve) => { resolveList = resolve; }));
+    const pending = useHarness().restore(checkpoint);
+    useHarness().removePaused(checkpoint.operationId);
+    resolveList([item]); await pending;
+    expect(useHarness().job).toBeNull();
+    expect(useHarness().removed).toEqual([checkpoint]);
+    expect(saveScriptBundleJob).not.toHaveBeenCalled();
   });
   it('allows scripts over 30 seconds to complete without submitting unsupported depth', async () => {
     useHarness().start(item.videoUrl, '长视频', 'model', file, undefined, 60); await settle();

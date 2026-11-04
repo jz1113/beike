@@ -4,6 +4,7 @@ import {
   API_REMOVED_PROVIDERS_KEY,
   DEFAULT_PROVIDERS,
   loadStoredProviders,
+  sameProviderRoute,
   type ApiProvider,
 } from './apiProviderTypes';
 
@@ -67,6 +68,14 @@ describe('loadStoredProviders', () => {
     expect(loaded.map(item => item.id)).toEqual(['openai_official', 'deepseek_official', 'comfly_gateway']);
     expect(loaded.find(item => item.id === 'openai_official')).toMatchObject({ apiKey: 'sk-live', providerType: 'openai' });
     expect(store.has(API_REMOVED_PROVIDERS_KEY)).toBe(false);
+  });
+
+  it('reuses the same OpenAI route without merging separate accounts or protocols', () => {
+    const first = provider({id:'one',name:'渠道一',baseUrl:'https://example.test/v1',apiKey:'test-one'});
+    const other = {...first, baseUrl:'https://example.test/'};
+    expect(sameProviderRoute(first,other)).toBe(true);
+    expect(sameProviderRoute(first,{...other,apiKey:'test-two'})).toBe(false);
+    expect(sameProviderRoute(first,{...other,providerType:'anthropic'})).toBe(false);
   });
 
   it('keeps providers the user added', () => {

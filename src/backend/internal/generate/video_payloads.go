@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 	"strings"
+
+	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
 func viduResolution(resolution string) string {
@@ -160,7 +162,7 @@ func wanOfficialPayload(model, prompt, mode, ratio, resolution string, duration 
 	}
 }
 
-func prepareWanMedia(ctx context.Context, body map[string]any, workspace string, production bool) error {
+func prepareWanMedia(ctx context.Context, root string, body map[string]any, workspace string, production bool, storeCfg *storage.ObjectConfig) error {
 	input, _ := body["input"].(map[string]any)
 	if input == nil {
 		return nil
@@ -186,6 +188,27 @@ func prepareWanMedia(ctx context.Context, body map[string]any, workspace string,
 			}
 			media[index]["url"] = converted
 			imageIndex++
+		case "reference_video":
+			if strings.HasPrefix(raw, "/storage/") {
+				if storeCfg == nil {
+					return imageEditPrepareError{"当前未配置对象存储（OSS/R2/COS/S3）。万相参考视频需要公网可访问链接，请在【设置 -> 对象存储】中完成配置后重试。"}
+				}
+				uploaded, err := uploadVideoReference(ctx, raw, workspace, production, *storeCfg)
+				if err != nil {
+					return err
+				}
+				raw = uploaded
+			}
+			if !strings.HasPrefix(strings.ToLower(raw), "https://") && !strings.HasPrefix(strings.ToLower(raw), "http://") {
+				return imageEditPrepareError{"万相参考视频需要公网可访问链接或当前工作区的已上传视频"}
+			}
+			media[index]["url"] = raw
+		case "reference_audio":
+			resolved, err := resolveWanAudioRef(ctx, root, raw, workspace, production, storeCfg)
+			if err != nil {
+				return err
+			}
+			media[index]["url"] = resolved
 		default:
 			if !strings.HasPrefix(raw, "https://") && !strings.HasPrefix(raw, "http://") {
 				return imageEditPrepareError{"参考素材需要可访问的公网地址"}
@@ -300,7 +323,10 @@ func klingOfficialPayload(model, prompt, mode, ratio, resolution string, duratio
 	return body
 }
 
-func minimaxOfficialPayload(model, prompt, mode, ratio, resolution string, duration int, images []string, audio, audioSet, watermark bool) map[string]any {
+func minimaxOfficialPayload(model, prompt, mode, ratio, resolution string, duration int, images, videos []string, audio, audioSet, watermark bool) map[string]any {
+	if minimaxH3(model) {
+		return minimaxH3Payload(model, prompt, mode, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
+	}
 	body := flatVideoPayload(model, prompt, ratio, resolution, duration, images, nil, audio, audioSet && audio, watermark)
 	switch mode {
 	case "text":

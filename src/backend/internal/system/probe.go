@@ -12,11 +12,14 @@ import (
 )
 
 type VideoProbe struct {
-	Duration float64
-	FPS      float64
-	Width    int
-	Height   int
-	HasAudio bool
+	Duration      float64
+	VideoDuration float64
+	Codec         string
+	PixelFormat   string
+	FPS           float64
+	Width         int
+	Height        int
+	HasAudio      bool
 }
 
 func ProbeVideo(root, path string) (VideoProbe, error) {
@@ -39,6 +42,9 @@ func ProbeVideo(root, path string) (VideoProbe, error) {
 func parseProbe(raw []byte) (VideoProbe, error) {
 	var parsed struct {
 		Streams []struct {
+			Codec        string `json:"codec_name"`
+			PixelFormat  string `json:"pix_fmt"`
+			Duration     string `json:"duration"`
 			CodecType    string `json:"codec_type"`
 			Width        int    `json:"width"`
 			Height       int    `json:"height"`
@@ -55,6 +61,8 @@ func parseProbe(raw []byte) (VideoProbe, error) {
 	duration, _ := strconv.ParseFloat(strings.TrimSpace(parsed.Format.Duration), 64)
 	width, height := 0, 0
 	avgRate, frameRate := "", ""
+	var videoDuration float64
+	var codec, pixel string
 	foundVideo := false
 	hasAudio := false
 	for _, stream := range parsed.Streams {
@@ -66,6 +74,8 @@ func parseProbe(raw []byte) (VideoProbe, error) {
 			continue
 		}
 		foundVideo = true
+		videoDuration, _ = strconv.ParseFloat(stream.Duration, 64)
+		codec, pixel = stream.Codec, stream.PixelFormat
 		width, height = stream.Width, stream.Height
 		avgRate, frameRate = stream.AvgFrameRate, stream.RFrameRate
 	}
@@ -79,7 +89,7 @@ func parseProbe(raw []byte) (VideoProbe, error) {
 	if fps <= 0 {
 		fps = 24
 	}
-	return VideoProbe{Duration: duration, FPS: fps, Width: width, Height: height, HasAudio: hasAudio}, nil
+	return VideoProbe{Duration: duration, VideoDuration: videoDuration, Codec: codec, PixelFormat: pixel, FPS: fps, Width: width, Height: height, HasAudio: hasAudio}, nil
 }
 
 func parseFrameRate(value string) float64 {

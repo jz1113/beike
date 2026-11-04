@@ -1,9 +1,5 @@
-import type { SalesBeatPurpose, SalesScriptBeat, SalesScriptDomain } from '@shared/domain/sales';
+import type { SalesScriptBeat, SalesScriptDomain } from '@shared/domain/sales';
 import type { BeatAddress } from './salesScriptEditor';
-
-const PURPOSE_LABELS: Record<SalesBeatPurpose, string> = {
-  hook: '开场吸引', showcase: '商品展示', proof: '卖点细节', usage: '使用场景', closing: '结尾收束', other: '动作过渡',
-};
 
 export function formatStoryboardTime(seconds: number): string {
   const ticks = Math.round(Math.max(0, seconds) * 10);
@@ -14,57 +10,136 @@ export function formatStoryboardTime(seconds: number): string {
 export interface ScriptStoryboardSegment {
   address: BeatAddress;
   index: number;
-  title: string;
   range: string;
   beat: SalesScriptBeat;
-  fields: Array<{ label: string; text: string }>;
+  observedAction: string;
+  timeEstimated: boolean;
   prompt: string;
 }
 
-/** Read and export the same timeline, including continuous action beats within a real shot. */
-export function buildScriptStoryboard(script: SalesScriptDomain): ScriptStoryboardSegment[] {
-  const style = [script.visualSpec.styleSummary, script.visualSpec.lighting].filter(Boolean).join('，');
-  const subjectFallback = { presenter: '出镜人物展示{{商品}}', hands: '手部与{{商品}}', product: '{{商品}}', mixed: '出镜主体与{{商品}}' }[script.format];
-  // Only reusable descriptions enter the prompt; source dialogue and raw observations stay in the reference record.
-  const neutralize = (text: string) => {
-    const terms = script.sourceExclusions.flatMap((item) => item.term.split(/[、，,/；;\s]+/))
-      .map((term) => term.trim()).filter((term) => term.length >= 2).sort((a, b) => b.length - a.length);
-    return terms.reduce((result, term) => result.split(term).join('{{商品}}'), text);
-  };
-  let index = 0;
-  return script.shots.flatMap((shot, shotIndex) => shot.beats.map((beat, beatIndex) => {
-    const title = shot.beats.length === 1 ? shot.summary || PURPOSE_LABELS[beat.purpose] : PURPOSE_LABELS[beat.purpose];
-    const camera = [beat.shotSize, beat.camera || script.visualSpec.cameraFeel].filter(Boolean).join('，');
-    const fields = [
-      { label: '画面风格', text: style || '未记录画面风格' },
-      { label: '主体', text: beat.subject || subjectFallback },
-      { label: '动作描述', text: beat.actionTemplate || '待补充动作描述' },
-      { label: '镜头变化', text: camera || '未记录镜头变化' },
-      { label: '眼神表情', text: beat.expression || (script.format === 'product' || script.format === 'hands' ? '无人物面部出镜' : '未记录眼神表情') },
-    ];
-    if (beat.scene) fields.push({ label: '场景与光线', text: beat.scene });
-    if (beat.transition) fields.push({ label: '衔接方式', text: beat.transition });
-    const speech = !script.audioAvailable || beat.voice.mode === 'none'
-      ? '无口播，保留自然动作节奏'
-      : `${beat.voice.mode === 'voiceover' ? '画外旁白，人物不做说话口型' : '人物自然口播'}${beat.voice.linePattern ? `，按「${beat.voice.linePattern}」填入当前商品已核实的台词` : '，台词使用当前商品已核实的资料'}`;
-    const prompt = neutralize([
-      `${script.visualSpec.aspectRatio}画幅，时长${Math.round((beat.end - beat.start) * 10) / 10}秒`,
-      style, beat.subject || subjectFallback, beat.scene, beat.actionTemplate, camera,
-      beat.expression, beat.transition, script.visualSpec.oneTake ? '保持一镜到底的动作衔接，机位与运镜按段落记录执行，不额外增加镜头运动' : '', speech,
-      '商品外观以当前商品参考图为准，无水印、无额外字幕',
-    ].filter(Boolean).join('。') + '。');
-    return { address: { shot: shotIndex, beat: beatIndex }, index: ++index, title,
-      range: `${formatStoryboardTime(beat.start)} - ${formatStoryboardTime(beat.end)}`, beat, fields, prompt };
-  }));
+function shotNumber(n: number): string {
+  const digits = '零一二三四五六七八九';
+  if (n < 10) return digits[n];
+  const tens = Math.floor(n / 10);
+  return (tens === 1 ? '' : digits[tens]) + '十' + (n % 10 ? digits[n % 10] : '');
 }
 
-export function exportScriptStoryboard(script: SalesScriptDomain): string {
-  return [script.title, script.overview,
-    script.visualSpec.oneTake ? '本视频为一镜到底，以下按动作和运镜变化划分分镜段落，不代表真实切镜。' : '以下按镜头切换与动作变化依次拆解。',
-    ...buildScriptStoryboard(script).map((segment) => [
-      `分镜 ${segment.index}：${segment.title}（${segment.range}）`,
-      ...segment.fields.map((field) => `• ${field.label}：${field.text}`),
-      '即梦生成提示词（中文）：', segment.prompt,
-    ].join('\n')),
+function observations(...values: (string | undefined)[]): string {
+  const recorded = values.map((value) => value?.trim()).filter((value): value is string => Boolean(value && !value.includes('{{')));
+  return recorded.filter((value, index) => value !== recorded[index - 1]).reduce((text, value) => text + (text && !/[。！？]$/.test(text) ? '。' : '') + value, '');
+}
+
+// Older model responses sometimes used English shot-size tokens.
+const shotSizeLabels: Record<string, string> = {
+  full_shot: '全身景', wide_shot: '远景', long_shot: '远景', medium_shot: '中景',
+  medium_close_up: '近景', close_up: '特写', extreme_close_up: '大特写',
+};
+
+export function storyboardStyle(script: SalesScriptDomain) {
+  return observations(script.visualSpec.styleSummary, script.visualSpec.lighting) || observations(script.overview) || '未记录总体风格';
+}
+
+export function buildScriptStoryboard(script: SalesScriptDomain) {
+  let index = 0;
+  return script.shots.map((shot, shotIndex) => {
+    const { analysis, beats } = shot;
+    const segments = beats.map((beat, beatIndex): ScriptStoryboardSegment => {
+      const camera = [beat.shotSize, beat.camera || script.visualSpec.cameraFeel].filter(Boolean).join('，');
+      const style = [script.visualSpec.styleSummary, script.visualSpec.lighting].filter(Boolean).join('，');
+      const records = [
+        ['画面风格', style], ['主体', beat.subject], ['可复用动作模板', beat.actionTemplate || beat.action],
+        ['镜头变化', camera], ['场景与光线', beat.scene], ['眼神表情', beat.expression],
+        ['衔接方式', beat.transition], ['原片动作记录', beat.referenceActionRaw],
+        ['原片台词记录', beat.voice.text], ['台词结构记录', beat.voice.linePattern], ['原片字幕记录', beat.subtitle],
+      ];
+      const prompt = [
+        `画幅：${script.visualSpec.aspectRatio}；本段时长：${Math.round((beat.end - beat.start) * 10) / 10}秒`,
+        `镜头结构记录：${script.visualSpec.oneTake ? '一镜到底' : '多镜头'}`,
+        `声音模式记录：${beat.voice.mode}；音轨可用：${script.audioAvailable ? '是' : '否'}`,
+        ...records.filter(([, text]) => text).map(([label, text]) => `${label}：${text}`),
+      ].join('\n');
+      return { address: { shot: shotIndex, beat: beatIndex }, index: ++index, beat, prompt,
+        observedAction: observations(beat.referenceActionRaw) || observations(beat.shows) || '未记录本段原片动作',
+        timeEstimated: beat.estimated || Boolean(script.sampleTimesSec?.length),
+        range: `${formatStoryboardTime(beat.start)} - ${formatStoryboardTime(beat.end)}` };
+    });
+    return segments.map((segment) => {
+      const beat = segment.beat;
+      const single = beats.length === 1;
+      const fields = [
+        { label: '画面风格', text: observations(beat.scene) || observations(analysis?.style) || observations(script.visualSpec.styleSummary) },
+        { label: '主体', text: observations(beat.subject) || observations(analysis?.subject) },
+        { label: '动作描述', text: observations(beat.referenceActionRaw, beat.shows) || (single ? observations(analysis?.action) : '') },
+        { label: '镜头变化', text: observations([beat.shotSize, beat.camera].filter(Boolean).join('，')) || observations(analysis?.camera) },
+        { label: '人物神态', text: observations(beat.expression) || observations(analysis?.expression) },
+      ].map((field) => ({ ...field, text: field.text || '未记录' }));
+      const shotId = String(shotIndex + 1).padStart(2, '0');
+      // Older scripts often used a topic label for shows. Prefer the recorded action.
+      const rawSize = observations(beat.shotSize).split(/[，。；]/u)[0];
+      const size = shotSizeLabels[rawSize.toLowerCase().replace(/[- ]/g, '_')] ?? rawSize;
+      const setup = (observations(beat.camera) || observations(analysis?.camera)).split(/[。；]/u)[0];
+      const camera = observations(beat.cameraLabel) || [...new Set([size, setup].filter(Boolean))].join('，') || '未记录';
+      const action = observations(beat.referenceActionRaw) || observations(beat.shows)
+        || (single ? observations(shot.summary, analysis?.action) : '') || '未记录';
+      const notes = [
+        ['主体', beat.subject], ['场景', beat.scene], ['神态', beat.expression],
+        ['台词', script.audioAvailable && !script.sampleTimesSec?.length ? beat.voice.text : ''],
+        ['字幕', beat.subtitle], ['衔接', beat.transition],
+      ].map(([label,value]) => ({label, text: observations(value)}))
+        .filter(note => note.text && !/^(?:none|n\/a|无|未记录|无变化)[。.]?$/i.test(note.text) && !action.includes(note.text));
+      const duration = Math.round((beat.end - beat.start) * 10) / 10;
+      return { number: single ? shotId : `${shotId}.${segment.address.beat + 1}`, camera, action, notes,
+        sectionLabel: beat.sectionLabel || '', duration, index: segment.index, title: `分镜${shotNumber(segment.index)}`, range: segment.range,
+        estimated: segment.timeEstimated || shot.estimated, fields, segments: [segment] };
+    });
+  }).flat();
+}
+
+export const storyboardColumns = ['镜号', '时间 / 时长', '画面与动作', '镜头方式'] as const;
+
+type StoryboardRow = ReturnType<typeof buildScriptStoryboard>[number];
+
+export function commonStoryboardNotes(rows: StoryboardRow[]) {
+  if (rows.length < 2) return [];
+  return rows[0].notes.filter(({label,text}) =>
+    ['主体', '场景', '字幕'].includes(label) && rows.every(row => row.notes.some(note => note.label === label && note.text === text)));
+}
+
+export function rowStoryboardNotes(row: StoryboardRow, common: StoryboardRow['notes']) {
+  return row.notes.filter(note => !common.some(shared => shared.label === note.label));
+}
+
+export function storyboardSections(rows: StoryboardRow[]) {
+  const sections: {label: string; rows: StoryboardRow[]}[] = [];
+  for (const row of rows) {
+    const previous = sections.at(-1);
+    if (previous && previous.label === row.sectionLabel) previous.rows.push(row);
+    else sections.push({label: row.sectionLabel, rows: [row]});
+  }
+  return sections;
+}
+
+export function sectionCaption(section: ReturnType<typeof storyboardSections>[number], index: number) {
+  const first = section.rows[0].segments[0].beat, last = section.rows.at(-1)!.segments[0].beat;
+  return `第 ${index+1} 段 · ${section.label || '全片'}（${first.start}–${last.end} 秒，${section.rows.length} 行）`;
+}
+
+export function exportScriptStoryboard(script: SalesScriptDomain, shots = buildScriptStoryboard(script)): string {
+  const row = (cells: readonly string[]) => '| ' + cells.map((cell) => cell.replaceAll('|', '\\|').replace(/\s*\r?\n\s*/g, ' ')).join(' | ') + ' |';
+  const common = commonStoryboardNotes(shots);
+  const tables = storyboardSections(shots).map((section, i) => [
+    sectionCaption(section,i), '', row(storyboardColumns), row(storyboardColumns.map(() => '---')),
+    ...section.rows.map(shot => row([shot.number, shot.range+'（'+(shot.estimated ? '约 ' : '')+shot.duration+' 秒）',
+      [shot.action, ...rowStoryboardNotes(shot, common).map(note => note.label+'：'+note.text)].join('　'), shot.camera])),
+  ].join('\n'));
+  return [`### 分镜总览（${script.durationSec} 秒 · ${script.shots.length} 个镜头 · ${shots.length} 行）`,
+    ...(shots.some(shot => shot.estimated) ? ['约数表示动作起止时间为估计。'] : []),
+    ...common.map(note => '全片'+note.label+'：'+note.text), ...tables, '### 视频总体风格', storyboardStyle(script)].join('\n\n');
+}
+
+export function exportScriptRecords(script: SalesScriptDomain, shots = buildScriptStoryboard(script)): string {
+  return [script.title, script.overview, exportScriptStoryboard(script, shots),
+    ...shots.map((shot) => [`${shot.title} · ${shot.range}`, ...shot.fields.map((f) => `${f.label}：${f.text}`), ...shot.segments.map((s) => s.prompt)].join('\n')),
+    ...script.sourceExclusions.map((item) => `原片专属元素记录：${item.type}：${item.term}（${item.replacementRule}）`),
   ].filter(Boolean).join('\n\n');
 }

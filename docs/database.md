@@ -4,6 +4,8 @@
 
 当前 schema、版本登记与官方种子统一由 `src/backend/internal/platform/database/migrate` 管理：`versions.go` 定义顺序和 checksum，`sources` 保存嵌入源文件。运行时使用 `_BeikeMigration` 账本。新增变更追加版本，不能修改已发布源文件来绕过校验。新库初始化、已有库升级和 `pnpm db:migrate` 使用同一条 Go 迁移链，升级前自动生成快照。
 
+`20261101_04_sales_products` 曾发布过仅末尾空行不同的两个脚本，迁移链兼容这两个已核实等价的 checksum，并保留数据库中原有的登记值。未知 checksum 或未知版本仍阻止启动，不通过改写或删除账本修复。
+
 不再保留第二套历史 SQL。早期增改表已纳入当前基线，后续脚本对应已登记迁移；旧工具链脚本也不能独立组成完整初始化链。历史源码从 Git 查询，当前 Go 迁移源文件及 checksum 保持不变。
 
 根 `database` 仅兼容已有本地数据，整目录忽略提交；新检出无需创建。`database/dev.db` 是已有本地开发数据，`database/database-backups` 保存该库的历史快照与恢复文件，两者保持原位。日常启动沿用系统应用数据目录中的 `azhuo.db`，不把旧开发库自动迁入，也不自动删除。
@@ -22,6 +24,12 @@
 维护命令不加载根目录 `.env` 的旧 `file:./dev.db` 配置，也不在运行库缺失时自动选择 `database/dev.db`。需要操作旧库时明确传参，避免迁移、备份或导出作用在错误的数据文件上。`seed:export` 同时兼容旧的 `AZHUO_DB_PATH` 文件参数环境变量。
 
 macOS 系统应用数据目录为 `~/Library/Application Support/com.azhuo.workbench`；Windows 为 `%APPDATA%/com.azhuo.workbench`；Linux 为 `~/.local/share/com.azhuo.workbench`。生产数据目录以服务环境配置为准。
+
+迁移 `20261103_03_library_preferences` 新增 `WorkspaceLibraryPreferences`，按工作区分别保存首页资产库入口和跨工作区共享开关。没有设置记录时，首页显示资产库，共享关闭。
+
+迁移 `20261103_02_sales_prompt_template_version` 给提示词编辑记录加上所属模板版本。读取工作区时清除已退役或与当前模板版本不符的编辑记录，任务和脚本历史保留。
+
+迁移 `20261103_01_sales_media_jobs` 新增按工作区隔离的 `SalesMediaJob` 和参考视频分析配置指纹。旧参考脚本继续可读、可编辑。缺少指纹的历史拆解不会自动作为新配置的缓存。服务端任务记录包含阶段回执和恢复所需的资料；模型凭证在执行或重试请求中提供。
 
 ## 检查、备份与恢复
 

@@ -51,6 +51,7 @@ type saveScriptBody struct {
 }
 
 type patchScriptBody struct {
+	ExpectedVersion  *int           `json:"expectedVersion"`
 	VideoURL         *string        `json:"videoUrl"`
 	DepthVideoURL    *string        `json:"depthVideoUrl"`
 	DepthTaskID      *string        `json:"depthTaskId"`
@@ -98,6 +99,7 @@ func scanReferenceScript(scanner interface{ Scan(...any) error }) (storedReferen
 		return item, err
 	}
 	_ = json.Unmarshal([]byte(raw), &item.Script)
+	discardSourcePreviewLinks(item.Script)
 	if item.Script == nil {
 		item.Script = map[string]any{}
 	}
@@ -212,6 +214,7 @@ func createOrReplaceScript(w http.ResponseWriter, r *http.Request, db *sql.DB, w
 		title = string([]rune(title)[:120])
 	}
 	body.Script["title"] = title
+	discardSourcePreviewLinks(body.Script)
 	raw, _ := json.Marshal(body.Script)
 	now := time.Now().UTC().Format(time.RFC3339)
 	id := strings.TrimSpace(body.ID)
@@ -221,7 +224,7 @@ func createOrReplaceScript(w http.ResponseWriter, r *http.Request, db *sql.DB, w
 	format := validScriptFormat(check.Format)
 	voiceMode := validScriptVoiceMode(check.VoiceMode)
 	_, err = db.ExecContext(r.Context(), `INSERT INTO "SalesReferenceScript" ("id","workspaceId","title","videoUrl","videoHash","durationSec","format","voiceMode","status","scriptJson","model","promptVersion","version","useCount","lastUsedAt","createdAt","updatedAt","depthVideoUrl","depthTaskId","depthOperationId") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,0,'',?,?,?,?,?) ON CONFLICT("id") DO UPDATE SET "title"=excluded."title","videoUrl"=CASE WHEN excluded."videoUrl"<>'' THEN excluded."videoUrl" ELSE "SalesReferenceScript"."videoUrl" END,"depthVideoUrl"=CASE WHEN excluded."depthVideoUrl"<>'' THEN excluded."depthVideoUrl" ELSE "SalesReferenceScript"."depthVideoUrl" END,"depthTaskId"=CASE WHEN excluded."depthTaskId"<>'' THEN excluded."depthTaskId" ELSE "SalesReferenceScript"."depthTaskId" END,"depthOperationId"=CASE WHEN excluded."depthOperationId"<>'' THEN excluded."depthOperationId" ELSE "SalesReferenceScript"."depthOperationId" END,"videoHash"=CASE WHEN excluded."videoHash"<>'' THEN excluded."videoHash" ELSE "SalesReferenceScript"."videoHash" END,"durationSec"=excluded."durationSec","format"=excluded."format","voiceMode"=excluded."voiceMode","status"=excluded."status","scriptJson"=excluded."scriptJson","version"="SalesReferenceScript"."version"+1,"updatedAt"=excluded."updatedAt" WHERE "SalesReferenceScript"."workspaceId"=excluded."workspaceId"`,
-		id, workspace, title, strings.TrimSpace(body.VideoURL), strings.TrimSpace(body.VideoHash), check.DurationSec, format, voiceMode, status, string(raw), strings.TrimSpace(body.Model), strings.TrimSpace(body.PromptVersion), now, now, strings.TrimSpace(body.DepthVideoURL), strings.TrimSpace(body.DepthTaskID), strings.TrimSpace(body.DepthOperationID))
+		id, workspace, title, savedSource(workspace, strings.TrimSpace(body.VideoURL)), strings.TrimSpace(body.VideoHash), check.DurationSec, format, voiceMode, status, string(raw), strings.TrimSpace(body.Model), strings.TrimSpace(body.PromptVersion), now, now, strings.TrimSpace(body.DepthVideoURL), strings.TrimSpace(body.DepthTaskID), strings.TrimSpace(body.DepthOperationID))
 	if err != nil {
 		httpx.WriteJSON(w, 500, map[string]any{"success": false, "error": "保存参考脚本失败"})
 		return
@@ -286,6 +289,10 @@ func patchReferenceScript(w http.ResponseWriter, r *http.Request, db *sql.DB, wo
 		httpx.WriteJSON(w, 400, map[string]any{"success": false, "error": err.Error()})
 		return
 	}
+	if body.VideoURL != nil {
+		v := savedSource(workspace, *body.VideoURL)
+		body.VideoURL = &v
+	}
 	if body.Title == nil && body.Status == nil && body.Script == nil && !body.RecordUse {
 		patchScriptLinks(w, r, db, workspace, id, body)
 		return
@@ -302,7 +309,14 @@ func patchReferenceScript(w http.ResponseWriter, r *http.Request, db *sql.DB, wo
 		return
 	}
 	title, status := current.Title, current.Status
+	if body.ExpectedVersion != nil && *body.ExpectedVersion != current.Version {
+		mediaFail(w, 409, "脚本已有新版本，本次编辑已保留，请重新打开原稿核对")
+		return
+	}
 	versionIncrement := 0
+	if body.Title != nil || body.Status != nil {
+		versionIncrement = 1
+	}
 	durationSec, format, voiceMode := current.DurationSec, current.Format, current.VoiceMode
 	scriptMap := current.Script
 	if body.Title != nil {
@@ -340,10 +354,16 @@ func patchReferenceScript(w http.ResponseWriter, r *http.Request, db *sql.DB, wo
 	if body.RecordUse {
 		useIncrement = 1
 	}
+	discardSourcePreviewLinks(scriptMap)
 	raw, _ := json.Marshal(scriptMap)
-	if _, err := db.ExecContext(r.Context(), `UPDATE "SalesReferenceScript" SET "videoUrl"=COALESCE(?,"videoUrl"),"depthVideoUrl"=COALESCE(?,"depthVideoUrl"),"depthTaskId"=COALESCE(?,"depthTaskId"),"depthOperationId"=COALESCE(?,"depthOperationId"),"title"=?,"durationSec"=?,"format"=?,"voiceMode"=?,"status"=?,"scriptJson"=?,"version"="version"+?,"useCount"="useCount"+?,"lastUsedAt"=CASE WHEN ?=1 THEN ? ELSE "lastUsedAt" END,"updatedAt"=? WHERE "workspaceId"=? AND "id"=?`,
-		body.VideoURL, body.DepthVideoURL, body.DepthTaskID, body.DepthOperationID, title, durationSec, format, voiceMode, status, string(raw), versionIncrement, useIncrement, useIncrement, now, now, workspace, id); err != nil {
+	updated, err := db.ExecContext(r.Context(), `UPDATE "SalesReferenceScript" SET "videoHash"=CASE WHEN COALESCE(?,"videoUrl")!="videoUrl" THEN '' ELSE "videoHash" END,"videoUrl"=COALESCE(?,"videoUrl"),"depthVideoUrl"=COALESCE(?,"depthVideoUrl"),"depthTaskId"=COALESCE(?,"depthTaskId"),"depthOperationId"=COALESCE(?,"depthOperationId"),"title"=?,"durationSec"=?,"format"=?,"voiceMode"=?,"status"=?,"scriptJson"=?,"version"="version"+?,"useCount"="useCount"+?,"lastUsedAt"=CASE WHEN ?=1 THEN ? ELSE "lastUsedAt" END,"updatedAt"=? WHERE "workspaceId"=? AND "id"=? AND "version"=?`,
+		body.VideoURL, body.VideoURL, body.DepthVideoURL, body.DepthTaskID, body.DepthOperationID, title, durationSec, format, voiceMode, status, string(raw), versionIncrement, useIncrement, useIncrement, now, now, workspace, id, current.Version)
+	if err != nil {
 		httpx.WriteJSON(w, 500, map[string]any{"success": false, "error": "更新参考脚本失败"})
+		return
+	}
+	if n, _ := updated.RowsAffected(); n != 1 {
+		mediaFail(w, 409, "脚本版本已更新，请重新核对后保存")
 		return
 	}
 	writePatchedScript(w, r, db, workspace, id)

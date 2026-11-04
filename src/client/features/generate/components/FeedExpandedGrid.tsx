@@ -146,25 +146,25 @@ export default function FeedExpandedGrid({
               ) : (
                 /* 生成成功 (高清图片展示) */
                 <div className="relative w-full h-full">
-                  {isGenerateVideoTask(task) ? (
-                    <div className="w-full h-full cursor-pointer" onClick={() => onPreview(task, batch.tasks)} title="点击播放视频">
+                  <button type="button" aria-label={isGenerateVideoTask(task) ? '预览生成视频' : '预览生成图片'}
+                    className="block h-full w-full cursor-pointer focus-visible:outline-offset-[-3px]"
+                    onClick={() => onPreview(task, batch.tasks)}>
+                    {isGenerateVideoTask(task) ? (
                       <LazyVideoCover src={proxyMediaUrl(task.resultUrl!, { asVideo: true })} />
-                    </div>
-                  ) : <img
-                    src={getFeedImageUrl(task.resultUrl, { thumb: true, width: 640 })}
-                    alt=""
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      if (!target.dataset.hasRetried && task.resultUrl) {
-                        target.dataset.hasRetried = 'true';
-                        target.src = proxyMediaUrl(task.resultUrl);
-                      }
-                    }}
-                    className="w-full h-full object-cover cursor-pointer hover:scale-102 transition-transform duration-300 select-none"
-                    onClick={() => onPreview(task, batch.tasks)}
-                    title="点击放大查看"
-                  />}
+                    ) : <img
+                      src={getFeedImageUrl(task.resultUrl, { thumb: true, width: 640 })}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.dataset.hasRetried && task.resultUrl) {
+                          target.dataset.hasRetried = 'true';
+                          target.src = proxyMediaUrl(task.resultUrl);
+                        }
+                      }}
+                      className="w-full h-full object-cover cursor-pointer hover:scale-102 transition-transform duration-300 select-none"
+                    />}
+                  </button>
 
                   {/* 左上角轻量透光「✦ AI生成」微胶囊 */}
                   <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-[10px] text-white/95 font-medium select-none pointer-events-none tracking-tight shadow-xs flex items-center gap-1">
@@ -174,7 +174,6 @@ export default function FeedExpandedGrid({
 
                   {/* 悬停放大指引 */}
                   <div
-                    onClick={() => onPreview(task, batch.tasks)}
                     className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center cursor-pointer pointer-events-none"
                   >
                     <div className="px-2.5 py-1 rounded-xl bg-black/75 backdrop-blur-md text-white text-[11px] font-medium flex items-center gap-1 shadow-md">

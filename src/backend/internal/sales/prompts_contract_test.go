@@ -13,7 +13,7 @@ import (
 
 func TestEditorAdaptContractRoundTripsExpressionAndTransition(t *testing.T) {
 	t.Setenv("AI_DRAWING_API_KEY", "test-key")
-	cfg := setupSalesTestConfig(t)
+	cfg := setupPromptExecutionTestConfig(t)
 	items := parsePromptList(t, requestPrompt(promptTestMux(cfg), "GET", "/api/sales/prompts", "", "local"))
 	var published salesPrompt
 	for _, item := range items {
@@ -41,16 +41,16 @@ func TestEditorAdaptContractRoundTripsExpressionAndTransition(t *testing.T) {
 	planAdaptHandler(cfg, func(_ context.Context, req gateway.TextRequest, _ bool) (int, map[string]any, error) {
 		assertRequestPrompt(t, req, published.Prompt)
 		return 200, scriptCompletion(example, "stop"), nil
-	}).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/sales/plan-adapt", strings.NewReader(`{"productName":"商品","model":"gpt-4o","presentationMode":"clean_visual","voiceMode":"none","beats":[{"index":0,"start":0,"end":3,"expression":"先看手，再抬眼浅笑","transition":"笑意回落，保持末姿势"}]}`)))
+	}).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/sales/plan-adapt", strings.NewReader(`{"productName":"商品","model":"gpt-4o","presentationMode":"clean_visual","voiceMode":"none","beats":[{"index":0,"start":0,"end":3,"refAction":"双手先交叠，再放松回落","expression":"先看手，再抬眼浅笑","transition":"笑意回落，保持末姿势"}]}`)))
 	var result struct {
 		Beats []map[string]any `json:"beats"`
 	}
 	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &result) != nil || len(result.Beats) != 1 {
 		t.Fatalf("editor contract was rejected by adaptation: %d %s", rec.Code, rec.Body.String())
 	}
-	for _, field := range []string{"expression", "transition"} {
-		if result.Beats[0][field] != contract.Beats[0][field] {
-			t.Fatalf("model following editor contract loses %s in API response", field)
+	for field, want := range map[string]string{"action": "双手先交叠，再放松回落", "expression": "先看手，再抬眼浅笑", "transition": "笑意回落，保持末姿势"} {
+		if result.Beats[0][field] != want {
+			t.Fatalf("model following editor contract replaces reference %s in API response", field)
 		}
 	}
 }

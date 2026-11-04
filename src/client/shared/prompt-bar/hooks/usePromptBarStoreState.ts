@@ -32,6 +32,8 @@ export function usePromptBarStoreState() {
       quickVideoModel: s.quickVideoModel ?? '',
       setQuickVideoModel: s.setQuickVideoModel,
       quickVideoDuration: s.quickVideoDuration ?? 5,
+      quickVideoContextIrEnabled: s.quickVideoContextIrEnabled ?? true,
+      setQuickVideoContextIrEnabled: s.setQuickVideoContextIrEnabled,
       setQuickVideoDuration: s.setQuickVideoDuration,
       quickVideoResolution: s.quickVideoResolution ?? '480P',
       setQuickVideoResolution: s.setQuickVideoResolution,

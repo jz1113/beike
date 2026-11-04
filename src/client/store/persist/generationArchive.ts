@@ -6,7 +6,7 @@ import type { DrawingSnapshot } from './generationSnapshotTypes';
 export type { DrawingSnapshot } from './generationSnapshotTypes';
 
 const MEDIA_FIELDS = ['resultUrl', 'productImageUrl', 'referenceImageUrl', 'sourceImageUrl'] as const;
-const MEDIA_ARRAY_FIELDS = ['referenceImages', 'images'] as const;
+const MEDIA_ARRAY_FIELDS = ['referenceImages', 'referenceVideoUrls', 'images'] as const;
 type Archive = { snapshot: DrawingSnapshot; files: Array<[string, File]> };
 const database = () => openDB('beike-generation-history', 1, {
   upgrade(db) { db.createObjectStore('snapshots'); },

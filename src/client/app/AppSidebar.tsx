@@ -1,4 +1,5 @@
-import { FolderOpen, Moon, MoreHorizontal, PanelLeft, Settings, Sun, UserRound, Wrench } from 'lucide-react';
+import { useLibraryPreferences } from '@client/shared/api/libraryPreferences';
+import { FolderOpen, History, Moon, MoreHorizontal, PanelLeft, Settings, Sun, UserRound, Wrench } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppView } from '@client/store/appView';
 import { useToast } from '@client/shared/hooks/useToast';
@@ -15,6 +16,7 @@ interface Props {
   currentView: AppView;
   onNavigateHub: () => void;
   onNavigateAssets: () => void;
+  onNavigateLibrary: () => void;
   onNavigateSkills: () => void;
   onOpenSettings: () => void;
   onOpenSession: (id: string) => void;
@@ -164,6 +166,7 @@ export default function AppSidebar({
   currentView,
   onNavigateHub,
   onNavigateAssets,
+  onNavigateLibrary,
   onNavigateSkills,
   onOpenSettings,
   onOpenSession,
@@ -173,6 +176,8 @@ export default function AppSidebar({
   const [logoHover, setLogoHover] = useState(false);
   const { message: toastMsg } = useToast(2500);
   const { t } = useI18n();
+  const preferences = useLibraryPreferences();
+  const showLibraryEntry = preferences.data?.showEntry ?? preferences.isError;
   const showLabel = !collapsed;
   const showExpandOnLogo = collapsed && logoHover;
 
@@ -253,12 +258,19 @@ export default function AppSidebar({
             icon={<Wrench className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
           <NavItem
-            label={t('sidebar.assets')}
+            label={t('sidebar.generationHistory')}
             active={currentView === 'assets'}
             onClick={onNavigateAssets}
             showLabel={showLabel}
-            icon={<FolderOpen className="h-[20px] w-[20px]" strokeWidth={1.8} />}
+            icon={<History className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
+          {showLibraryEntry && <NavItem
+            label={t('assets.assetLibrary')}
+            active={currentView === 'asset_library'}
+            onClick={onNavigateLibrary}
+            showLabel={showLabel}
+            icon={<FolderOpen className="h-[20px] w-[20px]" strokeWidth={1.8} />}
+          />}
         </nav>
       </div>
 

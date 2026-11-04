@@ -2,12 +2,13 @@ import { isValidElement, type ComponentProps, type ReactElement, type ReactNode 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfiguredModelPicker } from '@client/shared/models/ConfiguredModelPicker';
+import { useSalesTextModels } from '../hooks/useSalesTextModels';
 import { emptySalesCollection, type SalesCollectionState } from '../model/salesCollectionDraft';
 import { salesSummarySource } from '../model/salesSummary';
 import { SalesProductBottomBar } from './SalesProductBottomBar';
 type Props = ComponentProps<typeof SalesProductBottomBar>;
 
-vi.mock('../hooks/useSalesSummaryModels', () => ({ useSalesSummaryModels: () => ({ model: 'vision', options: [{ id: 'vision', name: 'Vision' }] }) }));
+vi.mock('../hooks/useSalesTextModels', () => ({ useSalesTextModels: vi.fn(() => ({ model: 'vision', options: [{ id: 'vision', name: 'Vision' }] })) }));
 const noop = () => {};
 const ocr = { engine: 'test', width: 100, height: 100, text: '纯棉面料', lines: [], cached: false };
 const recognized: SalesCollectionState = {
@@ -50,20 +51,24 @@ function click(node: ReactNode, label: string) {
 }
 
 describe('product bottom action hierarchy', () => {
-  it('shows model, OCR and extraction controls with storyboard skipping above the bottom bar', () => {
-    const { html } = view({ ...recognized, ocrImageUrls: [], colorSelection: { colorLabel: '', confirmedImageUrls: ['/text'], excludedImageUrls: [] } });
+  it('shows model, OCR and extraction controls alongside optional storyboard navigation', () => {
+    const onScrollToProduction = vi.fn();
+    const { tree, html } = view({ ...recognized, ocrImageUrls: [], colorSelection: { colorLabel: '', confirmedImageUrls: ['/text'], excludedImageUrls: [] } }, { summaryActions: { pending: false, error: null, onRun: noop, onCancel: noop, onScrollToProduction } });
+    click(tree.props.right, '跳过，进入分镜');
+    expect(onScrollToProduction).toHaveBeenCalledOnce();
     const list = buttons(html);
-    expect(list.map((button) => button.label)).toEqual(['Vision', '添加详情图', '提炼卖点']);
+    expect(list.map((button) => button.label)).toEqual(['Vision', '添加详情图', '跳过，进入分镜', '提炼卖点']);
     expect(list[0].attrs).toContain('aria-label="卖点提炼模型"');
     expect(list[1].attrs).not.toContain('sales-collect-primary');
-    expect(list[2].attrs).toContain('sales-collect-primary');
-    expect(list[2].attrs).toContain('disabled=""');
+    expect(list[2].attrs).toContain('sales-text-button');
+    expect(list[3].attrs).toContain('sales-collect-primary');
+    expect(list[3].attrs).toContain('disabled=""');
     expect(html).not.toContain('生成设置');
     expect(html).not.toContain('张参考图');
     expect(html).not.toContain('sales-actionbar-hint');
   });
 
-  it('keeps independent OCR and extraction available alongside manually entered text', () => {
+  it('keeps OCR and extraction from supplementary text independently available', () => {
     const state = { ...recognized, ocrImages: [], sellingPoints: '补充的商品材质' };
     const onRecognize = vi.fn();
     const onRun = vi.fn();
@@ -75,14 +80,40 @@ describe('product bottom action hierarchy', () => {
     click(tree.props.right, 'OCR 识别');
     expect(onRecognize).toHaveBeenCalledOnce();
     expect(onRun).not.toHaveBeenCalled();
-    click(tree.props.right, '提炼卖点');
-    expect(onRun).toHaveBeenCalledWith('vision');
+    expect(tree.props.left).toBeUndefined();
   });
 
   it('disables completed OCR instead of offering an action that does nothing', () => {
     const list = buttons(view(recognized).html);
     expect(list.find((button) => button.label === 'OCR 已识别')?.attrs).toContain('disabled=""');
     expect(list.find((button) => button.label === '提炼卖点')?.attrs).not.toContain('disabled=""');
+    expect(list.find((button) => button.label === '提炼卖点')?.attrs).toContain('按当前商品资料与核对后的 OCR 文字提炼卖点。');
+  });
+
+  it('keeps extraction errors visible in the fixed bar and clears them when the sources fit', () => {
+    const imageCatalog = Array.from({ length: 2 }, (_, index) => ({ index, url: `/text-${index}`, role: 'detail' as const }));
+    const state = { ...recognized, imageCatalog, ocrImageUrls: imageCatalog.map((image) => image.url),
+      ocrImages: imageCatalog.map((image) => ({ imageUrl: image.url, editedText: '字'.repeat(30_001), result: ocr })) };
+    const { tree, html } = view(state);
+    expect(renderToStaticMarkup(tree.props.left)).toContain('role="status">OCR 文字来源无效或过长');
+    expect(textContent(tree.props.left)).toContain('60000 字');
+    expect(buttons(html).find((button) => button.label === '提炼卖点')?.attrs).toContain('disabled=""');
+    const reduced = view({ ...state, ocrImageUrls: state.ocrImageUrls.slice(0, 1) });
+    expect(reduced.tree.props.left).toBeUndefined();
+    expect(buttons(reduced.html).find((button) => button.label === '提炼卖点')?.attrs).not.toContain('disabled=""');
+    expect(view(state, { disabled: true }).tree.props.left).toBeUndefined();
+    expect(view(state, { progress: { completed: 1, total: 2, current: 2, imageUrl: '/text-1', succeeded: 1, failed: 0 } }).tree.props.left).toBeUndefined();
+  });
+
+  it('shows missing-model guidance for existing text or results and keeps empty input quiet', () => {
+    vi.mocked(useSalesTextModels).mockReturnValueOnce({ model: '', options: [] });
+    expect(textContent(view(recognized).tree.props.left)).toBe('请在底部选择卖点提炼模型。');
+    vi.mocked(useSalesTextModels).mockReturnValueOnce({ model: '', options: [] });
+    expect(textContent(view({ ...completed, sellingPoints: '补充的商品材质' }).tree.props.left)).toBe('请在底部选择卖点提炼模型。');
+    expect(textContent(view({ ...completed, ocrImageUrls: [] }).tree.props.left)).toBe('请先补充商品资料或核对 OCR 识别文字，再提炼卖点。');
+    expect(view(emptySalesCollection()).tree.props.left).toBeUndefined();
+    expect(view({ ...recognized, ocrImages: [] }).tree.props.left).toBeUndefined();
+    expect(view({ ...recognized, ocrImages: [], sellingPoints: '只有手填资料' }).tree.props.left).toBeUndefined();
   });
 
   it('retries failed OCR independently of existing text and extraction', () => {
@@ -119,7 +150,7 @@ describe('product bottom action hierarchy', () => {
     expect(onCancel).toHaveBeenCalledOnce();
     const running = view(recognized, { disabled: true, onCancel, progress: { completed: 1, total: 4, current: 2, imageUrl: '/text', succeeded: 1, failed: 0 } });
     const runningButtons = buttons(running.html);
-    expect(runningButtons).toHaveLength(3);
+    expect(runningButtons.find((button) => button.label === '跳过，进入分镜')?.attrs).toContain('disabled=""');
     expect(runningButtons.find((button) => button.label === '提炼卖点')?.attrs).toContain('disabled=""');
     expect(runningButtons.find((button) => button.label === '停止识别')?.attrs).not.toContain('disabled=""');
     click(running.tree.props.right, '停止识别');

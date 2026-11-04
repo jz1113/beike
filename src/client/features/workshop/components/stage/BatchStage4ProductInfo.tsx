@@ -77,7 +77,6 @@ export function BatchStage4ProductInfo({
             {index === 0 && <span className="absolute bottom-0 inset-x-0 bg-slate-900/75 text-[9px] text-white">主参考</span>}
           </button>)}
         </div>}
-        {images.length > 0 && <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">来自选图步骤 · 第 1 张用于生图主参考</p>}
       </div>
     </div>
   );

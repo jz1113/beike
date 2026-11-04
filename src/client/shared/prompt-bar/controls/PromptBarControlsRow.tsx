@@ -62,6 +62,8 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
     quickVideoAspectId,
     quickVideoResolution,
     quickVideoDuration,
+    quickVideoContextIrEnabled,
+    setQuickVideoContextIrEnabled,
     quickAspectId,
     quickQuality,
     onDropdownOpenChange,
@@ -222,7 +224,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
         />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-nowrap items-center justify-center gap-1">
+      <div className="flex min-w-0 max-w-full flex-auto flex-wrap items-center justify-start gap-1 sm:justify-center">
         <div className="relative">
           <button
             ref={skillsButtonRef}
@@ -248,12 +250,14 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
           />
         </div>
 
-        <div className="relative min-w-0">
+        <div className="relative min-w-0 max-w-full">
           <button
             ref={modelButtonRef}
+            aria-haspopup="dialog"
+            aria-expanded={showModelPicker}
             type="button"
             onClick={() => setShowModelPicker(!showModelPicker)}
-            className={`${flatTriggerClass(showModelPicker)} max-w-[220px]`}
+            className={`${flatTriggerClass(showModelPicker)} max-w-[min(220px,100%)]`}
             title={selectedModelId ? `当前模型：${isAgent ? agentModelName : modelSourceId}` : '未配置模型'}
           >
             <span className="truncate">{isAgent ? agentModelName : modelDisplayName}</span>
@@ -289,6 +293,8 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
             quickVideoAspectId={quickVideoAspectId}
             quickVideoResolution={quickVideoResolution}
             quickVideoDuration={quickVideoDuration}
+            quickVideoContextIrEnabled={quickVideoContextIrEnabled}
+            setQuickVideoContextIrEnabled={setQuickVideoContextIrEnabled}
             setQuickVideoRefMode={setQuickVideoRefMode}
             setQuickVideoAspectId={setQuickVideoAspectId}
             setQuickVideoResolution={setQuickVideoResolution}

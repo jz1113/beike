@@ -22,11 +22,17 @@ import (
 
 var dataURLPattern = regexp.MustCompile(`^data:([^;]+);base64,(.+)$`)
 
+const maxStorageUploadBytes = 32 << 20
+
 func storageUploadHandler(cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		raw, err := io.ReadAll(io.LimitReader(r.Body, 32<<20))
+		raw, err := io.ReadAll(io.LimitReader(r.Body, maxStorageUploadBytes+1))
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "媒体上传至存储失败"})
+			return
+		}
+		if len(raw) > maxStorageUploadBytes {
+			httpx.WriteJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"success": false, "error": "上传内容超过 32 MB，请压缩文件后重试"})
 			return
 		}
 		if urls, ok := uploadWithObjectStore(r.Context(), r.Header.Get("Content-Type"), raw); ok {

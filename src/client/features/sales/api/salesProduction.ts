@@ -1,22 +1,23 @@
+import { salesMediaResult } from './salesMediaJobs';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { apiRequest } from '@client/shared/api/apiRequest';
 import { getGatewayClientHeaders, getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
-import { pollGenerationTask } from '@client/shared/api/generation/generationApi';
-import { sleepWhilePolling } from '@client/shared/api/generation/generationAbort';
-import { classifyGenerationPollResult, isTransientPollError } from '@client/shared/api/generation/generationErrors';
+import { pollSalesVideoTask, type SalesVideoTaskReceipt } from './salesVideoPolling';
 import { uploadStudioFile } from '@client/shared/api/uploadStudioFile';
 import { isPlaceholderIdentity } from '@shared/domain/workshop/workshop-pipeline/assetEligibility';
 import { getVideoModelById } from '@shared/domain/media/video';
+import { isMetasoH3 } from '@shared/domain/media/videoChannels';
 import { resolveVideoMode, videoInputError } from '@shared/domain/media/videoCapabilities';
 import { selectedTextModel } from '@shared/domain/models/textModelRoute';
 import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
 import type {
   SalesAdaptedBeat, SalesImitationMode, SalesMaterialCatalog, SalesPresentationMode, SalesVisualSpec,
 } from '@shared/domain/sales';
+import type { SalesPersonaVisualProfile } from '@shared/domain/sales/personaVisualProfile';
 import {
   salesAudioMixBodySchema, salesAudioMixResponseSchema,
   salesPlanAdaptBodySchema, salesPlanAdaptResponseSchema,
-  salesStudioAssetsResponseSchema,
+  salesStudioAssetsResponseSchema, salesVideoReviewResponseSchema,
 } from '@shared/contracts/salesProduction';
 
 export type SalesStudioAssetCatalog = SalesMaterialCatalog;
@@ -28,6 +29,9 @@ export interface SalesPlanAdaptInput {
   summary?: string;
   facts?: string;
   buyingPoints?: string[];
+  unresolved?: string[];
+  allowProductReframe?: boolean;
+  narration?: { sourceCopy: string; duration: number; targetCps: number };
   cautions?: string[];
   scriptTitle: string;
   oneTake: boolean;
@@ -36,17 +40,21 @@ export interface SalesPlanAdaptInput {
   presentationMode?: SalesPresentationMode;
   imitationMode?: SalesImitationMode;
   personaSummary: string;
+  personaReferenceImageUrl?: string;
+  personaPresence?: 'full_presenter' | 'silent_model' | 'hands_only' | 'none';
   sceneSummary: string;
-  sourceExclusions?: string[];
+  sourceExclusions?: Array<string | { term: string; type: string }>;
   beats: Array<{
     index: number;
     shotIndex: number;
+    preservePerformance?: boolean;
     start: number;
     end: number;
     purpose: string;
     shotSize: string;
     camera: string;
     refAction: string;
+    productVisible?: boolean;
     subject?: string;
     scene?: string;
     transition?: string;
@@ -56,6 +64,9 @@ export interface SalesPlanAdaptInput {
     imageLabel: string;
     buyingPoint: string;
     actionReference?: string;
+    sourceVoiceText?: string;
+    sourceLinePattern?: string;
+    sourceSubtitle?: string;
   }>;
 }
 
@@ -70,6 +81,17 @@ async function readJSON(response: Response, fallback: string): Promise<Json> {
   return data;
 }
 
+export async function reviewSalesVideo(videoUrl: string, signal: AbortSignal) {
+  const response = await apiRequest('POST', '/api/sales/video-review', {
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ videoUrl }),
+  });
+  const parsed = salesVideoReviewResponseSchema.safeParse(await readJSON(response, '音频视频核查失败'));
+  if (!parsed.success) throw new Error('音频视频核查结果不完整');
+  return parsed.data;
+}
+
 export async function fetchSalesStudioAssets(signal?: AbortSignal): Promise<SalesStudioAssetCatalog> {
   const response = await apiRequest('GET', '/api/sales/studio-assets', { signal });
   const parsed = salesStudioAssetsResponseSchema.safeParse(await readJSON(response, '读取资产库失败'));
@@ -81,7 +103,7 @@ export async function adaptSalesScriptPlan(
   input: SalesPlanAdaptInput,
   selection: string,
   signal: AbortSignal,
-): Promise<{ beats: SalesAdaptedBeat[]; model: string; promptVersion: string }> {
+): Promise<{ beats: SalesAdaptedBeat[]; model: string; promptVersion: string; spokenCopyPromptVersion?: string; personaVisualProfile?: SalesPersonaVisualProfile }> {
   const body = salesPlanAdaptBodySchema.parse({
     ...input,
     model: selection.startsWith('deepseek-official:') ? selection : selectedTextModel(selection).modelId,
@@ -135,6 +157,8 @@ export async function synthesizeSalesVoiceover(
 
 export async function submitAndPollSalesVideo(
   input: {
+    jobName?: string;
+    salesTrace?: { scriptId: string; scriptVersion: number; templateVersion: string; adaptVersion: string };
     prompt: string;
     model: string;
     durationSec: number;
@@ -143,33 +167,38 @@ export async function submitAndPollSalesVideo(
     resolution?: string;
     images: string[];
     videos?: string[];
+    audios?: string[];
+    voiceIds?: string[];
+    contextIrEnabled?: boolean;
     generateAudio: boolean;
   },
   onProgress: (label: string) => void,
   signal: AbortSignal,
-): Promise<{ videoUrl: string; taskId: string }> {
-  const selection = (input.model || 'doubao-seedance-2.5').trim();
+  onTaskSubmitted?: (task: SalesVideoTaskReceipt) => void | Promise<void>,
+): Promise<{ videoUrl: string; taskId: string; channelTaskId?: string }> {
+  const selection = (input.model || 'wan3.0-video').trim();
   const model = upstreamModalityModelId('video', selection);
-  const spec = getVideoModelById(model);
+  const gatewayHeaders = getGatewayClientHeaders(selection);
+  const baseUrl = gatewayHeaders['x-custom-base-url'];
+  const spec = getVideoModelById(model, baseUrl);
   signal.throwIfAborted();
   // Include the complete script timeline; never silently squeeze a long script into a short clip.
   const duration = Math.ceil(input.durationSec);
-  const resolution = input.resolution || (spec?.supportedResolutions?.includes('720P')
+  const resolution = isMetasoH3(model, baseUrl) && input.resolution?.toUpperCase() === '720P' ? '768P' : input.resolution || (spec?.supportedResolutions?.includes('720P')
     ? '720P'
     : spec?.supportedResolutions?.[0] || '720P');
   const clientTaskId = `sales_vid_${crypto.randomUUID()}`;
   // Slots represent identities/products/scenes, rather than the start and end frames of a clip.
   const refMode = resolveVideoMode(model, input.refMode || 'omni', input.images.length, input.videos?.length || 0);
-  const message = videoInputError({ model, refMode, images: input.images, videos: input.videos, duration, resolution, aspectRatio: input.aspectRatio });
+  const message = videoInputError({ model, refMode, images: input.images, videos: input.videos, audios: input.audios, voiceIds: input.voiceIds, audio: input.generateAudio, duration, resolution, aspectRatio: input.aspectRatio, baseUrl });
   if (message) throw new Error(`${message}。当前设置 ${input.durationSec} 秒、${input.aspectRatio} 画幅；请调整视频参数或选用支持这些参考素材的模型。`);
-  const gatewayHeaders = getGatewayClientHeaders(selection);
 
   onProgress(`正在提交 ${spec?.name || model} 视频生成任务…`);
   const response = await apiFetch('/api/generate/video', {
     method: 'POST',
     signal,
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json', Prefer: 'respond-async', 'X-Sales-Name': encodeURIComponent(input.jobName || ''), 'X-Sales-Model': encodeURIComponent(selection), 'X-Sales-Speech': input.generateAudio ? '1' : '0',
       'x-idempotency-key': clientTaskId,
       ...gatewayHeaders,
       ...storageConfigHeaders(),
@@ -177,6 +206,8 @@ export async function submitAndPollSalesVideo(
     body: JSON.stringify({
       clientTaskId,
       prompt: input.prompt,
+      preserve_prompt: true,
+      salesTrace: input.salesTrace,
       model,
       duration,
       aspect_ratio: input.aspectRatio || '9:16',
@@ -184,8 +215,11 @@ export async function submitAndPollSalesVideo(
       ref_mode: refMode,
       images: input.images,
       ...(input.videos?.length ? { videos: input.videos } : {}),
+      ...(input.audios?.length ? { audios: input.audios } : {}),
+      ...(input.voiceIds?.length ? { voice_ids: input.voiceIds } : {}),
       audio: input.generateAudio,
       watermark: false,
+      ...(isMetasoH3(model, baseUrl) ? { context_ir_enabled: input.contextIrEnabled ?? true } : {}),
       customBaseUrl: gatewayHeaders['x-custom-base-url'],
       storageConfig: readClientStorageConfig(),
     }),
@@ -198,45 +232,18 @@ export async function submitAndPollSalesVideo(
   if (text(data.status) === 'SUCCESS' && text(data.resultUrl)) {
     return { videoUrl: text(data.resultUrl), taskId: text(data.taskId) };
   }
-  const taskId = text(data.taskId);
+  const taskId = text(record(data.job).id) || text(data.taskId);
   if (!taskId) throw new Error('视频生成网关未返回有效任务编号');
 
-  const deadline = Date.now() + 8 * 60_000;
-  let tick = 0;
-  let queryFailures = 0;
-  while (Date.now() < deadline) {
-    await sleepWhilePolling(3000, () => signal.aborted);
-    tick += 1;
-    onProgress(`视频生成中（任务 ${taskId.slice(-8)} · 已等待 ${tick * 3}s）…`);
-    let polled: Json;
-    try {
-      polled = record(await pollGenerationTask(taskId, 'video', model, { modelSelection: selection, signal }));
-      signal.throwIfAborted();
-      queryFailures = 0;
-    } catch (error) {
-      signal.throwIfAborted();
-      queryFailures += 1;
-      const message = error instanceof Error ? error.message : '查询失败';
-      const transient = isTransientPollError(error) || /轮询失败 \((?:408|429|5\d\d)\)/.test(message);
-      if (!transient || queryFailures >= 3) {
-        throw new Error(`视频任务查询中断：${message}（任务 ${taskId}）。原任务可能仍在生成，请到历史记录核对，避免重复提交。`);
-      }
-      onProgress(`视频状态暂时无法查询，正在重试（${queryFailures}/3；任务 ${taskId.slice(-8)}）…`);
-      continue;
-    }
-    const outcome = classifyGenerationPollResult(polled, { httpOk: true });
-    if (outcome === 'success' && text(polled.resultUrl)) {
-      return { videoUrl: text(polled.resultUrl), taskId };
-    }
-    if (outcome === 'failure') {
-      throw new Error(text(polled.failReason) || text(polled.error) || '视频生成任务失败');
-    }
-  }
-  throw new Error(`视频生成等待超时（任务 ${taskId}），可在历史记录中继续核对`);
+  const task = { taskId, model, modelSelection: selection };
+  await onTaskSubmitted?.(task);
+  signal.throwIfAborted();
+  return pollSalesVideoTask(task, onProgress, signal, onTaskSubmitted);
 }
 
 export async function mixSalesFinalVideo(
   input: {
+    jobName?: string;
     videoUrl: string;
     voiceMode: 'speech' | 'voiceover' | 'none';
     voiceoverUrl?: string;
@@ -248,10 +255,10 @@ export async function mixSalesFinalVideo(
   const body = salesAudioMixBodySchema.parse(input);
   const response = await apiRequest('POST', '/api/sales/audio-mix', {
     signal,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Prefer: 'respond-async', 'X-Sales-Name': encodeURIComponent(input.jobName || '') },
     body: JSON.stringify(body),
   });
-  const parsed = salesAudioMixResponseSchema.safeParse(await readJSON(response, '成片配乐合成失败'));
+  const parsed = salesAudioMixResponseSchema.safeParse(await salesMediaResult(await readJSON(response, '成片配乐合成失败'), signal));
   if (!parsed.success) throw new Error('成片混音返回结果不完整');
   return parsed.data;
 }

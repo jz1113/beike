@@ -28,7 +28,7 @@ describe('person and scene batch image import', () => {
   it('stores one main image per asset, current category, and a reconciliation key', () => {
     const item = addSalesImageImportFiles('persona', [], [file()], []).items[0];
     const persona = salesImageImportData('persona', item, '/main.jpg', category);
-    expect(persona).toMatchObject({ name: '人物1', tags: '成年男', avatarUrl: '/main.jpg', sourceImages: '["/main.jpg"]' });
+    expect(persona).toMatchObject({ name: '人物1', tags: '青年男', avatarUrl: '/main.jpg', sourceImages: '["/main.jpg"]' });
     expect(JSON.parse(persona.dimensions as string)).toMatchObject({ salesImageImportKey: item.key, personaViews: { main: '/main.jpg', front: '' }, defaultVoiceId: '' });
     const scene = salesImageImportData('scene', { ...item, name: '场景1' }, '/scene.jpg', category);
     expect(scene).toMatchObject({ title: '场景1', tags: '户外', spatialType: 'outdoor', coverUrl: '/scene.jpg', sourceImages: '["/scene.jpg"]' });

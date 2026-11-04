@@ -24,6 +24,7 @@ export const APPROVED_MODELS: readonly ApprovedModel[] = [
 const BY_ID = new Map(APPROVED_MODELS.map((m) => [m.id.toLowerCase(), m]));
 
 const MODEL_ALIASES: Record<string, string> = {
+  h3: 'MiniMax-H3',
   'nano-banana-2.1': 'gemini-nano-banana-2.1',
   'nano-banana-2': 'gemini-3.1-flash-image',
   'nano-banana-2-lite': 'gemini-3.1-flash-lite-image',

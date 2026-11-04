@@ -77,6 +77,9 @@ func serveLocalMedia(cfg config.Config, w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
+	if serveLocalThumbnail(w, r, file, info) {
+		return
+	}
 	header := w.Header()
 	header.Set("Content-Type", mediaContentType(path))
 	header.Set("Cache-Control", "private, no-store")
@@ -218,6 +221,18 @@ func mediaContentType(path string) string {
 		return "video/quicktime"
 	case ".webm":
 		return "video/webm"
+	case ".mp3":
+		return "audio/mpeg"
+	case ".wav":
+		return "audio/wav"
+	case ".m4a":
+		return "audio/mp4"
+	case ".aac":
+		return "audio/aac"
+	case ".ogg", ".oga", ".opus":
+		return "audio/ogg"
+	case ".flac":
+		return "audio/flac"
 	case ".jpg", ".jpeg":
 		return "image/jpeg"
 	case ".png":

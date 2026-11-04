@@ -21,7 +21,7 @@ func customizePrompt(t *testing.T, cfg config.Config, id string) salesPrompt {
 	if !found {
 		t.Fatal("unknown prompt", id)
 	}
-	text := d.text + "\n本次自定义规则：自然拍摄节奏。"
+	text := "  用户保存的唯一执行文本：「" + id + "」。保留原有换行与空白。\n  "
 	item, err := saveSalesPrompt(context.Background(), cfg, "local", d, &text, d.resolve(nil).Version)
 	if err != nil {
 		t.Fatal(err)
@@ -43,28 +43,24 @@ func assertRequestPrompt(t *testing.T, req gateway.TextRequest, want string) {
 	if actual != want {
 		t.Fatal("model received different prompt than editor")
 	}
+	userData, _ := json.Marshal(messages[1:])
+	for _, hidden := range []string{"不能包装为卖点", "不推测实测效果", "不能臆测口播", "请按规则输出 JSON"} {
+		if strings.Contains(string(userData), hidden) {
+			t.Fatalf("execution appended hidden creative instructions: %s", hidden)
+		}
+	}
 }
 
-func TestSavedPromptsDriveSummaryNormalizeAndAdapt(t *testing.T) {
+func TestSavedPromptsDriveSummaryAndAdapt(t *testing.T) {
 	t.Setenv("AI_DRAWING_API_KEY", "test-key")
 	cfg := setupSalesTestConfig(t)
 	summary := customizePrompt(t, cfg, "summary")
 	rec := serveSummary(summaryHandler(cfg, func(_ context.Context, req gateway.TextRequest, _ bool) (int, map[string]any, error) {
-		assertRequestPrompt(t, req, summary.Prompt)
+		assertRequestPrompt(t, req, summary.Prompt+summaryTextOnlyBoundary)
 		return 200, summaryCompletion(exampleSummaryResult()), nil
 	}, func(context.Context, string, string) ([]byte, error) { return []byte("image"), nil }), exampleSummaryRequest())
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), summary.Version) {
 		t.Fatal("summary version", rec.Code, rec.Body.String())
-	}
-
-	normalize := customizePrompt(t, cfg, "script-normalize")
-	rec = httptest.NewRecorder()
-	scriptNormalizeHandler(cfg, func(_ context.Context, req gateway.TextRequest, _ bool) (int, map[string]any, error) {
-		assertRequestPrompt(t, req, normalize.Prompt)
-		return 200, scriptCompletion(validScript, "stop"), nil
-	}).ServeHTTP(rec, httptest.NewRequest("POST", "/api/sales/script-normalize", strings.NewReader(`{"rawText":"第一段起身，第二段转身","model":"gpt-4o"}`)))
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), normalize.Version) {
-		t.Fatal("normalize version", rec.Code, rec.Body.String())
 	}
 
 	adapt := customizePrompt(t, cfg, "plan-adapt")

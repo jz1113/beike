@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { useSyncExternalStore } from 'react';
 import type { PetPose, PetSpriteVersion } from '@shared/domain/pets/atlas';
 import { pointerLookIndex } from '@shared/domain/pets/atlas';
+import { queueSettingsSection } from '@shared/domain/settings/settingsNavigationStorage';
+import { useCanvasPetActivity } from './hooks/useCanvasPetActivity';
 import { resolvePetPose } from '@shared/domain/pets/activity';
 import { useFileDropZone } from '@client/shared/hooks/useFileDropZone';
 import { useMediaQuery } from '@client/shared/hooks/useMediaQuery';
@@ -10,7 +12,7 @@ import { useAppStore } from '@client/store';
 import { BeikePet } from '@client/shared/pets/BeikePet';
 import { getPetFeed, subscribePetFeed } from '@client/shared/pets/petFeed';
 import { PET_SIZES, beikePhaseFor, updatePetPreferences, usePetPreferences } from '@client/shared/pets/petPreferences';
-import { petSheetURL } from '@client/shared/pets/petClient';
+import { forgetPetSheet, petSheetURL } from '@client/shared/pets/petClient';
 import { petStackLayout, type PetFloatBox, type PetFloatPlacement } from '@client/shared/pets/petGeometry';
 import { PetSprite } from '@client/shared/pets/PetSprite';
 import { usePetAnchor } from '@client/shared/pets/usePetAnchor';
@@ -65,7 +67,7 @@ function floatStyle(place: PetFloatPlacement | undefined) {
   return place ? { left: place.left, top: place.top } : undefined;
 }
 
-export function AppPetHost() {
+export function AppPetHost({ canvas = false }: { canvas?: boolean }) {
   const preferences = usePetPreferences();
   const feed = useSyncExternalStore(subscribePetFeed, getPetFeed, () => null);
   const today = useTodayTokens();
@@ -76,14 +78,17 @@ export function AppPetHost() {
   const [menu, setMenu] = useState(false);
   const [look, setLook] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ id: string; url: string } | null>(null);
+  const [failedSheet,setFailedSheet] = useState('');
+  const [sheetRetry,setSheetRetry] = useState(0);
   const [version, setVersion] = useState<PetSpriteVersion>(2);
   const [floats, setFloats] = useState({ chip: CHIP_BOX, menu: MENU_BOX });
   const menuRef = useRef<HTMLDivElement>(null);
   const chipRef = useRef<HTMLButtonElement>(null);
-  const pose = resolvePetPose({ feedPhase: feed?.phase, flash, busy });
-  const shown = preferences.visible && preferences.petId !== 'none' && !settingsOpen;
+  const shown = preferences.visible && preferences.petId !== 'none' && !settingsOpen && (!canvas || preferences.canvasVisible);
+  const activity = useCanvasPetActivity(canvas && shown ? preferences.canvasLink : null);
+  const pose = resolvePetPose(canvas ? activity : {feedPhase:feed?.phase,flash,busy});
   const sprite = preferences.petId !== 'beike';
-  const anchor = usePetAnchor(Boolean(shown && feed?.enabled && feed.open), () => { setMenu(false); feed?.setOpen(false); });
+  const anchor = usePetAnchor(Boolean(shown && feed?.enabled && feed.open), () => { setMenu(false); feed?.setOpen(false); }, canvas);
   const size = PET_SIZES[preferences.size];
   const drop = useFileDropZone({
     onFiles: (files) => { if (feed?.enabled) feed.onFiles(files); },
@@ -100,22 +105,38 @@ export function AppPetHost() {
   useEffect(() => {
     if (!sprite || !shown) return undefined;
     let cancel = false;
+    setFailedSheet('');
     petSheetURL(preferences.petId).then((url) => {
       if (!cancel) setSheet((current) => current?.id === preferences.petId && current.url === url ? current : { id: preferences.petId, url });
-    }).catch(() => { if (!cancel) setSheet(null); });
+    }).catch(() => { if (!cancel) {setSheet(null);setFailedSheet(preferences.petId);} });
     return () => { cancel = true; };
-  }, [preferences.petId, sprite, shown]);
+  }, [preferences.petId, sprite, shown,sheetRetry]);
   useEffect(() => {
-    if (!shown || pose !== 'idle' || reduced || version !== 2 || !sprite) { setLook(null); return undefined; }
-    const track = (event: PointerEvent) => {
+    if (!shown || pose !== 'idle' || reduced || (sprite && version !== 2)) { setLook(null); return undefined; }
+    const track = (event: Pick<PointerEvent,'clientX'|'clientY'>) => {
       const rect = anchor.anchorRef.current?.getBoundingClientRect();
       if (!rect) return;
       const next = pointerLookIndex(event.clientX - (rect.left + rect.width / 2), event.clientY - (rect.top + rect.height / 2), 72);
       setLook((current) => current === next ? current : next);
     };
+    let frame: HTMLIFrameElement | null = null;
+    const trackFrame = (event: PointerEvent) => {
+      const rect = frame?.getBoundingClientRect();
+      if (rect) track({clientX:rect.left + event.clientX, clientY:rect.top + event.clientY});
+    };
+    const attach = () => {
+      const next = document.querySelector<HTMLIFrameElement>('iframe[title="贝壳云图项目画布"]');
+      if (frame !== next) frame?.contentWindow?.removeEventListener('pointermove', trackFrame);
+      frame = next;
+      frame?.contentWindow?.addEventListener('pointermove', trackFrame);
+    };
+    const onLoad = (event: Event) => {
+      if (event.target instanceof HTMLIFrameElement && event.target.title === '贝壳云图项目画布') attach();
+    };
+    if (canvas) { attach(); document.addEventListener('load', onLoad, true); }
     window.addEventListener('pointermove', track);
-    return () => window.removeEventListener('pointermove', track);
-  }, [shown, pose, reduced, version, sprite, anchor.anchorRef]);
+    return () => {window.removeEventListener('pointermove',track);document.removeEventListener('load',onLoad,true);frame?.contentWindow?.removeEventListener('pointermove',trackFrame);};
+  }, [canvas, shown, pose, reduced, version, sprite, anchor.anchorRef]);
   useEffect(() => {
     if (!menu) return undefined;
     const close = (event: Event) => {
@@ -145,10 +166,29 @@ export function AppPetHost() {
 
   if (!shown || typeof document === 'undefined') return null;
   const activate = () => {
+    if (sprite && failedSheet === preferences.petId) {
+      forgetPetSheet(preferences.petId);
+      setSheetRetry(value=>value+1);
+      return;
+    }
+    if (canvas) {
+      const frame = document.querySelector<HTMLIFrameElement>('iframe[title="贝壳云图项目画布"]');
+      if (frame?.offsetWidth && frame.contentWindow) frame.contentWindow.postMessage({kind:'studio:panel',panel:'chat'},location.origin);
+      else useAppStore.getState().setIsAssistantOpen(true);
+      return;
+    }
     if (feed?.enabled) { setMenu(false); feed.setOpen(!feed.open); return; }
     setMenu((open) => !open);
   };
-  const openMenu = (event: { preventDefault: () => void }) => { event.preventDefault(); setMenu(true); feed?.setOpen(false); };
+  const openMenu = (event: { preventDefault: () => void }) => {
+    event.preventDefault();
+    if (canvas) {
+      queueSettingsSection('canvas:pet');
+      useAppStore.getState().navigateToSettings();
+      return;
+    }
+    setMenu(true);feed?.setOpen(false);
+  };
   const lookIndex = pose === 'idle' ? look : null;
   const visualPose: PetPose = lookIndex === null ? pose : 'look';
   const panel = anchor.panelStyle;
@@ -163,10 +203,10 @@ export function AppPetHost() {
       <div ref={anchor.anchorRef} className="pointer-events-auto absolute" style={anchor.anchorStyle}>
         {sprite ? (
           <button type="button" {...drop.dropZoneProps} {...anchor.pointerProps} onClick={activate} onContextMenu={openMenu} aria-label="桌宠" style={{ width: size, height: petHeight }} className={`relative block touch-none border-0 bg-transparent p-0 ${anchor.moving ? 'cursor-grabbing' : 'cursor-grab'}`}>
-            {sheet?.id === preferences.petId ? <PetSprite src={sheet.url} version={version} pose={visualPose} lookIndex={lookIndex} size={size} paused={reduced} onVersion={setVersion} /> : <span className="text-xs text-slate-400">桌宠加载中</span>}
+            {failedSheet === preferences.petId ? <span className="text-xs">桌宠加载失败，点击重试</span> : sheet?.id === preferences.petId ? <PetSprite src={sheet.url} version={version} pose={visualPose} lookIndex={lookIndex} size={size} paused={reduced} onVersion={setVersion} onError={()=>setFailedSheet(preferences.petId)} /> : <span className="text-xs text-slate-400">桌宠加载中</span>}
           </button>
         ) : (
-          <BeikePet phase={beikePhaseFor(pose, feed?.phase)} label={feed?.enabled ? '投喂封面样张' : '桌宠'} disabled={!feed?.enabled || feed.phase === 'uploading' || feed.phase === 'analyzing'} onOpen={activate} onFiles={(files) => { if (feed?.enabled) feed.onFiles(files); }} onDragging={feed?.onDragging} moving={anchor.moving} size={size} onContextMenu={openMenu} pointerProps={anchor.pointerProps} />
+          <BeikePet phase={beikePhaseFor(pose, canvas ? null : feed?.phase)} lookIndex={lookIndex} badge={canvas && pose === 'success' ? '已完成' : undefined} label={feed?.enabled && !canvas ? '投喂封面样张' : '桌宠'} disabled={!feed?.enabled || feed.phase === 'uploading' || feed.phase === 'analyzing'} onOpen={activate} onFiles={(files) => { if (feed?.enabled) feed.onFiles(files); }} onDragging={feed?.onDragging} moving={anchor.moving} size={size} onContextMenu={openMenu} pointerProps={anchor.pointerProps} />
         )}
       </div>
       {feed?.enabled && chipPlace && (

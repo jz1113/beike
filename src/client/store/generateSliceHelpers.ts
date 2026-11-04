@@ -71,13 +71,17 @@ export function capGenerationTasks(tasks: GenerationTask[]): GenerationTask[] {
   return retainGenerationTasks(tasks);
 }
 
-export function mergeAndSortTasks(existing: GenerationTask[], incoming: GenerationTask[]): GenerationTask[] {
+export function mergeAndSortTasks(existing: GenerationTask[], incoming: GenerationTask[], fromDatabase = false): GenerationTask[] {
   const mergedList: GenerationTask[] = [];
   const idMap = new Map<string, number>();
   const taskIdMap = new Map<string, number>();
   const dbIdMap = new Map<string, number>();
+  // Older archive hydration accidentally assigned local attempt IDs as database IDs.
+  const restoreIdentity = (task: GenerationTask) => !fromDatabase && task.dbId === task.id && /^(hub-gen-|agent-task-)/.test(task.id)
+    ? { ...task, dbId: undefined } : task;
 
   existing.forEach((t) => {
+    t = restoreIdentity(t);
     if (isGenerationDeleted(t.id, t.taskId, t.resultUrl, t.dbId)) return;
     const index = mergedList.length;
     mergedList.push(t);
@@ -87,6 +91,7 @@ export function mergeAndSortTasks(existing: GenerationTask[], incoming: Generati
   });
 
   incoming.forEach((dt) => {
+    dt = fromDatabase ? { ...dt, dbId: dt.dbId || dt.id } : restoreIdentity(dt);
     if (isGenerationDeleted(dt.id, dt.taskId, dt.resultUrl, dt.dbId)) return;
 
     // 智能多维匹配：优先匹配 id，次选 taskId，末选 dbId
@@ -107,7 +112,7 @@ export function mergeAndSortTasks(existing: GenerationTask[], incoming: Generati
         ...prev,
         ...dt,
         id: prev.id, // 保留客户端本地关联的 id，保证当前会话组件稳定挂载
-        dbId: dt.id || prev.dbId,
+        dbId: dt.dbId || (fromDatabase ? dt.id : prev.dbId),
         taskId: dt.taskId || prev.taskId,
         status: isIncomingSuccess ? 'SUCCESS' : dt.status || prev.status,
         resultUrl: dt.resultUrl || prev.resultUrl,
@@ -310,7 +315,7 @@ export function syncTasksWithDatabase(
   dbTasks: GenerationTask[],
 ): { generationTasks: GenerationTask[]; sessions: ChatSession[] } {
   if (!dbTasks || dbTasks.length === 0) return { generationTasks: stateTasks, sessions };
-  const allGens = mergeAndSortTasks(stateTasks, dbTasks);
+  const allGens = mergeAndSortTasks(stateTasks, dbTasks, true);
   const taskMapById = new Map<string, GenerationTask>();
   const taskMapByTaskId = new Map<string, GenerationTask>();
   const taskMapByDbId = new Map<string, GenerationTask>();

@@ -30,8 +30,8 @@ describe('video generation modes follow official capabilities', () => {
     ['viduq4', ['omni', 'first_frame']],
     ['veo3.1', full],
     ['veo3.1-fast', full],
-    ['omni_flash-10s', seedance],
-    ['gemini-omni-1.1-flash', seedance],
+    ['omni_flash-10s', ['omni', 'text', 'edit']],
+    ['gemini-omni-1.1-flash', ['omni', 'text', 'edit']],
     ['grok-imagine-video-1.5', [...full, 'edit', 'extend']],
     ['sora-2', ['first_frame', 'text']],
     ['sora-2-pro', ['first_frame', 'text']],
@@ -118,13 +118,28 @@ describe('video payloads keep frame roles exclusive', () => {
 
   it('does not turn MiniMax reference images or first-last frames into the other mode', () => {
     const reference = buildVideoRequest({ ...base, model: 'MiniMax-H3', refMode: 'omni', images: [first], videos: [clip], resolution: '1080P' });
-    expect(reference.payload.mode).toBe('reference-to-video');
-    expect(reference.payload.imageUrls).toEqual([first]);
-    expect(reference.payload.image).toBeUndefined();
-    expect(reference.payload.resolution).toBe('2k');
+    expect(reference.payload).toEqual({ model: 'MiniMax-H3', prompt: base.prompt, seconds: '5', resolution: '2k', aspect_ratio: '16:9',
+      mode: 'multimodal-to-video', imageUrls: [first], videoUrls: [clip] });
     const frames = buildVideoRequest({ ...base, model: 'MiniMax-H3', refMode: 'first_last_frame', images: [first, last] });
-    expect(frames.payload.mode).toBe('first-last-frame');
-    expect(frames.payload.imageUrls).toEqual([first, last]);
+    expect(frames.payload).toMatchObject({ aspect_ratio: 'adaptive', resolution: '768P', mode: 'image-to-video', imageUrls: [first, last] });
+  });
+
+  it.each(['MiniMax-H3', 'h3'])('transports %s voice references through the gateway audioUrls field', (model) => {
+    const audio = 'https://example.com/voice.wav';
+    const request = buildVideoRequest({ ...base, model, refMode: 'omni', images: [first], videos: [clip], audios: [audio], audio: true });
+    expect(request.payload).toMatchObject({ model: 'MiniMax-H3', resolution: '768P', seconds: '5', mode: 'multimodal-to-video',
+      prompt: base.prompt, imageUrls: [first], videoUrls: [clip], audioUrls: [audio] });
+    expect(request.payload).not.toHaveProperty('generate_audio');
+    expect(request.payload).not.toHaveProperty('audio');
+    expect(request.endpoints('https://gateway.example/v1')).toEqual({
+      submit: ['https://gateway.example/v1/videos'], query: ['https://gateway.example/v1/videos/{taskId}'],
+    });
+    expect(() => buildVideoRequest({ ...base, model, refMode: 'first_frame', images: [first], audios: [audio] })).toThrow('全能参考');
+    expect(() => buildVideoRequest({ ...base, model, refMode: 'first_last_frame', images: [first, last], audios: [audio] })).toThrow('全能参考');
+  });
+
+  it.each([['768P', '768P'], ['2K', '2k']])('accepts the H3 native resolution %s', (resolution, expected) => {
+    expect(buildVideoRequest({ ...base, model: 'MiniMax-H3', resolution }).payload.resolution).toBe(expected);
   });
 
   it('separates Veo reference images from pinned frames and locks those durations', () => {
@@ -161,7 +176,7 @@ describe('video payloads keep frame roles exclusive', () => {
 
   it('rejects combinations the selected model does not implement', () => {
     expect(videoInputError({ model: 'sora-2', refMode: 'omni', images: [first, last], duration: 10, resolution: '720P', aspectRatio: '16:9' })).toMatch(/尚未接入/);
-    expect(videoInputError({ model: 'omni_flash-10s', refMode: 'omni', images: Array.from({ length: 8 }, () => first), duration: 10, resolution: '720P', aspectRatio: '16:9' })).toMatch(/7 张/);
+    expect(videoInputError({ model: 'omni_flash-10s', refMode: 'omni', images: Array.from({ length: 8 }, () => first), duration: 10, resolution: '720P', aspectRatio: '16:9' })).toMatch(/7 项/);
     expect(videoInputError({ model: 'omni_flash-10s', refMode: 'text', duration: 10, resolution: '720P', aspectRatio: '1:1' })).toMatch(/比例/);
     expect(videoInputError({ model: 'grok-imagine-video-1.5', refMode: 'omni', images: Array.from({ length: 15 }, () => first), duration: 5, resolution: '720P', aspectRatio: '16:9' })).toMatch(/14 张/);
     expect(videoInputError({ model: 'MiniMax-H3', refMode: 'omni', images: [first], videos: [clip, clip, clip, clip], duration: 5, resolution: '720P', aspectRatio: '16:9' })).toMatch(/3 个参考视频/);

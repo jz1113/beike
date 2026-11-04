@@ -7,6 +7,7 @@ function browserStorage(entries: Record<string, string> = {}) {
   const values = new Map(Object.entries(entries));
   const localStorage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
   vi.stubGlobal('window', { localStorage });
+  vi.stubGlobal('localStorage', localStorage);
   return values;
 }
 
@@ -27,7 +28,7 @@ describe('collection-only drafts', () => {
     expect(state.props).not.toHaveProperty('价格');
     writeSalesCollection(state);
     expect(values.get('beike.video_sales.draft.v4')).toBe(legacy);
-    expect(JSON.parse(values.get(SALES_COLLECTION_STORAGE_KEY)!)).toEqual(JSON.parse(JSON.stringify(state)));
+    expect(JSON.parse(values.get(SALES_COLLECTION_STORAGE_KEY + '.' + values.get('beike_workspace_secret'))!)).toEqual(JSON.parse(JSON.stringify(state)));
   });
 
   it('keeps an explicitly cleared collection empty instead of restoring an older product', () => {
@@ -57,4 +58,16 @@ describe('collection-only drafts', () => {
       { index: 1, role: 'detail', url: '/back.jpg' },
     ]);
   });
+});
+
+it('separates two workspace drafts and retains the original legacy copy', () => {
+  const values = browserStorage({[SALES_COLLECTION_STORAGE_KEY]: JSON.stringify({productName:'历史草稿'})});
+  expect(readSalesCollection().productName).toBe('历史草稿');
+  const first = values.get('beike_workspace_secret')!;
+  writeSalesCollection({...emptySalesCollection(), productName:'已修订'});
+  values.set('beike_workspace_secret','b'.repeat(64));
+  expect(readSalesCollection().productName).toBe('');
+  writeSalesCollection({...emptySalesCollection(),productName:'第二个工作区'});
+  values.set('beike_workspace_secret',first);
+  expect(readSalesCollection().productName).toBe('已修订');
 });

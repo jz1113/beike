@@ -26,17 +26,25 @@ func assetGridDigest(data []byte, kind string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func assetGridCell(bounds image.Rectangle, index int) image.Rectangle {
-	row, column := index/3, index%3
-	return image.Rect(bounds.Min.X+column*bounds.Dx()/3, bounds.Min.Y+row*bounds.Dy()/3,
-		bounds.Min.X+(column+1)*bounds.Dx()/3, bounds.Min.Y+(row+1)*bounds.Dy()/3)
+func assetGridDimensions(kind string) (columns, rows int) {
+	if kind == personaStrip {
+		return 4, 1
+	}
+	return 3, 3
+}
+
+func assetGridCell(bounds image.Rectangle, index int, kind string) image.Rectangle {
+	columns, rows := assetGridDimensions(kind)
+	row, column := index/columns, index%columns
+	return image.Rect(bounds.Min.X+column*bounds.Dx()/columns, bounds.Min.Y+row*bounds.Dy()/rows,
+		bounds.Min.X+(column+1)*bounds.Dx()/columns, bounds.Min.Y+(row+1)*bounds.Dy()/rows)
 }
 
 func splitAssetGrid(ctx context.Context, data []byte, kind, workspace string) ([]assetGridImage, error) {
-	if len(assetGridViews[kind]) != 9 {
+	if len(assetGridViews[kind]) == 0 {
 		return nil, errors.New("invalid grid kind")
 	}
-	if err := validateAssetGrid(data); err != nil {
+	if err := validateAssetGrid(data, kind); err != nil {
 		return nil, err
 	}
 	if err := ctx.Err(); err != nil {
@@ -56,7 +64,12 @@ func splitAssetGrid(ctx context.Context, data []byte, kind, workspace string) ([
 		return nil, err
 	}
 	defer files.Close()
-	images := make([]assetGridImage, 0, 9)
+	images := make([]assetGridImage, 0, len(assetGridViews[kind]))
+	dimensions, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	bounds := image.Rect(0, 0, dimensions.Width, dimensions.Height)
 	var decoded image.Image
 	var cell *image.RGBA
 	for index, view := range assetGridViews[kind] {
@@ -64,7 +77,7 @@ func splitAssetGrid(ctx context.Context, data []byte, kind, workspace string) ([
 			return nil, err
 		}
 		filename := fmt.Sprintf("%02d-%s.jpg", index+1, view)
-		if info, err := files.Stat(filename); err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
+		if !validStoredGridCell(files, filename, assetGridCell(bounds, index, kind)) {
 			// Completed retries need no full decode; partial retries decode only once.
 			if decoded == nil {
 				decoded, _, err = image.Decode(bytes.NewReader(data))
@@ -72,7 +85,7 @@ func splitAssetGrid(ctx context.Context, data []byte, kind, workspace string) ([
 					return nil, err
 				}
 			}
-			bounds := assetGridCell(decoded.Bounds(), index)
+			bounds := assetGridCell(decoded.Bounds(), index, kind)
 			// Reuse the crop buffer instead of allocating nine full-size bitmaps.
 			if cell == nil || cell.Bounds().Dx() != bounds.Dx() || cell.Bounds().Dy() != bounds.Dy() {
 				cell = image.NewRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
@@ -87,6 +100,26 @@ func splitAssetGrid(ctx context.Context, data []byte, kind, workspace string) ([
 		images = append(images, assetGridImage{View: view, URL: "/storage/" + rel})
 	}
 	return images, nil
+}
+
+func validStoredGridCell(files *os.Root, name string, expected image.Rectangle) bool {
+	info, err := files.Lstat(name)
+	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 {
+		return false
+	}
+	file, err := files.Open(name)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	size, err := jpeg.DecodeConfig(file)
+	if err != nil || size.Width != expected.Dx() || size.Height != expected.Dy() {
+		return false
+	}
+	// A truncated JPEG can have a perfectly valid header and dimensions.
+	var end [2]byte
+	_, err = file.ReadAt(end[:], info.Size()-2)
+	return err == nil && end == [2]byte{0xff, 0xd9}
 }
 
 // A workspace-rooted directory handle keeps symlinks in generated paths confined.

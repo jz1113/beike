@@ -51,19 +51,19 @@ describe('one grid for all asset views', () => {
     expect(Render().views.main).toBe('/person.jpg');
     expect(Render().active).toEqual([]);
   });
-  it('generates once for all nine missing views and blocks duplicate clicks', async () => {
+  it('generates once for all four missing views and blocks duplicate clicks', async () => {
     const result = deferred();
     generate.mockReturnValueOnce(result.promise);
     const run = Render().generate();
     expect(generate).toHaveBeenCalledTimes(1);
-    expect(Render().active).toHaveLength(9);
+    expect(Render().active).toHaveLength(4);
     await Render().generate();
     expect(generate).toHaveBeenCalledTimes(1);
     result.resolve(generated);
     await run;
-    expect(Render().views).toEqual({ main: '/main.jpg', ...generated });
+    expect(Render().views).toEqual({ sheet: '', main: '/main.jpg', ...generated });
     expect(Render().active).toEqual([]);
-    expect(Render().notice).toContain('9 张');
+    expect(Render().notice).toContain('4 张');
   });
   it('retains the request and original model for retries of a failed crop', async () => {
     generate.mockImplementationOnce(async (request) => { request.resultUrl = '/grid.png'; throw new Error('裁切保存失败'); });
@@ -97,7 +97,7 @@ describe('one grid for all asset views', () => {
     expect(Render().stage).toBe('');
     expect(Render().active).toEqual([]);
     expect(Render().recovering).toBe(true);
-    expect(Render().notice).toContain('九宫格已生成');
+    expect(Render().notice).toContain('视角图已生成');
     expect(Render().error).toContain('读取原图超时');
     generate.mockResolvedValueOnce(generated);
     await Render().generate();
@@ -145,7 +145,7 @@ describe('one grid for all asset views', () => {
   it('does not apply an incomplete crop response over existing references', async () => {
     generate.mockImplementationOnce(async (request) => { request.resultUrl = '/grid.png'; return { face: '/face.jpg' }; });
     await Render().generate();
-    expect(Render().error).toContain('裁切结果不完整');
+    expect(Render().error).toContain('生成视角不完整');
     expect(Render().views.face).toBe('');
     expect(Render().recovering).toBe(true);
   });
@@ -192,7 +192,7 @@ it('restores uploaded and generated references after the dialog is unmounted', a
   await Render(draft).generate();
   remount();
   const restored = Render(draft);
-  expect(restored.views).toEqual({ main: '/user-main.jpg', ...generated });
+  expect(restored.views).toEqual({ sheet: '', main: '/user-main.jpg', ...generated });
   expect(restored.missing).toEqual([]);
   expect(generate).toHaveBeenCalledTimes(1);
 });
@@ -214,7 +214,7 @@ it('persists the key before submission and restores the same interrupted paid ta
   generate.mockResolvedValueOnce(generated);
   await Render(draft).generate();
   expect(generate.mock.calls[1][0]).toMatchObject({ key: original.key, taskId: 'paid-task', prompt: 'paid prompt', model: 'test' });
-  expect(Render(draft).views).toEqual({ main: '/main.jpg', ...generated });
+  expect(Render(draft).views).toEqual({ sheet: '', main: '/main.jpg', ...generated });
 });
 
 it('does not submit a paid request when its recovery data cannot be saved', async () => {
@@ -240,7 +240,7 @@ it('recovers after effect replay without losing the task or letting an old reque
     request.taskId = 'original-paid-task'; onStage('generating'); return first.promise;
  }).mockReturnValueOnce(second.promise);
   const firstRun = Render().generate();
-  expect(Render().active).toHaveLength(9);
+  expect(Render().active).toHaveLength(4);
   // Fast Refresh runs cleanup and setup with the SAME hook state and refs.
   hooks.cleanup?.(); hooks.cleanup = undefined; Render();
   expect(Render().active).toEqual([]);
@@ -249,12 +249,12 @@ it('recovers after effect replay without losing the task or letting an old reque
   const secondRun = Render().generate();
   expect(generate.mock.calls[1][0].taskId).toBe('original-paid-task');
   first.resolve(generated); await firstRun;
-  expect(Render().active).toHaveLength(9);
+  expect(Render().active).toHaveLength(4);
   await Render().generate();
   expect(generate).toHaveBeenCalledTimes(2);
   second.resolve(generated); await secondRun;
   expect(Render().active).toEqual([]);
-  expect(Render().views).toEqual({ main: '/main.jpg', ...generated });
+  expect(Render().views).toEqual({ sheet: '', main: '/main.jpg', ...generated });
 });
 
 it('recovers an interrupted upload after effect replay and ignores its late result', async () => {

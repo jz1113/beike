@@ -177,7 +177,7 @@ func parseProductTool(ctx context.Context, db *sql.DB, cfg config.Config, worksp
 		return toolJSON(false, "缺少 url")
 	}
 	if socialLink(raw) {
-		return toolJSON(false, "社媒解析失败（请在设置中配置奇云或 APIA 解析凭证并同步到服务端）")
+		return toolJSON(false, "社媒解析失败")
 	}
 	if db == nil {
 		return toolJSON(false, "解析请求失败")

@@ -1,3 +1,4 @@
+import { listApprovedModels } from './modelCatalog';
 import type { TextProtocol } from './textProtocol';
 
 export type ModalityStorageKind = 'chat' | 'image' | 'video' | 'three_d' | 'music' | 'voice' | 'avatar';
@@ -33,6 +34,17 @@ function seed(
   return { id, name, modality, vendor, modelId, isInfrequent: false, ...extra };
 }
 
+/** 使用宿主模型目录的精确上游 ID 和展示名。每个预设只指向全局渠道。 */
+function catalogSeeds(kind: 'chat' | 'image' | 'video', ids: readonly string[]): DefaultModalityModel[] {
+  const catalog = listApprovedModels(kind === 'chat' ? 'multimodal' : kind);
+  const vendors: Record<string, string> = { alibaba: 'qwen', kuaishou: 'kling', bfl: 'flux' };
+  return ids.map(id => {
+    const model = catalog.find(item => item.id === id);
+    if (!model) throw new Error(`未收录的${kind}线路：${id}`);
+    return seed(`${kind}_catalog_${id}`, model.name, kind, vendors[model.vendor] ?? model.vendor, id);
+  });
+}
+
 /** 设置页与前台共用的模态默认模型。空列表和占位项会补回这些模型；用户解除过的种子不会再自动补回。 */
 export const DEFAULT_MODALITY_MODELS: Record<ModalityStorageKind, DefaultModalityModel[]> = {
   chat: [
@@ -45,6 +57,12 @@ export const DEFAULT_MODALITY_MODELS: Record<ModalityStorageKind, DefaultModalit
     seed('chat_minimax', 'MiniMax', 'chat', 'minimax', 'abab6.5s-chat'),
     seed('chat_glm', 'GLM', 'chat', 'glm', 'glm-4v'),
     seed('chat_qwen', 'Qwen', 'chat', 'qwen', 'qwen-vl-max'),
+    ...catalogSeeds('chat', [
+      'gpt-6-astra',
+      'gemini-3.1-pro-preview',
+      'grok-4.7',
+      'qwen3.8-max',
+    ]),
   ],
   image: [
     seed('img_openai', 'GPT Image', 'image', 'openai', 'gpt-image-2', { isDefault: true }),
@@ -53,6 +71,14 @@ export const DEFAULT_MODALITY_MODELS: Record<ModalityStorageKind, DefaultModalit
     seed('img_xai', 'Grok Image', 'image', 'xai', 'grok-image'),
     seed('img_kling', 'Kolors', 'image', 'kling', 'kling-image'),
     seed('img_qwen', 'Qwen Image', 'image', 'qwen', 'qwen-image'),
+    ...catalogSeeds('image', [
+      'qwen-image-edit',
+      'gemini-3.1-flash-image',
+      'doubao-seedream-4-5-251128',
+      'seedream-v5-pro',
+      'grok-4.2-image',
+      'grok-imagine-image-quality',
+    ]),
   ],
   video: [
     seed('vid_bytedance', 'Seedance', 'video', 'bytedance', 'doubao-seedance-2.5', { isDefault: true }),
@@ -66,6 +92,16 @@ export const DEFAULT_MODALITY_MODELS: Record<ModalityStorageKind, DefaultModalit
     seed('vid_vidu', 'Vidu', 'video', 'vidu', 'vidu-2.0'),
     seed('vid_mj', 'MJ Video', 'video', 'midjourney', 'midjourney-video'),
     seed('vid_topaz', 'Topaz', 'video', 'topaz', 'topaz-video-upscale'),
+    ...catalogSeeds('video', [
+      'veo3.1-fast',
+      'sora-2-pro',
+      'doubao-seedance-2.0-mini',
+      'doubao-seedance-2-0-fast-260128',
+      'kling-video-v3-omni',
+      'MiniMax-H3',
+      'viduq3-pro',
+      'viduq3-turbo',
+    ]),
   ],
   three_d: [
     seed('3d_hunyuan_fal', 'Hunyuan 3D', 'three_d', 'hunyuan', 'fal-ai/hunyuan-3d/v3.1/pro', { isDefault: true }),

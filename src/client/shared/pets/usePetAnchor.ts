@@ -7,11 +7,12 @@ import {
 type Geometry = { point: PetPoint; size: PetSize; bounds: PetBounds; panelHeight: number };
 type Gesture = { id: number; x: number; y: number; origin: PetPoint; moved: boolean; target: HTMLButtonElement };
 
-function persist(point: PetPoint) {
-  try { writePetPosition(window.localStorage, point); } catch { /* Storage getter can also fail. */ }
+function persist(point: PetPoint, key?: string) {
+  try { writePetPosition(window.localStorage, point, key); } catch { /* Storage getter can also fail. */ }
 }
 
-export function usePetAnchor(panelOpen: boolean, onDragStart: () => void) {
+export function usePetAnchor(panelOpen: boolean, onDragStart: () => void, canvas = false) {
+  const key = canvas ? "beike.pet.canvas.position.v1" : undefined;
   const rootRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -32,9 +33,9 @@ export function usePetAnchor(panelOpen: boolean, onDragStart: () => void) {
     gesture.current = null;
     suppressClick.current = active.moved || cancelled;
     setMoving(false);
-    if (active.moved && geometry.current) persist(geometry.current.point);
+    if (active.moved && geometry.current) persist(geometry.current.point, key);
     if (active.target.hasPointerCapture(active.id)) active.target.releasePointerCapture(active.id);
-  }, []);
+  }, [key]);
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -61,14 +62,14 @@ export function usePetAnchor(panelOpen: boolean, onDragStart: () => void) {
       const size = { width: pet.width / sx, height: pet.height / sy };
       let point = geometry.current?.point;
       if (!point) {
-        try { point = readPetPosition(window.localStorage) ?? undefined; } catch { /* Use default position. */ }
+        try { point = readPetPosition(window.localStorage, key) ?? undefined; } catch { /* Use default position. */ }
       }
-      point = clampPetPosition(point ?? { x: Infinity, y: Infinity }, size, bounds);
+      point = clampPetPosition(point ?? { x: Infinity, y: canvas ? (bounds.height - size.height) / 2 : Infinity }, size, bounds);
       const content = panelRef.current?.firstElementChild;
       const panelHeight = content ? content.getBoundingClientRect().height / sy : 380;
       const previous = geometry.current;
       update({ point, size, bounds, panelHeight });
-      persist(point);
+      persist(point, key);
       // Opening or closing the panel must not interrupt a pointer gesture.
       const resized = previous && (JSON.stringify(previous.bounds) !== JSON.stringify(bounds) || JSON.stringify(previous.size) !== JSON.stringify(size));
       if (resized && gesture.current) finish(true);
@@ -87,7 +88,7 @@ export function usePetAnchor(panelOpen: boolean, onDragStart: () => void) {
       window.visualViewport?.removeEventListener('resize', measure);
       window.visualViewport?.removeEventListener('scroll', measure);
     };
-  }, [panelOpen, finish, update]);
+  }, [panelOpen, finish, update, canvas, key]);
 
   useLayoutEffect(() => () => {
     const active = gesture.current;

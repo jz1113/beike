@@ -3,7 +3,7 @@ import { batchHistoryTitle } from '../../model/workspace/batchHistory';
 import type { WorkshopBatch } from '@shared/workshopSnapshot';
 import type { useBatchWorkshopRunner } from '../../hooks/useBatchWorkshopRunner';
 import type { BatchProductItem } from '../../model/batchTypes';
-import { exportBatchZip, exportBatchExcel, exportSingleProductZip, downloadSingleTaskImage } from '../../model/delivery/batchRunnerExport';
+import { exportBatchZip, exportBatchExcel, downloadSingleTaskImage } from '../../model/delivery/batchRunnerExport';
 import BatchStage4Queue from '../stage/BatchStage4Queue';
 import { WorkshopAssetBindings } from '../settings/WorkshopAssetBindings';
 
@@ -11,16 +11,13 @@ interface BatchWorkshopHistoryPreviewProps {
   batch: WorkshopBatch;
   runner: ReturnType<typeof useBatchWorkshopRunner>;
   isHistoryExporting: boolean;
-  historyExportItemId: string | null;
   setIsHistoryExporting: Dispatch<SetStateAction<boolean>>;
-  setHistoryExportItemId: Dispatch<SetStateAction<string | null>>;
   onClose: () => void;
 }
 
-export function BatchWorkshopHistoryPreview({ batch, runner, isHistoryExporting, historyExportItemId, setIsHistoryExporting, setHistoryExportItemId, onClose }: BatchWorkshopHistoryPreviewProps) {
+export function BatchWorkshopHistoryPreview({ batch, runner, isHistoryExporting, setIsHistoryExporting, onClose }: BatchWorkshopHistoryPreviewProps) {
   const historyExportDeps = {
     setIsExportingZip: setIsHistoryExporting,
-    setExportingSingleItemId: setHistoryExportItemId,
     setToastMsg: (msg: string | null) => { if (msg) runner.showToast(msg); },
     showToast: runner.showToast,
   };
@@ -45,10 +42,8 @@ export function BatchWorkshopHistoryPreview({ batch, runner, isHistoryExporting,
         isGeneratingBatch={false}
       generateCopywritingForProduct={async () => {}}
         isExportingZip={isHistoryExporting}
-        exportingSingleItemId={historyExportItemId}
         handleExportZip={() => exportBatchZip(batch.snapshot.items as BatchProductItem[], historyExportDeps)}
         handleExportExcel={() => exportBatchExcel(batch.snapshot.items as BatchProductItem[], historyExportDeps)}
-        handleExportSingleProductZip={(item) => exportSingleProductZip(item, historyExportDeps)}
         handleDownloadSingleTaskImage={(url, filename) => downloadSingleTaskImage(url, filename, runner.showToast)}
         setPreviewImageUrl={runner.setPreviewImageUrl}
         onPreviewGallery={runner.openGalleryPreview}

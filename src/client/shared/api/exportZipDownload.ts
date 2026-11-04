@@ -6,6 +6,20 @@ export interface ExportZipStatistics { total: number; succeeded: number; failed:
 export interface ExportZipResult extends ExportZipStatistics { savedVia: 'browser' }
 export interface ExportProgress { phase: 'packing' | 'saving' | 'done'; downloaded: number; total?: number; result?: ExportZipStatistics; savedVia?: 'browser' }
 
+function localExportSources(payload: Record<string, unknown>): Record<string, unknown> {
+  if (typeof window === 'undefined' || !Array.isArray(payload.images)) return payload;
+  return { ...payload, images: payload.images.map(item => {
+    if (!item || typeof item !== 'object' || typeof item.url !== 'string' || !/^https?:\/\//i.test(item.url)) return item;
+    try {
+      const url = new URL(item.url);
+      if (url.origin === window.location.origin && url.pathname.startsWith('/storage/')) {
+        return { ...item, url: url.pathname + url.search };
+      }
+    } catch { /* Leave invalid URLs for the export failure report. */ }
+    return item;
+  }) };
+}
+
 export function readExportZipResult(response: Response): ExportZipStatistics {
   const count = (key: string) => {
     const raw = response.headers.get(key);
@@ -79,7 +93,7 @@ async function isCompleteZip(blob: Blob): Promise<boolean> {
 }
 
 export async function exportZipDownload(payload: Record<string, unknown>, filename: string, onProgress: (progress: ExportProgress) => void): Promise<ExportZipResult> {
-  const body = JSON.stringify(payload);
+  const body = JSON.stringify(localExportSources(payload));
   onProgress({ phase: 'packing', downloaded: 0 });
   const response = await apiFetch('/api/generate/export-zip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
   if (!response.ok) {

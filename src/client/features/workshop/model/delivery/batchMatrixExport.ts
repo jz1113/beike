@@ -2,7 +2,7 @@ import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import { apiFetch, proxyMediaUrl, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { formatWorkshopCopywriting, type WorkshopExportRow } from '@shared/domain/workshop/workshopExport';
 import type { BatchProductItem } from '../batchTypes';
-import { exportFourShots, exportGeneratedTitle, exportProductId, exportPromptGroupName } from './batchExport';
+import { exportImageTasks, exportGeneratedTitle, exportProductId, exportPromptGroupName } from './batchExport';
 
 export type MatrixExportRow = WorkshopExportRow;
 
@@ -64,6 +64,7 @@ export async function buildMatrixExportRows(
   opts?: { includeShot?: (item: BatchProductItem, shotNo: number) => boolean; allowUpload?: boolean },
 ): Promise<MatrixExportRow[]> {
   const rows: MatrixExportRow[] = [];
+  const extended = items.some(item => exportImageTasks(item).some(task => task.shot_no > 4));
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const row: MatrixExportRow = {
@@ -74,11 +75,12 @@ export async function buildMatrixExportRows(
       '生成图片链接2': '',
       '生成图片链接3': '',
       '生成图片链接4': '',
+      ...(extended ? { '生成图片链接5': '', '生成图片链接6': '', '生成图片链接7': '', '生成图片链接8': '' } : {}),
       '标题': exportGeneratedTitle(item),
       '文案': formatWorkshopCopywriting(item.copywriting?.content),
       '对应生成的提示词资产分组组名': exportPromptGroupName(item),
     };
-    const shots = exportFourShots(item).filter(task => !opts?.includeShot || opts.includeShot(item, task.shot_no));
+    const shots = exportImageTasks(item).filter(task => !opts?.includeShot || opts.includeShot(item, task.shot_no));
     await Promise.all(shots.map(async task => {
       row[`生成图片链接${task.shot_no}` as keyof MatrixExportRow] = opts?.allowUpload === false
         ? existingImageUrl(task.resultUrl!)

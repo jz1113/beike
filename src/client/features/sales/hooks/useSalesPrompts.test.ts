@@ -38,7 +38,7 @@ vi.mock('react', () => ({
   },
 }));
 vi.mock('../api/salesPrompts', async (original) => ({ ...await original<typeof import('../api/salesPrompts')>(), listSalesPrompts: vi.fn(), saveSalesPrompt: vi.fn() }));
-const summary: SalesPrompt = { id: 'summary', title: '卖点提炼', description: '', prompt: '自定义旧稿', defaultPrompt: '默认稿', version: 'v1', customized: true };
+const summary: SalesPrompt = { id: 'summary', title: '卖点提炼', description: '', prompt: '自定义旧稿', defaultPrompt: '默认稿', version: 'v1', customized: true, configured: true };
 const script: SalesPrompt = { ...summary, id: 'script-analysis', title: '脚本拆解', prompt: '拆解要求' };
 const grid: SalesPrompt = { ...summary, id: 'persona-grid', title: '人物补图 · 九宫格', prompt: '人物 3×3 等分九宫格', version: 'grid-v1' };
 function Render(enabled = true) {
@@ -61,9 +61,9 @@ beforeEach(() => {
 });
 afterEach(() => { hooks.cleanups.forEach((cleanup) => cleanup()); vi.unstubAllGlobals(); });
 
-it('includes both current grid templates and excludes retired single-view prompts from older servers', async () => {
-  const currentIds = ['summary', 'script-analysis', 'script-normalize', 'plan-adapt', 'persona-grid', 'scene-grid'];
-  const retiredIds = ['persona-face', 'persona-front', 'persona-side', 'scene-left', 'scene-right', 'scene-reverse'];
+it('includes asset creation templates and excludes retired single-view prompts from older servers', async () => {
+  const currentIds = ['summary', 'script-analysis', 'plan-adapt', 'spoken-copy', 'spoken-review', 'final-video', 'final-video-depth', 'persona-design', 'scene-design', 'persona-grid', 'scene-grid'];
+  const retiredIds = ['script-normalize', 'persona-face', 'persona-front', 'persona-side', 'scene-left', 'scene-right', 'scene-reverse'];
   vi.mocked(listSalesPrompts).mockResolvedValue([...currentIds, ...retiredIds].map((id) => ({ ...summary, id })));
   await Render().refresh();
   expect(Render().items.map(({ id }) => id)).toEqual(currentIds);
@@ -84,6 +84,37 @@ it('saves the grid template independently while preserving another stage draft',
   Render().select(summary.id);
   expect(Render().text).toBe('未保存的文案要求');
   expect(Render().hasUnsaved).toBe(true);
+});
+
+it('requires an explicit save before the visible initial final-video template can execute', async () => {
+  const initial = { ...summary, id: 'final-video', title: '最终视频生成', prompt: '', defaultPrompt: '可编辑的初始模板', configured: false, customized: false };
+  vi.mocked(listSalesPrompts).mockResolvedValue([initial]);
+  await Render().refresh();
+  expect(Render()).toMatchObject({ text: initial.defaultPrompt, hasUnsaved: false });
+  expect(Render().dirty(initial)).toBe(true);
+  const saved = { ...initial, prompt: initial.defaultPrompt, configured: true, customized: true, version: 'saved-v1' };
+  vi.mocked(saveSalesPrompt).mockResolvedValue(saved);
+  await Render().save();
+  expect(saveSalesPrompt).toHaveBeenCalledExactlyOnceWith('final-video', initial.defaultPrompt, initial.version);
+  expect(Render().selected).toEqual(saved);
+  expect(Render().dirty(saved)).toBe(false);
+});
+
+it('saves the depth template independently and preserves the script template draft', async () => {
+  const scriptFinal = { ...summary, id: 'final-video', title: '最终视频生成 · 纯分镜版' };
+  const depthFinal = { ...summary, id: 'final-video-depth', title: '最终视频生成 · 深度视频版' };
+  vi.mocked(listSalesPrompts).mockResolvedValue([scriptFinal, depthFinal]);
+  await Render().refresh();
+  Render().updateDraft('纯分镜的独立编辑');
+  Render().select(depthFinal.id);
+  Render().updateDraft('深度视频只参考动作');
+  const saved = { ...depthFinal, prompt: '深度视频只参考动作', version: 'depth-v2' };
+  vi.mocked(saveSalesPrompt).mockResolvedValue(saved);
+  await Render().save();
+  expect(saveSalesPrompt).toHaveBeenCalledExactlyOnceWith(depthFinal.id, saved.prompt, depthFinal.version);
+  Render().select(scriptFinal.id);
+  expect(Render().text).toBe('纯分镜的独立编辑');
+  expect(Render().selected?.prompt).toBe(scriptFinal.prompt);
 });
 
 it('retains independent drafts when changing stages and leaving the manager tab', async () => {

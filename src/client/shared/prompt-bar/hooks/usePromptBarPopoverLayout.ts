@@ -17,7 +17,7 @@ interface PopoverLayout {
 /** Keep parameter menus inside the visible workspace, with scrolling when neither side fits. */
 export function usePromptBarPopoverLayout(
   isOpen: boolean,
-  preferUp: boolean,
+  preferUp: boolean | 'below',
   anchorRef: RefObject<HTMLElement | null>,
   panelWidth = PANEL_WIDTH,
   panelMaxHeight = PANEL_MAX_HEIGHT,
@@ -71,9 +71,11 @@ export function usePromptBarPopoverLayout(
       const above = Math.max(0, rect.top - bounds.top - EDGE_PADDING - PANEL_GAP);
       const below = Math.max(0, bounds.bottom - rect.bottom - EDGE_PADDING - PANEL_GAP);
       const desiredHeight = Math.min(panelMaxHeight, panel.scrollHeight + panel.offsetHeight - panel.clientHeight);
-      const isUp = preferUp
+      // A requested dropdown can scroll below its trigger if at least a few rows fit.
+      const requiredBelow = preferUp === 'below' ? Math.min(120, desiredHeight) : desiredHeight;
+      const isUp = preferUp === true
         ? above >= desiredHeight || above >= below
-        : below < desiredHeight && above > below;
+        : below < requiredBelow && above > below;
       const next = {
         isUp,
         width,
@@ -104,7 +106,7 @@ export function usePromptBarPopoverLayout(
 
   return {
     panelRef,
-    opensUp: layout?.isUp ?? preferUp,
+    opensUp: layout?.isUp ?? (preferUp === true),
     panelStyle: layout ? { left: layout.left, width: layout.width, maxHeight: layout.maxHeight, ...(portal ? { top: layout.top, bottom: layout.bottom } : {}) } : undefined,
   };
 }

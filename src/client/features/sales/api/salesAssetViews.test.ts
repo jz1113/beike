@@ -17,7 +17,7 @@ vi.mock('@client/shared/media/imageJpeg', () => ({ convertImageToJpeg: vi.fn() }
 
 const jpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0xff, 0xd9]);
 const jpeg = new Blob([jpegBytes], { type: 'image/jpeg' });
-const gridImages = (kind: 'persona' | 'scene' = 'persona') => (kind === 'persona' ? PERSONA_VIEWS : SCENE_VIEWS)
+const gridImages = (kind: 'persona' | 'scene' = 'persona', whole = true) => kind === 'persona' && whole ? [{view: 'sheet', url: '/stored/sheet.jpg'}] : (kind === 'persona' ? PERSONA_VIEWS : SCENE_VIEWS)
   .filter(({ id }) => id !== 'main').map(({ id }) => ({ view: id, url: `/stored/${id}.jpg` }));
 const requestFor = (patch: Partial<AssetViewRequest> = {}): AssetViewRequest => ({
   key: 'key', model: 'gpt-image-2', references: ['/main.jpg'], ...patch,
@@ -25,34 +25,34 @@ const requestFor = (patch: Partial<AssetViewRequest> = {}): AssetViewRequest => 
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(listSalesPrompts).mockResolvedValue(['persona', 'scene'].map((kind) => ({
-    id: `${kind}-grid`, title: '九宫格', description: '', prompt: `${kind} 3x3 九宫格`, defaultPrompt: '', version: 'grid-v1', customized: true,
+    id: `${kind}-grid`, title: '九宫格', description: '', prompt: `${kind} 视角模板`, defaultPrompt: '', version: 'grid-v1', customized: true, configured: true,
   })));
   vi.mocked(submitImageGenTaskResult).mockResolvedValue({ url: '/grid.png', temporary: false });
   vi.mocked(apiRequest).mockImplementation(async (_method, _path, options) => new Response(JSON.stringify({
-    success: true, images: gridImages(JSON.parse(String(options?.body)).kind),
+    success: true, images: gridImages(JSON.parse(String(options?.body)).kind, !!JSON.parse(String(options?.body)).whole),
   })));
   vi.mocked(convertImageToJpeg).mockResolvedValue(jpeg);
   vi.mocked(uploadSalesCustomAsset).mockImplementation(async (file) => `/stored/${file.name}`);
 });
 
-it.each(['persona', 'scene'] as const)('submits one %s grid then crops all nine views on the backend', async (kind) => {
+it.each(['persona', 'scene'] as const)('submits one %s grid then crops the expected views on the backend', async (kind) => {
   const request = requestFor();
   const signal = new AbortController().signal;
   const onStage = vi.fn();
   const result = await generateSalesAssetGrid(kind, request, signal, onStage);
   expect(onStage.mock.calls).toEqual([['prompt'], ['generating'], ['cropping']]);
-  expect(Object.entries(result)).toHaveLength(9);
+  expect(Object.entries(result)).toHaveLength(kind === 'persona' ? 1 : 9);
   expect(result).toEqual(Object.fromEntries(gridImages(kind).map(({ view, url }) => [view, url])));
   expect(submitImageGenTaskResult).toHaveBeenCalledTimes(1);
   const [payload, deps] = vi.mocked(submitImageGenTaskResult).mock.calls[0];
-  expect(payload).toMatchObject({ model: request.model, prompt: `${kind} 3x3 九宫格`, aspectRatio: kind === 'persona' ? '3:4' : '4:3',
-    quality: 'high', useReferenceImage: true, referenceImages: ['/main.jpg'], metadata: { layout: '3x3', promptVersion: 'grid-v1' } });
+  expect(payload).toMatchObject({ model: request.model, prompt: `${kind} 视角模板`, aspectRatio: kind === 'persona' ? '16:9' : '4:3',
+    quality: 'high', useReferenceImage: true, referenceImages: ['/main.jpg'], metadata: { layout: kind === 'persona' ? '1x4' : '3x3', promptVersion: 'grid-v1' } });
   expect(payload.size).toMatch(/^\d+x\d+$/);
   await deps.onTaskSubmitted?.('original-task');
   expect(request.taskId).toBe('original-task');
   expect(deps.idempotencyKey).toBe('key');
   expect(apiRequest).toHaveBeenCalledExactlyOnceWith('POST', '/api/sales/asset-view-grid', {
-    signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, imageUrl: '/grid.png' }),
+    signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, layout: kind === 'persona' ? '1x4' : '3x3', ...(kind === 'persona' && {whole: true}), imageUrl: '/grid.png' }),
   });
   expect(uploadSalesCustomAsset).not.toHaveBeenCalled();
   expect(convertImageToJpeg).not.toHaveBeenCalled();
@@ -68,7 +68,7 @@ it('limits references and resolution to the selected image model capabilities', 
 it.each(['/remote-grid.png', 'data:image/png;base64,cG5nLWJ5dGVz'])('passes temporary or inline output to the backend for cropping: %s', async (url) => {
   vi.mocked(submitImageGenTaskResult).mockResolvedValueOnce({ url, temporary: true });
   await generateSalesAssetGrid('persona', requestFor(), new AbortController().signal);
-  expect(JSON.parse(String(vi.mocked(apiRequest).mock.calls[0][2]?.body))).toEqual({ kind: 'persona', imageUrl: url });
+  expect(JSON.parse(String(vi.mocked(apiRequest).mock.calls[0][2]?.body))).toEqual({ kind: 'persona', layout: '1x4', whole: true, imageUrl: url });
 });
 
 it('polls the original task and uses the stored prompt instead of generating again', async () => {
@@ -126,17 +126,23 @@ it('keeps the frozen prompt and idempotency key after an uncertain submission', 
   vi.mocked(listSalesPrompts).mockResolvedValue([]);
   await generateSalesAssetGrid('persona', request, signal);
   expect(listSalesPrompts).toHaveBeenCalledTimes(1);
-  expect(vi.mocked(submitImageGenTaskResult).mock.calls[1][0].prompt).toBe('persona 3x3 九宫格');
+  expect(vi.mocked(submitImageGenTaskResult).mock.calls[1][0].prompt).toBe('persona 视角模板');
   expect(vi.mocked(submitImageGenTaskResult).mock.calls[1][1].idempotencyKey).toBe('key');
 });
 
 it('identifies an old backend without submitting or using a retired single-view prompt', async () => {
-  vi.mocked(listSalesPrompts).mockResolvedValue([{ id: 'persona-face', title: '脸部', description: '', prompt: '只生成脸部', defaultPrompt: '只生成脸部', version: 'old', customized: false }]);
+  vi.mocked(listSalesPrompts).mockResolvedValue([{ id: 'persona-face', title: '脸部', description: '', prompt: '只生成脸部', defaultPrompt: '只生成脸部', version: 'old', customized: false, configured: false }]);
   const request = requestFor();
   await expect(generateSalesAssetGrid('persona', request, new AbortController().signal)).rejects.toThrow('请重启贝壳服务');
   expect(request.prompt).toBeUndefined();
   expect(submitImageGenTaskResult).not.toHaveBeenCalled();
   expect(apiRequest).not.toHaveBeenCalled();
+});
+
+it('does not use the initial grid template when the workspace has not saved it', async () => {
+  vi.mocked(listSalesPrompts).mockResolvedValue([{ id: 'persona-grid', title: '人物补图', description: '', prompt: '', defaultPrompt: '初始九宫格要求', version: 'unconfigured', configured: false, customized: false }]);
+  await expect(generateSalesAssetGrid('persona', requestFor(), new AbortController().signal)).rejects.toThrow('请先在提示词管理中保存');
+  expect(submitImageGenTaskResult).not.toHaveBeenCalled();
 });
 
 it('stops an aborted generation before submission or crop requests', async () => {
@@ -188,14 +194,14 @@ it.each(['persona', 'scene'] as const)('retains an oversized %s grid for crop re
   expect(listSalesPrompts).not.toHaveBeenCalled();
   expect(apiRequest).toHaveBeenCalledTimes(2);
   expect(vi.mocked(apiRequest).mock.calls[1][2]?.body).toBe(vi.mocked(apiRequest).mock.calls[0][2]?.body);
-  expect(request.images).toEqual(Object.fromEntries(gridImages(kind).map(({ view, url }) => [view, url])));
+  expect(request.images).toEqual(Object.fromEntries(gridImages(kind, false).map(({ view, url }) => [view, url])));
 });
 
 it('checkpoints each generation stage before waiting for the next network operation', async () => {
   const request = requestFor();
   const checkpoints: AssetViewRequest[] = [];
   vi.mocked(submitImageGenTaskResult).mockImplementationOnce(async (_input, options) => {
-    expect(checkpoints.at(-1)).toMatchObject({ key: 'key', prompt: 'persona 3x3 九宫格' });
+    expect(checkpoints.at(-1)).toMatchObject({ key: 'key', prompt: 'persona 视角模板' });
     await options.onTaskSubmitted?.('paid-task');
     expect(checkpoints.at(-1)).toMatchObject({ taskId: 'paid-task' });
     return { url: '/original-grid.jpg', temporary: false };

@@ -1,9 +1,12 @@
+import { createPortal } from 'react-dom';
+import { WorkshopOutputPreview } from './product/WorkshopOutputPreview';
+import { WorkshopContentList } from './layout/WorkshopContentList';
+import { WorkshopStageNavigation } from './layout/WorkshopStageNavigation';
 import { WorkspaceSaveNotice } from './layout/WorkspaceSaveNotice';
 import { useEffect, useState } from 'react';
 import { useBatchWorkshopRunner } from '../hooks/useBatchWorkshopRunner';
 import BatchStage1Collect from './stage/BatchStage1Collect';
 import BatchStage2Config from './stage/BatchStage2Config';
-import { BatchConfigProvider, type BatchConfigContextValue } from './settings/BatchConfigContext';
 import BatchStage3Prompts from './stage/BatchStage3Prompts';
 import BatchStage4Queue from './stage/BatchStage4Queue';
 import { BatchPreviewLightbox } from '@client/shared/modals/lightbox/BatchPreviewLightbox';
@@ -15,17 +18,14 @@ import { BatchProductItem, TypedProductImage } from '../model/batchTypes';
 import type { WorkshopBatch } from '@shared/workshopSnapshot';
 import type { WorkshopStage } from '../model/workspace/workshopFlow';
 import { BatchWorkshopHistoryPreview } from './history/BatchWorkshopHistoryPreview';
-import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 export type { TypedProductImage, BatchProductItem };
-export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?: (type: PromptAssetType) => void }) {
+export default function BatchWorkshopView({ onOpenSkills, stageNavigationTarget }: { stageNavigationTarget: HTMLElement | null; onOpenSkills: () => void }) {
   const runner = useBatchWorkshopRunner();
   const freshEntry = useAppStore(s => s.pendingFreshWorkshopEntry);
   const isWorkshopConfigOpen = useAppStore(s => s.isWorkshopConfigOpen);
   const setIsWorkshopConfigOpen = useAppStore(s => s.setIsWorkshopConfigOpen);
-  const setActiveWorkshopTab = useAppStore(s => s.setActiveWorkshopTab);
   const [historyGenerationBatch, setHistoryGenerationBatch] = useState<WorkshopBatch | null>(null);
   const [isHistoryExporting, setIsHistoryExporting] = useState(false);
-  const [historyExportItemId, setHistoryExportItemId] = useState<string | null>(null);
   const {
     currentStage,
     setCurrentStage,
@@ -63,10 +63,8 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
     updateItemCopywriting,
     generateAllCopywriting,
     isExportingZip,
-    exportingSingleItemId,
     handleExportZip,
     handleExportExcel,
-    handleExportSingleProductZip,
     handleDownloadSingleTaskImage,
     previewImageUrl,
     setPreviewImageUrl,
@@ -97,7 +95,15 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
     renameBatch,
     readBatch,
   } = runner;
+  const [focus, setFocus] = useState({ batch: '', id: '' });
+  const batchId = activeBatch?.id || '';
+  const focusedId = focus.batch === batchId ? focus.id : '';
+  const focusContent = (id: string) => setFocus({ batch: batchId, id });
   const flow = runner.flow;
+  const editingProduct = currentStage === 1 || currentStage === 2;
+  const pendingCollection = items.filter(item => item.status === 'pending' || item.status === 'failed').length;
+  const selectedContentId = (successfulItems.find(item => item.id === focusedId) ?? successfulItems[0])?.id;
+  const importing = currentStage === 1 || !successfulItems.length;
   useEffect(() => {
     if (workspaceReady && !flow.busy && !historyGenerationBatch && currentStage > 1 && successfulItems.length === 0 && !flow.hasResults) setCurrentStage(1);
   }, [workspaceReady, flow.busy, flow.hasResults, historyGenerationBatch, currentStage, successfulItems.length, setCurrentStage]);
@@ -111,27 +117,6 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
     if (reason) { showToast(reason); return; }
     setCurrentStage(stage);
   };
-  const confirmImagesAndAnalyze = () => {
-    if (flow.busy) return;
-    if (!flow.imagesReady || runner.analysisIssue) {
-      showToast(runner.analysisIssue || '请为每款商品至少选择一张商品图');
-      return;
-    }
-    setCurrentStage(3);
-    // Returning from image selection must preserve already reviewed prompts.
-    if (flow.pendingAnalysisIds.length > 0) void startBatchVisionAnalyze(selectedArchId, { productIds: flow.pendingAnalysisIds });
-  };
-  const stage2ConfigValue: BatchConfigContextValue = {
-    successfulItems, setItems, activeImgFilter, setActiveImgFilter,
-    toggleProductImageSelection, batchSetProductImages, handleRemoveItem,
-    onPreviewGallery: openGalleryPreview,
-    onPreviewImage: url => openGalleryPreview([url], 0),
-    onNextStage: confirmImagesAndAnalyze,
-    onPrevStage: () => selectStage(1),
-    analysisIssue: runner.analysisIssue,
-    busy: flow.busy,
-  };
-
   if (!workspaceReady) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8" role={workspaceError ? 'alert' : 'status'}>
@@ -162,27 +147,24 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
         onOpenGenerationView={setHistoryGenerationBatch}
         showToast={showToast}
       />
-      <div key={historyGenerationBatch?.id || currentStage} className={`flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-10 sm:px-6 lg:px-8 ${currentStage === 1 && !historyGenerationBatch ? 'pt-1 sm:pt-2' : 'pt-5'}`}>
-        <div className={
-          !historyGenerationBatch && currentStage === 1
-            ? "mx-auto w-full max-w-[1120px] flex-1 flex flex-col"
-            : historyGenerationBatch || currentStage === 4
-              ? "mx-auto w-full max-w-[1840px] space-y-4"
-              : !historyGenerationBatch && currentStage === 2 ? "mx-auto w-full max-w-[1760px] flex-1 flex flex-col min-h-0" : "mx-auto w-full max-w-[1760px] space-y-4"
-        }>
-          {!historyGenerationBatch && currentStage === 3 && <WorkshopProductionSummary runner={runner} onOpenSettings={() => setIsWorkshopConfigOpen(true)} />}
+      {!historyGenerationBatch && stageNavigationTarget && createPortal(<WorkshopStageNavigation stage={currentStage} flow={flow} onSelect={selectStage} />, stageNavigationTarget)}
+      <div key={historyGenerationBatch?.id || (editingProduct ? 'products' : currentStage)} className="workshop-main-scroll">
+        <div className="w-full min-w-0">
           {historyGenerationBatch ? (
             <BatchWorkshopHistoryPreview
               batch={historyGenerationBatch}
               runner={runner}
               isHistoryExporting={isHistoryExporting}
-              historyExportItemId={historyExportItemId}
               setIsHistoryExporting={setIsHistoryExporting}
-              setHistoryExportItemId={setHistoryExportItemId}
               onClose={() => setHistoryGenerationBatch(null)}
             />
-          ) : currentStage === 1 && (
-            <BatchStage1Collect
+          ) : editingProduct && <div className="workshop-product-layout">
+            <aside className="workshop-product-rail" aria-label="商品与批次内容">
+              <header className="workshop-pane-heading"><h2>商品资料</h2>
+                {successfulItems.length > 0 && <button type="button" disabled={flow.busy} aria-expanded={importing}
+                  onClick={() => selectStage(importing ? 2 : 1)}>{importing ? '收起商品导入' : '添加商品'}</button>}
+              </header>
+            <div hidden={!importing}><BatchStage1Collect
               key={runner.activeBatch?.id || 'draft'}
               batchInputText={batchInputText}
               setBatchInputText={setBatchInputText}
@@ -193,26 +175,39 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
               handleTableImport={runner.handleTableImport}
               handleParseInput={handleParseInput}
               startBatchCollect={startBatchCollect}
-              onContinue={() => selectStage(2)}
               busy={flow.busy}
-            />
-          )}
-
-          {!historyGenerationBatch && currentStage === 2 && (
-            <BatchConfigProvider value={stage2ConfigValue}>
-              <BatchStage2Config key={runner.activeBatch?.id || 'draft'} />
-            </BatchConfigProvider>
-          )}
+            /></div>
+              {pendingCollection > 0 && !importing && <button type="button" disabled={flow.busy} className="workshop-rail-notice" onClick={() => selectStage(1)}>处理待采集内容（{pendingCollection} 条）</button>}
+              {successfulItems.length > 0 && <WorkshopContentList label="本批图文" items={successfulItems} currentId={selectedContentId}
+                onSelect={focusContent} status={row => row.selectedProductImages.length ? `已选 ${row.selectedProductImages.length} 张参考图` : '待选参考图'} />}
+            </aside>
+            <div className="workshop-product-editor">
+            {successfulItems.length > 0 && <fieldset disabled={flow.busy} className="min-w-0">
+              <BatchStage2Config key={runner.activeBatch?.id} successfulItems={successfulItems} setItems={setItems} focusedId={focusedId} onFocus={focusContent}
+                activeImgFilter={activeImgFilter} setActiveImgFilter={setActiveImgFilter}
+                toggleProductImageSelection={toggleProductImageSelection} batchSetProductImages={batchSetProductImages}
+                handleRemoveItem={handleRemoveItem} onPreviewGallery={openGalleryPreview}
+                onPreviewImage={url => openGalleryPreview([url], 0)} busy={flow.busy} onNextStage={() => selectStage(3)} />
+            </fieldset>}
+              {!successfulItems.length && <WorkshopOutputPreview shotCount={selectedShotCount} aspect={selectedAspect} strategy={generationStrategy}
+                pending={pendingCollection} collecting={isCollecting} busy={flow.busy || runner.isAutoPilotRunning}
+                onMode={(mode, count) => { runner.setGenerationStrategy(mode); if (mode === 'single_shot') runner.setSelectedShotCount(count); }}
+                onSettings={() => setIsWorkshopConfigOpen(true)} />}
+            </div>
+          </div>}
 
           {!historyGenerationBatch && currentStage === 3 && (
             <BatchStage3Prompts
+              settings={<WorkshopProductionSummary runner={runner} onOpenSkills={onOpenSkills} onOpenSettings={() => setIsWorkshopConfigOpen(true)} />}
+              focusedId={focusedId} onFocus={focusContent}
+              flow={flow}
               generationStrategy={generationStrategy}
               selectedShotCount={selectedShotCount}
               successfulItems={successfulItems}
               setItems={setItems}
               isAnalyzingAll={isAnalyzingAll}
               analyzeProgress={analyzeProgress}
-              startBatchVisionAnalyze={(productIds) => startBatchVisionAnalyze(selectedArchId, productIds ? { productIds } : undefined)}
+              startBatchVisionAnalyze={(productIds) => startBatchVisionAnalyze(selectedArchId, { productIds })}
               analyzeSingleProduct={analyzeSingleProduct}
               handleRemoveItem={handleRemoveItem}
               startBatchGeneration={startBatchGeneration}
@@ -224,7 +219,7 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
           )}
 
           {!historyGenerationBatch && currentStage === 4 && (
-            <BatchStage4Queue
+            <BatchStage4Queue focusedId={focusedId} onFocus={focusContent}
               successfulItems={items.filter(item => (item.selected && item.status === 'success') || item.tasks.some(task => task.recoveryRequired))}
               selectedVisionModel={runner.selectedVisionModel}
               availableImageModels={availableImageModels}
@@ -238,10 +233,8 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
               retryFailedImageTasks={retryFailedImageTasks}
               retrySingleShotTask={retrySingleShotTask}
               isExportingZip={isExportingZip}
-              exportingSingleItemId={exportingSingleItemId}
               handleExportZip={handleExportZip}
               handleExportExcel={handleExportExcel}
-              handleExportSingleProductZip={handleExportSingleProductZip}
               handleDownloadSingleTaskImage={handleDownloadSingleTaskImage}
               setPreviewImageUrl={setPreviewImageUrl}
               onPreviewGallery={openGalleryPreview}
@@ -273,8 +266,7 @@ export default function BatchWorkshopView({ onOpenAssetTab }: { onOpenAssetTab?:
         runner={runner}
         isOpen={isWorkshopConfigOpen}
         onClose={() => setIsWorkshopConfigOpen(false)}
-        onOpenAssetTab={onOpenAssetTab}
-        onFallbackAssets={() => setActiveWorkshopTab('prompt_assets')}
+        onOpenSkills={onOpenSkills}
       />
       {/* 底部 Toast */}
       {toastMsg && (

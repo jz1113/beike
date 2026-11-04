@@ -2,8 +2,6 @@ import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import type { AssistantRunMode, ReferenceScope } from '@shared/domain/assistant/taskPolicy';
 import { useCallback, useRef } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
-import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
-import { selectedTextModel } from '@shared/domain/models/textModelRoute';
 import { approveAssistantTool, executeClientToolAction } from '@client/features/assistant/api/assistantClientActions';
 import type {
   TurnStreamState,
@@ -151,8 +149,6 @@ export function useAssistantTurn() {
     turnIdForApprovalRef.current = nextTurnId;
     patch({}, onUpdate);
 
-    const routeOptions = getMultimodalClientOverrides(model);
-    const upstreamModel = model.startsWith('deepseek-official:') ? model : selectedTextModel(model).modelId;
     const prefs = loadPromptPreferences();
     const directVideo = shouldAnalyzeVideoDirectly(messages, skillId);
 
@@ -165,14 +161,13 @@ export function useAssistantTurn() {
         threadId: sessionId,
         turnId: nextTurnId,
         messages,
-        model: upstreamModel || model,
+        model,
         reasoningEffort: params.reasoningEffort || prefs.reasoning?.reasoningEffort || 'medium',
         generationMode: 'auto',
         fallbackModels,
         historyLimit,
         runMode: params.runMode,
         referenceScope: params.referenceScope,
-        ...routeOptions,
         systemPrompt,
         skillId,
         allowedTools,

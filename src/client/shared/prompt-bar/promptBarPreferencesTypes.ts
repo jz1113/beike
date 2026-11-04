@@ -3,7 +3,7 @@ import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 export type PromptPreferencesTab = 'video' | 'image' | 'reasoning';
 
 export type VideoAspectOption = 'smart' | '21:9' | '16:9' | '3:2' | '4:3' | '1:1' | '3:4' | '2:3' | '9:16';
-export type VideoResolutionOption = '480P' | '540P' | '720P' | '1080P' | '2K' | '4K';
+export type VideoResolutionOption = '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
 export type VideoDurationMode = 'smart' | 'custom';
 export type PreferenceGenerationMode = 'normal' | 'auto';
 
@@ -14,6 +14,7 @@ export interface PromptVideoPreferences {
   durationMode: VideoDurationMode;
   customDurationSec: number; // 4 ~ 180 秒
   generationMode: PreferenceGenerationMode;
+  contextIrEnabled?: boolean;
 }
 
 export type ImageAspectOption = 'smart' | '21:9' | '16:9' | '3:2' | '4:3' | '1:1' | '3:4' | '2:3' | '9:16' | '5:4' | '4:5' | '4:1' | '1:4' | '8:1' | '1:8';
@@ -58,6 +59,7 @@ export const DEFAULT_PROMPT_PREFERENCES: PromptComposerPreferences = {
     durationMode: 'smart',
     customDurationSec: 5,
     generationMode: 'normal',
+    contextIrEnabled: true,
   },
   image: {
     modelId: 'smart',
@@ -85,7 +87,8 @@ export function loadPromptPreferences(): PromptComposerPreferences {
     if (!raw) return DEFAULT_PROMPT_PREFERENCES;
     const parsed = JSON.parse(raw);
     return {
-      video: { ...DEFAULT_PROMPT_PREFERENCES.video, ...parsed.video },
+      video: { ...DEFAULT_PROMPT_PREFERENCES.video, ...parsed.video,
+        contextIrEnabled: typeof parsed.video?.contextIrEnabled === 'boolean' ? parsed.video.contextIrEnabled : true },
       image: {
         ...DEFAULT_PROMPT_PREFERENCES.image,
         ...parsed.image,
@@ -104,10 +107,23 @@ export function loadPromptPreferences(): PromptComposerPreferences {
   }
 }
 
+export const promptPreferencesChanged = 'beike:prompt-preferences-changed';
+
+export function restoreImagePromptOptions(quality: unknown, strength: unknown) {
+  const validTier = (value: unknown): value is ImageQualityTier =>
+    value === 'low' || value === 'medium' || value === 'high' || value === 'xhigh' || value === 'max';
+  if (!validTier(quality) && !validTier(strength)) return;
+  const prefs = loadPromptPreferences();
+  savePromptPreferences({ ...prefs, image: { ...prefs.image,
+    ...(validTier(quality) && { quality }), ...(validTier(strength) && { inferenceStrength: strength }),
+  } });
+}
+
 export function savePromptPreferences(prefs: PromptComposerPreferences): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    window.dispatchEvent(new Event(promptPreferencesChanged));
   } catch {
     // ignore
   }

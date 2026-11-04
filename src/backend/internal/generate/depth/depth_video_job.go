@@ -1,11 +1,12 @@
 package depth
 
 import (
+	"beike.local/cloud/src/backend/internal/platform/network"
+	"beike.local/cloud/src/backend/internal/platform/storage"
 	"context"
 	"encoding/base64"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -217,17 +218,30 @@ func writeDepthVideoInput(work string, job depthVideoJob) (string, error) {
 		}
 		return target, os.WriteFile(target, raw, 0o600)
 	}
-	if job.videoURL != "" {
-		if blockedDepthHost(job.videoURL) {
-			return "", errors.New("下载视频失败")
+	if strings.HasPrefix(job.videoURL, "/storage/") {
+		rel := strings.TrimPrefix(job.videoURL, "/storage/")
+		if !storage.WorkspaceRel(rel, job.workspace, false) {
+			return "", errors.New("深度动作原片不属于当前工作区")
 		}
+		f, err := os.Open(storage.StoredFile(rel))
+		if err != nil {
+			return "", errors.New("深度动作原片已失效")
+		}
+		defer f.Close()
+		raw, err := io.ReadAll(io.LimitReader(f, int64(depthVideoFileBytes)+1))
+		if err != nil || len(raw) == 0 || len(raw) > depthVideoFileBytes {
+			return "", errors.New("深度原片不可读或超过 35 MB")
+		}
+		return target, os.WriteFile(target, raw, 0600)
+	}
+	if job.videoURL != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, job.videoURL, nil)
 		if err != nil {
 			return "", errors.New("下载视频失败")
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := network.SafeClient().Do(req)
 		if err != nil {
 			return "", errors.New("下载视频失败")
 		}
@@ -245,21 +259,6 @@ func writeDepthVideoInput(work string, job depthVideoJob) (string, error) {
 		return target, os.WriteFile(target, body, 0o600)
 	}
 	return "", errors.New("缺少视频输入")
-}
-
-func blockedDepthHost(raw string) bool {
-	host := raw
-	if strings.Contains(raw, "://") {
-		parts := strings.SplitN(raw, "://", 2)
-		host = parts[1]
-	}
-	host = strings.Split(host, "/")[0]
-	host = strings.Split(host, ":")[0]
-	if host == "localhost" || strings.HasSuffix(host, ".local") || host == "" {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified())
 }
 
 func failDepthVideo(job depthVideoJob, message string) {

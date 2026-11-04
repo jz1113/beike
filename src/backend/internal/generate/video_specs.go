@@ -19,6 +19,8 @@ func videoSpecFor(model string) (videoSpec, bool) {
 		return spec, true
 	}
 	switch {
+	case minimaxH3(id):
+		return videoSpecs["MiniMax-H3"], true
 	case strings.Contains(id, "seedance-2.5") || strings.Contains(id, "seedance-2-5"):
 		return videoSpecs["doubao-seedance-2.5"], true
 	case strings.Contains(id, "seedance"):
@@ -71,13 +73,24 @@ func defaultVideoResolution(model string) string {
 
 func videoSpecError(model, mode, resolution, aspect string, duration float64) string {
 	spec, ok := videoSpecFor(model)
+	if minimaxH3(model) {
+		switch resolution {
+		case "768P":
+			resolution = "720P"
+		case "2K":
+			resolution = "1080P"
+		}
+	}
 	if ok && !containsString(spec.resolutions, resolution) {
 		return "当前模型不支持所选清晰度，请重新选择"
 	}
 	if ok && !containsString(spec.aspects, aspect) {
 		return "当前模型不支持所选比例，请重新选择"
 	}
-	if mode == "edit" {
+	if strings.Contains(strings.ToLower(model), "grok") && (mode == "omni" || mode == "first_last_frame") && resolution == "1080P" {
+		return "Grok 参考生成与首尾帧模式最高支持 720P，请降低清晰度或切换生成方式"
+	}
+	if mode == "edit" && !omniFlash(model) {
 		return ""
 	}
 	if duration == -1 && (strings.Contains(strings.ToLower(model), "seedance") || strings.HasPrefix(model, "wan3")) {
@@ -140,7 +153,7 @@ func withAdaptive(values []string) []string {
 var videoSpecs = map[string]videoSpec{
 	"veo3.1":                          {[]int{4, 6, 8}, []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16"}},
 	"veo3.1-fast":                     {[]int{4, 6, 8}, []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16"}},
-	"omni_flash-10s":                  {[]int{10}, []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16"}},
+	"omni_flash-10s":                  {[]int{10}, []string{"720P"}, []string{"16:9", "9:16"}},
 	"kling-video-v3":                  {ints(3, 15), []string{"720P", "1080P"}, videoRatios},
 	"kling-video-v3-omni":             {ints(3, 15), []string{"720P", "1080P"}, videoRatios},
 	"kling-video-v2-5-turbo":          {[]int{5, 10}, []string{"720P", "1080P"}, videoRatios},
@@ -159,4 +172,79 @@ var videoSpecs = map[string]videoSpec{
 	"viduq3-turbo":                    {ints(1, 16), []string{"540P", "720P", "1080P"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
 	"viduq3-pro":                      {ints(1, 16), []string{"540P", "720P", "1080P"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
 	"viduq4-preview":                  {ints(3, 16), []string{"540P", "720P", "1080P", "2K", "4K"}, []string{"16:9", "9:16", "1:1", "4:3", "3:4"}},
+}
+
+func videoPixelSize(ratio, resolution string) string {
+	upper := strings.ToUpper(resolution)
+	is4K := strings.Contains(upper, "4K") || strings.Contains(upper, "UHD")
+	is1080 := strings.Contains(upper, "1080") || strings.Contains(upper, "FHD")
+	is480 := strings.Contains(upper, "480") || strings.Contains(upper, "SD")
+	switch ratio {
+	case "9:16":
+		if is4K {
+			return "2160x3840"
+		}
+		if is1080 {
+			return "1080x1920"
+		}
+		if is480 {
+			return "480x854"
+		}
+		return "720x1280"
+	case "1:1":
+		if is4K {
+			return "2048x2048"
+		}
+		if is1080 {
+			return "1440x1440"
+		}
+		if is480 {
+			return "720x720"
+		}
+		return "1024x1024"
+	case "4:3":
+		if is4K {
+			return "2880x2160"
+		}
+		if is1080 {
+			return "1440x1080"
+		}
+		if is480 {
+			return "640x480"
+		}
+		return "960x720"
+	case "3:4":
+		if is4K {
+			return "2160x2880"
+		}
+		if is1080 {
+			return "1080x1440"
+		}
+		if is480 {
+			return "480x640"
+		}
+		return "720x960"
+	case "21:9":
+		if is4K {
+			return "3840x1645"
+		}
+		if is1080 {
+			return "2560x1080"
+		}
+		if is480 {
+			return "1120x480"
+		}
+		return "1680x720"
+	default:
+		if is4K {
+			return "3840x2160"
+		}
+		if is1080 {
+			return "1920x1080"
+		}
+		if is480 {
+			return "854x480"
+		}
+		return "1280x720"
+	}
 }

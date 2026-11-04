@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import type { PetPose } from '@shared/domain/pets/atlas';
 import type { PetSummary } from '@shared/contracts/pets';
 import { BeikePet } from '@client/shared/pets/BeikePet';
-import { fetchPets, petSheetURL } from '@client/shared/pets/petClient';
+import { fetchPets, forgetPetSheet, petSheetURL } from '@client/shared/pets/petClient';
 import { PET_SIZES, beikePhaseFor, updatePetPreferences, usePetPreferences, type PetSizeName } from '@client/shared/pets/petPreferences';
 import { PetSprite } from '@client/shared/pets/PetSprite';
 import { PetImportForm } from './PetImportForm';
@@ -36,90 +36,78 @@ export function petChoices(remote: PetSummary[]): PetChoice[] {
 
 export function PetSettingsPanel() {
   const preferences = usePetPreferences();
+  const [listed, setListed] = useState(false);
   const [pets, setPets] = useState<PetSummary[]>([]);
   const [loadError, setLoadError] = useState('');
   const [preview, setPreview] = useState<PetPose>('idle');
   const [look, setLook] = useState(4);
   const [sheet, setSheet] = useState('');
   const [importOpen, setImportOpen] = useState(false);
-  const [actionOpen, setActionOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [sheetError, setSheetError] = useState('');
+  const [retrySheet,setRetrySheet] = useState(0);
   const selected = pets.find((pet) => pet.id === preferences.petId);
   const shown = preferences.visible && preferences.petId !== 'none';
-  const sizeLabel = SIZE_OPTIONS.find(([id]) => id === preferences.size)?.[1] || '中';
-  const poseValue: PetPose = preview === 'working' || preview === 'look' ? preview : 'idle';
+  const poseValue: PetPose = preview === 'look' && selected?.spriteVersion === 1 ? 'idle' : preview;
   const reload = () => {
     setLoadError('');
     return fetchPets().then(setPets).catch((error: unknown) => setLoadError(error instanceof Error ? error.message : '无法读取桌宠'));
   };
   const toggleVisible = () => updatePetPreferences(shown ? { visible: false } : { visible: true, petId: preferences.petId === 'none' ? 'beike' : preferences.petId });
-  const cycleSize = () => {
-    const index = SIZE_OPTIONS.findIndex(([id]) => id === preferences.size);
-    updatePetPreferences({ size: SIZE_OPTIONS[(index + 1) % SIZE_OPTIONS.length][0] });
-  };
   useEffect(() => {
     let cancel = false;
-    fetchPets().then((next) => { if (!cancel) setPets(next); }).catch((error: unknown) => {
+    fetchPets().then((next) => { if (!cancel) {setPets(next);setListed(true);} }).catch((error: unknown) => {
       if (!cancel) setLoadError(error instanceof Error ? error.message : '无法读取桌宠');
     });
     return () => { cancel = true; };
   }, []);
   useEffect(() => {
-    if (preview !== 'look') return undefined;
+    if (poseValue !== 'look') return undefined;
     const timer = window.setInterval(() => setLook((value) => (value + 1) % 16), 450);
     return () => window.clearInterval(timer);
-  }, [preview]);
+  }, [poseValue]);
   useEffect(() => {
-    if (!selected) { setSheet(''); return undefined; }
+    setSheet('');setSheetError('');
+    if (!selected) return;
     let cancel = false;
-    petSheetURL(selected.id).then((url) => { if (!cancel) setSheet(url); }).catch(() => { if (!cancel) setSheet(''); });
+    petSheetURL(selected.id).then(url => { if (!cancel) setSheet(url); }).catch(() => {
+      if (!cancel) setSheetError('桌宠图片加载失败');
+    });
     return () => { cancel = true; };
-  }, [selected]);
-  useEffect(() => {
-    if (!actionOpen) return undefined;
-    const close = (event: PointerEvent) => {
-      if (menuRef.current?.contains(event.target as Node)) return;
-      setActionOpen(false);
-    };
-    window.addEventListener('pointerdown', close);
-    return () => window.removeEventListener('pointerdown', close);
-  }, [actionOpen]);
-
+  }, [selected,retrySheet]);
   const choices = petChoices(pets);
   const previewSize = PET_SIZES[preferences.size];
   return (
     <div className="space-y-8">
+      <h2 className="text-lg font-semibold">贝壳云图桌宠</h2>
       {loadError && <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">{loadError}<button type="button" className="ml-3 underline" onClick={() => void reload()}>重试</button></p>}
       <section className="rounded-3xl border border-slate-200 bg-white px-4 py-6 dark:border-white/10 dark:bg-white/[0.03] sm:px-6">
         <div className="flex h-48 items-center justify-center">
           {preferences.petId === 'none' ? <p className="text-sm text-slate-500">未选择桌宠</p> : preferences.petId === 'beike' ? (
-            <BeikePet decorative phase={beikePhaseFor(preview)} label="桌宠预览" onOpen={() => undefined} onFiles={() => undefined} size={previewSize} />
-          ) : sheet ? (
+            <BeikePet decorative phase={beikePhaseFor(preview)} lookIndex={preview === 'look' ? look : null} label="桌宠预览" onOpen={() => undefined} onFiles={() => undefined} size={previewSize} />
+          ) : sheet && !sheetError ? (
             <div style={{ width: previewSize, height: Math.round(previewSize * 208 / 192) }}>
-              <PetSprite src={sheet} version={selected?.spriteVersion || 2} pose={preview} lookIndex={preview === 'look' ? look : null} size={previewSize} />
+              <PetSprite src={sheet} version={selected?.spriteVersion || 2} pose={poseValue} lookIndex={poseValue === 'look' ? look : null} size={previewSize} onError={()=>setSheetError('桌宠图片加载失败')}/>
             </div>
-          ) : <p className="text-sm text-slate-500">{loadError || '正在准备预览'}</p>}
+          ) : <p className="text-sm text-slate-500">{sheetError || loadError || (!listed || selected ? '正在准备预览' : '未找到选中的桌宠，可在下方重新选择。')}{sheetError && <button className="ml-2 underline" onClick={()=>{forgetPetSheet(preferences.petId);setRetrySheet(n=>n+1);}}>重试</button>}</p>}
         </div>
-        <div className="mt-2 flex justify-center">
-          <div ref={menuRef} className="relative">
-            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-[#1c1c1f]">
-              <button type="button" aria-pressed={shown} aria-label="显示桌宠" onClick={toggleVisible} className="grid h-8 w-8 place-items-center rounded-full text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10">
-                {shown ? <Eye size={15} /> : <EyeOff size={15} />}
-              </button>
-              <span className="mx-0.5 h-4 w-px bg-slate-200 dark:bg-white/10" />
-              <button type="button" aria-label={`显示大小 ${sizeLabel}`} onClick={cycleSize} className="min-w-8 px-2 text-xs font-medium text-slate-700 dark:text-slate-100">{sizeLabel}</button>
-              <span className="mx-0.5 h-4 w-px bg-slate-200 dark:bg-white/10" />
-              <button type="button" aria-label="动作预览" aria-haspopup="menu" aria-expanded={actionOpen} onClick={() => setActionOpen((open) => !open)} className="grid h-8 w-8 place-items-center rounded-full text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10">
-                <ChevronDown size={15} />
-              </button>
-            </div>
-            {actionOpen && (
-              <div role="menu" className="absolute left-1/2 top-full z-10 mt-2 w-28 -translate-x-1/2 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-white/10 dark:bg-[#1b1b1e]">
-                {POSE_OPTIONS.map(([id, label]) => (
-                  <button key={id} type="button" role="menuitem" aria-pressed={poseValue === id} onClick={() => { setPreview(id); setActionOpen(false); }} className={`block w-full px-3 py-1.5 text-left ${poseValue === id ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>{label}</button>
-                ))}
-              </div>
-            )}
+        <div className="settings-preview-list">
+          <div className="settings-preview-row"><span>显示桌宠</span>
+            <button type="button" role="switch" aria-label="显示桌宠" aria-checked={shown} className={`settings-switch ${shown ? 'is-on' : ''}`} onClick={toggleVisible}><span/></button>
+          </div>
+          <div className="settings-preview-row"><div>在画布显示<p className="text-xs text-slate-500">点击桌宠打开画布助手，右键打开桌宠设置。</p></div>
+            <button type="button" role="switch" aria-label="在画布显示" disabled={!shown} aria-checked={shown && preferences.canvasVisible} className={`settings-switch ${shown && preferences.canvasVisible ? 'is-on' : ''}`} onClick={()=>updatePetPreferences({canvasVisible:!preferences.canvasVisible})}><span/></button>
+          </div>
+          <div className="settings-preview-row"><span>快捷预览</span>
+            <div className="settings-segment" role="group" aria-label="快捷预览">{POSE_OPTIONS.map(([id,label])=>
+              <button key={id} type="button" disabled={id === 'look' && selected?.spriteVersion === 1} aria-pressed={poseValue===id} onClick={()=>setPreview(id)}>{label}</button>)}</div>
+          </div>
+          <div className="settings-preview-row"><span>显示大小</span>
+            <div className="settings-segment" role="group" aria-label="显示大小">{SIZE_OPTIONS.map(([size,label])=>
+              <button key={size} type="button" aria-pressed={preferences.size===size} onClick={()=>updatePetPreferences({size})}>{label}</button>)}</div>
+          </div>
+          <div className="settings-preview-row"><div>画布联动<p className="text-xs text-slate-500">全开时响应节点和连线变化；仅生成时只响应当前项目的任务。</p></div>
+            <div className="settings-segment" role="group" aria-label="画布联动">{([['all','全开'],['generation','仅生成'],['off','关闭']] as const).map(([mode,label])=>
+              <button key={mode} type="button" aria-pressed={preferences.canvasLink===mode} onClick={()=>updatePetPreferences({canvasLink:mode})}>{label}</button>)}</div>
           </div>
         </div>
       </section>

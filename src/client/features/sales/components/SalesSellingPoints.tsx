@@ -37,7 +37,7 @@ export function SalesSellingPoints({ state, disabled, onChange }: Props) {
           {copyStatus?.text === copyText && copyStatus.ok ? '已复制' : '复制全部'}
         </button>
       </div>
-      <div className={`sales-selling-body ${result.points.length > 0 ? 'has-points' : ''}`}>
+      <div className="sales-selling-body">
         <div className="sales-selling-overview">
           <label htmlFor="sales-summary-overview">一句话概括</label>
           <textarea id="sales-summary-overview" aria-label="最终卖点概括" value={result.summary} maxLength={1000} rows={2} disabled={disabled} onChange={(event) => updateResult({ summary: event.target.value })} />

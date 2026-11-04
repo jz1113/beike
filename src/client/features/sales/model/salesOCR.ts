@@ -5,6 +5,7 @@ export interface SalesOCRImage {
   imageUrl: string;
   editedText: string;
   confirmedText?: string;
+  documentBreak?: string;
   result?: SalesOCRResult;
   error?: string;
 }
@@ -24,6 +25,7 @@ export function parseSalesOCR(saved: Record<string, unknown>, catalog: SalesImag
     const result = salesOCRResultSchema.safeParse(entry.result);
     entries.set(entry.imageUrl, {
       imageUrl: entry.imageUrl, editedText: typeof entry.editedText === 'string' ? entry.editedText.slice(0, 100_000) : '',
+      ...(typeof entry.documentBreak === 'string' && /^\n{0,2}$/.test(entry.documentBreak) ? { documentBreak: entry.documentBreak } : {}),
       ...(typeof entry.confirmedText === 'string' ? { confirmedText: entry.confirmedText.slice(0, 100_000) } : {}),
       ...(result.success ? { result: result.data } : {}),
       ...(typeof entry.error === 'string' ? { error: entry.error.slice(0, 1000) } : {}),

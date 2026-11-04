@@ -14,6 +14,7 @@ export const VIEW_TO_URL: Record<AppView, string> = {
   headline_poster: 'headline_poster',
   keyword_review: 'keyword_review',
   assets: 'assets',
+  asset_library: 'asset_library',
   canvas: 'canvas',
   settings: 'settings',
   skills: 'skills',

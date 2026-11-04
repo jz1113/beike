@@ -1,5 +1,7 @@
 # 模型接入索引
 
+设置 → API 接入 → 添加服务商支持按预设填写协议和地址。服务商须手动添加，密钥由该渠道、模型或后台的现有配置提供。设置侧栏的数量按各模态的配置目录计算，停用或移除服务商后不计入其绑定线路。该数量不代表账户已获得上游授权。
+
 模型目录统一引用本页。模型 ID、适配器和能力以 `src/shared/domain/models/model-catalog/` 与同级 `model-adapters/` 为准；官网链接与网关文档标识集中保存在本页。设置页的模态种子来自 `src/shared/domain/models/modalityDefaults.ts`，不能把设置条目等同于完整产品能力。
 
 ## 调用约定
@@ -9,6 +11,7 @@
 - 聚合网关上的 `qwen-image-max` 仍使用通用 DALL·E Generations；旧别名 `qwen-image-3` 已从原清单修正。
 - Midjourney 网关模型 ID 为 `midjourney`，运行时提交为 `mj_fast_imagine`；网关 v7/v8 共用 Imagine / Action / Fetch 接口。其 Apifox 链接是网关资料，不是厂商官方 API。
 - 网关别名与官方型号分别处理，不能因为链接指向某厂商就认定其所有参数适用于当前通道。
+- 秘塔 `metaso.cn` 的 H3 使用 `/api/minimax/v2/video_generation` 及对应 V2 查询，采用带 role 的 `content`；本应用将所有清晰度统一限制为 4–15 秒以避免超时长翻倍计费，详见[视频生成接入](视频生成模型调用参考.md)。
 
 ## 接入细节
 
@@ -79,7 +82,7 @@
 | `doubao-seedance-2.5` | video | volcengine | [火山方舟视频生成](https://www.volcengine.com/docs/82379/1520757) |
 | `sora-2` | video | openai | [OpenAI Videos API](https://platform.openai.com/docs/api-reference/videos) |
 | `sora-2-pro` | video | openai | [OpenAI Videos API](https://platform.openai.com/docs/api-reference/videos) |
-| `MiniMax-H3` | video | minimax | [MiniMax 视频生成](https://platform.minimaxi.com/document/video_api_intro) |
+| `MiniMax-H3` | video | minimax | [MiniMax H3 V2 视频生成](https://platform.minimax.cn/docs/api-reference/video-generation-v2-create) |
 | `wan3.0-video` | video | alibaba | [通义万相视频生成](https://help.aliyun.com/zh/model-studio/wan-video) |
 | `grok-imagine-video-1.5` | video | xai | [xAI Videos](https://docs.x.ai/developers/rest-api-reference/inference/videos) |
 | `viduq3` | video | vidu | [Vidu Q3 参考生视频](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q3/reference-to-video) |
@@ -97,7 +100,7 @@
 | --- | --- |
 | `gpt-image-2.5-flare` | `515692647` → `gpt-image-2.5-flare-generations`<br>`515693438` → `gpt-image-2.5-flare-edits` |
 | `gpt-image-2.5-sunburst` | `515693868` → `gpt-image-2.5-sunburst-generations`<br>`515694152` → `gpt-image-2.5-sunburst-edits` |
-| `gpt-image-2` | `514117865` → `gpt-image-2-generations`<br>`514118355` → `gpt-image-2-edits`<br>`447261009` → `gpt-image-2-official-generations`<br>`447258891` → `gpt-image-2-official-edits` |
+| `gpt-image-2` | `514117865` → `gpt-image-2-generations`<br>`528133582` → `gpt-image-2-edits`<br>`447261009` → `gpt-image-2-official-generations`<br>`447258891` → `gpt-image-2-official-edits` |
 | `nano-banana-pro` | `420361512` → `nano-banana-pro-generations`<br>`420361517` → `nano-banana-pro-edits`<br>`406882253` → `nano-banana-pro-gemini-official` |
 | `nano-banana` | `341817446` → `nano-banana-generations`<br>`341817449` → `nano-banana-edits`<br>`363472251` → `nano-banana-gemini-official` |
 | `doubao-seedream-4-0-250828` | `302915860` → `dalle-generations`<br>`288978020` → `dalle-edits` |

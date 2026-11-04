@@ -34,6 +34,10 @@ func proxyHostAllowed(cfg config.Config, host string) bool {
 	if network.PrivateIP(host) {
 		return false
 	}
+	// Permit the exact result hosts published for Metaso H3 and Omni Flash.
+	if host == "files.metaso.cn" || host == "oss-us.file-download.life" {
+		return true
+	}
 	for _, suffix := range configuredProxyHosts() {
 		if host == suffix || strings.HasSuffix(host, "."+suffix) {
 			return true

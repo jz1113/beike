@@ -24,3 +24,4 @@ CREATE TABLE IF NOT EXISTS "SalesProduct" (
 CREATE INDEX IF NOT EXISTS "SalesProduct_workspace_idx" ON "SalesProduct"("workspaceId", "updatedAt" DESC, "id" DESC);
 CREATE INDEX IF NOT EXISTS "SalesProduct_filter_idx" ON "SalesProduct"("workspaceId", "category", "audience", "updatedAt" DESC);
 CREATE INDEX IF NOT EXISTS "SalesProduct_source_idx" ON "SalesProduct"("workspaceId", "collectedProductUrl");
+

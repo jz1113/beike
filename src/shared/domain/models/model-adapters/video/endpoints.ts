@@ -1,4 +1,5 @@
 import { isDashScopeBase } from '@shared/domain/media/imageCapabilities';
+import { isMetasoH3, isMiniMaxOfficialBase } from '@shared/domain/media/videoChannels';
 import { normalizeGatewayBaseUrl } from '@shared/domain/models/gatewayUrl';
 import type { GatewayEndpoints } from '../types';
 
@@ -78,17 +79,36 @@ export function wanOfficialEndpoints(baseUrl: string): GatewayEndpoints {
 }
 
 export function grokImagineVideoEndpoints(baseUrl: string, mode = 'text'): GatewayEndpoints {
-  const root = rootOf(baseUrl);
+  let root = rootOf(baseUrl);
+  let official = false;
+  try {
+    const host = new URL(root).hostname.toLowerCase();
+    official = host === 'api.x.ai' || host.endsWith('.api.x.ai');
+  } catch {
+    // Preserve gateway-relative bases; input validation handles invalid URLs.
+  }
+  if (!official && !root.toLowerCase().endsWith('/xai')) root += '/xai';
   const path = mode === 'edit' ? 'edits' : mode === 'extend' ? 'extensions' : 'generations';
   return {
-    submit: [`${root}/xai/v1/videos/${path}`],
-    query: [`${root}/xai/v1/videos/{taskId}`],
+    submit: [`${root}/v1/videos/${path}`],
+    query: [`${root}/v1/videos/{taskId}`],
   };
 }
 
 export function minimaxVideoEndpoints(modelId: string) {
   return (baseUrl: string): GatewayEndpoints => {
     const root = rootOf(baseUrl);
+    if (isMetasoH3(modelId, baseUrl)) {
+      const channelRoot = `${new URL(baseUrl).origin}/api/minimax/v2`;
+      return { submit: [`${channelRoot}/video_generation`], query: [`${channelRoot}/query/video_generation/{taskId}`] };
+    }
+    if (modelId.toLowerCase() === 'minimax-h3' && isMiniMaxOfficialBase(baseUrl)) {
+      const api = root.replace(/\/v2$/, '') + '/v2';
+      return { submit: [`${api}/video_generation`], query: [`${api}/query/video_generation/{taskId}`] };
+    }
+    if (modelId.toLowerCase() === 'minimax-h3') {
+      return { submit: [`${root}/v1/videos`], query: [`${root}/v1/videos/{taskId}`] };
+    }
     if (modelId.toLowerCase().includes('t2v-01')) {
       return {
         submit: [`${root}/minimax/v1/video_generation`],

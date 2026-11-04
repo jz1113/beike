@@ -35,6 +35,21 @@ func TestLocalUploadStoresDataURL(t *testing.T) {
 	}
 }
 
+func TestUploadRejectsOversizedBodyBeforeSaving(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AZHUO_CACHE_DIR", root)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/api/assets/storage/upload", bytes.NewReader(make([]byte, maxStorageUploadBytes+1)))
+	storageUploadHandler(config.Config{}).ServeHTTP(w, r)
+	if w.Code != http.StatusRequestEntityTooLarge || !strings.Contains(w.Body.String(), "32 MB") {
+		t.Fatalf("oversized upload: %d %s", w.Code, w.Body.String())
+	}
+	files, err := os.ReadDir(root)
+	if err != nil || len(files) != 0 {
+		t.Fatalf("rejected upload wrote files: %v %v", files, err)
+	}
+}
+
 func TestStorageTestReportsIncompleteConfig(t *testing.T) {
 	handler := storageTestHandler(config.Config{NodeEnv: "development"})
 	response := httptest.NewRecorder()

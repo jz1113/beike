@@ -64,7 +64,7 @@ export function useWorkshopAnalysis({ deps, itemsRef, setItems, recipes, selecte
       return 0;
     }
     if (activeItems.some(item => item.isAnalyzing || item.tasks.some(task => task.status === 'IN_PROGRESS' || task.recoveryRequired))) {
-      showToast('存在执行中或待核对的任务，请先在成图与交付中处理');
+      showToast('存在执行中或待核对的任务，请先在图文交付中处理');
       return 0;
     }
 

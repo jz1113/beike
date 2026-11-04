@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SalesScriptDomain, SalesScriptStatus } from '@shared/domain/sales';
 import {
-  analyzeReferenceVideo, deleteSalesScript, fetchScriptAnalysisPrompt, listSalesScripts, normalizePastedScript,
+  analyzeReferenceVideo, deleteSalesScript, fetchScriptAnalysisPrompt, listSalesScripts,
   patchSalesScript, saveSalesScript, uploadScriptVideo, type StoredSalesScript, type SalesScriptDraftResult,
 } from '../api/salesScripts';
 
 export interface SalesScriptVideoSource { videoUrl: string; videoHash: string; durationSec: number; aspectRatio: string; hasAudio: boolean; name: string }
-export interface SalesScriptDraft { videoUrl?: string; depthVideoUrl?: string; depthTaskId?: string; depthOperationId?: string; id?: string; status: SalesScriptStatus; script: SalesScriptDomain; model: string; promptVersion: string; videoHash?: string; cached?: boolean }
+export interface SalesScriptDraft { version?: number; videoUrl?: string; depthVideoUrl?: string; depthTaskId?: string; depthOperationId?: string; id?: string; status: SalesScriptStatus; script: SalesScriptDomain; model: string; promptVersion: string; videoHash?: string; cached?: boolean }
 
-type Busy = '' | 'upload' | 'analyze' | 'normalize' | 'save' | 'prompt';
+type Busy = '' | 'upload' | 'analyze' | 'save' | 'prompt';
 
 export function useSalesScripts() {
   const [items, setItems] = useState<StoredSalesScript[]>([]);
@@ -81,7 +81,7 @@ export function useSalesScripts() {
     draftSession.current += 1;
     setVideo(null);
     setSavedSnapshot(result.existingId ? JSON.stringify(result.script) : '');
-    setDraft({ id: result.existingId, status: 'draft', script: result.script, model: result.model,
+    setDraft({ id: result.existingId, version:result.version, status: result.status || 'draft', script: result.script, model: result.model,
       promptVersion: result.promptVersion, videoHash: result.videoHash, cached: result.cached, videoUrl });
     void refresh();
   }, [refresh]);
@@ -97,16 +97,6 @@ export function useSalesScripts() {
     if (result) acceptAnalysis(result, video.videoUrl);
   }, [acceptAnalysis, run, video]);
 
-  const normalize = useCallback(async (rawText: string, selection?: string) => {
-    const result = await run('normalize', (signal) => normalizePastedScript(rawText, { videoUrl: video?.videoUrl, selection }, signal));
-    if (result) {
-      draftSession.current += 1;
-      setVideo(null);
-      setSavedSnapshot('');
-      setDraft({ status: 'draft', script: result.script, model: result.model, promptVersion: result.promptVersion, videoHash: result.videoHash || video?.videoHash, videoUrl: video?.videoUrl, id: result.existingId });
-    }
-  }, [run, video]);
-
   const copyPrompt = useCallback(async () => {
     const result = await run('prompt', (signal) => fetchScriptAnalysisPrompt(signal));
     if (!result) return false;
@@ -117,7 +107,7 @@ export function useSalesScripts() {
   const openStored = useCallback((item: StoredSalesScript) => {
     cancel(); draftSession.current += 1;
     setSavedSnapshot(JSON.stringify(item.script));
-    setDraft({ id: item.id, status: item.status, script: item.script, model: item.model, promptVersion: item.promptVersion, videoHash: item.videoHash, videoUrl: item.videoUrl, depthVideoUrl: item.depthVideoUrl, depthTaskId: item.depthTaskId, depthOperationId: item.depthOperationId });
+    setDraft({ id: item.id, version:item.version, status: item.status, script: item.script, model: item.model, promptVersion: item.promptVersion, videoHash: item.videoHash, videoUrl: item.videoUrl, depthVideoUrl: item.depthVideoUrl, depthTaskId: item.depthTaskId, depthOperationId: item.depthOperationId });
   }, [cancel]);
 
   const updateDraft = useCallback((script: SalesScriptDomain) => setDraft((previous) => previous ? { ...previous, script, status: 'draft' } : previous), []);
@@ -126,14 +116,14 @@ export function useSalesScripts() {
     if (!draft) return null;
     const session = draftSession.current;
     const saved = await run('save', () => draft.id
-      ? patchSalesScript(draft.id, { status, script: draft.script })
+      ? patchSalesScript(draft.id, { status, script: draft.script, ...(draft.version ? {expectedVersion:draft.version} : {}) })
       : saveSalesScript({ videoUrl: draft.videoUrl || '', videoHash: draft.videoHash || '', status, model: draft.model, promptVersion: draft.promptVersion, script: draft.script }));
     if (saved) {
       invalidateList();
       setItems((previous) => [saved, ...previous.filter((item) => item.id !== saved.id)]);
       if (draftSession.current !== session) return null;
       setSavedSnapshot(JSON.stringify(draft.script));
-      setDraft((previous) => previous ? { ...previous, id: saved.id, status: previous.script === draft.script ? saved.status : 'draft' } : previous);
+      setDraft((previous) => previous ? { ...previous, id: saved.id, version:saved.version, status: previous.script === draft.script ? saved.status : 'draft' } : previous);
       if (draftRef.current?.script !== draft.script) {
         setError('保存期间脚本有新修改，请再次保存或确认入库。');
         return null;
@@ -169,5 +159,5 @@ export function useSalesScripts() {
   }, [invalidateList]);
 
   return { items, loading, listError, error, reportError: setError, clearError: () => setError(''), busy, cancel, video, clearVideo: () => setVideo(null),
-    draft, hasUnsaved, acceptAnalysis, acceptStored, uploadedFile: uploadedFile.current, closeDraft: () => { cancel(); draftSession.current += 1; setDraft(null); setSavedSnapshot(''); }, refresh, uploadVideo, analyze, normalize, copyPrompt, openStored, updateDraft, saveDraft, archive, remove, reclassify };
+    draft, hasUnsaved, acceptAnalysis, acceptStored, uploadedFile: uploadedFile.current, closeDraft: () => { cancel(); draftSession.current += 1; setDraft(null); setSavedSnapshot(''); }, refresh, uploadVideo, analyze, copyPrompt, openStored, updateDraft, saveDraft, archive, remove, reclassify };
 }

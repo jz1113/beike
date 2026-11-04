@@ -14,6 +14,10 @@ func videoSubmissionBody(row videoSubmission) map[string]any {
 		"prompt": row.prompt, "aspect_ratio": row.ratio, "resolution": row.resolution,
 		"status": row.status, "retryable": false,
 	}
+	if row.diagnostics != nil {
+		body["submissionDiagnostics"] = row.diagnostics
+		body["diagnosticsSaved"] = row.diagnostics.SubmissionOutcome != "prepared"
+	}
 	pending := imageTaskStillSubmitting(row.taskID)
 	if !pending {
 		body["taskId"] = row.taskID

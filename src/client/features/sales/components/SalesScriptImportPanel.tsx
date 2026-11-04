@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
-import { Film, Loader2, Sparkles, Square, UploadCloud, X } from 'lucide-react';
+import { CircleAlert, Film, Sparkles, Square, X } from 'lucide-react';
 import { ConfiguredModelPicker } from '@client/shared/models/ConfiguredModelPicker';
 import { useSalesSummaryModels } from '../hooks/useSalesSummaryModels';
 import type { SalesScriptVideoSource } from '../hooks/useSalesScripts';
 import { formatScriptSeconds } from '../model/salesScriptEditor';
-import { salesFocusClass, salesGhostButtonClass } from './salesChrome';
+import { salesFocusClass, salesGhostButtonClass, salesPrimaryButtonClass } from './salesChrome';
+import { SalesVideoDropzone } from './SalesVideoDropzone';
 import { SalesReferenceAudioSave } from './SalesReferenceAudioSave';
 
 interface Props {
   preferredModel: string;
   onModelChange: (model: string) => void;
   video: SalesScriptVideoSource | null;
-  busy: '' | 'upload' | 'analyze' | 'normalize' | 'save' | 'prompt';
+  busy: '' | 'upload' | 'analyze' | 'save' | 'prompt';
   error?: string;
   pendingBundle?: boolean;
+  onPausePending: () => void;
   onUpload: (file: File) => void | Promise<boolean>;
   onClearVideo: () => void;
   onAnalyze: (model: string, force?: boolean) => void;
@@ -25,7 +27,7 @@ const VIDEO_ACCEPT = 'video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm';
 
 export function SalesScriptImportPanel({
   preferredModel, onModelChange, video, busy, error, pendingBundle,
-  onUpload, onClearVideo, onAnalyze, onCancel, onClose,
+  onUpload, onClearVideo, onAnalyze, onCancel, onClose, onPausePending,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => { dialogRef.current?.showModal(); }, []);
@@ -54,7 +56,7 @@ export function SalesScriptImportPanel({
         <header className="sales-import-modal-header">
           <div>
             <h2>上传参考视频</h2>
-            <p>一次导入，同时拆解分镜脚本并生成深度动作视频，自动关联保存到素材库。脚本完成后即可先核对，深度视频继续处理。</p>
+            <p>拆解分镜并生成深度动作视频，完成后存入素材库。</p>
           </div>
           {onClose && (
             <button type="button" disabled={working} aria-label="关闭新增脚本窗口" onClick={onClose} className={`sales-modal-close ${salesFocusClass}`}>
@@ -62,9 +64,6 @@ export function SalesScriptImportPanel({
             </button>
           )}
         </header>
-
-        {pendingBundle && !working && <p className="sales-card-hint">已有视频正在处理，请关闭此窗口，在素材库进度卡中继续未完成项。</p>}
-        {error && <p role="alert" className="sales-import-modal-error">{error}</p>}
 
         <div className="sales-import-modal-body">
           <input
@@ -81,35 +80,42 @@ export function SalesScriptImportPanel({
             }}
           />
 
-          <div
-            className={`sales-import-dropzone ${dragOver ? 'is-over' : ''} ${video ? 'has-video' : ''}`}
+          {video ? <div
+            className={`sales-import-dropzone ${dragOver ? 'is-over' : ''} has-video`}
             onDragOver={(e) => { e.preventDefault(); if (!working) setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
           >
-            {video ? (
               <div className="sales-script-video-badge">
                 <span className="sales-video-badge-icon"><Film size={16} aria-hidden /></span>
                 <div className="sales-video-badge-meta">
                   <strong title={video.name}>{video.name}</strong>
-                  <span>实测 {formatScriptSeconds(video.durationSec)} · {video.aspectRatio} 画幅 · {video.hasAudio ? '含可听音轨' : '无音轨'}</span>
+                  <span>{formatScriptSeconds(video.durationSec)} · {video.aspectRatio} · {video.hasAudio ? '含音轨' : '无音轨'}</span>
                 </div>
                 <button type="button" disabled={working} onClick={() => fileRef.current?.click()} className={salesGhostButtonClass}>更换视频</button>
                 <button type="button" disabled={working} aria-label="移除参考视频" onClick={onClearVideo} className={`sales-script-icon-btn ${salesFocusClass}`}><X size={13} aria-hidden /></button>
               </div>
-            ) : (
-              <button type="button" disabled={working} onClick={() => fileRef.current?.click()} className={`sales-dropzone-trigger ${salesFocusClass}`}>
-                <span className="sales-dropzone-icon">
-                  {busy === 'upload' ? <Loader2 size={28} className="animate-spin" aria-hidden /> : <UploadCloud size={28} aria-hidden />}
-                </span>
-                <strong>{busy === 'upload' ? '正在探测视频时长、画幅与音轨…' : '点击选择或拖入参考视频'}</strong>
-                <span>支持 MP4 / MOV / WebM。脚本分析 ≤64MB / 10分钟，深度视频 ≤35MB / 30秒；超出深度限制时，脚本仍独立处理。</span>
-              </button>
-            )}
-
+          </div> : <>
+            <SalesVideoDropzone title={busy === 'upload' ? '正在读取视频信息…' : '点击或拖拽上传参考视频'}
+              hint="支持 MP4、MOV、WebM · 最大 64 MiB · 最长 10 分钟"
+              loading={busy === 'upload'} disabled={working} onChoose={() => fileRef.current?.click()}
+              onFiles={([file]) => { if (file) void onUpload(file); }} />
+            <small className="sales-card-hint">深度视频限 35 MiB、30 秒以内，超出时仅拆解分镜。</small>
+          </>}
+          {(error || (pendingBundle && !working)) && <div className={`sales-import-status ${error ? 'has-error' : ''}`}>
+            <CircleAlert size={16} aria-hidden />
+            <div>
+              {error && <p role="alert">{error}</p>}
+              {pendingBundle && !working && <p>暂存上次进度后即可提交当前视频，稍后可在素材库恢复。</p>}
+            </div>
+            {pendingBundle && !working && <button type="button" className={salesGhostButtonClass} onClick={onPausePending}>暂存上次进度</button>}
+          </div>}
+          {video?.hasAudio && <p className="sales-card-hint">部分模型只分析画面，不读取音轨。口播可在拆解后逐段核对和补录。</p>}
+          {video?.hasAudio && <SalesReferenceAudioSave key={video.videoUrl} videoUrl={video.videoUrl} title={video.name} durationSec={video.durationSec} disabled={working} />}
+        </div>
         <footer className="sales-import-modal-footer">
           <div className="sales-script-model-bar">
-            <span className="sales-model-caption">视频多模态模型：</span>
+            <span className="sales-model-caption">分析模型</span>
             <ConfiguredModelPicker
               ariaLabel="参考脚本拆解模型"
               value={model}
@@ -128,15 +134,12 @@ export function SalesScriptImportPanel({
                 <Square size={12} aria-hidden />停止处理
               </button>
             ) : (
-              <button type="button" disabled={!video || !model || pendingBundle} onClick={() => onAnalyze(model)} className={`sales-collect-primary ${salesFocusClass}`}>
-                <Sparkles size={14} aria-hidden />同时生成脚本与深度视频
+              <button type="button" disabled={!video || !model || pendingBundle} onClick={() => onAnalyze(model)} className={salesPrimaryButtonClass}>
+                <Sparkles size={14} aria-hidden />开始拆解
               </button>
             )}
           </div>
         </footer>
-          </div>
-          {video?.hasAudio && <SalesReferenceAudioSave key={video.videoUrl} videoUrl={video.videoUrl} title={video.name} durationSec={video.durationSec} disabled={working} />}
-        </div>
       </section>
     </dialog>
   );

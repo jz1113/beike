@@ -252,3 +252,41 @@ func TestAudioMixConvertsVideoCodecsForMP4Delivery(t *testing.T) {
 		})
 	}
 }
+
+func TestMixRejectsNarrationLongerThanPicture(t *testing.T) {
+	root, _ := filepath.Abs("../../../..")
+	ffmpeg, ok := system.FFmpegBinary(root)
+	if !ok {
+		t.Skip("missing ffmpeg")
+	}
+	dir := t.TempDir()
+	t.Setenv("AZHUO_CACHE_DIR", dir)
+	dir = filepath.Join(dir, "local")
+	os.MkdirAll(dir, 0755)
+	if b, e := exec.Command(ffmpeg, "-v", "error", "-f", "lavfi", "-i", "color=s=64x64:d=1", "-c:v", "libx264", filepath.Join(dir, "in.mp4")).CombinedOutput(); e != nil {
+		t.Fatal(e, string(b))
+	}
+	if b, e := exec.Command(ffmpeg, "-v", "error", "-f", "lavfi", "-i", "sine=duration=2", filepath.Join(dir, "vo.wav")).CombinedOutput(); e != nil {
+		t.Fatal(e, string(b))
+	}
+	w := httptest.NewRecorder()
+	AudioMix(config.Config{Root: root}).ServeHTTP(w, httptest.NewRequest("POST", "/", strings.NewReader(`{"videoUrl":"/storage/local/in.mp4","voiceMode":"voiceover","voiceoverUrl":"/storage/local/vo.wav"}`)))
+	if w.Code != 422 || !strings.Contains(w.Body.String(), "旁白实测 2.00 秒") {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}
+
+func TestSilentSpeechIsDetectedBeforeAddingMusic(t *testing.T) {
+	root, _ := filepath.Abs("../../../..")
+	ffmpeg, ok := system.FFmpegBinary(root)
+	if !ok {
+		t.Skip("missing ffmpeg")
+	}
+	input := filepath.Join(t.TempDir(), "silent.wav")
+	if b, e := exec.Command(ffmpeg, "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=16000:cl=mono", "-t", "0.4", input).CombinedOutput(); e != nil {
+		t.Fatal(e, string(b))
+	}
+	if err := checkSalesAudioSignal(t.Context(), ffmpeg, input); err == nil || !strings.Contains(err.Error(), "静音") {
+		t.Fatal(err)
+	}
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getModelCredentials } from '@client/shared/api/gatewayClient';
+import { getGatewayClientBaseUrl, getModelCredentials } from '@client/shared/api/gatewayClient';
 import { ConfiguredModelPicker } from '@client/shared/models/ConfiguredModelPicker';
 import { agentTriggerModelName } from '@client/shared/prompt-bar/controls/PromptBarModelPickerModal';
 import { EXTENDED_IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
@@ -28,6 +28,7 @@ import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
 import { DEFAULT_MODALITY_MODELS } from '@shared/domain/models/modalityDefaults';
 import { readEffectiveModalityModels, upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
 import type { BatchGenerationSettings } from './buildGenerationPromptBatch';
+import { getVideoModelById } from '@shared/domain/media/video';
 
 export function resolvePreferredBatchModel(
   kind: 'image' | 'video',
@@ -101,6 +102,7 @@ export function syncBatchSettingsStore(update: Partial<BatchGenerationSettings>)
   if (update.videoResolution !== undefined) state.setQuickVideoResolution(update.videoResolution);
   if (update.videoDuration !== undefined) state.setQuickVideoDuration(update.videoDuration);
   if (update.videoRefMode !== undefined) state.setQuickVideoRefMode(update.videoRefMode);
+  if (update.videoContextIrEnabled !== undefined) state.setQuickVideoContextIrEnabled(update.videoContextIrEnabled);
 }
 
 export default function GenerationBatchSettings({
@@ -120,8 +122,9 @@ export default function GenerationBatchSettings({
   const [prefs, setPrefs] = useState<PromptComposerPreferences>(() => loadPromptPreferences());
 
   const persistPrefs = (next: PromptComposerPreferences) => {
-    setPrefs(next);
-    savePromptPreferences(next);
+    const current = { ...next, video: { ...next.video, contextIrEnabled: useAppStore.getState().quickVideoContextIrEnabled ?? true } };
+    setPrefs(current);
+    savePromptPreferences(current);
   };
 
   const patch = (update: Partial<BatchGenerationSettings>) => {
@@ -175,6 +178,8 @@ export default function GenerationBatchSettings({
   const resolvedVideoModel = selectedVideo?.upstreamId
     || upstreamModalityModelId('video', value.videoModel)
     || value.videoModel;
+  const videoBaseUrl = getGatewayClientBaseUrl(value.videoModel);
+  const videoProfile = getVideoModelById(resolvedVideoModel, videoBaseUrl);
 
   return (
     <div className="space-y-3">
@@ -257,12 +262,15 @@ export default function GenerationBatchSettings({
           <PromptBarVideoTab
             compact
             modelId={resolvedVideoModel}
-            supportedAspectRatios={selectedVideo?.supportedAspectRatios}
-            supportedResolutions={selectedVideo?.supportedResolutions}
+            baseUrl={videoBaseUrl}
+            supportedAspectRatios={videoProfile?.supportedAspectRatios || selectedVideo?.supportedAspectRatios}
+            supportedResolutions={videoProfile?.supportedResolutions || selectedVideo?.supportedResolutions}
             mode={value.videoRefMode}
             aspect={value.videoAspect}
             resolution={value.videoResolution}
             duration={value.videoDuration}
+            contextIrEnabled={value.videoContextIrEnabled ?? true}
+            onContextIrEnabled={(videoContextIrEnabled) => patch({ videoContextIrEnabled })}
             onMode={(videoRefMode) => patch({ videoRefMode })}
             onAspect={(videoAspect) => {
               patch({ videoAspect });

@@ -1,12 +1,13 @@
 import { SETTINGS_NAV_ITEMS, type SettingsNavSection } from '../model/settingsNavigation';
 import { useI18n } from '@client/shared/i18n';
 import {
-  Activity, AudioLines, Bot, Box, HardDrive, Languages, LayoutGrid, MessageSquare,
+  Activity, AudioLines, Bot, Box, FolderOpen, HardDrive, Languages, LayoutGrid, MessageSquare,
   Music, Palette, Plug, SunMedium, UserRound, Video,
 } from 'lucide-react';
 
 const SECTION_ICONS = {
   profile: Activity,
+  library: FolderOpen,
   appearance: SunMedium,
   api: Plug,
   chat: MessageSquare,
@@ -62,7 +63,7 @@ export function SettingsSidebar({
               {profileBadge ? (
                 <span className="text-[10px] font-mono text-emerald-700">{gatewayBalanceFormatted > 999 ? `${(gatewayBalanceFormatted / 1000).toFixed(1)}k` : gatewayBalanceFormatted.toFixed(1)}</span>
               ) : countBadge !== undefined ? (
-                <span className="text-[11px] font-mono text-slate-400 font-normal">{countBadge}</span>
+                <span title="当前模型目录中启用渠道的线路数" className="text-[11px] font-mono text-slate-400 font-normal">{countBadge}</span>
               ) : null}
             </button>
           );

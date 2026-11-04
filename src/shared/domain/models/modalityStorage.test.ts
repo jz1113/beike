@@ -126,6 +126,24 @@ describe('modalityStorage', () => {
     expect(upstreamModalityModelId('chat', 'claude-opus-4-6')).toBe('claude-opus-4-6');
   });
 
+  it('keeps a custom route when its upstream model is added to the shipped catalog', () => {
+    memoryStore.set(API_PROVIDERS_STORAGE_KEY, JSON.stringify([{ id: 'my-channel' }]));
+    memoryStore.set(getModalityStorageKey('video'), JSON.stringify([
+      { id: 'saved-video', modelId: 'veo3.1-fast', channelId: 'my-channel', isCustom: true },
+    ]));
+    const selected = modalityPickerSelections('video')?.filter(item => item.modelId === 'veo3.1-fast');
+    expect(selected).toHaveLength(1);
+    expect(selected?.[0]).toMatchObject({id:'veo3.1-fast', entryId:'saved-video'});
+  });
+
+  it('does not offer disabled or removed channels, and keeps the other selection ID stable', () => {
+    memoryStore.set(API_PROVIDERS_STORAGE_KEY, JSON.stringify([{id:'paused', enabled:false}, {id:'active'}]));
+    memoryStore.set(getModalityStorageKey('image'), JSON.stringify(['paused','active','removed'].map(channelId => ({
+      id: 'entry-'+channelId, modelId:'qwen-image-edit', channelId,
+    }))));
+    expect(modalityPickerSelections('image')?.filter(item => item.modelId === 'qwen-image-edit').map(item => item.id)).toEqual(['entry-active']);
+  });
+
   it('restores shipped defaults when a saved modality list is empty', () => {
     noteRemovedDefaultModels('image', [{ id: 'img_openai' }], []);
     memoryStore.set(getModalityStorageKey('image'), '[]');

@@ -1,0 +1,35 @@
+.sales-video-dropzone {
+  width: 100%; display: grid; align-content: center; justify-items: center;
+  min-height: clamp(192px, 29dvh, 300px); padding: 24px 18px; text-align: center;
+  border: 2px dashed #ad811e; border-radius: 28px; background: #fffcf5; color: var(--sales-ink);
+  cursor: pointer; transition: border-color .16s, background-color .16s;
+}
+.dark .sales-video-dropzone { border-color: #9e791c; background: #1d1d20; }
+.sales-video-dropzone:hover:not(:disabled), .sales-video-dropzone:focus-visible, .sales-video-dropzone.is-over {
+  border-color: #c99212; background: #fff6df;
+}
+.dark .sales-video-dropzone:hover:not(:disabled), .dark .sales-video-dropzone:focus-visible, .dark .sales-video-dropzone.is-over {
+  border-color: #dbac3c; background: #29251c;
+}
+.sales-video-dropzone > * { pointer-events: none; }
+.sales-upload-cloud {
+  display: grid; place-items: center; width: 60px; height: 60px; margin-bottom: 18px; border-radius: 16px;
+  background: #302f32; color: white; box-shadow: 0 5px 12px #0002;
+}
+.dark .sales-upload-cloud { background: #38383d; }
+.sales-upload-cloud svg { width: 27px; height: 27px; }
+.sales-video-dropzone strong { font-size: 18px; line-height: 1.45; font-weight: 700; }
+.sales-upload-hint { margin-top: 7px; font-size: 13px; line-height: 1.6; color: var(--sales-muted); }
+.sales-video-dropzone:disabled { cursor: default; opacity: .7; }
+.sales-video-dropzone.is-compact {
+  min-height: 0; grid-template-columns: auto 1fr; justify-items: start; column-gap: 12px;
+  border-width: 1px; border-radius: 10px; padding: 10px 14px; text-align: left;
+}
+.is-compact .sales-upload-cloud { grid-row: span 2; align-self: center; width: 36px; height: 36px; margin: 0; border-radius: 9px; }
+.is-compact .sales-upload-cloud svg { width: 18px; height: 18px; }
+.sales-video-dropzone.is-compact strong { font-size: 14px; }
+.is-compact .sales-upload-hint { margin-top: 1px; font-size: 12px; }
+@media (max-width: 520px), (max-height: 580px) {
+  .sales-video-dropzone:not(.is-compact) { min-height: 160px; border-radius: 20px; padding: 16px; }
+  .sales-video-dropzone:not(.is-compact) .sales-upload-cloud { width: 44px; height: 44px; margin-bottom: 12px; border-radius: 12px; }
+}

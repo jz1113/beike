@@ -31,7 +31,10 @@ func CompleteResponses(ctx context.Context, req TextRequest) (int, map[string]an
 	input := []any{}
 	for _, raw := range messages {
 		message := textMap(raw)
-		content, _ := message["content"].([]any)
+		content, err := textContentParts(message)
+		if err != nil {
+			return 0, nil, err
+		}
 		parts := []any{}
 		for _, raw := range content {
 			part := textMap(raw)
@@ -40,6 +43,8 @@ func CompleteResponses(ctx context.Context, req TextRequest) (int, map[string]an
 				parts = append(parts, map[string]any{"type": "input_text", "text": part["text"]})
 			case "image_url":
 				parts = append(parts, map[string]any{"type": "input_image", "image_url": textMap(part["image_url"])["url"]})
+			default:
+				return 0, nil, errors.New("unsupported Responses message content part")
 			}
 		}
 		input = append(input, map[string]any{"role": message["role"], "content": parts})

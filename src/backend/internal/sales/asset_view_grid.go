@@ -24,9 +24,32 @@ const assetGridMaxBytes = 64 << 20
 // Bound concurrent full-image decoding rather than multiplying memory by nine.
 var assetGridSlots = make(chan struct{}, 2)
 
+const personaStrip = "persona-1x4"
+
+func (job assetViewJob) gridKind() string {
+	metadata, _ := job.generation["metadata"].(map[string]any)
+	if job.Kind == "persona" && metadata["layout"] == "1x4" {
+		return personaStrip
+	}
+	return job.Kind
+}
+
+func (job assetViewJob) wholeSheet() bool {
+	metadata, _ := job.generation["metadata"].(map[string]any)
+	return job.gridKind() == personaStrip && metadata["output"] == "sheet"
+}
+
+func (job assetViewJob) outputViews() []string {
+	if job.wholeSheet() {
+		return []string{"sheet"}
+	}
+	return assetGridViews[job.gridKind()]
+}
+
 var assetGridViews = map[string][]string{
-	"persona": {"face", "front", "side", "threeQuarterLeft", "threeQuarterRight", "back", "sideRight", "upperBody", "backThreeQuarter"},
-	"scene":   {"left", "right", "reverse", "frontWide", "leftWide", "rightWide", "reverseLeft", "reverseRight", "detail"},
+	personaStrip: {"front", "side", "back", "face"},
+	"persona":    {"face", "front", "side", "threeQuarterLeft", "threeQuarterRight", "back", "sideRight", "upperBody", "backThreeQuarter"},
+	"scene":      {"left", "right", "reverse", "frontWide", "leftWide", "rightWide", "reverseLeft", "reverseRight", "detail"},
 }
 
 type assetGridImage struct {
@@ -50,6 +73,8 @@ func AssetViewGrid(_ config.Config) http.HandlerFunc {
 		}
 		var body struct {
 			Kind     string `json:"kind"`
+			Layout   string `json:"layout"`
+			Whole    bool   `json:"whole"`
 			ImageURL string `json:"imageUrl"`
 		}
 		bodyLimit := int64(base64.StdEncoding.EncodedLen(assetGridMaxBytes)) + 4096
@@ -58,14 +83,21 @@ func AssetViewGrid(_ config.Config) http.HandlerFunc {
 		if err := decoder.Decode(&body); err != nil {
 			var oversized *http.MaxBytesError
 			if errors.As(err, &oversized) {
-				httpx.WriteJSON(w, 413, map[string]any{"success": false, "code": "image_too_large", "error": "九宫格请求过大，原图最多支持 64 MB"})
+				httpx.WriteJSON(w, 413, map[string]any{"success": false, "code": "image_too_large", "error": "视角图请求过大，原图最多支持 64 MB"})
 			} else {
-				fail(400, "请选择人物或场景九宫格图片")
+				fail(400, "请选择人物或场景视角图图片")
 			}
 			return
 		}
-		if len(assetGridViews[body.Kind]) != 9 || strings.TrimSpace(body.ImageURL) == "" {
-			fail(400, "请选择人物或场景九宫格图片")
+		gridKind := body.Kind
+		if body.Kind == "persona" && body.Layout == "1x4" {
+			gridKind = personaStrip
+		} else if body.Layout != "" && body.Layout != "3x3" {
+			fail(400, "不支持的视角布局")
+			return
+		}
+		if (body.Whole && gridKind != personaStrip) || (body.Kind != "persona" && body.Kind != "scene") || strings.TrimSpace(body.ImageURL) == "" {
+			fail(400, "请选择人物或场景视角图图片")
 			return
 		}
 		if err := decoder.Decode(new(any)); err != io.EOF {
@@ -82,25 +114,39 @@ func AssetViewGrid(_ config.Config) http.HandlerFunc {
 			if errors.As(err, &oversized) {
 				status, code = http.StatusRequestEntityTooLarge, "image_too_large"
 			}
-			httpx.WriteJSON(w, status, map[string]any{"success": false, "code": code, "error": "九宫格原图读取失败：" + err.Error()})
+			httpx.WriteJSON(w, status, map[string]any{"success": false, "code": code, "error": "视角图原图读取失败：" + err.Error()})
 			return
 		}
-		if err := validateAssetGrid(data); err != nil {
+		if err := validateAssetGrid(data, gridKind); err != nil {
 			fail(422, err.Error())
 			return
 		}
-		images, err := splitAssetGrid(ctx, data, body.Kind, workspace)
+		images, err := storeAssetViewResult(ctx, data, gridKind, workspace, body.Whole)
 		if err != nil {
 			log.Printf("[sales-grid] crop/save failed: %v", err)
 			if ctx.Err() != nil {
-				fail(504, "九宫格裁切已取消或超时，可继续处理原图")
+				fail(504, "视角图裁切已取消或超时，可继续处理原图")
 			} else {
-				fail(500, "九宫格裁切或保存失败，可继续处理原图")
+				fail(500, "视角图裁切或保存失败，可继续处理原图")
 			}
 			return
 		}
 		httpx.WriteJSON(w, 200, map[string]any{"success": true, "images": images})
 	}
+}
+
+func storeAssetViewResult(ctx context.Context, data []byte, kind, workspace string, whole bool) ([]assetGridImage, error) {
+	if !whole {
+		return splitAssetGrid(ctx, data, kind, workspace)
+	}
+	if err := validateAssetGrid(data, kind); err != nil {
+		return nil, err
+	}
+	url, err := storeAssetCreationBytes(ctx, data, kind, workspace)
+	if err != nil {
+		return nil, err
+	}
+	return []assetGridImage{{View: "sheet", URL: url}}, nil
 }
 
 func readAssetGrid(ctx context.Context, source, workspace string) ([]byte, error) {
@@ -126,11 +172,11 @@ func readAssetGrid(ctx context.Context, source, workspace string) ([]byte, error
 		return nil, originalImageSizeError{assetGridMaxBytes}
 	}
 	if !ok {
-		return nil, errors.New("九宫格图片编码无效")
+		return nil, errors.New("视角图图片编码无效")
 	}
 	data, err := base64.StdEncoding.DecodeString(payload)
 	if err != nil || len(data) == 0 {
-		return nil, errors.New("九宫格图片编码无效")
+		return nil, errors.New("视角图图片编码无效")
 	}
 	if len(data) > assetGridMaxBytes {
 		return nil, originalImageSizeError{assetGridMaxBytes}
@@ -138,16 +184,20 @@ func readAssetGrid(ctx context.Context, source, workspace string) ([]byte, error
 	return data, nil
 }
 
-func validateAssetGrid(data []byte) error {
+func validateAssetGrid(data []byte, kind string) error {
 	dimensions, _, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
-		return errors.New("请使用有效的 JPEG、PNG、WebP 或 GIF 九宫格图片")
+		return errors.New("请使用有效的 JPEG、PNG、WebP 或 GIF 视角图图片")
 	}
-	if dimensions.Width < 768 || dimensions.Height < 768 {
-		return errors.New("九宫格分辨率过低，每个视角至少需要 256 × 256 像素")
+	columns, rows := assetGridDimensions(kind)
+	if kind == personaStrip && dimensions.Width <= dimensions.Height {
+		return errors.New("人物三视图需要横向一行四格原图")
+	}
+	if dimensions.Width < columns*256 || dimensions.Height < rows*256 {
+		return errors.New("视角图分辨率过低，每个视角至少需要 256 × 256 像素")
 	}
 	if int64(dimensions.Width)*int64(dimensions.Height) > 40_000_000 {
-		return errors.New("九宫格超过 4000 万像素")
+		return errors.New("视角图超过 4000 万像素")
 	}
 	return nil
 }

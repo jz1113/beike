@@ -1,3 +1,4 @@
+import { PERSONA_CATEGORIES, personaGender, type PersonaCategory, personaGroupToDimensions } from '../model/salesPersonaClassification';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Layers, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
@@ -7,8 +8,8 @@ import type { ScriptTaxonomyItem } from '@shared/contracts/salesScriptTaxonomy';
 import { deleteSalesMaterial, deleteSalesSound, updateSalesMaterial, updateSalesSound } from '../api/salesMaterials';
 import { buildActionDefaultAnglePatch } from '../model/salesActionViews';
 import {
-  mergeGroupTag, PERSONA_GROUP_LABELS, personaGroupToDimensions, SCENE_SPACE_LABELS,
-  type SalesMaterialCard, type SalesPersonaGroup, type SalesSceneSpace,
+  mergeGroupTag, SCENE_SPACE_LABELS,
+  type SalesMaterialCard, type SalesSceneSpace,
 } from '../model/salesMaterialCatalog';
 import { SalesActionAngleGallery } from './SalesActionAngleGallery';
 import { salesFocusClass, salesGhostButtonClass, salesInputClass } from './salesChrome';
@@ -39,9 +40,10 @@ export function SalesMaterialDetailDialog({
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description);
   const [tags, setTags] = useState((card.editableTags ?? card.tags).join('，'));
-  const [personaGroup, setPersonaGroup] = useState<SalesPersonaGroup>(card.personaGroup || 'female');
+  const [personaGroup, setPersonaGroup] = useState<PersonaCategory>(card.personaGroup || 'female');
   const [sceneSpace, setSceneSpace] = useState<SalesSceneSpace>(card.sceneSpace || 'indoor');
-  const [voiceGroup, setVoiceGroup] = useState<SalesPersonaGroup>(card.voiceGroup || 'female');
+  const [voiceGroup, setVoiceGroup] = useState<PersonaCategory>(card.voiceGroup || 'female');
+  const [voiceId, setVoiceId] = useState(card.voiceId || '');
   const [actionCategoryId, setActionCategoryId] = useState(card.categoryId || '');
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -105,12 +107,12 @@ export function SalesMaterialDetailDialog({
       const trimmedTitle = title.trim();
       const trimmedDesc = description.trim();
       if (card.kind === 'persona') {
-        const nextTags = mergeGroupTag(tags, PERSONA_GROUP_LABELS[personaGroup], ['男', '女', '老', '儿童']);
+        const nextTags = mergeGroupTag(tags, PERSONA_CATEGORIES[personaGroup], Object.values(PERSONA_CATEGORIES));
         await updateSalesMaterial('persona', card.id, {
           name: trimmedTitle,
           description: trimmedDesc,
           tags: nextTags,
-          dimensions: personaGroupToDimensions(undefined, personaGroup),
+          dimensions: personaGroupToDimensions(card.dimensions, personaGroup),
         });
       } else if (card.kind === 'scene') {
         const nextTags = mergeGroupTag(tags, SCENE_SPACE_LABELS[sceneSpace], ['室内', '户外']);
@@ -135,7 +137,8 @@ export function SalesMaterialDetailDialog({
           description: trimmedDesc,
           promptText: trimmedDesc,
           voiceGroup: card.soundType === 'voice' ? voiceGroup : undefined,
-          gender: card.soundType === 'voice' && voiceGroup === 'male' ? 'male' : 'female',
+          voiceId: card.soundType === 'voice' ? voiceId.trim() : undefined,
+          gender: card.soundType === 'voice' ? personaGender(voiceGroup) : undefined,
           tags: tagList,
           moodTags: tagList,
         });
@@ -185,6 +188,7 @@ export function SalesMaterialDetailDialog({
     setPersonaGroup(card.personaGroup || 'female');
     setSceneSpace(card.sceneSpace || 'indoor');
     setVoiceGroup(card.voiceGroup || 'female');
+    setVoiceId(card.voiceId || '');
     setActionCategoryId(card.categoryId || '');
     setAddingCategory(false);
     setNewCategoryName('');
@@ -251,7 +255,8 @@ export function SalesMaterialDetailDialog({
         ) : images.length > 0 ? (
           <div className="sales-material-detail-images">{images.map((url, i) => <img key={url} src={proxyMediaUrl(url)} alt={`${card.title}参考图 ${i + 1}`} />)}</div>
         ) : null}
-        {card.audio && <StudioAudioPlayer src={proxyMediaUrl(card.audio)} label={`${card.title}试听`} className="my-3 w-full" />}
+        {card.audio && <StudioAudioPlayer src={proxyMediaUrl(card.audio, { asAudio: true })} label={`${card.title}试听`} className="my-3 w-full" />}
+        {card.kind === 'sound' && card.soundType === 'voice' && <p className="sales-material-notice">导入人声时，超过 15 秒会自动保留前 15 秒；试听与视频生成使用同一份样本，原文件保留。</p>}
         {isCompactDialog && editing && <p className="sales-material-edit-media-type">{card.badge}</p>}
       </div>
 
@@ -262,9 +267,9 @@ export function SalesMaterialDetailDialog({
             <div className="sales-dialog-field">
               <span>人物分类</span>
               <div className="sales-segment-group" role="group" aria-label="编辑人物分类">
-                {(['male', 'female', 'senior', 'child'] as const).map((id) => (
+                {(Object.keys(PERSONA_CATEGORIES) as PersonaCategory[]).map((id) => (
                   <button key={id} type="button" aria-pressed={personaGroup === id} onClick={() => setPersonaGroup(id)} className={`sales-segment-item ${salesFocusClass}`}>
-                    {PERSONA_GROUP_LABELS[id]}
+                    {PERSONA_CATEGORIES[id]}
                   </button>
                 ))}
               </div>
@@ -337,14 +342,18 @@ export function SalesMaterialDetailDialog({
             <div className="sales-dialog-field">
               <span>人声细分</span>
               <div className="sales-segment-group" role="group" aria-label="编辑人声细分">
-                {(['male', 'female', 'senior', 'child'] as const).map((id) => (
+                {(Object.keys(PERSONA_CATEGORIES) as PersonaCategory[]).map((id) => (
                   <button key={id} type="button" aria-pressed={voiceGroup === id} onClick={() => setVoiceGroup(id)} className={`sales-segment-item ${salesFocusClass}`}>
-                    {PERSONA_GROUP_LABELS[id]}
+                    {PERSONA_CATEGORIES[id]}
                   </button>
                 ))}
               </div>
             </div>
           )}
+          {card.kind === 'sound' && card.soundType === 'voice' && <label>合成音色编号（选填）
+            <input aria-label="合成音色编号" maxLength={200} value={voiceId} onChange={(event) => setVoiceId(event.target.value)} placeholder="填写语音服务商提供的音色编号" className={salesInputClass} disabled={pending} />
+            <small>用于合成口播音色参考或旁白。声音样本可单独用于口播参考；编号留空不代表 TTS 已克隆该样本。</small>
+          </label>}
 
           {!isCompactDialog && nameField}
           {card.kind !== 'action' && (
@@ -369,6 +378,7 @@ export function SalesMaterialDetailDialog({
         </form>
       ) : (
         <>
+          {card.kind === 'sound' && card.soundType === 'voice' && <p className="sales-material-detail-description">合成音色编号：{card.voiceId || '未配置'}</p>}
           {card.kind !== 'action' && card.description ? (
             <p className="sales-material-detail-description">{card.description}</p>
           ) : null}

@@ -1,29 +1,30 @@
+import { confirmAction } from '@client/shared/utils/confirmAction';
 import { useCanvasHydrated } from '../../hooks/useCanvasHydrated';
-import {visibleCanvasProjects} from '../../store/canvasProjectDefaults';
-import React, { useState, useEffect } from 'react';
-import { Plus, MoreHorizontal, Trash2, Edit2, ChevronRight } from 'lucide-react';
+import {studioCover, visibleCanvasProjects} from '../../store/canvasProjectDefaults';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Plus, MoreHorizontal, Trash2, Edit2, ChevronRight, LayoutGrid } from 'lucide-react';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import type { CanvasProject } from '../../model/types';
+import { videoWorkflowTemplates } from '../../model/videoWorkflowProjects';
 
 interface CanvasRecentProjectsProps {
   onEnterCanvas?: (projectId: string) => void;
   className?: string;
   maxDisplay?: number;
-  /** 首页画布模式用独立方卡；画布视图保持网格里的新建入口。 */
-  lead?: 'grid' | 'square';
 }
 
 export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
   onEnterCanvas,
   className = '',
   maxDisplay = 7,
-  lead = 'grid',
 }) => {
   const hydrated = useCanvasHydrated();
   const { projects:allProjects, createProject, selectProject, updateProjectTitle, deleteProject } = useCanvasStore();
-  const projects=visibleCanvasProjects(allProjects);
+  const projects=useMemo(()=>visibleCanvasProjects(allProjects),[allProjects]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const editingMenuButton = useRef<HTMLButtonElement>(null);
+  const searchBox = useRef<HTMLInputElement>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,10 +48,14 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
     setEditingId(null);
   };
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    deleteProject(id);
     setMenuOpenId(null);
+    const project = allProjects.find(item => item.id === id);
+    if (project && await confirmAction({
+      title:'删除画布项目', description:`删除「${project.title}」及其中的节点和连线？此操作无法撤销。`,
+      confirmText:'删除项目', cancelText:'取消', danger:true,
+    })) deleteProject(id);
   };
 
   const handleCreateNew = () => {
@@ -64,45 +69,44 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
     onEnterCanvas?.(id);
   };
 
-  // 🌟 全屏下一排最多放 8 个（1 个新建项目 + 最多 7 个最近画布）
-  const displayedProjects = maxDisplay > 0 ? projects.slice(0, maxDisplay) : projects;
+  const [showAll, setShowAll] = useState(false);
+  const [query, setQuery] = useState('');
+  const search = query.trim().toLocaleLowerCase();
+  const displayedProjects = search
+    ? projects.filter(project => project.title.toLocaleLowerCase().includes(search))
+    : maxDisplay > 0 && !showAll ? projects.slice(0, maxDisplay) : projects;
   const hasRecentProjects = projects.length > 0;
 
-  const createCard = lead === 'square' ? (
+  const createCard = (
     <button
       type="button"
+      disabled={!hydrated}
       onClick={handleCreateNew}
-      className="flex h-[168px] w-[168px] flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-[#1B1B1E] text-slate-500 dark:text-[#8E8E93] shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-white/20 hover:text-slate-950 dark:hover:text-white hover:shadow-md"
+      className={`disabled:cursor-wait disabled:opacity-60 flex ${hasRecentProjects ? 'h-16 w-full sm:h-auto sm:aspect-video sm:flex-col' : 'h-[168px] w-[168px] flex-col'} items-center justify-center gap-3 rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-[#1B1B1E] text-slate-500 dark:text-[#8E8E93] shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-white/20 hover:text-slate-950 dark:hover:text-white hover:shadow-md`}
     >
       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-[#E5E5EA]">
         <Plus className="h-5 w-5" strokeWidth={2.2} />
       </span>
       <span className="text-sm font-medium">新建项目</span>
     </button>
-  ) : (
-    <div
-      onClick={handleCreateNew}
-      className="group/new flex flex-col gap-2 cursor-pointer transition-all duration-200"
-    >
-      <div className="w-full aspect-video rounded-2xl border border-slate-200/80 dark:border-white/10 bg-slate-100/70 dark:bg-white/5 hover:bg-slate-200/70 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/20 flex items-center justify-center transition-all duration-200 shadow-2xs group-hover/new:shadow-md group-hover/new:-translate-y-0.5">
-        <div className="w-10 h-10 rounded-full bg-white/80 dark:bg-[#1B1B1E] shadow-2xs flex items-center justify-center text-slate-400 dark:text-slate-300 group-hover/new:text-slate-900 dark:group-hover/new:text-white group-hover/new:scale-110 transition-all duration-200">
-          <Plus className="w-6 h-6 stroke-[2.2]" />
-        </div>
-      </div>
-      <div className="px-1">
-        <span className="text-xs sm:text-[13px] font-semibold text-slate-800 dark:text-[#EDEDED] group-hover/new:text-slate-950 dark:group-hover/new:text-white transition-colors">
-          新建项目
-        </span>
-      </div>
-    </div>
   );
 
   return (
     <section className={`w-full space-y-4 select-none ${className}`}>
-      {lead === 'square' && createCard}
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-slate-500 dark:text-slate-400">复刻流程模板</span>
+        {videoWorkflowTemplates.map(template => <button key={template.kind} type="button" disabled={!hydrated}
+          title={template.summary} className="rounded-lg border border-slate-200 px-3 py-2 text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
+          onClick={() => { const project = createProject(undefined, template.kind); onEnterCanvas?.(project.id); }}>
+          新建{template.title}
+        </button>)}
+        <span className="text-xs text-slate-500">含步骤说明与接入点，尚未接通自动执行</span>
+      </div>
+      {!hasRecentProjects && createCard}
+      {!hydrated && <p role="status" className="text-sm text-slate-500">正在读取本地项目…</p>}
       {/* 空画布不展示“最近项目 · 0 个画布”的无效标题行，直接给出新建入口。 */}
       {hasRecentProjects && (
-        <div className="flex items-center justify-between pb-1 border-b border-slate-200/50 dark:border-white/10">
+        <div className="flex flex-wrap items-center gap-2 pb-1 border-b border-slate-200/50 dark:border-white/10">
           <div className="flex items-center gap-2 py-1">
             <span className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
               最近项目
@@ -112,31 +116,40 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
             </span>
           </div>
 
-          {projects.length > maxDisplay && (
+          <input
+            ref={searchBox}
+            type="search"
+            aria-label="搜索项目"
+            placeholder="搜索项目"
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Escape' && !event.nativeEvent.isComposing) setQuery('');
+            }}
+            className="ml-auto min-w-0 w-36 max-w-full rounded-lg border border-slate-200 bg-transparent px-2 py-1 text-sm dark:border-white/10"
+          />
+          {!search && maxDisplay > 0 && projects.length > maxDisplay && (
             <button
               type="button"
-              onClick={() => {
-                if (projects[0]) {
-                  handleSelectCard(projects[0].id);
-                } else {
-                  handleCreateNew();
-                }
-              }}
+              onClick={() => setShowAll(!showAll)}
+              aria-expanded={showAll}
               className="text-xs text-slate-400 hover:text-slate-700 dark:text-[#8E8E93] dark:hover:text-white flex items-center gap-0.5 transition-colors cursor-pointer"
             >
-              进入画板查看全部
+              {showAll ? '收起项目' : '查看全部项目'}
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
       )}
 
-      {(lead === 'grid' || hasRecentProjects) && (
-      <div className="grid grid-cols-1 min-[540px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-        {lead === 'grid' && createCard}
-
-        {/* 🌟 历史画布卡片 */}
+      {search && hasRecentProjects && !displayedProjects.length && <p role="status" className="text-sm text-slate-500">没有找到匹配的项目</p>}
+      {hasRecentProjects && (
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,168px),1fr))] items-start gap-4 sm:gap-5">
+        {createCard}
         {displayedProjects.map((proj) => {
+          const cover = studioCover(proj.studioScene) || proj.thumbnail;
+          const nodeCount = proj.studioScene?.nodes.length ?? proj.nodes.length;
+          const detail = nodeCount ? `${nodeCount} 个节点` : proj.studioScene?.strokes?.length ? '手绘画布' : proj.studioScene?.textBoxes?.length ? '文本画布' : '项目画布';
           const isEditing = editingId === proj.id;
           const isMenuOpen = menuOpenId === proj.id;
 
@@ -149,31 +162,35 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
               className="group/card flex flex-col gap-2 cursor-pointer transition-all duration-200 relative"
             >
               {/* 卡片封面预览视口 */}
-              <div className="w-full aspect-video rounded-2xl border border-slate-200/80 dark:border-white/10 bg-slate-100 dark:bg-[#14171D] overflow-hidden relative shadow-2xs group-hover/card:shadow-md group-hover/card:-translate-y-0.5 transition-all duration-200">
-                {proj.thumbnail ? (
-                  <img
-                    src={proj.thumbnail}
-                    alt={proj.title}
-                    className="w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-300"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-[#eaecef] dark:bg-[#20252F] transition-colors" />
-                )}
-              </div>
+              <button type="button" aria-label={`打开画布：${proj.title}`} className="w-full aspect-video rounded-2xl border border-slate-200/80 dark:border-white/10 bg-slate-100 dark:bg-[#14171D] overflow-hidden relative shadow-2xs group-hover/card:shadow-md group-hover/card:-translate-y-0.5 transition-all duration-200">
+                <span className="flex h-full flex-col items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                  <LayoutGrid aria-hidden="true" className="h-6 w-6" />{detail}
+                </span>
+                {cover && <img key={cover} src={cover} loading="lazy" alt=""
+                  onError={event => { event.currentTarget.hidden = true; }}
+                  className="absolute inset-0 w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-300"
+                />}
+              </button>
 
               {/* 卡片底部标题行与右侧三点操作 */}
               <div className="px-1 flex items-start justify-between gap-1.5 relative">
                 <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                   {isEditing ? (
                     <input
+                      aria-label="项目名称"
+                      maxLength={40}
                       autoFocus
                       type="text"
                       value={editingTitle}
                       onChange={(e) => setEditingTitle(e.target.value)}
                       onBlur={() => handleSaveRename(proj.id)}
                       onKeyDown={(e) => {
+                        if (e.nativeEvent.isComposing || (e.key !== 'Enter' && e.key !== 'Escape')) return;
+                        e.preventDefault();
+                        const trigger = editingMenuButton.current;
                         if (e.key === 'Enter') handleSaveRename(proj.id);
-                        if (e.key === 'Escape') setEditingId(null);
+                        else setEditingId(null);
+                        requestAnimationFrame(() => (trigger?.isConnected ? trigger : searchBox.current)?.focus());
                       }}
                       onClick={(e) => e.stopPropagation()}
                       className="w-full text-xs sm:text-[13px] font-semibold text-slate-900 dark:text-white px-1.5 py-0.5 rounded border border-indigo-400 bg-white dark:bg-[#1B1B1E] focus:outline-none"
@@ -184,12 +201,21 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
                     </span>
                   )}
                   <span className="text-[11px] text-slate-600 dark:text-[#8E8E93] font-normal">
-                    {proj.subtitle || '画布 · 刚刚修改'}
+                    {'画布 · ' + new Date(proj.updatedAt).toLocaleDateString()}
                   </span>
                 </div>
 
                 {/* 标题右侧横向三点操作按钮 */}
-                <div className="relative shrink-0 pt-0.5">
+                <div className="relative shrink-0 pt-0.5"
+                  onBlur={event => {
+                    if (isMenuOpen && !event.currentTarget.contains(event.relatedTarget)) setMenuOpenId(null);
+                  }}
+                  onKeyDown={event => {
+                    if (event.key !== 'Escape' || !isMenuOpen) return;
+                    event.preventDefault();
+                    setMenuOpenId(null);
+                    event.currentTarget.querySelector('button')?.focus();
+                  }}>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -199,6 +225,8 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
                     className="w-6 h-6 rounded-lg text-slate-600 dark:text-[#8E8E93] hover:text-slate-800 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
                     title="更多操作"
                     aria-label="项目更多选项"
+                    aria-expanded={isMenuOpen}
+                    ref={isEditing ? editingMenuButton : undefined}
                   >
                     <MoreHorizontal className="w-4 h-4" />
                   </button>

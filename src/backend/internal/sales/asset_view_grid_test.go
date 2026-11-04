@@ -34,7 +34,7 @@ func assetGridFixture(t *testing.T, width, height int) []byte {
 	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	for i, value := range gridColors {
-		draw.Draw(img, assetGridCell(img.Bounds(), i), image.NewUniform(value), image.Point{}, draw.Src)
+		draw.Draw(img, assetGridCell(img.Bounds(), i, "scene"), image.NewUniform(value), image.Point{}, draw.Src)
 	}
 	var encoded bytes.Buffer
 	if err := png.Encode(&encoded, img); err != nil {
@@ -73,7 +73,7 @@ func TestAssetGridCutsNineJpegsInOrderAndRetriesWithoutRewriting(t *testing.T) {
 				t.Fatal("not a JPEG", item, err)
 			}
 			decoded, format, err := image.Decode(bytes.NewReader(raw))
-			cell := assetGridCell(image.Rect(0, 0, 901, 1202), index)
+			cell := assetGridCell(image.Rect(0, 0, 901, 1202), index, "scene")
 			if err != nil || format != "jpeg" || decoded.Bounds().Dx() != cell.Dx() || decoded.Bounds().Dy() != cell.Dy() {
 				t.Fatal("incorrect integer split dimensions", cell, err)
 			}
@@ -104,13 +104,13 @@ func TestAssetGridIntegerCellsCoverAllPixels(t *testing.T) {
 	bounds := image.Rect(2, 7, 903, 1209)
 	area := 0
 	for index := range 9 {
-		cell := assetGridCell(bounds, index)
+		cell := assetGridCell(bounds, index, "scene")
 		area += cell.Dx() * cell.Dy()
 		if !cell.In(bounds) {
 			t.Fatal("out of bounds", cell)
 		}
 		for other := range index {
-			if !cell.Intersect(assetGridCell(bounds, other)).Empty() {
+			if !cell.Intersect(assetGridCell(bounds, other, "scene")).Empty() {
 				t.Fatal("overlapping grid cells")
 			}
 		}
@@ -195,7 +195,7 @@ func TestAssetGridRejectsBadSourcesAndTooSmallOrLargeImages(t *testing.T) {
 	binary.BigEndian.PutUint32(data[16:20], 9000)
 	binary.BigEndian.PutUint32(data[20:24], 5000)
 	binary.BigEndian.PutUint32(data[29:33], crc32.ChecksumIEEE(data[12:29]))
-	if err := validateAssetGrid(data); err == nil || !strings.Contains(err.Error(), "4000") {
+	if err := validateAssetGrid(data, "scene"); err == nil || !strings.Contains(err.Error(), "4000") {
 		t.Fatal("pixel limit did not run before decode", err)
 	}
 	if _, err := readAssetGrid(context.Background(), "data:image/png;base64,"+strings.Repeat("A", base64.StdEncoding.EncodedLen(assetGridMaxBytes)+4), "local"); err == nil {
@@ -270,5 +270,64 @@ func TestAssetGridRejectsInvalidRequestsAndReportsBusy(t *testing.T) {
 	busy := requestAssetGrid(t, "scene", "/storage/local/grid.png", "local")
 	if busy.Code != 429 {
 		t.Fatal("did not bound concurrent decoding", busy.Code)
+	}
+}
+
+func TestGridRetryRepairsOnlyTruncatedCell(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AZHUO_CACHE_DIR", root)
+	source := assetGridFixture(t, 1200, 900)
+	views, err := splitAssetGrid(t.Context(), source, "persona", "local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := func(i int) string { return filepath.Join(root, strings.TrimPrefix(views[i].URL, "/storage/")) }
+	good, _ := os.Stat(file(0))
+	broken, _ := os.Stat(file(6))
+	if err := os.Truncate(file(6), broken.Size()-64); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := splitAssetGrid(t.Context(), source, "persona", "local"); err != nil {
+		t.Fatal(err)
+	}
+	repaired, _ := os.Stat(file(6))
+	retained, _ := os.Stat(file(0))
+	if repaired.Size() != broken.Size() || retained.ModTime() != good.ModTime() {
+		t.Fatal("incorrect partial repair")
+	}
+}
+
+func TestPersonaStripCutsFourFullHeightColumns(t *testing.T) {
+	t.Setenv("AZHUO_CACHE_DIR", t.TempDir())
+	// An odd width makes the final column one pixel wider.
+	const width, height = 1401, 768
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for index := range 4 {
+		rect := image.Rect(index*width/4, 0, (index+1)*width/4, height)
+		draw.Draw(img, rect, image.NewUniform(gridColors[index]), image.Point{}, draw.Src)
+	}
+	var source bytes.Buffer
+	if err := png.Encode(&source, img); err != nil {
+		t.Fatal(err)
+	}
+	images, err := splitAssetGrid(t.Context(), source.Bytes(), personaStrip, "local")
+	if err != nil || len(images) != 4 {
+		t.Fatal(images, err)
+	}
+	for i, want := range []string{"front", "side", "back", "face"} {
+		raw, err := readAssetGrid(t.Context(), images[i].URL, "local")
+		if err != nil {
+			t.Fatal(err)
+		}
+		crop, _, err := image.Decode(bytes.NewReader(raw))
+		if err != nil || images[i].View != want || crop.Bounds() != image.Rect(0, 0, (i+1)*width/4-i*width/4, height) {
+			t.Fatalf("invalid crop %d: %v", i, err)
+		}
+		got := color.RGBAModel.Convert(crop.At(10, height-1)).(color.RGBA)
+		for _, delta := range []int{int(got.R) - int(gridColors[i].R), int(got.G) - int(gridColors[i].G), int(got.B) - int(gridColors[i].B)} {
+			if delta < -3 || delta > 3 {
+				t.Fatalf("incorrect column %s: %v", want, got)
+			}
+		}
 	}
 }

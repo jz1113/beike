@@ -3,9 +3,9 @@ import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client
 import { getGatewayClientHeaders, getModelCredentials } from '@client/shared/api/gatewayClient';
 import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
 import { normalizeImageUrlToStandardJpg, formatDisplayModel, getAspectRatioFromSize } from '@shared/domain/media/drawing';
-import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
+import { prepareVideoSubmissionInput } from './videoSubmissionInput';
 import { prepareImageSubmission } from './prepareImageSubmission';
-import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
+import { isTaskVideoReference } from '@client/shared/media/mediaHelper';
 import { prepareVideoReferences } from './prepareVideoReferences';
 import { recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
 import { logLatencyAudit } from '@shared/domain/core/latencyAudit';
@@ -181,12 +181,14 @@ export async function submitSingleGenerationTask(
             ? [t.referenceImageUrl]
             : [];
 
-      const videoRefs = rawRefs.filter((u) => isVideoMediaUrl(u));
+      const videoRefs = rawRefs.filter((u) => isTaskVideoReference(t, u));
       const imageRefs = rawRefs
-        .filter((u) => !isVideoMediaUrl(u))
+        .filter((u) => !isTaskVideoReference(t, u))
         .map((img) => normalizeImageUrlToStandardJpg(img))
         .filter(Boolean) as string[];
 
+      const videoBaseUrl = gatewayHeaders['x-custom-base-url'] || localUrl;
+      const videoInput = prepareVideoSubmissionInput(t, videoBaseUrl, imageRefs, videoRefs);
       const finalVideoRefs = await prepareVideoReferences(videoRefs, signal);
 
       throwIfGenerationAborted(() => Boolean(signal?.aborted));
@@ -206,7 +208,7 @@ export async function submitSingleGenerationTask(
           model: t.model || 'doubao-seedance-2.5',
           duration: t.videoDuration || 5,
           aspect_ratio: t.size || '16:9',
-          resolution: resolveVideoResolution(t.videoResolution, getVideoModelById(t.model)?.supportedResolutions),
+          ...videoInput,
           ref_mode: t.videoRefMode || 'omni',
           images: imageRefs,
           videos: finalVideoRefs,

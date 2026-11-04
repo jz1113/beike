@@ -2,14 +2,12 @@ import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
 import type { AssetProductCategory, PromptAlbum } from '@shared/domain/assets/assetOrganization';
 import { buildPromptGroupFolders, buildPromptGroupSubcategoryFolders, promptGroupSubcategoryOptions, topLevelCategories } from './promptGroupFolders';
 
-export function buildCategorySkillNavigation(items: AssetLibrarySlim[], categories: AssetProductCategory[], albums: PromptAlbum[]) {
-  return topLevelCategories(categories).flatMap(root => {
-    const folders = buildPromptGroupSubcategoryFolders(items, categories, albums, root.id);
-    return promptGroupSubcategoryOptions(categories, root.id).map(child => ({
+export function buildCategorySkillNavigation(categories: AssetProductCategory[]) {
+  return topLevelCategories(categories).flatMap(root =>
+    promptGroupSubcategoryOptions(categories, root.id).map(child => ({
       ...child, parent: root.name, parentId: root.id,
-      count: folders.find(folder => folder.id === child.id)?.items.length || 0,
-    }));
-  });
+    })),
+  );
 }
 
 export function buildPromptLibraryNavigation(items: AssetLibrarySlim[], categories: AssetProductCategory[], albums: PromptAlbum[]) {

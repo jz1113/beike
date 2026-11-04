@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo, type RefObject } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useMemo, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { type PreferenceModelItem } from '../hooks/usePromptBarWorkflowModels';
@@ -139,6 +139,12 @@ export function PromptBarModelPickerModal({
 
   const [expandedRowId, setExpandedRowId] = useState<string | null>(activeRowId);
   const wasOpen = useRef(false);
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const panel = panelRef.current;
+    const selected = panel?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    (selected || panel?.querySelector<HTMLElement>('button, [role="button"]'))?.focus({ preventScroll: true });
+  }, [isOpen, panelRef]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -200,6 +206,24 @@ export function PromptBarModelPickerModal({
     <div
       ref={panelRef}
       style={panelStyle}
+      role="dialog"
+      aria-label="选择模型"
+      onKeyDown={event => {
+        const choices = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), [role="button"]'));
+        const index = choices.indexOf(document.activeElement as HTMLElement);
+        if (index < 0) return;
+        if (event.key === 'Tab') {
+          if (event.shiftKey ? index === 0 : index === choices.length - 1) {
+            event.preventDefault();
+            onClose();
+            triggerRef.current?.focus();
+          }
+          return;
+        }
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        event.preventDefault();
+        choices[(index + (event.key === 'ArrowDown' ? 1 : choices.length - 1)) % choices.length]?.focus();
+      }}
       className={`fixed ${
         opensUp ? 'origin-bottom' : 'origin-top'
       } overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/95 text-slate-900 shadow-[0_20px_50px_rgba(0,0,0,0.12)] backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10 dark:bg-[#18191c]/95 dark:text-slate-100 dark:shadow-[0_20px_50px_rgba(0,0,0,0.45)] z-[10010] animate-fade-in p-1.5 text-left select-none`}
@@ -287,6 +311,7 @@ function ModelRow({
       <div
         role="button"
         tabIndex={0}
+        aria-pressed={selected}
         onClick={() => onSelect(picked?.primaryModelId || row.allModelIds[0])}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {

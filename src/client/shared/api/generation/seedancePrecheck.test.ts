@@ -68,6 +68,7 @@ describe('seedancePrecheck', () => {
     await runSeedancePrecheck([video]);
 
     const init = vi.mocked(apiFetch).mock.calls[0][1]!;
+    expect(JSON.parse(String(init.body)).model).toBe('doubao-seedance-2.5');
     expect(JSON.parse(String(init.body)).storageConfig).toEqual(storageConfig);
     expect(JSON.parse(new Headers(init.headers).get('x-storage-config')!)).toEqual(storageConfig);
   });

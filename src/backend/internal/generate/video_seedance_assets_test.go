@@ -197,7 +197,7 @@ func TestSeedancePrecheckValidatesAndCachesAssets(t *testing.T) {
 	if parsed.Results[1].Status != "rejected" || !strings.Contains(parsed.Results[1].Error, "参考图片未通过安全检测") {
 		t.Fatalf("expected second item rejected, got %#v", parsed.Results[1])
 	}
-	if cached := loadSeedanceCachedURI(server.URL, "Video", "https://cdn.example/depth-action.mp4"); cached != "asset://precheck-vid-1" {
+	if cached := loadSeedanceCachedURI(seedanceAssetScope{base: server.URL, apiKey: "secret", model: "doubao-seedance-2.0-mini", workspace: "local"}, "Video", "https://cdn.example/depth-action.mp4"); cached != "asset://precheck-vid-1" {
 		t.Fatalf("expected cached asset URI, got %q", cached)
 	}
 	if msg := validateSeedanceVideoDuration(1.2); !strings.Contains(msg, "2 ~ 30 秒") {

@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import { densityComposerPill } from '@client/shared/ui/layoutClasses';
 import { useI18n } from '@client/shared/i18n';
@@ -26,6 +26,10 @@ export default function PromptBarModeSelector({
   onSelectMode,
 }: PromptBarModeSelectorProps) {
   const { t } = useI18n();
+  const trigger = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    if (isOpen) menuRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus();
+  }, [isOpen, menuRef]);
 
   const currentModeLabel = (() => {
     if (quickGenMode === 'agent') return t('promptBar.modes.agent');
@@ -38,9 +42,22 @@ export default function PromptBarModeSelector({
   })();
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative" ref={menuRef} onKeyDown={event => {
+      if (!isOpen) return;
+      if (event.key === 'Escape') {
+        trigger.current?.focus();
+        return;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      const choices = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[aria-pressed]'));
+      const index = choices.indexOf(document.activeElement as HTMLButtonElement);
+      choices[(index + (event.key === 'ArrowDown' ? 1 : choices.length - 1)) % choices.length]?.focus();
+    }}>
       <button
         type="button"
+        ref={trigger}
+        aria-expanded={isOpen}
         onClick={onToggle}
         className={`${densityComposerPill} rounded-full flex items-center gap-1.5 transition-all cursor-pointer border-0 shrink-0 ${modeButtonClass}`}
       >
@@ -59,69 +76,27 @@ export default function PromptBarModeSelector({
             isUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
           } w-44 rounded-2xl bg-white dark:bg-[#18191c]/95 dark:backdrop-blur-xl border border-slate-200/90 dark:border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.12)] p-1.5 z-50 animate-fade-in text-left space-y-0.5 select-none text-slate-900 dark:text-slate-100`}
         >
-          {/* 1. Agent 模式 */}
-          <button
-            type="button"
-            onClick={() => onSelectMode('agent')}
-            className={`w-full px-3 py-2 rounded-xl text-left transition-colors cursor-pointer flex items-center justify-between group ${
-              quickGenMode === 'agent'
-                ? 'bg-slate-100/90 dark:bg-white/15 text-slate-950 dark:text-white font-semibold'
-                : 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10'
-            }`}
-          >
-            <span className="text-[13.5px] font-medium text-slate-900 dark:text-white">Agent模式</span>
-            {quickGenMode === 'agent' && (
-              <Check className="w-4 h-4 text-slate-900 dark:text-white stroke-[2.2]" />
-            )}
-          </button>
-
-          {/* 2. 视频生成 */}
-          <button
-            type="button"
-            onClick={() => onSelectMode('video')}
-            className={`w-full px-3 py-2 rounded-xl text-left transition-colors cursor-pointer flex items-center justify-between group ${
-              quickGenMode === 'video'
-                ? 'bg-slate-100/90 dark:bg-white/15 text-slate-950 dark:text-white font-semibold'
-                : 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10'
-            }`}
-          >
-            <span className="text-[13.5px] font-medium text-slate-900 dark:text-white">视频生成</span>
-            {quickGenMode === 'video' && (
-              <Check className="w-4 h-4 text-slate-900 dark:text-white stroke-[2.2]" />
-            )}
-          </button>
-
-          {/* 3. 图片生成 */}
-          <button
-            type="button"
-            onClick={() => onSelectMode('image')}
-            className={`w-full px-3 py-2 rounded-xl text-left transition-colors cursor-pointer flex items-center justify-between group ${
-              quickGenMode === 'image'
-                ? 'bg-slate-100/90 dark:bg-white/15 text-slate-950 dark:text-white font-semibold'
-                : 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10'
-            }`}
-          >
-            <span className="text-[13.5px] font-medium text-slate-900 dark:text-white">图片生成</span>
-            {quickGenMode === 'image' && (
-              <Check className="w-4 h-4 text-slate-900 dark:text-white stroke-[2.2]" />
-            )}
-          </button>
-
-          {/* 4. 音频生成 */}
-          <button
-            type="button"
-            onClick={() => onSelectMode('audio')}
-            className={`w-full px-3 py-2 rounded-xl text-left transition-colors cursor-pointer flex items-center justify-between group ${
-              quickGenMode === 'audio'
-                ? 'bg-slate-100/90 dark:bg-white/15 text-slate-950 dark:text-white font-semibold'
-                : 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10'
-            }`}
-          >
-            <span className="text-[13.5px] font-medium text-slate-900 dark:text-white">音频生成</span>
-            {quickGenMode === 'audio' && (
-              <Check className="w-4 h-4 text-slate-900 dark:text-white stroke-[2.2]" />
-            )}
-          </button>
+          {(['agent', 'video', 'image', 'audio'] as const).map(mode => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={quickGenMode === mode}
+              onClick={() => {
+                onSelectMode(mode);
+                trigger.current?.focus();
+              }}
+              className={`w-full px-3 py-2 rounded-xl text-left transition-colors cursor-pointer flex items-center justify-between group ${
+                quickGenMode === mode
+                  ? 'bg-slate-100/90 dark:bg-white/15 text-slate-950 dark:text-white font-semibold'
+                  : 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10'
+              }`}
+            >
+              <span className="text-[13.5px] font-medium text-slate-900 dark:text-white">
+                {{agent: 'Agent模式', video: '视频生成', image: '图片生成', audio: '音频生成'}[mode]}
+              </span>
+              {quickGenMode === mode && <Check className="w-4 h-4 text-slate-900 dark:text-white stroke-[2.2]" />}
+            </button>
+          ))}
         </div>
       )}
     </div>

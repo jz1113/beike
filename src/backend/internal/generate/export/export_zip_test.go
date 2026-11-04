@@ -149,7 +149,7 @@ func TestMatrixPacksStoredImage(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "shot.png"), png, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	payload := `{"offlineMatrix":true,"batchTitle":"批次","products":[{"skuId":"sku1","promptAssetGroupName":"组","copywritingTitle":"封面","images":[{"url":"/storage/shot.png","originalUrl":"https://cdn.example.com/a.png"}]}]}`
+	payload := `{"offlineMatrix":true,"batchTitle":"批次","products":[{"skuId":"sku1","promptAssetGroupName":"组","copywritingTitle":"封面","images":[{"url":"/storage/shot.png","originalUrl":"https://cdn.example.com/a.png","shotNo":8}]}]}`
 	response := httptest.NewRecorder()
 	ExportZip(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/export-zip", strings.NewReader(payload)))
 	if response.Code != http.StatusOK {
@@ -162,7 +162,7 @@ func TestMatrixPacksStoredImage(t *testing.T) {
 	foundImage := false
 	foundLink := false
 	for _, file := range reader.File {
-		if file.Name == "组---sku1-封面/图1.png" {
+		if file.Name == "组---sku1-封面/图8.png" {
 			foundImage = true
 		}
 		if file.Name != "生成成果清单.xlsx" {
@@ -177,7 +177,7 @@ func TestMatrixPacksStoredImage(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		link, err := sheet.GetCellValue("生成成果清单", "D2")
+		link, err := sheet.GetCellValue("生成成果清单", "K2")
 		_ = sheet.Close()
 		if err != nil {
 			t.Fatal(err)

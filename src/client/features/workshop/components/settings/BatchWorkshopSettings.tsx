@@ -1,16 +1,14 @@
 import type { useBatchWorkshopRunner } from '../../hooks/useBatchWorkshopRunner';
-import type { PromptAssetType } from '@shared/domain/prompts/prompt-asset/states';
 import { WorkshopSettingsModal } from './WorkshopSettingsModal';
 
 interface BatchWorkshopSettingsProps {
   runner: ReturnType<typeof useBatchWorkshopRunner>;
   isOpen: boolean;
   onClose: () => void;
-  onOpenAssetTab?: (type: PromptAssetType) => void;
-  onFallbackAssets: () => void;
+  onOpenSkills: () => void;
 }
 
-export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenAssetTab, onFallbackAssets }: BatchWorkshopSettingsProps) {
+export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenSkills }: BatchWorkshopSettingsProps) {
   const {
     analyzeConcurrency,
     autoGenerateCopywriting,
@@ -41,11 +39,7 @@ export function BatchWorkshopSettings({ runner, isOpen, onClose, onOpenAssetTab,
         workspaceStatus={runner.workspaceStatus} workspaceError={runner.workspaceError}
         busy={runner.flow.busy || runner.isAutoPilotRunning}
         skillLoadState={runner.skillLoadState} skillLoadError={runner.skillLoadError} onReloadSkills={runner.reloadSkills}
-        onOpenAssets={(type = 'full_prompt') => {
-          onClose();
-          if (onOpenAssetTab) onOpenAssetTab(type);
-          else onFallbackAssets();
-        }}
+        onOpenSkills={() => { onClose(); onOpenSkills(); }}
         isOpen={isOpen}
         onClose={onClose}
         selectedArchId={selectedArchId}

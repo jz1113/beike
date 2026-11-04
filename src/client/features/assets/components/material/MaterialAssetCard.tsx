@@ -104,7 +104,6 @@ export function MaterialAssetCard({
 
   return (
     <div
-      onClick={handleCardClick}
       className={`group relative flex flex-col cursor-pointer transition-all ${
         isSelected ? 'scale-[0.99]' : ''
       }`}
@@ -119,13 +118,14 @@ export function MaterialAssetCard({
         <button
           type="button"
           onClick={(e) => onToggleSelect(task.id, e)}
-          aria-label={isSelected ? '取消勾选' : '勾选'}
+          aria-pressed={isSelected}
+          aria-label={`${isSelected ? '取消勾选' : '勾选'}：${title}`}
           className={`absolute left-2 top-2 z-20 flex h-4 w-4 items-center justify-center rounded-sm transition-all ${
             isSelected
               ? 'bg-slate-900 text-white shadow-xs opacity-100 dark:bg-white dark:text-slate-950'
               : isBatchMode
               ? 'border border-slate-300 bg-white/90 opacity-100 hover:bg-white text-transparent dark:hover:bg-white/10 dark:bg-[#18191c]/95'
-              : 'border border-slate-300 bg-white/80 opacity-0 group-hover:opacity-100 hover:bg-white text-transparent dark:hover:bg-white/10 dark:bg-[#18191c]/95'
+              : 'border border-slate-300 bg-white/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-white text-transparent dark:hover:bg-white/10 dark:bg-[#18191c]/95'
           }`}
         >
           {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
@@ -169,6 +169,11 @@ export function MaterialAssetCard({
         )}
       </div>
 
+      <button type="button" onClick={handleCardClick}
+        aria-label={`${isBatchMode ? '选择' : isDoc ? '打开' : '预览'}：${title}`}
+        aria-pressed={isBatchMode ? isSelected : undefined}
+        disabled={!isBatchMode && !isDoc && !task.resultUrl}
+        className="absolute inset-0 z-10 rounded-xl cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500" />
       <p className="mt-1.5 truncate text-[11px] font-medium text-slate-700 dark:text-[#C7C7CC] group-hover:text-slate-900 dark:group-hover:text-white px-0.5 transition-colors" title={title}>
         {title}
       </p>

@@ -1,15 +1,12 @@
 import { Children, isValidElement, type ComponentProps, type ReactElement } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { confirmAction } from '@client/shared/utils/confirmAction';
-import { atlasFaceItemSchema } from '@shared/contracts/salesAtlas';
-import { fetchAtlasMediaAsFile } from '../api/salesAtlas';
 import { createSalesMaterial, deleteSalesMaterial, updateSalesMaterial } from '../api/salesMaterials';
 import { SalesPersonaDialog } from './SalesPersonaDialog';
 import { SalesSceneDialog } from './SalesSceneDialog';
 import { SalesAssetDraftStatus } from './SalesAssetDraftStatus';
-import { AtlasHubDrawer } from './atlas/AtlasHubDrawer';
 
-const draft = vi.hoisted(() => ({ clear: vi.fn(), status: 'saved' as const, fields: { name: '待保存', group: 'female', voiceId: '', space: 'indoor', tags: '' }, setField: vi.fn(), upload: vi.fn(), savedAssetId: undefined as string | undefined, unconfirmedBackground: false }));
+const draft = vi.hoisted(() => ({ clear: vi.fn(), flush: vi.fn(), status: 'saved' as const, fields: { name: '待保存', group: 'female', voiceId: '', space: 'indoor', tags: '' }, setField: vi.fn(), upload: vi.fn(), savedAssetId: undefined as string | undefined, unconfirmedBackground: false, background: true, active: [] as string[], stage: '' as '' | 'uploading' | 'generating' }));
 const hooks = vi.hoisted(() => ({ index: 0, slots: [] as unknown[], cleanup: undefined as (() => void) | undefined }));
 vi.mock('react', async (original) => ({
   ...await original<typeof import('react')>(),
@@ -27,12 +24,12 @@ vi.mock('react', async (original) => ({
 }));
 vi.mock('@client/shared/utils/confirmAction', () => ({ confirmAction: vi.fn() }));
 vi.mock('../api/salesMaterials', () => ({ createSalesMaterial: vi.fn(), updateSalesMaterial: vi.fn(), deleteSalesMaterial: vi.fn() }));
-vi.mock('../api/salesAtlas', () => ({ fetchAtlasMediaAsFile: vi.fn() }));
 vi.mock('../hooks/useSalesAssetDraft', () => ({ useSalesAssetDraft: () => ({
-  fields: draft.fields, setField: draft.setField, clear: draft.clear, status: draft.status, flush: () => true, error: '',
+  fields: draft.fields, setField: draft.setField, clear: draft.clear, status: draft.status, flush: draft.flush, error: '',
 }) }));
-vi.mock('../hooks/useSalesPersonaViews', () => ({ useSalesPersonaViews: () => ({ views: { main: '/main.jpg' }, extraImages: [], active: [], upload: draft.upload, savedAssetId: draft.savedAssetId, unconfirmedBackground: draft.unconfirmedBackground }) }));
-vi.mock('../hooks/useSalesSceneViews', () => ({ useSalesSceneViews: () => ({ views: { main: '/main.jpg' }, extraImages: [], active: [], savedAssetId: draft.savedAssetId, unconfirmedBackground: draft.unconfirmedBackground }) }));
+const dimensions = (base?: string) => JSON.stringify({ ...JSON.parse(base || '{}'), assetCreation: { referenceImageUrl: '/reference.jpg', prompt: '自然光下的全新形象', imageUrl: '/main.jpg' } });
+vi.mock('../hooks/useSalesPersonaViews', () => ({ useSalesPersonaViews: () => ({ views: { main: '/main.jpg' }, extraImages: [], active: draft.active, background: draft.background, stage: draft.stage, upload: draft.upload, savedAssetId: draft.savedAssetId, unconfirmedBackground: draft.unconfirmedBackground, withCreationDimensions: dimensions }) }));
+vi.mock('../hooks/useSalesSceneViews', () => ({ useSalesSceneViews: () => ({ views: { main: '/main.jpg' }, extraImages: [], active: draft.active, background: draft.background, stage: draft.stage, savedAssetId: draft.savedAssetId, unconfirmedBackground: draft.unconfirmedBackground, withCreationDimensions: dimensions }) }));
 const onSaved = vi.fn(); const onClose = vi.fn();
 type Node = ReactElement<Record<string, unknown>>;
 function Render(kind: 'persona' | 'scene', scene?: ComponentProps<typeof SalesSceneDialog>['scene']) {
@@ -54,22 +51,7 @@ function submit(kind: 'persona' | 'scene') {
   (find(Render(kind), (node) => node.type === 'form').props.onSubmit as (event: { preventDefault: () => void }) => void)({ preventDefault: vi.fn() });
 }
 function pending(kind: 'persona' | 'scene') { return find(Render(kind), (node) => node.type === 'button' && node.props.type === 'submit').props.disabled; }
-beforeEach(() => { hooks.cleanup?.(); hooks.cleanup = undefined; hooks.slots = []; vi.clearAllMocks(); draft.clear.mockReturnValue(true); draft.fields.name = '待保存'; draft.fields.group = 'female'; draft.savedAssetId = undefined; draft.unconfirmedBackground = false; });
-
-it.each(['male', 'female', 'senior', 'child'])('starts the atlas picker from %s and preserves that persona category when filling the main image', async (group) => {
-  draft.fields.group = group; draft.fields.name = '';
-  const root = Render('persona');
-  (find(root, (node) => node.type === 'button' && Children.toArray(node.props.children as ReactElement).includes('从人像图鉴选主图')).props.onClick as () => void)();
-  const picker = find(Render('persona'), (node) => node.type === AtlasHubDrawer);
-  expect(picker.props.defaultFaceAudience).toBe(group === 'male' ? 'adult_male' : 'adult_female');
-  const file = new File(['image'], 'atlas.jpg', { type: 'image/jpeg' });
-  vi.mocked(fetchAtlasMediaAsFile).mockResolvedValueOnce(file);
-  const face = atlasFaceItemSchema.parse({ id: 'atlas', fullUrl: '/atlas.jpg' });
-  await (picker.props.onPickPersonaFace as NonNullable<ComponentProps<typeof AtlasHubDrawer>['onPickPersonaFace']>)(face, '图鉴人物', group === 'male' ? 'female' : 'male');
-  expect(draft.upload).toHaveBeenCalledExactlyOnceWith('main', file);
-  expect(draft.setField).toHaveBeenCalledExactlyOnceWith('name', '图鉴人物');
-  expect(draft.fields.group).toBe(group);
-});
+beforeEach(() => { hooks.cleanup?.(); hooks.cleanup = undefined; hooks.slots = []; vi.clearAllMocks(); draft.clear.mockReturnValue(true); draft.flush.mockReturnValue(true); draft.fields.name = '待保存'; draft.fields.group = 'female'; draft.savedAssetId = undefined; draft.unconfirmedBackground = false; draft.background = true; draft.active = []; draft.stage = ''; });
 
 it.each(['persona', 'scene'] as const)('unlocks an interrupted %s save after effect replay and ignores its late completion', async (kind) => {
   let finishFirst!: () => void; let finishSecond!: () => void;
@@ -159,4 +141,50 @@ it.each(['persona', 'scene'] as const)('requires reconciling an uncertain %s bac
   expect(pending(kind)).toBe(true);
   submit(kind);
   expect(createSalesMaterial).not.toHaveBeenCalled();
+});
+
+it.each(['persona', 'scene'] as const)('preserves the %s drawing prompt and generated main image when saving the asset', async (kind) => {
+  vi.mocked(createSalesMaterial).mockResolvedValueOnce();
+  submit(kind);
+  await vi.waitFor(() => expect(createSalesMaterial).toHaveBeenCalledOnce());
+  const data = vi.mocked(createSalesMaterial).mock.calls[0][1];
+  expect(JSON.parse(data.dimensions as string).assetCreation).toEqual({ referenceImageUrl: '/reference.jpg', prompt: '自然光下的全新形象', imageUrl: '/main.jpg' });
+});
+
+it.each(['persona', 'scene'] as const)('allows closing a confirmed %s background task while keeping edits locked', (kind) => {
+  draft.active = ['face']; draft.stage = 'generating'; draft.savedAssetId = 'confirmed-asset';
+  const root = Render(kind);
+  const headerClose = find(root, (node) => node.type === 'button' && node.props['aria-label'] === `关闭${kind === 'persona' ? '人物' : '场景'}窗口`);
+  const footerClose = find(root, (node) => node.type === 'button' && node.props.children === '暂存关闭');
+  expect(headerClose.props.disabled).toBe(false);
+  expect(footerClose.props.disabled).toBe(false);
+  expect(find(root, (node) => node.type === 'input').props.disabled).toBe(true);
+  expect(find(root, (node) => node.type === 'button' && node.props.type === 'submit').props.disabled).toBe(true);
+  (headerClose.props.onClick as () => void)();
+  (footerClose.props.onClick as () => void)();
+  const preventDefault = vi.fn();
+  (root.props.onCancel as (event: { preventDefault: () => void }) => void)({ preventDefault });
+  expect(preventDefault).toHaveBeenCalledOnce();
+  expect(draft.flush).toHaveBeenCalledTimes(3);
+  expect(onClose).toHaveBeenCalledTimes(3);
+  expect(draft.clear).not.toHaveBeenCalled();
+});
+
+it.each(['persona', 'scene'] as const)('keeps a %s dialog open during upload or before background confirmation', (kind) => {
+  draft.active = ['face'];
+  for (const state of [
+    { savedAssetId: undefined, unconfirmedBackground: false, stage: 'generating' as const, background: true },
+    { savedAssetId: 'old-asset', unconfirmedBackground: true, stage: 'generating' as const, background: true },
+    { savedAssetId: 'confirmed-asset', unconfirmedBackground: false, stage: 'uploading' as const, background: true },
+    { savedAssetId: 'confirmed-asset', unconfirmedBackground: false, stage: 'generating' as const, background: false },
+  ]) {
+    Object.assign(draft, state);
+    const root = Render(kind);
+    const close = find(root, (node) => node.type === 'button' && node.props.children === '暂存关闭');
+    expect(close.props.disabled).toBe(true);
+    (close.props.onClick as () => void)();
+    (root.props.onCancel as (event: { preventDefault: () => void }) => void)({ preventDefault: vi.fn() });
+  }
+  expect(onClose).not.toHaveBeenCalled();
+  expect(draft.flush).not.toHaveBeenCalled();
 });

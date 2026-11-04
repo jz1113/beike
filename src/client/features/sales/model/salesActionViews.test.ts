@@ -4,7 +4,7 @@ import { buildActionDefaultAnglePatch, extractActionAngleEntries } from './sales
 describe('sales multi-angle pose action views', () => {
   it('orders 5 pose camera angles consistently and marks the explicit default angle', () => {
     const dimensions = JSON.stringify({
-      atlasPoseId: 'full_std_stand_01',
+      customMetadata: 'standing',
       defaultAngle: 'diagonal',
       actionViews: {
         low: '/pose/low.jpg',
@@ -38,7 +38,7 @@ describe('sales multi-angle pose action views', () => {
 
   it('updates defaultAngle and cover/media URLs while preserving existing dimensions fields', () => {
     const initial = JSON.stringify({
-      atlasPoseId: 'upper_hand_02',
+      customMetadata: 'hand',
       defaultAngle: 'front',
       actionViews: { front: '/front.jpg', side: '/side.jpg' },
     });
@@ -46,7 +46,7 @@ describe('sales multi-angle pose action views', () => {
     expect(patch.coverUrl).toBe('/side.jpg');
     expect(patch.mediaUrl).toBe('/side.jpg');
     expect(JSON.parse(patch.dimensions)).toEqual({
-      atlasPoseId: 'upper_hand_02',
+      customMetadata: 'hand',
       defaultAngle: 'side',
       actionViews: { front: '/front.jpg', side: '/side.jpg' },
     });
