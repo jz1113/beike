@@ -11,13 +11,11 @@ interface Props {
   homeMode: 'generate' | 'canvas';
   setHomeMode: (mode: 'generate' | 'canvas') => void;
   recentProjects?: ReactNode;
-  canvasComposer?: ReactNode;
   creativeTools?: ReactNode;
 }
 
 export default function HomePage({
   recentProjects,
-  canvasComposer,
   creativeTools,
   homeMode,
   setHomeMode,
@@ -106,9 +104,6 @@ export default function HomePage({
               <div aria-hidden={homeMode !== 'canvas'} inert={homeMode !== 'canvas'} className={homeMode === 'canvas' ? 'relative z-20 mx-auto mt-5 w-full max-w-[1200px]' : 'hidden'}>
                 <Suspense fallback={<p role="status" className="text-sm text-slate-500">正在加载项目列表…</p>}>
                   {recentProjects}
-                </Suspense>
-                <Suspense fallback={<p role="status" className="text-sm text-slate-500">正在加载画布输入…</p>}>
-                  {canvasComposer}
                 </Suspense>
               </div>
             )}

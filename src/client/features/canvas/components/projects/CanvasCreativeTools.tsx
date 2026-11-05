@@ -5,7 +5,6 @@ import promptReverseArt from '@client/assets/creative-tools/prompt-reverse.jpg';
 import productAnglesArt from '@client/assets/creative-tools/product-angles.jpg';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { CanvasToolSpotlight } from './CanvasToolSpotlight';
 import { useCanvasHydrated } from '../../hooks/useCanvasHydrated';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { CanvasStorySetup } from './CanvasStorySetup';
@@ -48,8 +47,6 @@ export default function CanvasCreativeTools({ onEnterCanvas, onOpenImageTool }: 
   };
   return <section aria-label="画布创作工具" className="mx-auto w-full max-w-[1720px]">
     <h2 className="sr-only">创作工具</h2>
-    <div className="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-start">
-      <CanvasToolSpotlight items={[tools[0], tools[2], tools[5]]} ready={hydrated} onSelect={start} />
       <div className="relative min-w-0 flex-1">
         <div ref={carousel} aria-label="创作工具列表" className="grid grid-flow-col grid-rows-2 gap-2 snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth [scrollbar-width:none] motion-reduce:scroll-auto [&::-webkit-scrollbar]:hidden" style={{ gridAutoColumns: 'minmax(min(320px, 100%), calc((100% - 24px) / 4))' }}>
       {tools.map(tool => {
@@ -76,7 +73,6 @@ export default function CanvasCreativeTools({ onEnterCanvas, onOpenImageTool }: 
           <button type="button" aria-label="查看后面的创作工具" disabled={edges.end} onClick={() => scroll(1)} className="pointer-events-auto -mr-3 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-700 shadow-sm disabled:invisible dark:border-white/10 dark:bg-[#292929] dark:text-white"><ChevronRight className="h-4 w-4" /></button>
         </div>
       </div>
-    </div>
     {storySetup && <CanvasStorySetup onClose={() => setStorySetup(false)} onEnterCanvas={onEnterCanvas} />}
   </section>;
 }

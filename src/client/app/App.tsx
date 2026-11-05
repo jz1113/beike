@@ -63,7 +63,6 @@ function AssetCenterWithCanvas() {
 }
 const CanvasCreativeTools = lazyWithRetry(() => import('@client/features/canvas/components/projects/CanvasCreativeTools'));
 const CanvasRecentProjects = lazyWithRetry(() => import('@client/features/canvas/components/projects/CanvasRecentProjects'));
-const CanvasHomeComposer = lazyWithRetry(() => import('@client/features/canvas/components/projects/CanvasHomeComposer'));
 // 点阵背景为纯装饰，延后下载，使首页核心控件和灵感流优先可用。
 const GlobalDynamicBackground = lazyWithRetry(() => import('@client/shared/media/widgets/GlobalDynamicBackground'));
 
@@ -311,7 +310,6 @@ export default function App() {
                 <ViewKeepAlivePanel view="home" currentView={pageView}>
                   <AppErrorBoundary title="首页异常" resetLabel="重新加载" onReset={() => window.location.reload()}>
                     <HomePage 
-                      canvasComposer={<CanvasHomeComposer onEnterCanvas={() => setCurrentView('canvas')} />}
                       homeMode={homeMode} setHomeMode={setHomeMode}
                       creativeTools={<CanvasCreativeTools onOpenImageTool={setHomeImageTool} onEnterCanvas={() => setCurrentView('canvas')} />}
                       recentProjects={<CanvasRecentProjects compact maxDisplay={3} onOpenAll={() => navigateAssetTab('canvas')} onEnterCanvas={() => setCurrentView('canvas')} />}
