@@ -45,7 +45,7 @@ export function LibraryProductionTools({folder, catalog, onNotice}: {
       <button onClick={()=>setDialog('images')}><Upload size={14}/>导入图片</button>
     </>}
     <button disabled={action && batch.pending} onClick={()=>directory.current?.click()}><FolderInput size={14}/>导入文件夹</button>
-    <button onClick={()=>setDialog('skills')}><Settings2 size={14}/>技能设置</button>
+    <button onClick={()=>setDialog('skills')}><Settings2 size={14}/>文案设置</button>
     <input hidden type="file" multiple ref={el=>{directory.current=el;el?.setAttribute('webkitdirectory','');}}
       onChange={event=>{
         const chosen = Array.from(event.target.files ?? []).filter(file=>!file.name.startsWith('.'));

@@ -1,0 +1,19 @@
+.sales-canvas-panel { min-height: 0; }
+.sales-canvas-panel .sales-editor-production { height: auto; min-height: 640px; }
+.sales-canvas-panel .sales-editor-production-body { overflow: visible; }
+.sales-canvas-panel .sales-delivery-shell { min-height: 640px; }
+[data-sales-canvas-stage="voice"] .sales-delivery-stage-col,
+[data-sales-canvas-stage="voice"] .sales-delivery-prompt,
+[data-sales-canvas-stage="voice"] .sales-material-review,
+[data-sales-canvas-stage="subtitles"] .sales-delivery-stage-col,
+[data-sales-canvas-stage="subtitles"] .sales-delivery-prompt,
+[data-sales-canvas-stage="export"] .sales-delivery-prompt { display: none; }
+[data-sales-canvas-stage="voice"] .sales-delivery-main,
+[data-sales-canvas-stage="subtitles"] .sales-delivery-main { display: flex; flex-direction: column; }
+[data-sales-canvas-stage="voice"] .sales-delivery-dock > :not(.sales-delivery-tools):not(.sales-delivery-controls),
+[data-sales-canvas-stage="subtitles"] .sales-delivery-dock > :not(.sales-delivery-tools):not(.sales-delivery-controls),
+[data-sales-canvas-stage="voice"] .sales-delivery-tools > :not(.sales-delivery-audio-card),
+[data-sales-canvas-stage="subtitles"] .sales-delivery-tools > :not(.sales-delivery-audio-card),
+[data-sales-canvas-stage="subtitles"] .sales-delivery-audio-card > :not(.sales-delivery-subtitles),
+[data-sales-canvas-stage="voice"] .sales-delivery-subtitles,
+[data-sales-canvas-stage="video"] .sales-delivery-audio-card { display: none; }

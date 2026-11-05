@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, MessageSquare, MoreHorizontal, Pencil, Pin, SquarePen, Trash2, X } from 'lucide-react';
+import { useCanvasStore } from '@client/features/canvas/store/useCanvasStore';
 import { useAppStore, type ChatSession } from '@client/store';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 
@@ -53,16 +54,21 @@ function SessionLeadingMark({ session }: { session: ChatSession }) {
 interface Props {
   currentView: string;
   onOpenSession: (id: string) => void;
+  onOpenAssistantSession: (id: string) => void;
   onCreateConversation: () => void;
 }
 
 export function SidebarHistory({
   currentView,
   onOpenSession,
+  onOpenAssistantSession,
   onCreateConversation,
 }: Props) {
   const sessions = useAppStore((s) => s.sessions);
+  const assistantSessions = useAppStore((s) => s.assistantSessions ?? []);
   const currentSessionId = useAppStore((s) => s.currentSessionId);
+  const currentAssistantSessionId = useAppStore((s) => s.currentAssistantSessionId);
+  const activeCanvasProjectId = useCanvasStore((s) => s.activeProjectId);
   const renameSession = useAppStore((s) => s.renameSession);
   const pinSession = useAppStore((s) => s.pinSession);
   const deleteSession = useAppStore((s) => s.deleteSession);
@@ -73,6 +79,7 @@ export function SidebarHistory({
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   const ordered = [...sessions].sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)) || b.createdAt - a.createdAt);
+  const assistantOrdered = [...assistantSessions].sort((a, b) => b.updatedAt - a.updatedAt);
 
   useEffect(() => {
     if (!menu && !deleteTarget) return;
@@ -131,7 +138,9 @@ export function SidebarHistory({
             ) : (
               <div className="space-y-0.5">
                 {ordered.map((session) => {
-                    const active = currentView === 'generate' && session.id === currentSessionId;
+                    const active = session.canvasProjectId
+                      ? currentView === 'canvas' && session.canvasProjectId === activeCanvasProjectId
+                      : currentView === 'generate' && session.id === currentSessionId;
                     const title = session.title || '新创作对话';
                     return (
                       <div
@@ -150,6 +159,7 @@ export function SidebarHistory({
                           {session.isPinned && (
                             <Pin className="h-3 w-3 shrink-0 text-amber-500 fill-amber-500 rotate-45" />
                           )}
+                          <span className="shrink-0 text-[10px] text-slate-400 dark:text-[#8E8E93]">{session.canvasProjectId ? '画布' : '生成'}</span>
                           {editingId === session.id ? (
                             <input
                               autoFocus
@@ -183,6 +193,26 @@ export function SidebarHistory({
                     );
                   })}
                 </div>
+            )}
+            {assistantOrdered.length > 0 && (
+              <div className="mt-2 space-y-0.5">
+                {assistantOrdered.map((session) => {
+                  const active = currentView === 'canvas' && session.id === currentAssistantSessionId;
+                  const title = session.title || '画布助手';
+                  return (
+                    <button
+                      key={session.id}
+                      type="button"
+                      onClick={() => onOpenAssistantSession(session.id)}
+                      className={`flex w-full items-center gap-1.5 rounded-xl px-2 py-1.5 text-left ${active ? 'bg-[#ECEDEF] font-medium text-slate-950 dark:bg-[#1F1F24] dark:text-white' : 'text-slate-800 hover:bg-white dark:text-[#E5E5EA] dark:hover:bg-white/[0.06]'}`}
+                    >
+                      <ChatBubbleIcon />
+                      <span className="shrink-0 text-[10px] text-slate-400 dark:text-[#8E8E93]">助手</span>
+                      <span className="truncate text-[13px] leading-5">{title}</span>
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}

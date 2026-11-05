@@ -19,10 +19,10 @@ interface Props {
   canvasProjects: AssetCanvasProject[];
   mergedTasks: MergedAssetTask[];
   sourceType?: 'ai' | 'uploaded';
-  onSourceTypeChange: (source: 'ai' | 'uploaded') => void;
   setPreviewTask: (task: MergedAssetTask, queue?: MergedAssetTask[]) => void;
   onBatchDelete: (ids: string[]) => Promise<boolean>;
   onBatchDownload: (ids: string[]) => void;
+  onOpenCanvasProject?: (projectId: string) => void;
   onBatchDeleteProjects?: (projects: ProjectFolderItem[]) => Promise<boolean | void> | boolean | void;
   projectHistoryReady?: boolean;
   isDownloadingZip?: boolean;
@@ -34,10 +34,10 @@ export default function MaterialLibraryView({
   canvasProjects,
   mergedTasks,
   sourceType = 'ai',
-  onSourceTypeChange,
   setPreviewTask,
   onBatchDelete,
   onBatchDownload,
+  onOpenCanvasProject,
   onBatchDeleteProjects,
   projectHistoryReady = false,
   isDownloadingZip = false,
@@ -145,7 +145,6 @@ export default function MaterialLibraryView({
         project={currentProject}
         mergedTasks={mergedTasks}
         sourceType={sourceType}
-        onSourceTypeChange={onSourceTypeChange}
         onBack={() => { setReturnProjectId(currentProject.id); setSelectedProject(null); handleExitBatchMode(); }}
         setPreviewTask={setPreviewTask}
         onBatchDelete={onBatchDelete}
@@ -184,7 +183,10 @@ export default function MaterialLibraryView({
         <>
           <MaterialProjectView
             projects={projectList}
-            onSelectProject={(project) => setSelectedProject(project)}
+            onSelectProject={(project) => {
+              if (project.type === 'canvas' && onOpenCanvasProject) { onOpenCanvasProject(project.id); return; }
+              setSelectedProject(project);
+            }}
             returnProjectId={returnProjectId}
             selectedProjectIds={selectedProjectIds}
             isBatchMode={isBatchMode}

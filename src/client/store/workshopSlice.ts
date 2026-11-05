@@ -1,3 +1,5 @@
+import { requestEcommerceCanvas } from '@client/shared/navigation/commerceCanvas';
+import { DEFAULT_MULTIMODAL_MODEL_ID } from '@shared/domain/models/modelCatalog';
 import type { StateCreator } from 'zustand';
 import { ShotPrompt, buildActionDigestFromShots } from '@shared/domain/prompts/vision';
 import { normalizeCollectedProductImages } from '@shared/domain/collection/productImages';
@@ -76,8 +78,8 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
   error: null,
   // Step 2 全局
   selectedVisionModel: typeof window !== 'undefined'
-    ? getStoredMultimodalModelId('gemini-3.7-flash')
-    : 'gemini-3.7-flash',
+    ? getStoredMultimodalModelId(DEFAULT_MULTIMODAL_MODEL_ID)
+    : DEFAULT_MULTIMODAL_MODEL_ID,
   selectedArchId: readInitialSelectedArchId(),
   isAnalyzing: false,
 
@@ -266,11 +268,11 @@ export const createWorkshopSlice: StateCreator<AppState, [], [], WorkshopSlice> 
       apiUsed: apiUsed || null,
       error: null,
       currentStep: 1,
-      currentView: 'workshop',
       workshopMode: 'storyboard_generate',
       activeWorkshopTab: 'studio',
       quickRefImage: firstImg || get().quickRefImage
     });
+    requestEcommerceCanvas();
   },
 
   toggleImageSelection: (index) => set((state) => {

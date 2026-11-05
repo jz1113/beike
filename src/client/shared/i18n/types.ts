@@ -56,6 +56,7 @@ export interface TranslationSchema {
     };
   };
   sidebar: {
+    assetWorkspace: string;
     create: string;
     skills: string;
     generationHistory: string;

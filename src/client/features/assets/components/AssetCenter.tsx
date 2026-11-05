@@ -29,6 +29,7 @@ export default function AssetCenter({
   canvasProjects,
   onDeleteCanvasProject,
   onDeleteCanvasNode,
+  onSelectCanvasProject,
 }: AssetCenterProps) {
   const { t } = useI18n();
   const { currentView, generationTasks, sessions, setPreviewTask, deleteSession } = useAppStore(
@@ -216,10 +217,10 @@ export default function AssetCenter({
           canvasProjects={canvasProjects}
           mergedTasks={mergedTasks}
           sourceType={sourceType}
-          onSourceTypeChange={setSourceType}
           setPreviewTask={(task, queue) => setPreviewTask(task as unknown as Parameters<typeof setPreviewTask>[0], queue as unknown as Parameters<typeof setPreviewTask>[1])}
           onBatchDelete={handleBatchDeleteTasks}
           onBatchDownload={handleBatchDownloadTasks}
+          onOpenCanvasProject={onSelectCanvasProject}
           onBatchDeleteProjects={handleBatchDeleteProjects}
           projectHistoryReady={serverHistoryComplete}
           isDownloadingZip={isDownloadingZip}

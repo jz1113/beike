@@ -22,12 +22,6 @@ export interface MaterialLibraryToolbarProps {
   selectedCount: number;
   totalCount: number;
   onToggleSelectAll: () => void;
-  statusFilter?: string;
-  onStatusFilterChange?: (val: string) => void;
-  timeFilter?: string;
-  onTimeFilterChange?: (val: string) => void;
-  displaySize?: string;
-  onDisplaySizeChange?: (val: string) => void;
 }
 
 export function MaterialLibraryToolbar({

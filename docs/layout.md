@@ -72,7 +72,7 @@ src/client/
 | `workshop` | `settings` / `delivery` / `history` | 生成配置 / 成图、进度、审核与交付 / 历史批次 |
 | `assistant` | `message` / `panels` / `brand-kit` / `document` / `skill` | 对话消息 / 功能面板 / 品牌 / 文档 / 技能 |
 
-生成历史 `AssetCenter`、电商图文组装组件 `BatchWorkshopView`、设置通用的 `SettingsControls / SettingsSidebar / SettingsPreview` 留在各自 components 根目录。只在本功能使用的共用组件无需提升到全局 shared。
+生成历史 `AssetCenter`、电商图文画布控制器 `WorkshopCanvasController`、设置通用的 `SettingsControls / SettingsSidebar / SettingsPreview` 按功能目录存放。`app/WorkshopCanvasIntegration.tsx`、`app/SalesCanvasIntegration.tsx` 分别负责图文、视频与画布的组合，功能目录不互相引用。只在本功能使用的共用组件无需提升到全局 shared。
 
 素材库的平铺列表、项目计数与项目详情使用相同的素材合并和来源筛选规则。画布封面与空项目占位不作为独立素材；文字备注不计入素材数。“我上传的”只展示带独立上传标记的记录，生成任务的参考图字段不改变生成结果的来源。历史素材逐页加载并显示加载或重试状态；历史未完整读取时不能删除对话项目。批量操作只作用于当前可见的勾选项，筛选切换和删除后清理失效勾选。项目归属使用精确标识匹配，服务端确认素材删除成功后才移除本地对话项目；删除、下载与项目清理共享操作锁。
 
@@ -89,7 +89,7 @@ src/client/
 
 ### 功能导航
 
-前端功能路径相对于 `src/client/features`，后端路径相对于 `src/backend/internal`。功能目录优先使用一个常用英文词；封面、关键词、带货分别记作 `poster / keywords / sales`。相同业务沿用相同名称，共用后端能力按实际归属列出。
+前端功能路径相对于 `src/client/features`，后端路径相对于 `src/backend/internal`。功能目录优先使用一个常用英文词；封面、带货分别记作 `poster / sales`。相同业务沿用相同名称，共用后端能力按实际归属列出。
 
 | 功能 | 前端 | 后端 |
 | --- | --- | --- |
@@ -101,12 +101,10 @@ src/client/
 | AI 助手 | `assistant` | `assistant` |
 | 电商图文 | `workshop` | `workshop`、`catalog`、`platform/database/learning` |
 | 封面 | `poster` | `generate/poster` |
-| 词包 | `keywords` | `keywords` |
-| OSS 视频下载 | `collect` | `system` |
 | 电商视频 | `sales` | `sales`、`catalog`（共用采集） |
 | 技能 | `skills` | `catalog`、`platform/database` |
 
-页面入口统一为 `PosterStudio / KeywordsStudio / SalesStudio`。商品采集的目录与选图规则位于 `src/shared/domain/sales`，模型协议适配位于后端 `gateway`。
+电商视频、电商图文与封面统一从画布项目进入，分别由 `SalesCanvasController`、`WorkshopCanvasController` 与 `PosterCanvasPanel` 将控件渲染到节点内部。技能里的「使用」、快捷键和助手载入商品都会打开或新建电商图文画布，不再进入已卸下的独立工作台。词包审核和浏览器视频下载的页面与接口都已移除。商品采集的目录与选图规则位于 `src/shared/domain/sales`，模型协议适配位于后端 `gateway`。
 
 数字人与 PPT 功能重建中，旧视图参数回到首页。旧工作室、专属契约与生成接口已移除；数字人历史数据库迁移、用户数据和模型线路配置保留。`generate/export` 继续服务电商图文等功能的通用 ZIP 导出。
 
@@ -127,7 +125,7 @@ src/client/
 | `internal/library` / `internal/assets` | 素材库、图组、查重与反推 / 存储、生图任务与素材生命周期 |
 | `internal/generate` | 图像、视频、分析、文案、语音与画布任务编排 |
 | `internal/generate/{depth,poster,export}` | 深度推理、封面设计、文件导出子包 |
-| `internal/workshop` / `internal/keywords` | 电商图文批次与输出审核 / 关键词审核与提交保护 |
+| `internal/workshop` | 电商图文批次与输出审核 |
 | `internal/assistant` | 回合、记忆、沙箱、工具与运行时；`extract` 抽取文档，`sessions` 读写会话 |
 | `internal/gateway` | 模型协议、提交适配与文本流式处理 |
 | `internal/platform/collect` | 采集上游请求与响应 |
@@ -158,7 +156,7 @@ Go 的同目录文件共同组成一个包，共享未导出类型。领域包�
 
 `src/shared/workshopSnapshot.ts` 组合契约与业务规则，承担旧快照适配，避免让 contracts 与 domain 相互引用。`src/shared/data` 保存官方种子与主机规则；`textModelCapabilities.json` 位于 domain/models，由共享数据检查生成并校验 Go gateway 的嵌入副本。
 
-官方架构由 `src/shared/domain/prompts/masterRecipes.ts` 的 `OFFICIAL_MASTER_RECIPES` 与 `src/shared/data/officialMasterRecipes.json` 同步维护，`pnpm check:shared-data` 校验两者一致，Go 种子加载器与 `seed:export` 统一使用 `officialMasterRecipes.json`；原始数据库架构行一并保存在提示词资产快照中，不再保留第二份架构导出文件。
+官方总配方 `OFFICIAL_MASTER_RECIPES` 与 `src/shared/data/officialMasterRecipes.json` 当前都是空数组，由 `pnpm check:shared-data` 校验一致；同文件里的首饰架构片段仍供品类配方使用。Go 种子加载器与 `seed:export` 统一使用 `officialMasterRecipes.json`；原始数据库架构行一并保存在提示词资产快照中，不再保留第二份架构导出文件。
 
 domain 的子目录包括 `assistant / assets / collection / core / media / models / pets / products / prompts / sales / settings / skills / workshop`。其中 core 放环境注入、并发池和任务状态；models 放模型目录与调用适配；业务提示词、技能和电商图文规则分别放入 prompts、skills 和 workshop。
 
@@ -212,11 +210,9 @@ GitHub CI 额外运行 Gitleaks，配置位于 `tools/configs/gitleaks.toml`，�
 
 生成任务状态、结果和 usage 的读写统一携带工作区和媒体类型；托管模式先核对本地任务归属，再查询缓存或上游。仅本机 `local` 工作区兼容未落盘的旧上游任务 ID，已落盘的他区/其他媒体任务不能走该回退。生图幂等标识通过单条 SQLite 写入原子领取，进行中、未知结果与明确失败均复用原回执，不因重试再次提交；改变参数必须使用新标识。新回执 ID 保存输入指纹，旧成功回执继续可读；请求取消后使用有界独立 context 保存上游回执。
 
-视频下载的模式选择与队列放在 `collect/hooks`，浏览器逐文件下载放在 `collect/api/browserVideoDownloads.ts`；后端 `system/video_download*` 负责本机目录授权、受控写入和任务归属。托管环境仅通过只读视频代理交付浏览器，不能接受客户端服务器路径。路径授权和任务仅在当前服务进程内有效，不作为数据库持久任务。
-
 媒体代理的进程缓存实现位于 `platform/media/cache.go`，由 system 配置和持有：最多 128MiB 内容、256 个键、15 分钟 TTL，LRU 淘汰；同时最多 8 个原图抓取，合并同键请求，失败不缓存。API 的十分钟维护周期回收空闲过期内容。它是可丢弃的代理缓存，不管理用户素材文件。
 
-本机下载任务最多保留 128 个，完成回执最长保留 1 小时，满额优先淘汰旧的已结束回执；运行任务不淘汰，满额时新建返回 429。关闭服务时拒绝新建、取消并等待当前下载收尾；这些内存回执不跨服务重启恢复。内存清理接口实际清除代理缓存并尝试 WAL 检查点，不强制 GC；`runtimeSys` 是 Go 运行时保留内存，历史 `rss` 字段仅保留兼容别名，不代表实测 RSS。`cacheCleared.bytes` 是移出缓存的内容字节，`freedBytes` 是运行时 Sys 的观测差值，两者均不保证操作系统立即回收。
+内存清理接口实际清除代理缓存并尝试 WAL 检查点，不强制 GC；`runtimeSys` 是 Go 运行时保留内存，历史 `rss` 字段仅保留兼容别名，不代表实测 RSS。`cacheCleared.bytes` 是移出缓存的内容字节，`freedBytes` 是运行时 Sys 的观测差值，两者均不保证操作系统立即回收。
 
 浏览器入口 `main.tsx` 在首次渲染前调用 `store/bootstrap.ts` 的 `bootstrapAppStore`，返回 `ready / dispose`；重复调用复用当前 handle，释放后取消订阅、空闲回调和页面监听，并阻止过期恢复结果写回。HMR 通过 dispose 释放。`store/index.ts` 只组装切片和导出，不再自行启动异步恢复或持久化订阅。切片目前仍同步读取既有浏览器偏好，旧草稿迁移和两份会话缓存保留，不将此次调整解读为全部状态 IO 已抽离。
 

@@ -15,7 +15,6 @@ import (
 	"beike.local/cloud/src/backend/internal/assistant"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate/depth"
-	"beike.local/cloud/src/backend/internal/keywords"
 	"beike.local/cloud/src/backend/internal/library"
 	"beike.local/cloud/src/backend/internal/platform/database"
 	learning "beike.local/cloud/src/backend/internal/platform/database/learning"
@@ -85,9 +84,6 @@ func main() {
 	assistant.FlushTelemetry()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := system.DrainVideoDownloads(ctx); err != nil {
-		log.Printf("[API] 下载关闭超时: %v", err)
-	}
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("[API] 关闭超时: %v", err)
 	}
@@ -107,13 +103,9 @@ func maintain(cfg config.Config) {
 }
 
 func sweep(cfg config.Config) {
-	if count := keywords.PurgeExpiredReceipts(time.Now()); count > 0 {
-		log.Printf("→ [提交收据] 已清理 %d 个过期收据", count)
-	}
 	if count := system.PurgeExpiredMediaReviews(cfg.MediaReviewRoot(), time.Now()); count > 0 {
 		log.Printf("→ [媒体审查] 已清理 %d 个过期待核记录", count)
 	}
-	system.PurgeExpiredVideoDownloads(time.Now())
 	system.PurgeExpiredProxyCache()
 	assets.CleanupAssistantMedia(time.Now())
 }

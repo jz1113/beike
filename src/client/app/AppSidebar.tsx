@@ -1,5 +1,5 @@
 import { useLibraryPreferences } from '@client/shared/api/libraryPreferences';
-import { FolderOpen, History, Moon, MoreHorizontal, PanelLeft, Settings, Sun, UserRound, Wrench } from 'lucide-react';
+import { FolderOpen, History, MessageSquare, Moon, MoreHorizontal, PanelLeft, Settings, Sun, UserRound, Wrench } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppView } from '@client/store/appView';
 import { useToast } from '@client/shared/hooks/useToast';
@@ -20,6 +20,7 @@ interface Props {
   onNavigateSkills: () => void;
   onOpenSettings: () => void;
   onOpenSession: (id: string) => void;
+  onOpenAssistantSession: (id: string) => void;
   onCreateConversation: () => void;
 }
 
@@ -170,6 +171,7 @@ export default function AppSidebar({
   onNavigateSkills,
   onOpenSettings,
   onOpenSession,
+  onOpenAssistantSession,
   onCreateConversation,
 }: Props) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -245,7 +247,7 @@ export default function AppSidebar({
         <nav className={`flex w-full flex-col items-center gap-1 ${collapsed ? '' : 'md:items-stretch md:gap-[6px]'}`} aria-label="主导航">
           <NavItem
             label={t('sidebar.create')}
-            active={currentView === 'home'}
+            active={currentView === 'home' || currentView === 'generate'}
             onClick={onNavigateHub}
             showLabel={showLabel}
             icon={<NavGenerateIcon className="h-[20px] w-[20px]" strokeWidth={1.8} />}
@@ -258,20 +260,31 @@ export default function AppSidebar({
             icon={<Wrench className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
           <NavItem
-            label={t('sidebar.generationHistory')}
+            label={t('sidebar.assetWorkspace')}
             active={currentView === 'assets'}
             onClick={onNavigateAssets}
             showLabel={showLabel}
             icon={<History className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
           {showLibraryEntry && <NavItem
-            label={t('assets.assetLibrary')}
+            label={t('assets.materialLibrary')}
             active={currentView === 'asset_library'}
             onClick={onNavigateLibrary}
             showLabel={showLabel}
             icon={<FolderOpen className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />}
         </nav>
+        {!showLabel && (
+          <button
+            type="button"
+            aria-label="对话"
+            onClick={toggleCollapsed}
+            className="group relative mt-1 flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 hover:bg-black/[0.04] hover:text-slate-900 dark:text-[#8E8E93] dark:hover:bg-white/[0.06] dark:hover:text-[#EDEDED]"
+          >
+            <MessageSquare className="h-5 w-5" strokeWidth={1.8} />
+            <SidebarTooltip>对话</SidebarTooltip>
+          </button>
+        )}
       </div>
 
       {showLabel && (
@@ -279,6 +292,7 @@ export default function AppSidebar({
           <SidebarHistory
             currentView={currentView}
             onOpenSession={onOpenSession}
+            onOpenAssistantSession={onOpenAssistantSession}
             onCreateConversation={onCreateConversation}
           />
         </div>

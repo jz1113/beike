@@ -5,6 +5,10 @@ export interface ServiceStatus {
   label: string;
   detail: string;
 }
+export const SERVICE_STATUS_COLORS: Record<ServiceStatus['state'], string> = {
+  unconfigured: 'text-slate-400', disabled: 'text-slate-500 dark:text-slate-400', untested: 'text-amber-700',
+  testing: 'text-indigo-600', passed: 'text-emerald-700', failed: 'text-rose-600',
+};
 export function resolveServiceStatus(configured: boolean, enabled = true, testing = false, result?: ConnectionTestRecord): ServiceStatus {
   if (!configured) return { state: 'unconfigured', label: '未配置', detail: '请填写并保存所需凭证' };
   if (!enabled) return { state: 'disabled', label: '已停用', detail: '配置已保留；启用后请重新确认测试结果' };

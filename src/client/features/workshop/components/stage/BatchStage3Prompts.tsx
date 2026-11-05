@@ -4,7 +4,6 @@ import BatchStageFooter from './BatchStageFooter';
 import { BatchStage3Header } from './BatchStage3Header';
 import { BatchStage3ProductItem } from './BatchStage3ProductItem';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
-import { useAppStore } from '@client/store';
 import type { getWorkshopFlow, WorkshopStage } from '../../model/workspace/workshopFlow';
 import { WorkshopContentList } from '../layout/WorkshopContentList';
 import { editWorkshopGridPrompt, editWorkshopPrompt } from '../../model/analysis/editWorkshopPrompt';
@@ -24,6 +23,7 @@ interface Props {
   analyzeSingleProduct: (item: BatchProductItem, itemIndex?: number) => Promise<boolean>;
   handleRemoveItem: (id: string) => void;
   startBatchGeneration: () => Promise<void>;
+  generationActionLabel?: string;
   onPreviewImage?: (url: string) => void;
   onPrevStage: () => void;
   onGoToStage: (stage: WorkshopStage) => void;
@@ -42,6 +42,7 @@ export default function BatchStage3Prompts({
   analyzeSingleProduct,
   handleRemoveItem,
   startBatchGeneration,
+  generationActionLabel,
   onPreviewImage,
   onPrevStage,
   onGoToStage,
@@ -102,14 +103,12 @@ export default function BatchStage3Prompts({
     });
   };
 
-  const setIsWorkshopConfigOpen = useAppStore(s => s.setIsWorkshopConfigOpen);
-
   return (
     <div className="w-full space-y-5 pb-8 bg-transparent">
       <BatchStage3Header settings={settings}
         isAnalyzingAll={analysisBusy} analyzeProgress={isAnalyzingAll ? analyzeProgress : { current: 0, total: successfulItems.filter(item => item.isAnalyzing).length }} />
-      {!analysisBusy && analysisIssue && pendingAnalysisIds.length > 0 && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
-        <span>{analysisIssue}</span><button type="button" onClick={() => setIsWorkshopConfigOpen(true)} className="shrink-0 font-semibold underline underline-offset-4">检查生产设置</button>
+      {!analysisBusy && analysisIssue && pendingAnalysisIds.length > 0 && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
+        <span>{analysisIssue}</span>
       </div>}
       {successfulItems.length > 1 && <div role="group" aria-label="分镜分析状态筛选" className="flex flex-wrap gap-2">
         {([['all', '全部', successfulItems.length], ['pending', analysisBusy ? '待完成' : '待处理', successfulItems.length - readyCount], ['ready', '已就绪', readyCount], ['failed', '分析失败', failedCount]] as const).map(([value, label, count]) => <button key={value} type="button" aria-pressed={filter === value}
@@ -160,7 +159,7 @@ export default function BatchStage3Prompts({
         prevLabel="返回商品资料"
         prevDisabled={flow.busy}
         primaryAction={{
-          label: analysisBusy ? '正在分析分镜…' : readiness.canGenerate ? `确认方案，生成配图（${readyCount * selectedShotCount} 张）` : pendingAnalysisIds.length > 0 ? `${readyCount > 0 ? '仅分析未就绪' : successfulItems.length === 1 && item?.analysisError ? '重试分析' : '分析配图方案'}（${pendingAnalysisIds.length} 条）` : readiness.issues.some(issue => issue.stage === 4) ? '前往核对原任务' : '定位待修正项',
+          label: analysisBusy ? '正在分析分镜…' : readiness.canGenerate ? generationActionLabel || `确认方案，生成配图（${readyCount * selectedShotCount} 张）` : pendingAnalysisIds.length > 0 ? `${readyCount > 0 ? '仅分析未就绪' : successfulItems.length === 1 && item?.analysisError ? '重试分析' : '分析配图方案'}（${pendingAnalysisIds.length} 条）` : readiness.issues.some(issue => issue.stage === 4) ? '前往核对原任务' : '定位待修正项',
           onClick: readiness.canGenerate ? startBatchGeneration : pendingAnalysisIds.length ? analyzePending : () => {
             const issue = readiness.issues.find(entry => entry.stage === 4) || readiness.issues[0];
             if (issue?.stage === 3) locateProduct(issue.productId);

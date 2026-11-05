@@ -925,7 +925,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get_api_generate_headline_design"];
         put?: never;
         post: operations["post_api_generate_headline_design"];
         delete?: never;
@@ -1085,7 +1085,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get_api_generate_headline_title"];
         put?: never;
         post: operations["post_api_generate_headline_title"];
         delete?: never;
@@ -1120,54 +1120,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["post_api_generate_image_batch"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/keyword-review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_generate_keyword_review"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/keyword-review/balance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_generate_keyword_review_balance"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/generate/keyword-review/rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_api_generate_keyword_review_rules"];
-        put: operations["put_api_generate_keyword_review_rules"];
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1248,6 +1200,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["post_api_generate_video_bind"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/generate/video/silent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_api_generate_video_silent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2022,71 +1990,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/system/video-downloads": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** @description 本机专用。要求应用写凭证和当前工作区的原生目录选择授权；生产环境禁止写服务器目录。 */
-        post: operations["post_api_system_video_downloads"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/system/video-downloads/{jobId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_api_system_video_downloads_jobId"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/system/video-downloads/{jobId}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_system_video_downloads_jobId_cancel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/system/video-downloads/pick-directory": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_system_video_downloads_pick_directory"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/workshop/task-records": {
         parameters: {
             query?: never;
@@ -2219,33 +2122,6 @@ export interface components {
             defaultPrompt: string;
             version: string;
             customized: boolean;
-        };
-        VideoDownloadRequest: {
-            directory: string;
-            directoryToken: string;
-            /**
-             * @default 100
-             * @enum {integer}
-             */
-            concurrency: 0 | 100;
-            items: {
-                /** @description 单个安全视频文件名；同名已存在时拒绝覆盖 */
-                filename: string;
-                /** @description 由后端视频代理安全策略校验的远程 URL */
-                url: string;
-            }[];
-        };
-        VideoDownloadSnapshot: {
-            jobId: string;
-            directory: string;
-            running: boolean;
-            items: {
-                filename: string;
-                url: string;
-                /** @enum {string} */
-                status: "pending" | "running" | "success" | "failed";
-                error?: string;
-            }[];
         };
         CategoryLearningNote: {
             id: string;
@@ -2387,21 +2263,7 @@ export interface components {
             }[];
         };
     };
-    responses: {
-        /** @description 请求、授权或运行环境不允许此操作；error 含可展示的原因 */
-        VideoDownloadError: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": {
-                    /** @enum {boolean} */
-                    success: false;
-                    error: string;
-                };
-            };
-        };
-    };
+    responses: never;
     parameters: never;
     requestBodies: never;
     headers: never;
@@ -4045,6 +3907,24 @@ export interface operations {
             };
         };
     };
+    get_api_generate_headline_design: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     post_api_generate_headline_design: {
         parameters: {
             query?: never;
@@ -4225,6 +4105,24 @@ export interface operations {
             };
         };
     };
+    get_api_generate_headline_title: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     post_api_generate_headline_title: {
         parameters: {
             query?: never;
@@ -4280,78 +4178,6 @@ export interface operations {
         };
     };
     post_api_generate_image_batch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_generate_keyword_review: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_generate_keyword_review_balance: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_api_generate_keyword_review_rules: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    put_api_generate_keyword_review_rules: {
         parameters: {
             query?: never;
             header?: never;
@@ -4501,6 +4327,24 @@ export interface operations {
         };
         responses: {
             /** @description 仅为提交结果未确认且无上游任务 ID 的记录绑定人工核对到的任务 ID，不重新提交 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_generate_video_silent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6053,127 +5897,6 @@ export interface operations {
                 };
                 content?: never;
             };
-        };
-    };
-    post_api_system_video_downloads: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VideoDownloadRequest"];
-            };
-        };
-        responses: {
-            /** @description 已创建本机后台下载任务 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @enum {boolean} */
-                        success: true;
-                        jobId: string;
-                    };
-                };
-            };
-            400: components["responses"]["VideoDownloadError"];
-            401: components["responses"]["VideoDownloadError"];
-            403: components["responses"]["VideoDownloadError"];
-            429: components["responses"]["VideoDownloadError"];
-            503: components["responses"]["VideoDownloadError"];
-        };
-    };
-    get_api_system_video_downloads_jobId: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                jobId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 仅返回当前工作区所属任务 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VideoDownloadSnapshot"];
-                };
-            };
-            401: components["responses"]["VideoDownloadError"];
-            404: components["responses"]["VideoDownloadError"];
-            503: components["responses"]["VideoDownloadError"];
-        };
-    };
-    post_api_system_video_downloads_jobId_cancel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                jobId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 已请求取消当前工作区所属任务 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @enum {boolean} */
-                        success: true;
-                    };
-                };
-            };
-            401: components["responses"]["VideoDownloadError"];
-            404: components["responses"]["VideoDownloadError"];
-            503: components["responses"]["VideoDownloadError"];
-        };
-    };
-    post_api_system_video_downloads_pick_directory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 生产返回浏览器模式；本机返回选定目录和内存授权，授权限当前工作区、8 小时内有效 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @enum {boolean} */
-                        success: true;
-                        /** @enum {string} */
-                        mode: "browser";
-                    } | {
-                        /** @enum {boolean} */
-                        success: true;
-                        /** @enum {string} */
-                        mode: "local";
-                        directory: string;
-                        directoryToken: string;
-                    };
-                };
-            };
-            400: components["responses"]["VideoDownloadError"];
-            401: components["responses"]["VideoDownloadError"];
-            503: components["responses"]["VideoDownloadError"];
         };
     };
     get_api_workshop_task_records: {

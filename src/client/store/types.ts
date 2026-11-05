@@ -36,15 +36,11 @@ export type WorkshopTab = 'studio' | 'prompt_assets' | 'recipes';
 export interface ViewSlice {
   currentView: AppView;
   previousView: AppView | null;
-  activeModuleId: string;
   activeWorkshopTab: WorkshopTab;
-  isWorkshopConfigOpen: boolean;
   setCurrentView: (view: AppView) => void;
   navigateToSettings: () => void;
   backFromSettings: () => void;
-  setActiveModuleId: (id: string) => void;
   setActiveWorkshopTab: (tab: WorkshopTab | 'categories') => void;
-  setIsWorkshopConfigOpen: (open: boolean) => void;
 }
 
 export interface HomeSlice {

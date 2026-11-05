@@ -16,8 +16,9 @@
 - [电商图文生产流程](workshop-production.md)：导入、流程门禁、提示词同步与交付恢复。
 - [电商图文参考样本与类目技能](workshop-reference-generation.md)：学习记忆、版本对照与晋升。
 - [封面](poster.md)：标题、设计、生图、批次恢复与封面记忆。
-- [词包](keywords.md)：审核模式、规则版本、导出与中断恢复。
+- [首页创作工具与能力接入](creative-tools.md)：可用工作流、API 依赖与接入条件。
 - [无限画布](canvas.md)：节点参考、任务、保存与深度处理。
+- [项目画布工作室](canvas-studio.md)：项目保存、素材库、宿主通信与发布版渲染资源维护。
 - [电商视频](video-sales.md)：重建期间保留商品采集、资料和选图。
 - [助手执行机制](assistant-runtime.md)：工具、技能、上下文、执行预算与回执。
 - [Agent 技能包维护](skills.md)：存放位置、文件导入导出、执行正文与按需读取。

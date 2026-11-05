@@ -279,7 +279,6 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
             <div className="flex-1 overflow-y-auto min-h-0 settings-page-scroll p-4 sm:p-6 lg:p-8">
               <div className="settings-page-content w-full min-w-0">
                 {navSection === 'canvas' && (canvasPage === 'pet' ? <PetSettingsPanel /> : <CanvasPreview page={canvasPage} />)}
-                {navSection === 'pet' && <PetSettingsPanel />}
                 {['chat', 'image', 'video', 'three_d', 'music', 'voice', 'avatar'].includes(navSection) && (
                   <ModalityHubView
                     kind={navSection as ModalityKind}

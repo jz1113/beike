@@ -24,8 +24,12 @@ export const VIEW_TO_URL: Record<AppView, string> = {
 export function parseViewFromSearchParams(search: string): AppView {
   const params = new URLSearchParams(search);
   const raw = params.get('view') || 'home';
-  const normalized = VIEW_URL_ALIASES[raw] || raw;
+  const normalized = raw === 'asset_library' && params.get('tab') === 'canvas' ? 'assets' : VIEW_URL_ALIASES[raw] || raw;
   return normalizeAppView(normalized) ?? 'home';
+}
+
+export function parseAssetLibraryTab(search: string): 'canvas' | 'media' {
+  return new URLSearchParams(search).get('tab') === 'canvas' ? 'canvas' : 'media';
 }
 
 export function parseWorkshopTabFromSearchParams(search: string) {
@@ -54,9 +58,3 @@ export function syncViewToUrl(view: AppView, extra?: Record<string, string>) {
   const url = next ? `${window.location.pathname}?${next}` : window.location.pathname || '/';
   window.history.replaceState(null, '', url);
 }
-
-/**
- * TanStack Router 评估结论（Phase 4）：
- * - 当前 4 个顶栏视图 + 电商图文 step 深链，用 `routes.ts` + `viewSlice` 已足够。
- * - 若未来需要嵌套路由（资产中心多 tab、电商图文 5 步独立 URL），再引入 TanStack Router。
- */

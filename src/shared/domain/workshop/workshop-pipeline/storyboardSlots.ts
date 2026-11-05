@@ -299,39 +299,6 @@ export function maybeApplyJewelryCameraFallback(input: {
   };
 }
 
-export function buildProductOnlyVisionPrompt(input: {
-  productTitle?: string;
-  productProps?: unknown;
-  shotCount: number;
-  templateStyle?: string;
-  slots: FilledShotSlot[];
-}): string {
-  const title = input.productTitle || '指定商品';
-  const props = input.productProps && typeof input.productProps === 'object'
-    ? Object.entries(input.productProps as Record<string, unknown>)
-        .map(([key, value]) => `  • ${key}: ${value}`)
-        .join('\n')
-    : '';
-  const locked = input.slots[0];
-  const actions = input.slots
-    .map((shot) => `${shot.shotNo}. ${shot.title}｜场景：${shot.scene || '母本未描述'}｜光线：${shot.lighting || '母本未描述'}｜动作：${shot.action || '（架构槽位）'}｜机位：${shot.camera || shot.angle || '保持资产机位'}`)
-    .join('\n');
-  return `# Role: 商品外观校对员
-已选定场景、穿搭、人设与镜头槽位。你只看 @图片1，补「商品如何佩戴/摆放、受光落在哪」一句。
-禁止改写场景、穿搭、人设、动作、机位、景别。
-## 商品
-- 标题：${title}${props ? `\n- 规格：\n${props}` : ''}
-## 已锁定槽位（只读）
-- 场景与光线：逐镜独立绑定，以下方各镜描述为准，不得将第一镜场景套用于其他镜头。
-- 穿搭：${locked?.outfit?.reversePrompt || [locked?.outfit?.top, locked?.outfit?.bottom].filter(Boolean).join(' / ') || '由资产决定'}
-- 人设：${locked?.persona?.name || '由资产或纯商品规则决定'}
-${actions}
-${input.templateStyle ? `## 拍摄架构（槽位约束，禁止当创作文案重写）\n${input.templateStyle}\n` : ''}
-输出合法 JSON：
-{"product_fingerprint":"品类词","product_role":"worn_apparel|worn_accessory|held_object|placed_object","prompts":[{"shot_no":1,"product_sentence":"佩戴/摆放 @图片1 与受光一句"}]}
-prompts 长度必须为 ${input.shotCount}。`;
-}
-
 function first<T>(items?: T[]): T | undefined {
   return Array.isArray(items) && items.length > 0 ? items[0] : undefined;
 }

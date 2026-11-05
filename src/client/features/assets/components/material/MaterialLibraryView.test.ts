@@ -108,20 +108,16 @@ describe('material library interactions', () => {
     expect(view.type).toBe(MaterialProjectDetailView);
     const detail = child(view, MaterialProjectDetailView);
     expect(detail.props.sourceType).toBe('uploaded');
-    detail.props.onSourceTypeChange('ai');
-    expect(input.onSourceTypeChange).toHaveBeenCalledWith('ai');
     expect(detail.props.project.assetCount).toBe(1);
   });
 });
 
 describe('project detail interactions', () => {
-  it('uses the outer source immediately and forwards the inner source switch', () => {
+  it('uses the page source and does not repeat the source switch', () => {
     const input = props();
     const view = Render(() => MaterialProjectDetailView({ ...input, sourceType: 'uploaded', project: { id: 's', type: 'session', title: '项目', photos: [], assetCount: 1 }, onBack: vi.fn() }));
     expect(nodes(view).some((node) => node.props.src === '/generated.png')).toBe(false);
     expect(nodes(view).some((node) => node.props.src === '/upload.png')).toBe(true);
-    const aiButton = nodes(view).find((node) => node.type === 'button' && node.props.children === 'AI 生成');
-    (aiButton!.props.onClick as () => void)();
-    expect(input.onSourceTypeChange).toHaveBeenCalledWith('ai');
+    expect(nodes(view).some((node) => node.type === 'button' && node.props.children === 'AI 生成')).toBe(false);
   });
 });

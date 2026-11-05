@@ -1,13 +1,15 @@
 export type AppView = 'home' | 'generate' | 'workshop' | 'headline_poster' | 'keyword_review' | 'assets' | 'asset_library' | 'canvas' | 'settings' | 'skills' | 'video_sales';
 
+const MOUNTED_VIEWS = ['home', 'generate', 'assets', 'asset_library', 'canvas', 'settings', 'skills'] as const;
+
 const LEGACY_VIEW: Record<string, AppView> = {
   hub: 'home',
-  buyer_show: 'workshop',
+  buyer_show: 'home',
   home: 'home',
   generate: 'generate',
-  workshop: 'workshop',
-  headline_poster: 'headline_poster',
-  keyword_review: 'keyword_review',
+  workshop: 'home',
+  headline_poster: 'home',
+  keyword_review: 'home',
   assets: 'assets',
   asset_library: 'asset_library',
   canvas: 'canvas',
@@ -16,8 +18,8 @@ const LEGACY_VIEW: Record<string, AppView> = {
   ppt_generator: 'home',
   avatar: 'home',
   digital_human: 'home',
-  video_sales: 'video_sales',
-  daihuo: 'video_sales',
+  video_sales: 'home',
+  daihuo: 'home',
 };
 
 export function normalizeAppView(raw: string | null | undefined): AppView | null {
@@ -26,17 +28,5 @@ export function normalizeAppView(raw: string | null | undefined): AppView | null
 }
 
 export function isAppView(value: string): value is AppView {
-  return (
-    value === 'home' ||
-    value === 'generate' ||
-    value === 'workshop' ||
-    value === 'headline_poster' ||
-    value === 'keyword_review' ||
-    value === 'assets' ||
-    value === 'asset_library' ||
-    value === 'canvas' ||
-    value === 'settings' ||
-    value === 'skills' ||
-    value === 'video_sales'
-  );
+  return (MOUNTED_VIEWS as readonly string[]).includes(value);
 }

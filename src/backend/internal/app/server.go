@@ -18,7 +18,6 @@ import (
 	"beike.local/cloud/src/backend/internal/generate/export"
 	"beike.local/cloud/src/backend/internal/generate/poster"
 	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/keywords"
 	"beike.local/cloud/src/backend/internal/library"
 	"beike.local/cloud/src/backend/internal/sales"
 	"beike.local/cloud/src/backend/internal/system"
@@ -65,14 +64,6 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/pets/import", true, system.ImportPets(cfg)},
 		{"GET /api/pets/{id}/spritesheet", true, system.PetSpritesheet(cfg)},
 		{"GET /api/system/proxy-video", false, system.ProxyVideo(cfg)},
-		{"POST /api/system/video-downloads/pick-directory", false, system.PickVideoDirectory(cfg)},
-		{"POST /api/system/video-downloads", false, system.StartVideoDownload(cfg)},
-		{"GET /api/system/video-downloads/{jobId}", false, system.VideoDownloadStatus(cfg)},
-		{"POST /api/system/video-downloads/{jobId}/cancel", false, system.CancelVideoDownload(cfg)},
-		{"POST /api/generate/keyword-review/balance", true, keywords.Balance()},
-		{"POST /api/generate/keyword-review", true, keywords.Review(cfg)},
-		{"GET /api/generate/keyword-review/rules", true, keywords.RulesGet(cfg)},
-		{"PUT /api/generate/keyword-review/rules", true, keywords.RulesPut(cfg)},
 		{"GET /api/catalog/categories", true, catalog.Categories(cfg)},
 		{"POST /api/catalog/categories/migration-preview", true, catalog.CategoryPreview(cfg)},
 		{"POST /api/catalog/categories/migration-apply", true, catalog.CategoryApply(cfg)},
@@ -183,7 +174,9 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/generate/canvas-text", true, generate.CanvasText(cfg)},
 		{"POST /api/generate/layer-decomposition", true, generate.LayerDecomposition(cfg)},
 		{"POST /api/generate/headline-title", true, poster.HeadlineTitle(cfg)},
+		{"GET /api/generate/headline-title", true, poster.HeadlineTitle(cfg)},
 		{"POST /api/generate/headline-design", true, poster.HeadlineDesign(cfg)},
+		{"GET /api/generate/headline-design", true, poster.HeadlineDesign(cfg)},
 		{"POST /api/generate/headline-deconstruct", true, poster.HeadlineDeconstruct(cfg)},
 		{"GET /api/generate/headline-templates", true, poster.HeadlineTemplates(cfg)},
 		{"PATCH /api/generate/headline-templates/{id}", true, poster.HeadlineTemplates(cfg)},
@@ -202,8 +195,9 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/generate/video", true, sales.BackgroundMedia(cfg, "video", generate.Video(cfg))},
 		{"GET /api/generate/video", true, generate.Video(cfg)},
 		{"POST /api/generate/video/bind", true, generate.VideoBind(cfg)},
+		{"POST /api/generate/video/silent", true, generate.VideoSilent(cfg)},
 		{"POST /api/generate/seedance/precheck", true, generate.SeedancePrecheck(cfg)},
-		{"POST /api/generate/audio", true, generate.Audio(cfg)},
+		{"POST /api/generate/audio", true, sales.BackgroundMedia(cfg, "voice", generate.Audio(cfg))},
 		{"GET /api/generate/audio", true, generate.Audio(cfg)},
 		{"POST /api/generate/depth-image", true, depth.DepthImage(cfg)},
 		{"POST /api/generate/depth-video", true, depth.DepthVideo(cfg)},

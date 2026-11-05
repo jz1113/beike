@@ -45,10 +45,13 @@ export function executeClientToolAction(
     }
     case 'navigate': {
       const target = action.target_view as string;
-      if (target && isAppView(target)) {
+      if (target === 'workshop' || target === 'buyer_show') {
+        store.setCurrentView('workshop');
+        showToast(String(action.message || '已打开电商图文画布'));
+      } else if (target && isAppView(target)) {
         store.setCurrentView(target);
         showToast(String(action.message || '已切换工作台视图'));
-      }
+      } else if (target) showToast('这个页面已经收进首页或画布');
       break;
     }
     case 'load_workshop_product': {

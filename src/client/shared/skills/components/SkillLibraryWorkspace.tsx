@@ -8,7 +8,8 @@ import StyleExtractModal from '@client/shared/modals/StyleExtractModal';
 import type { BaseStyleSkill } from '@client/shared/modals/style-extract/types';
 import { BUILTIN_ASSISTANT_SKILLS, mergeAssistantSkills, type AssistantSkill } from '@shared/domain/assistant/skills';
 import { skillEntryKey, type SkillLibraryEntry, type SkillRuntime, type WorkshopSkill } from '@shared/domain/skills/library';
-import { filterSkills } from '../model/filterSkills';
+import { skillActivationPrompt } from '../model/creationSkillFlows';
+import { filterSkills, skillCategories } from '../model/filterSkills';
 import { librarySkillItem } from '../model/libraryView';
 import { loadSkillFavorites, saveSkillFavorites, type SkillItem, type SkillMainTab } from '../model/skillTypes';
 import { AgentCreateSkillBar } from './AgentCreateSkillBar';
@@ -19,7 +20,6 @@ import { SkillsTopNav } from './SkillsTopNav';
 import { SkillsCategoryFilter } from './SkillsCategoryFilter';
 import { SkillsCardGrid } from './SkillsCardGrid';
 import { CreationSkillDetailModal } from './CreationSkillDetailModal';
-import { SkillLibraryDetail } from './SkillLibraryDetail';
 import { WorkshopSkillEditor } from './WorkshopSkillEditor';
 import { SkillFilesLocationDialog } from './SkillFilesLocationDialog';
 import { useSkillLibraryData } from './useSkillLibraryData';
@@ -34,7 +34,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
   const { message, show: showToast } = useToast(3500);
   const studio = useLibrarySkillStudio(showToast);
   const [runtime, setRuntime] = useState<SkillRuntime | 'all'>(initialRuntime);
-  const [presentation, setPresentation] = useState<'creation' | 'agent'>(initialRuntime === 'assistant' ? 'agent' : 'creation');
+  const [presentation, setPresentation] = useState<'creation' | 'agent'>('creation');
   const [tab, setTab] = useState<SkillMainTab>('all');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('全部');
@@ -61,10 +61,8 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
   const allItems = useMemo(() => mergedEntries.map(librarySkillItem), [mergedEntries]);
   const scopedItems = allItems.filter((item) => item.presentation === presentation && (runtime === 'all' || item.runtime === runtime));
   const categories = useMemo(
-    () => presentation === 'agent'
-      ? ['全部', ...new Set(scopedItems.map((item) => item.category))]
-      : ['全部'],
-    [presentation, scopedItems],
+    () => skillCategories(scopedItems),
+    [scopedItems],
   );
   const favorites = useMemo(() => {
     const set = new Set<string>(localFavorites);
@@ -108,21 +106,13 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
     announceSkillLibraryChange();
   };
 
-  const tryAgentSkill = (skill: AssistantSkill, initialPromptOverride?: string) => {
+  const tryAgentSkill = (skill: AssistantSkill, initialPromptOverride?: string, referenceImages?: string[]) => {
     const store = useAppStore.getState();
     const title = assistantSkillTitle(skill);
+    if (referenceImages !== undefined) store.setQuickRefImages([...referenceImages]);
     store.setActiveAssistantSkillId(skill.id);
     store.setQuickGenMode('agent');
-    if (initialPromptOverride !== undefined) {
-      store.setQuickPrompt(initialPromptOverride);
-    } else {
-      const current = store.quickPrompt || '';
-      const token = `#[skill:${title}]`;
-      if (!current.includes(token)) {
-        const stripped = current.replace(/#\[skill:[^\]]+\]\s*/gi, '').trim();
-        store.setQuickPrompt(stripped ? `${token} ${stripped}` : `${token} `);
-      }
-    }
+    store.setQuickPrompt(skillActivationPrompt(skill.id, title, store.quickPrompt || '', initialPromptOverride));
     if (store.currentView === 'canvas') {
       store.setIsAssistantOpen(true);
     } else {
@@ -130,7 +120,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
       store.setCurrentView(activeSession?.tasks?.length ? 'generate' : 'home');
     }
     setAgentDetail(null);
-    showToast(`已选用「${title}」，可在创作栏修改参数或上传垫图`);
+    showToast(referenceImages !== undefined ? `已带入「${title}」示例的提示词与参考素材，可修改后发送` : `已选用「${title}」，填写需求或添加参考素材后发送`);
   };
 
   const toggleAgentSkill = (skill: AssistantSkill) => {
@@ -142,9 +132,10 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
   };
 
   const askAgentToCreate = (idea: string) => {
-    const creator = BUILTIN_ASSISTANT_SKILLS.find(skill => skill.id === 'skill-creator');
-    if (!creator) { showToast('技能创建器暂不可用，请使用手动创建'); return; }
-    tryAgentSkill(creator, `请为我创建一个${presentation === 'agent' ? 'Agent 运行技能' : '创作模板技能'}。\n需求：${idea}\n先根据需求补齐任务边界、输入、执行步骤与验收规则，再交付可保存的 SKILL.md 和必要资源。只使用当前真实可用的工具，不要套用无关的通用模板。`);
+    const store=useAppStore.getState();
+    store.setActiveAssistantSkillId(null);store.setQuickGenMode('agent');
+    store.setQuickPrompt(`请为我创建一个${presentation === 'agent' ? 'Agent 运行技能' : '创作模板技能'}。\n需求：${idea}\n交付标准 SKILL.md 和必要资源，注明作者、真实来源和许可证；没有核验的来源不得标成官方技能。只使用当前真实可用的工具。`);
+    if(store.currentView==='canvas')store.setIsAssistantOpen(true);else store.setCurrentView('home');
     showToast('已准备好技能创建需求，请在对话栏确认并发送');
   };
 
@@ -163,11 +154,11 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
     void run(key, () => setLibrarySkillFavorite(entry, nextFav));
   };
 
-  const applySkill = (item: SkillItem, initialPromptOverride?: string) => {
+  const applySkill = (item: SkillItem, initialPromptOverride?: string, referenceImages?: string[]) => {
     const entry = entries.get(item.id);
     if (!entry) return;
     if (entry.kind === 'assistant') {
-      tryAgentSkill(entry.content, initialPromptOverride);
+      tryAgentSkill(entry.content, initialPromptOverride, referenceImages);
       return;
     }
     const store = useAppStore.getState();
@@ -214,7 +205,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
   };
 
   return (
-    <div className={`flex h-full min-h-0 flex-1 flex-col overflow-hidden text-slate-900 dark:text-slate-100 ${presentation === 'agent' ? 'bg-white dark:bg-[#141517]' : 'bg-[#F5F6F8] dark:bg-[#111215]'}`}>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white text-slate-900 dark:bg-[#111111] dark:text-slate-100">
       <input ref={fileInput} type="file" multiple accept=".md,.zip,.txt,text/markdown,application/zip" className="hidden" onChange={(event) => {
         if (event.target.files?.length) void studio.upload(event.target.files, presentation);
         event.target.value = '';
@@ -235,13 +226,13 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
         onSelectWorkshop={presentation === 'creation' ? () => setWorkshopEditor('new') : undefined}
       />
 
-      <div className="shrink-0 px-5 pb-3 sm:px-8 lg:px-10">
-        <div className="w-full space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-2 dark:border-white/[0.08]">
+      <div className="shrink-0 px-5 pb-1 sm:px-8">
+        <div className="w-full space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/70 pb-1 dark:border-white/[0.07]">
             <div aria-label="技能归属" className="flex items-center gap-6">
               {([['all', '全部'], ['my', '我的'], ['favorite', '收藏']] as const).map(([value, label]) => (
                 <button key={value} type="button" aria-pressed={tab === value} onClick={() => { setTab(value); setCategory('全部'); }}
-                  className={`relative cursor-pointer pb-2 text-sm transition-colors ${tab === value ? 'font-bold text-slate-950 after:absolute after:inset-x-0 after:bottom-0 after:h-[2.5px] after:rounded-full after:bg-slate-950 dark:text-white dark:after:bg-white' : 'font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}>
+                  className={`relative cursor-pointer pb-2 text-sm transition-colors ${tab === value ? 'font-medium text-slate-950 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-slate-950 dark:text-white dark:after:bg-white' : 'font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}>
                   {label}
                 </button>
               ))}
@@ -264,7 +255,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
 
       <AgentCreateSkillBar isOpen={agentOpen} onClose={() => setAgentOpen(false)} onAskAgent={askAgentToCreate} onGenerated={(result) => { studio.generated({ ...result, draft: { ...result.draft, kind: presentation } }); setAgentOpen(false); }} showToast={showToast} />
 
-      <main id="skill-library-panel" role="tabpanel" aria-labelledby={`skill-tab-${presentation}`} className="min-h-0 flex-1 overflow-y-auto px-5 pb-10 pt-3 sm:px-8 lg:px-10" aria-busy={loading}>
+      <main id="skill-library-panel" role="tabpanel" aria-labelledby={`skill-tab-${presentation}`} className="min-h-0 flex-1 overflow-y-auto px-5 pb-10 pt-4 sm:px-8" aria-busy={loading}>
         <div className="w-full space-y-6">
           {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"><p>{error}，可刷新重试。</p><button type="button" onClick={() => { void reload(); }} className="font-semibold underline underline-offset-4">重新加载</button></div>}
           {presentation === 'agent' && (
@@ -282,7 +273,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
               {filteredAgentSkills.length === 0 && <div className="flex justify-center gap-3 pb-8"><button type="button" onClick={filteredByUser ? resetFilters : createSkill} className="rounded-lg bg-slate-900 px-4 py-2 text-xs text-white dark:bg-white dark:text-slate-900">{filteredByUser ? '清除筛选' : '创建运行技能'}</button><button type="button" onClick={() => fileInput.current?.click()} className="px-4 py-2 text-xs text-slate-500">导入技能包</button></div>}
             </div>
           ) : (
-            <SkillsCardGrid skills={filteredCreationItems} favorites={favorites} onUseSkill={(item) => applySkill(item)} onEdit={edit} onFeed={feed} onDelete={remove}
+            <SkillsCardGrid skills={filteredCreationItems} favorites={favorites} onUseSkill={(item, example) => applySkill(item, example ? item.example?.prompt : undefined, example ? item.example?.referenceImages : undefined)} onEdit={edit} onFeed={feed} onDelete={remove}
               onDetail={(item) => setDetail(entries.get(item.id) || null)} onToggleFavorite={toggleFavoriteByKey}
               onDuplicate={(item) => { const entry = entries.get(item.id); if (entry?.kind === 'assistant') duplicateSkill(entry.content); }}
               emptyMessage={error ? '技能库暂时无法读取' : myLibraryEmpty ? '还没有自己的创作技能' : tab === 'favorite' && !query.trim() ? '还没有收藏创作技能' : filteredByUser ? '该分类下暂无匹配的创作技能' : '还没有创作技能'}
@@ -303,9 +294,7 @@ export function SkillLibraryWorkspace({ initialRuntime = 'all', onEnterWorkshop 
       <ManualSkillStudioModal isOpen={studio.open} onClose={studio.close} showToast={showToast} initialFiles={studio.files} initialDraft={studio.draft} heading={studio.editing ? '编辑技能' : '创建技能'} mode={studio.editing ? 'edit' : 'create'} onSave={studio.save} />
       {workshopEditor && <WorkshopSkillEditor key={workshopEditor === 'new' ? 'new' : workshopEditor.id} skill={workshopEditor === 'new' ? null : workshopEditor} onClose={() => setWorkshopEditor(null)} onSaved={() => showToast('技能已保存，可选择应用到电商图文')} />}
       <StyleExtractModal key={feedSkill?.id || 'new'} baseSkill={feedSkill} initialImages={[]} isOpen={extractOpen} onClose={() => setExtractOpen(false)} onRecipeCreated={() => { announceSkillLibraryChange(); showToast('新技能已保存，可选择应用到电商图文'); }} />
-      {detail && (librarySkillItem(detail).presentation === 'creation'
-        ? <CreationSkillDetailModal key={skillEntryKey(detail)} item={librarySkillItem(detail)} isFavorite={favorites.has(skillEntryKey(detail))} onDuplicate={detail.kind === 'assistant' ? () => duplicateSkill(detail.content) : undefined} onClose={() => setDetail(null)} onToggleFavorite={() => toggleFavoriteByKey(skillEntryKey(detail))} onUse={(initialPromptOverride) => { applySkill(librarySkillItem(detail), initialPromptOverride); setDetail(null); }} showToast={showToast} />
-        : <SkillLibraryDetail entry={detail} onClose={() => setDetail(null)} />)}
+      {detail && librarySkillItem(detail).presentation === 'creation' && <CreationSkillDetailModal key={skillEntryKey(detail)} item={librarySkillItem(detail)} isFavorite={favorites.has(skillEntryKey(detail))} onDuplicate={detail.kind === 'assistant' ? () => duplicateSkill(detail.content) : undefined} onClose={() => setDetail(null)} onToggleFavorite={() => toggleFavoriteByKey(skillEntryKey(detail))} onUse={(initialPromptOverride, referenceImages) => { applySkill(librarySkillItem(detail), initialPromptOverride, referenceImages); setDetail(null); }} showToast={showToast} />}
       <CodexSkillDetailModal skill={agentDetail} isActive={Boolean(agentDetail && activeAssistantSkillId === agentDetail.id)} onClose={() => setAgentDetail(null)} onToggleActive={toggleAgentSkill} onTryNow={tryAgentSkill} onEdit={(skill) => { setAgentDetail(null); studio.edit(skill); }} onDelete={removeAssistant} showToast={showToast} />
       {message && <div role="status" className="fixed bottom-10 left-1/2 z-[150] max-w-[90vw] -translate-x-1/2 rounded-full bg-slate-900 px-5 py-2.5 text-xs text-white dark:bg-white dark:text-slate-900">{message}</div>}
     </div>

@@ -105,7 +105,7 @@ describe('presentAgentTurn', () => {
 
   it('formats skill and skill resource reads cleanly with a separator', () => {
     const [block] = presentAgentTurn([
-      call('skill', 'read_skill', '{"skill_id":"prompt-reverse-engineer"}'),
+      call('skill', 'read_skill', '{"skill_id":"beike-prompt-extraction"}'),
       result('skill', 'read_skill', '已读取技能 提示词反推专家'),
       call('file', 'read_skill_file', '{"path":"assetDeconstruct/REVERSE_ENGINE_CORE_SPEC"}'),
       result('file', 'read_skill_file', '已读取 assetDeconstruct/REVERSE_ENGINE_CORE_SPEC'),

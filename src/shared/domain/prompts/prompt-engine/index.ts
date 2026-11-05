@@ -4,7 +4,7 @@
  * 原创生成（storyboard_generate）提示词装配流水线（无「定向提示词」遗留字段）：
  *
  * 1. 分析阶段（`/api/generate/analyze`）
- *    - `buildVisionSystemPrompt()`（vision.ts）：注入 `templateStyle`（拍摄架构）、`lockedAssets`（资产锁定）、`assetLibraryData`（资产库插槽）
+ *    - Go `workshopDirection` 写入商品事实与创作技能，客户端不再拼视觉系统提示词
  *    - 客户端 Batch 固定传入 `extraRequirements`（分镜数量、@图片1 锚定），不经 Zustand store
  *
  * 2. 分镜后处理（analyze.ts / useBatchWorkshopRunner）

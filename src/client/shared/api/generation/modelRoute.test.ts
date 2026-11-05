@@ -79,7 +79,7 @@ describe('text model request routing', () => {
     ]));
     expect(routed('/api/generate/canvas-text', { model: 'b', prompt: 'hello' })).toMatchObject({ model: 'gemini-4-argon', customBaseUrl: 'https://b.test', customApiKey: 'b', textProtocol: 'openai' });
   });
-  it.each(['/api/assistant/turn/start', '/api/generate/analyze', '/api/generate/copywriting', '/api/generate/keyword-review', '/api/generate/headline-title', '/api/generate/headline-design', '/api/generate/headline-deconstruct'])('routes %s text/vision requests', path => {
+  it.each(['/api/assistant/turn/start', '/api/generate/analyze', '/api/generate/copywriting', '/api/generate/headline-title', '/api/generate/headline-design', '/api/generate/headline-deconstruct'])('routes %s text/vision requests', path => {
     expect(routed(path, { model: 'claude-5.5-haiku' }).textProtocol).toBe('anthropic');
     expect(routed(path, { model: 'claude-5.5-haiku', textProtocol: 'openai', customApiKey: 'chosen' })).toMatchObject({ textProtocol: 'openai', customApiKey: 'chosen' });
   });

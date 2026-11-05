@@ -20,7 +20,6 @@ interface Props {
   onBatchDelete: (ids: string[]) => Promise<boolean>;
   onBatchDownload: (ids: string[]) => void;
   sourceType: 'ai' | 'uploaded';
-  onSourceTypeChange: (source: 'ai' | 'uploaded') => void;
   isDownloadingZip?: boolean;
   isDeleting?: boolean;
 }
@@ -35,7 +34,6 @@ export default function MaterialProjectDetailView({
   onBatchDelete,
   onBatchDownload,
   sourceType,
-  onSourceTypeChange,
   isDownloadingZip = false,
   isDeleting = false,
 }: Props) {
@@ -88,32 +86,6 @@ export default function MaterialProjectDetailView({
             <ArrowLeft className="h-4 w-4 shrink-0" />
             <span className="truncate" title={project.title}>{project.title}</span>
           </button>
-
-          {/* AI生成 / 我上传的 胶囊 */}
-          <div className="inline-flex items-center p-0.5 rounded-full bg-slate-100 border border-slate-200/60 shadow-2xs dark:bg-white/10 dark:border-white/10">
-            <button
-              type="button"
-              onClick={() => onSourceTypeChange('ai')}
-              className={`px-3 py-1 rounded-full text-xs transition-all ${
-                sourceType === 'ai'
-                  ? 'bg-white text-slate-900 font-semibold shadow-2xs dark:text-slate-100 dark:bg-[#18191c]'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
-              }`}
-            >
-              AI 生成
-            </button>
-            <button
-              type="button"
-              onClick={() => onSourceTypeChange('uploaded')}
-              className={`px-3 py-1 rounded-full text-xs transition-all ${
-                sourceType === 'uploaded'
-                  ? 'bg-white text-slate-900 font-semibold shadow-2xs dark:text-slate-100 dark:bg-[#18191c]'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
-              }`}
-            >
-              我上传的
-            </button>
-          </div>
         </div>
 
         {/* 右侧：搜索 + 筛选 + 排序 + 展示尺寸 */}

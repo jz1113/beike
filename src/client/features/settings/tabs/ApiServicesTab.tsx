@@ -1,3 +1,4 @@
+import { waitForCredentialSaves } from '@client/shared/api/persistCredentials';
 import React, { useState, useEffect, useRef } from 'react';
 import { SettingsConnectionContext } from '../components/SettingsControls';
 import { ApiServicesWanbangPanel } from '../components/vendors/ApiServicesWanbangPanel';
@@ -6,7 +7,7 @@ import { ApiProvidersNavList } from '../components/providers/ApiProvidersNavList
 import { ApiProviderDetailPanel } from '../components/providers/ApiProviderDetailPanel';
 import { AddProviderModal } from '../components/providers/AddProviderModal';
 import { serviceStatuses } from '../model/serviceStatuses';
-import { SERVICE_STATUS_COLORS } from '../components/vendors/ApiServicesNavList';
+import { SERVICE_STATUS_COLORS } from '../model/connectionStatus';
 import { useApiProviders } from '../hooks/useApiProviders';
 import { loadStoredProviders } from '../model/apiProviderTypes';
 import {
@@ -16,8 +17,6 @@ import {
 import {
   canonicalProviderId,
   loadSavedProviderCredentialSnapshots,
-  propagateProviderCredentials,
-  rememberSavedProviderCredentials,
 } from '../model/providerCredentialSync';
 import type { ApiServicesTabProps } from './apiServicesTabTypes';
 
@@ -54,18 +53,11 @@ export default function ApiServicesTab({
     testProvider,
     isTesting,
     testResults,
+    saveProvider,
   } = useApiProviders({
     isOpen: true,
     showToast,
-    onProviderRemoved: (removedId) => {
-      // 清理该服务商关联的自定义模型
-      const remainingModels = m.customModels.filter(model => {
-        return model.channel !== removedId && (model as { providerId?: string }).providerId !== removedId;
-      });
-      if (remainingModels.length !== m.customModels.length) {
-        m.setCustomModels(remainingModels);
-      }
-    },
+    onProviderRemoved: () => m.reloadStoredModels(),
   });
 
   // 如果 selectedServiceId 是集成服务（wanbang），或独立存储页的 cloud_storage，保持在这些服务上
@@ -88,9 +80,10 @@ export default function ApiServicesTab({
   };
 
   const handleSaveCurrentProviderConfig = async () => {
-    if (!currentProvider) return;
+    if (!currentProvider || !c.configLoaded) return;
     setIsSavingProvider(true);
     try {
+      await waitForCredentialSaves();
       const currentCredentials = {
         baseUrl: currentProvider.baseUrl.trim(),
         apiKey: currentProvider.apiKey.trim(),
@@ -113,26 +106,17 @@ export default function ApiServicesTab({
             !== currentCredentials.baseUrl.replace(/\/+$/, '').toLowerCase())
         ? { baseUrl: legacyGlobalConfig.baseUrl, apiKey: legacyGlobalConfig.apiKey }
         : previousCredentials;
-      let saved = true;
-      // 同步到对应底层配置
-      if (canonicalId === 'comfly_gateway') {
-        saved = await c.handleSaveApiConfig(currentCredentials.baseUrl, currentCredentials.apiKey, false);
-      } else if (canonicalId === 'openai_official') {
-        saved = await c.handleSaveOpenAIConfig(false, currentCredentials);
-      } else if (canonicalId === 'deepseek_official') {
-        saved = await c.handleSaveDeepSeekConfig(false, currentCredentials.apiKey);
-      } else if (canonicalId === 'lianchi_images') {
-        saved = await c.handleSaveLianchiConfig(false, currentCredentials.apiKey);
-      }
-      if (!saved) return;
-      const result = propagateProviderCredentials(currentProvider.id, migrationPreviousCredentials, currentCredentials);
+      const result = saveProvider(currentProvider, migrationPreviousCredentials, {
+        openAI: { enabled: c.openAIEnabled, allowInsecureHttp: c.openAIAllowInsecureHttp },
+      });
       savedProviderCredentialsRef.current[currentProvider.id] = currentCredentials;
-      rememberSavedProviderCredentials(currentProvider.id, currentCredentials);
+      m.reloadStoredModels();
+      c.reloadConfig();
       showToast(result.updated > 0
         ? `「${currentProvider.name}」已保存，已同步 ${result.updated} 处模型凭证`
         : `「${currentProvider.name}」配置已保存`);
-    } catch {
-      showToast(`保存「${currentProvider.name}」配置失败`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : `保存「${currentProvider.name}」配置失败`);
     } finally {
       setIsSavingProvider(false);
     }
@@ -190,7 +174,7 @@ export default function ApiServicesTab({
               onRemoveProvider={removeProvider}
               onTestProvider={() => void testProvider(currentProvider.id)}
               isTesting={isTesting}
-              isSaving={isSavingProvider}
+              isSaving={isSavingProvider || !c.configLoaded}
               testOutcome={testResults[currentProvider.id]}
             />
           ) : (

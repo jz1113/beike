@@ -46,10 +46,9 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'video', label: '视频', keywords: ['视频', '默认'] },
   { id: 'three_d', label: '3D', keywords: ['3d', '混元'] },
   { id: 'music', label: '音乐', keywords: ['音乐', 'suno'] },
-  { id: 'avatar', label: '数字人', keywords: ['数字人', '对口型', '口型', '驱动'] },
+  { id: 'avatar', label: '数字人（重建中）', keywords: ['数字人', '对口型', '口型', '驱动', '重建'] },
   { id: 'voice', label: '语音', keywords: ['语音', '配音'] },
-  { id: 'canvas', label: '画布功能', keywords: ['画布', '连线', '节点'] },
-  { id: 'pet', label: '桌宠', keywords: ['桌宠', '宠物', 'codex'] },
+  { id: 'canvas', label: '画布功能', keywords: ['画布', '连线', '节点', '桌宠'] },
   { id: 'language', label: '语言', keywords: ['语言', '中文'] },
   { id: 'storage', label: '存储', keywords: ['存储', 'oss', 'r2', 's3'] },
 ];

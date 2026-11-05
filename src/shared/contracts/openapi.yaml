@@ -600,6 +600,11 @@ paths:
         '200':
           description: 沿用现有 JSON 或二进制响应
   /api/generate/headline-design:
+    get:
+      operationId: get_api_generate_headline_design
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
     post:
       operationId: post_api_generate_headline_design
       responses:
@@ -660,6 +665,11 @@ paths:
         '200':
           description: 沿用现有 JSON 或二进制响应
   /api/generate/headline-title:
+    get:
+      operationId: get_api_generate_headline_title
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
     post:
       operationId: post_api_generate_headline_title
       responses:
@@ -679,29 +689,6 @@ paths:
   /api/generate/image-batch:
     post:
       operationId: post_api_generate_image_batch
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/generate/keyword-review:
-    post:
-      operationId: post_api_generate_keyword_review
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/generate/keyword-review/balance:
-    post:
-      operationId: post_api_generate_keyword_review_balance
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/generate/keyword-review/rules:
-    get:
-      operationId: get_api_generate_keyword_review_rules
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-    put:
-      operationId: put_api_generate_keyword_review_rules
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
@@ -788,6 +775,12 @@ paths:
       responses:
         '200':
           description: 仅为提交结果未确认且无上游任务 ID 的记录绑定人工核对到的任务 ID，不重新提交
+  /api/generate/video/silent:
+    post:
+      operationId: post_api_generate_video_silent
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
   /api/health:
     get:
       operationId: get_api_health
@@ -1696,127 +1689,6 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
-  /api/system/video-downloads:
-    post:
-      operationId: post_api_system_video_downloads
-      description: 本机专用。要求应用写凭证和当前工作区的原生目录选择授权；生产环境禁止写服务器目录。
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VideoDownloadRequest'
-      responses:
-        '200':
-          description: 已创建本机后台下载任务
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [success, jobId]
-                properties:
-                  success:
-                    type: boolean
-                    enum: [true]
-                  jobId:
-                    type: string
-        '400':
-          $ref: '#/components/responses/VideoDownloadError'
-        '401':
-          $ref: '#/components/responses/VideoDownloadError'
-        '403':
-          $ref: '#/components/responses/VideoDownloadError'
-        '429':
-          $ref: '#/components/responses/VideoDownloadError'
-        '503':
-          $ref: '#/components/responses/VideoDownloadError'
-  '/api/system/video-downloads/{jobId}':
-    get:
-      operationId: get_api_system_video_downloads_jobId
-      parameters:
-        - in: path
-          name: jobId
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: 仅返回当前工作区所属任务
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VideoDownloadSnapshot'
-        '401':
-          $ref: '#/components/responses/VideoDownloadError'
-        '404':
-          $ref: '#/components/responses/VideoDownloadError'
-        '503':
-          $ref: '#/components/responses/VideoDownloadError'
-  '/api/system/video-downloads/{jobId}/cancel':
-    post:
-      operationId: post_api_system_video_downloads_jobId_cancel
-      parameters:
-        - in: path
-          name: jobId
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: 已请求取消当前工作区所属任务
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [success]
-                properties:
-                  success:
-                    type: boolean
-                    enum: [true]
-        '401':
-          $ref: '#/components/responses/VideoDownloadError'
-        '404':
-          $ref: '#/components/responses/VideoDownloadError'
-        '503':
-          $ref: '#/components/responses/VideoDownloadError'
-  /api/system/video-downloads/pick-directory:
-    post:
-      operationId: post_api_system_video_downloads_pick_directory
-      responses:
-        '200':
-          description: 生产返回浏览器模式；本机返回选定目录和内存授权，授权限当前工作区、8 小时内有效
-          content:
-            application/json:
-              schema:
-                oneOf:
-                  - type: object
-                    required: [success, mode]
-                    properties:
-                      success:
-                        type: boolean
-                        enum: [true]
-                      mode:
-                        type: string
-                        enum: [browser]
-                  - type: object
-                    required: [success, mode, directory, directoryToken]
-                    properties:
-                      success:
-                        type: boolean
-                        enum: [true]
-                      mode:
-                        type: string
-                        enum: [local]
-                      directory:
-                        type: string
-                      directoryToken:
-                        type: string
-        '400':
-          $ref: '#/components/responses/VideoDownloadError'
-        '401':
-          $ref: '#/components/responses/VideoDownloadError'
-        '503':
-          $ref: '#/components/responses/VideoDownloadError'
   /api/workshop/task-records:
     get:
       operationId: get_api_workshop_task_records
@@ -1864,20 +1736,6 @@ paths:
         '200':
           description: 沿用现有 JSON 或二进制响应
 components:
-  responses:
-    VideoDownloadError:
-      description: 请求、授权或运行环境不允许此操作；error 含可展示的原因
-      content:
-        application/json:
-          schema:
-            type: object
-            required: [success, error]
-            properties:
-              success:
-                type: boolean
-                enum: [false]
-              error:
-                type: string
   schemas:
     SalesPersonaVisualProfile:
       type: object
@@ -2056,57 +1914,6 @@ components:
           type: string
         customized:
           type: boolean
-    VideoDownloadRequest:
-      type: object
-      required: [directory, directoryToken, items]
-      properties:
-        directory:
-          type: string
-        directoryToken:
-          type: string
-        concurrency:
-          type: integer
-          enum: [0, 100]
-          default: 100
-        items:
-          type: array
-          minItems: 1
-          maxItems: 500
-          items:
-            type: object
-            required: [filename, url]
-            properties:
-              filename:
-                type: string
-                description: 单个安全视频文件名；同名已存在时拒绝覆盖
-              url:
-                type: string
-                description: 由后端视频代理安全策略校验的远程 URL
-    VideoDownloadSnapshot:
-      type: object
-      required: [jobId, directory, running, items]
-      properties:
-        jobId:
-          type: string
-        directory:
-          type: string
-        running:
-          type: boolean
-        items:
-          type: array
-          items:
-            type: object
-            required: [filename, url, status]
-            properties:
-              filename:
-                type: string
-              url:
-                type: string
-              status:
-                type: string
-                enum: [pending, running, success, failed]
-              error:
-                type: string
     CategoryLearningNote:
       type: object
       required: [id, kind, content, createdAt]
