@@ -11,12 +11,18 @@ interface CanvasRecentProjectsProps {
   onEnterCanvas?: (projectId: string) => void;
   className?: string;
   maxDisplay?: number;
+  compact?: boolean;
+  assetView?: boolean;
+  onOpenAll?: () => void;
 }
 
 export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
   onEnterCanvas,
   className = '',
   maxDisplay = 7,
+  compact = false,
+  assetView = false,
+  onOpenAll,
 }) => {
   const hydrated = useCanvasHydrated();
   const { projects:allProjects, createProject, selectProject, updateProjectTitle, deleteProject } = useCanvasStore();
@@ -93,7 +99,8 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
 
   return (
     <section className={`w-full space-y-4 select-none ${className}`}>
-      <div className="flex flex-wrap items-center gap-2 text-sm">
+      {compact && onOpenAll && <button type="button" onClick={onOpenAll}>全部</button>}
+      {!assetView && <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-slate-500 dark:text-slate-400">复刻流程模板</span>
         {videoWorkflowTemplates.map(template => <button key={template.kind} type="button" disabled={!hydrated}
           title={template.summary} className="rounded-lg border border-slate-200 px-3 py-2 text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
@@ -101,7 +108,7 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
           新建{template.title}
         </button>)}
         <span className="text-xs text-slate-500">含步骤说明与接入点，尚未接通自动执行</span>
-      </div>
+      </div>}
       {!hasRecentProjects && createCard}
       {!hydrated && <p role="status" className="text-sm text-slate-500">正在读取本地项目…</p>}
       {/* 空画布不展示“最近项目 · 0 个画布”的无效标题行，直接给出新建入口。 */}

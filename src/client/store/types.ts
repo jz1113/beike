@@ -37,6 +37,8 @@ export interface ViewSlice {
   currentView: AppView;
   previousView: AppView | null;
   activeWorkshopTab: WorkshopTab;
+  isWorkshopConfigOpen: boolean;
+  setIsWorkshopConfigOpen: (open: boolean) => void;
   setCurrentView: (view: AppView) => void;
   navigateToSettings: () => void;
   backFromSettings: () => void;

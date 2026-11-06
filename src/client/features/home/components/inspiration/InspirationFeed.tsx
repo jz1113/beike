@@ -1,3 +1,4 @@
+import { matchesInspirationSearch } from '../../model/inspirationSearch';
 import { visibleJustifiedRows } from '../../model/justifiedRows';
 import { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react';
 import type { InspirationItem, InspirationUseOptions } from '../../model/inspirationItem';
@@ -24,6 +25,7 @@ const FEED_GAP = 8;
 export default function InspirationFeed({ onUsePrompt }: Props) {
   const isVisible = useViewVisibility();
   const [mediaFilter, setMediaFilter] = useState<InspirationMediaFilter>('image');
+  const [query, setQuery] = useState('');
   const [published, setPublished] = useState<PublishedHomeItem[]>(() => readPublishedHomeItems());
   const [selectedModalItem, setSelectedModalItem] = useState<InspirationItem | null>(null);
   const [selectedCanvasItem, setSelectedCanvasItem] = useState<PublishedHomeItem | null>(null);
@@ -44,8 +46,8 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
   const filteredItems = useMemo(() => {
     const mine = published.filter(item => isInspirationVideo(item) === (mediaFilter === 'video'));
     const seeded = INSPIRATION_ITEMS.filter(item => isInspirationVideo(item) === (mediaFilter === 'video'));
-    return [...mine, ...seeded];
-  }, [published, mediaFilter]);
+    return [...mine, ...seeded].filter(item => matchesInspirationSearch(item, 'all', query));
+  }, [published, mediaFilter, query]);
 
   useEffect(() => {
     const refresh = () => setPublished(readPublishedHomeItems());
@@ -63,7 +65,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
     setHasStartedBrowsing(false);
-  }, [mediaFilter, published]);
+  }, [mediaFilter, published, query]);
 
   // 用户开始滚动后逐批加载；首批不足一屏时只补到页面可以滚动。
   useEffect(() => {
@@ -150,6 +152,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
     <div className="w-full space-y-3.5 pt-2 select-none">
       <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-white">精选作品</h2>
       <div role="tablist" aria-label="素材类型" className="inline-flex rounded-full bg-[#F4F5F8] p-1 dark:bg-[#1B1B1E]">
+        <input type="search" aria-label="搜索作品" placeholder="搜索作品" value={query} onChange={event => setQuery(event.target.value)} className="rounded-lg border border-current/20 bg-transparent px-3 py-1 text-sm" />
         {INSPIRATION_MEDIA_FILTERS.map((item) => {
           const selected = mediaFilter === item.id;
           return (

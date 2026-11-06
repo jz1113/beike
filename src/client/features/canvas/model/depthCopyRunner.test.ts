@@ -1,9 +1,16 @@
 import {expect,it,vi} from 'vitest';
-import {createVideoWorkflowProject} from './videoWorkflowProjects';
 import {createDepthCopyRunner} from './depthCopyRunner';
+import type {StudioScene} from './types';
 import type {StudioTaskCommands} from './studioTaskState';
 function fixture(){
- const scene=createVideoWorkflowProject('depth-copy','copy',1).studioScene!;
+ const scene:StudioScene={nodes:[],connections:[],groups:[],textBoxes:[],strokes:[],view:{x:0,y:0,zoom:1}};
+ const add=(key:string,type:string,settings:Record<string,unknown>={})=>scene.nodes.push({id:'copy-'+key,type,nodeName:key,settings});
+ for(const key of ['product','person','background'])add(key,'input-image',{mediaType:'image'});
+ add('source','input-image',{mediaType:'video'});
+ add('analysis','text-node');add('keyframe','gen-image');add('depth','gen-video',{beikeOperation:'depth-video'});
+ add('video','gen-video');add('compose','gen-video',{beikeOperation:'compose-original'});
+ for(const [from,to] of [['source','analysis'],['product','keyframe'],['person','keyframe'],['source','depth'],['keyframe','video'],['depth','video'],['video','compose']])
+  scene.connections.push({id:from+'-'+to,from:'copy-'+from,to:'copy-'+to});
  const node=(key:string)=>scene.nodes.find(n=>n.id==='copy-'+key)!;
  for(const key of ['source','product','person','background'])node(key).content='/storage/'+key+(key==='source'?'.mp4':'.png');
  node('video').settings={...node('video').settings as object,model:'my-video-model',duration:'10s',beikeVideoMode:'omni'};

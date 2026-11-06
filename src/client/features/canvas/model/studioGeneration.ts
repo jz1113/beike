@@ -1,3 +1,4 @@
+import { assertStudioReferenceNumbers, normalizeStudioReferenceNumbers } from './studioReferenceNumbers';
 import { registerRefMediaKind } from '@client/shared/media/refMediaRegistry';
 import { useAppStore } from '@client/store';
 import { availableBatchModels, buildGenerationPromptBatch } from '@client/shared/agent/buildGenerationPromptBatch';
@@ -41,9 +42,10 @@ export interface StudioRequest {
   ratio?: string;
   duration?: number;
   resolution?: string;
+  optimizePrompt?: boolean;
 }
 
-export function submitStudioGeneration(request: StudioRequest) {
+export function prepareStudioGeneration(request: StudioRequest) {
   const store = useAppStore.getState();
   if (!store.generationHistoryReady) throw new Error('生成历史仍在恢复，请稍后重试');
   const channel = studioChannels().find(model => model.id === request.model);
@@ -58,6 +60,7 @@ export function submitStudioGeneration(request: StudioRequest) {
     registerRefMediaKind(url, type);
     return {id:String(index), name:`参考${type === 'video' ? '视频' : '图'} ${index + 1}`, type, url};
   });
+  assertStudioReferenceNumbers(prompt, media);
   const settings = currentBatchSettings();
   let aspect = /^\d+:\d+$/.test(request.ratio ?? '') ? request.ratio : undefined;
   let duration = request.duration;
@@ -75,7 +78,7 @@ export function submitStudioGeneration(request: StudioRequest) {
     const profile = getVideoModelById(model, baseUrl);
     if (profile) {
       const videoCount = media.filter(item => item.type === 'video').length;
-      const mode = resolveVideoMode(model, undefined, media.length - videoCount, videoCount);
+      const mode = resolveVideoMode(model, undefined, media.length - videoCount, videoCount, baseUrl);
       settings.videoRefMode = mode;
       settings.videoResolution = resolveVideoResolution(request.resolution || settings.videoResolution, videoResolutionOptions(model, mode, baseUrl));
       const requestedDuration = duration ?? settings.videoDuration;
@@ -83,16 +86,21 @@ export function submitStudioGeneration(request: StudioRequest) {
       if (!options.length) throw new Error('当前视频线路没有可用时长，请重新选择模型或参数');
       duration = options.reduce((best, value) => Math.abs(value - requestedDuration) < Math.abs(best - requestedDuration) ? value : best);
       const requestedAspect = aspect || settings.videoAspect;
-      aspect = videoRatioLocked(model, mode) ? 'adaptive' : profile.supportedAspectRatios.includes(requestedAspect) ? requestedAspect : profile.supportedAspectRatios[0];
+      aspect = videoRatioLocked(model, mode, baseUrl) ? 'adaptive' : profile.supportedAspectRatios.includes(requestedAspect) ? requestedAspect : profile.supportedAspectRatios[0];
       appliedVideoSettings = { resolution:settings.videoResolution, duration:`${duration}s`, ratio:aspect };
     }
   }
   const entry = {
-    id: request.taskId, title: prompt.slice(0, 40), prompt, mediaType: channel.kind,
+    id: request.taskId, title: prompt.slice(0, 40), prompt: normalizeStudioReferenceNumbers(prompt, media), mediaType: channel.kind,
     referenceIndexes: media.map((_, index) => index),
     aspect, duration,
   };
   const [task] = buildGenerationPromptBatch([entry], media, settings, false); // 渠道已与当前的宿主目录校验。
-  store.addGenerationTask({ ...task, referenceVideoUrls:media.filter(item=>item.type === 'video').map(item=>item.url), id: request.taskId }, false);
-  return appliedVideoSettings;
+  return { task: { ...task, referenceVideoUrls:media.filter(item=>item.type === 'video').map(item=>item.url), id: request.taskId }, settings: appliedVideoSettings };
+}
+
+export function submitStudioGeneration(request: StudioRequest) {
+  const prepared = prepareStudioGeneration(request);
+  if (prepared) useAppStore.getState().addGenerationTask(prepared.task, false);
+  return prepared?.settings;
 }

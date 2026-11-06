@@ -48,6 +48,8 @@ export interface AgentTurnTaskData {
 }
 
 export type GenerationTask = ContractGenerationTask & {
+  canvasProjectId?: string;
+  usageScope?: import("@client/shared/utils/usageLog").UsageScope;
   /** Original assistant deliverable; kept across generation history restoration. */
   generationOrigin?: { sourceId: string; entryId: string };
   depthStyle?: DepthVideoStyle;
@@ -62,6 +64,7 @@ export type GenerationTask = ContractGenerationTask & {
 };
 
 export interface ChatSession {
+  canvasProjectId?: string;
   id: string;
   title: string;
   createdAt: number;

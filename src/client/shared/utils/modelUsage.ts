@@ -1,4 +1,4 @@
-import type { UsageLogItem } from './usageLog';
+import type { UsageLogItem, UsageScope } from './usageLog';
 import { recordModelUsage, resolveModelVendor } from './usageTracker';
 
 export type ReportedUsage = {
@@ -29,6 +29,9 @@ export function recordChatTokens(input: {
   type?: UsageLogItem['type'];
   usage: unknown;
   mediaCount?: number;
+  scope?: UsageScope;
+  operationId?: string;
+  success?: boolean;
 }): void {
   const tokens = readReportedUsage(input.usage);
   if (!tokens || !input.modelId) return;
@@ -38,14 +41,18 @@ export function recordChatTokens(input: {
     provider: resolveModelVendor(input.modelId),
     type: input.type || 'chat',
     ...tokens,
+    scope: input.scope,
+    localTaskId: input.operationId,
     mediaCount: input.mediaCount,
-    success: true,
+    success: input.success !== false,
   });
 }
 
 export function recordMediaTaskUsage(input: {
   taskId?: string;
   localTaskId?: string;
+  recordId?: string;
+  scope?: UsageScope;
   modelId: string;
   modelName?: string;
   type: UsageLogItem['type'];
@@ -58,6 +65,8 @@ export function recordMediaTaskUsage(input: {
   recordModelUsage({
     taskId: input.taskId,
     localTaskId: input.localTaskId,
+    recordId: input.recordId,
+    scope: input.scope,
     modelId: input.modelId,
     modelName: input.modelName || input.modelId,
     provider: resolveModelVendor(input.modelId),

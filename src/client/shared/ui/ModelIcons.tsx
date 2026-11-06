@@ -86,7 +86,7 @@ function svgRawToDataUri(raw: string): string {
   return `data:image/svg+xml;base64,${encoded}`;
 }
 
-function getModelLogoDataUri(modelId: string, isDark = false): string | null {
+export function getModelLogoDataUri(modelId: string, isDark = false): string | null {
   const file = logoFileFromPath(getModelLogoPath(modelId));
   // 严格白名单：不在构建期内联资源表中的 file 一律拒绝
   if (!ALLOWED_LOGO_FILES.has(file)) return null;

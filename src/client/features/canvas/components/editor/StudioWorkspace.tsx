@@ -1,3 +1,4 @@
+import { handleStudioEditingKey } from '../../model/studioEditingKeys';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CanvasStoryboardView } from '../storyboard/CanvasStoryboardView';
 import { useCanvasStore } from '../../store/useCanvasStore';
@@ -58,7 +59,7 @@ export function StudioWorkspace({projectId, onHome}: {projectId: string; onHome:
       const current = store.projects.find(item => item.id === projectId);
       if (!current) return;
       if (event.data?.kind === 'studio:ready') {
-        Object.assign(frame.current!.contentWindow!, {beikeCanvasChat:canvasChatRequest, beikeCanvasSpeech:canvasSpeechRequest, beikeCanvasDownload:downloadMedia});
+        Object.assign(frame.current!.contentWindow!, {beikeCanvasChat:canvasChatRequest, beikeCanvasSpeech:canvasSpeechRequest, beikeCanvasDownload:downloadMedia, beikeCanvasEditingKey:handleStudioEditingKey});
         frame.current?.contentWindow?.postMessage({kind:'studio:init', projectId, scene:current.studioScene, channels:studioChannels(), preferenceKeys:Object.values(studioPreferenceKeys), preferencePrefix:studioPreferencePrefix}, location.origin);
       } else if (event.data?.kind === 'studio:generate' && event.data.projectId === projectId) {
         try {

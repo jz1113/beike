@@ -1,14 +1,12 @@
 import type { ModalityKind, ModalityModelItem } from './modalityModelTypes';
 import {
   loadStoredModalityGlobalConfig,
-  loadStoredModalityModels,
-  saveStoredModalityGlobalConfig,
-  saveStoredModalityModels,
 } from './modalityModelStorage';
-import { loadCustomModels, persistCustomModels } from './customModelsStorage';
+import type { WorkflowModel } from './workflowModel';
+import { writeLocalConfig } from '@client/shared/api/localConfigStorage';
 
 export const PROVIDER_CREDENTIALS_CHANGED_EVENT = 'beike:provider-credentials-changed';
-const SAVED_PROVIDER_CREDENTIALS_KEY = 'beike_api_provider_saved_credentials_v1';
+export const SAVED_PROVIDER_CREDENTIALS_KEY = 'beike_api_provider_saved_credentials_v1';
 
 const MODALITY_KINDS: ModalityKind[] = ['chat', 'image', 'video', 'three_d', 'music', 'voice', 'avatar'];
 
@@ -45,16 +43,6 @@ export function loadSavedProviderCredentialSnapshots(): Record<string, ProviderC
   }
 }
 
-export function rememberSavedProviderCredentials(providerId: string, credentials: ProviderCredentials): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const snapshots = loadSavedProviderCredentialSnapshots();
-    snapshots[providerId] = { baseUrl: credentials.baseUrl.trim(), apiKey: credentials.apiKey.trim() };
-    localStorage.setItem(SAVED_PROVIDER_CREDENTIALS_KEY, JSON.stringify(snapshots));
-  } catch {
-    // Ignore unavailable browser storage; the in-memory snapshot still protects this session.
-  }
-}
 
 function cleanKey(value: string | undefined): string {
   return (value || '').trim();
@@ -73,7 +61,7 @@ function changedValue(previous: string, next: string, normalize: (value: string 
   return Boolean(previous) && normalize(previous) !== normalize(next);
 }
 
-function isProviderModel(item: ModalityModelItem, providerId: string): boolean {
+function isProviderModel(item: Pick<ModalityModelItem, 'channelId'>, providerId: string): boolean {
   const canonicalId = canonicalProviderId(providerId);
   return (!item.channelId && canonicalId === 'comfly_gateway')
     || canonicalProviderId(item.channelId || '') === canonicalId;
@@ -94,11 +82,11 @@ function isCustomModelForProvider(model: { providerId?: string; channel?: string
   return Boolean(legacyChannel && model.channel === legacyChannel);
 }
 
-export function propagateProviderCredentials(
+export function providerCredentialChanges(
   providerId: string,
   previous: ProviderCredentials,
   next: ProviderCredentials,
-): { updated: number } {
+): { updated: number; values: Record<string, string | null> } {
   const previousKey = cleanKey(previous.apiKey);
   const nextKey = cleanKey(next.apiKey);
   const previousBaseUrl = (previous.baseUrl || '').trim();
@@ -106,6 +94,7 @@ export function propagateProviderCredentials(
   const keyChanged = changedValue(previousKey, nextKey, value => cleanKey(value));
   const baseUrlChanged = changedValue(previousBaseUrl, nextBaseUrl, normalizedBaseUrl);
   let updated = 0;
+  const values: Record<string, string | null> = {};
 
   if (isComflyProviderId(providerId)) {
     const global = loadStoredModalityGlobalConfig();
@@ -121,11 +110,14 @@ export function propagateProviderCredentials(
       globalChanged = true;
     }
     if (globalChanged) {
-      saveStoredModalityGlobalConfig({
+      const savedGlobal = {
         ...globalNext,
         apiKeyHistory: nextKey ? Array.from(new Set([nextKey, ...global.apiKeyHistory])) : global.apiKeyHistory,
         baseUrlHistory: nextBaseUrl ? Array.from(new Set([nextBaseUrl, ...global.baseUrlHistory])) : global.baseUrlHistory,
-      });
+      };
+      values.beike_modality_global_config_v1 = JSON.stringify(savedGlobal);
+      values.ai_custom_base_url = savedGlobal.baseUrl || null;
+      values.ai_custom_api_key = savedGlobal.apiKey || null;
       updated += 1;
     }
   }
@@ -133,10 +125,13 @@ export function propagateProviderCredentials(
   // A changed previous credential is needed before replacing model-level
   // snapshots; empty previous values are intentionally left untouched.
   if (keyChanged || baseUrlChanged) {
-    const custom = loadCustomModels([]);
-    if (!custom.invalid) {
+    const rawCustom = localStorage.getItem('custom_models');
+    if (rawCustom) {
+      const custom: unknown = JSON.parse(rawCustom);
+      if (!Array.isArray(custom)) throw new Error('模型配置格式异常，请先恢复模型配置后保存');
       let customChanged = 0;
-      const models = custom.models.map(model => {
+      const models = (custom as WorkflowModel[]).map(model => {
+        if (!model || typeof model !== 'object') return model;
         const belongsToProvider = isCustomModelForProvider(model, providerId);
         if (!belongsToProvider) return model;
         let changed = false;
@@ -154,13 +149,18 @@ export function propagateProviderCredentials(
         if (changed) customChanged += 1;
         return changed ? nextModel : model;
       });
-      if (customChanged > 0 && persistCustomModels(models)) updated += customChanged;
+      if (customChanged > 0) { values.custom_models = JSON.stringify(models); updated += customChanged; }
     }
 
     for (const kind of MODALITY_KINDS) {
-      const models = loadStoredModalityModels(kind);
+      const rawModels = localStorage.getItem(`beike_modality_models_v1_${kind}`);
+      if (!rawModels) continue;
+      const parsed: unknown = JSON.parse(rawModels);
+      if (!Array.isArray(parsed)) throw new Error('模型配置格式异常，请先恢复模型配置后保存');
+      const models = parsed as ModalityModelItem[];
       let modelChanged = 0;
       const nextModels = models.map(model => {
+        if (!model || typeof model !== 'object') return model;
         if (!isProviderModel(model, providerId)) return model;
         let changed = false;
         const nextModel = { ...model };
@@ -176,14 +176,23 @@ export function propagateProviderCredentials(
         return changed ? nextModel : model;
       });
       if (modelChanged > 0) {
-        saveStoredModalityModels(kind, nextModels);
+        values[`beike_modality_models_v1_${kind}`] = JSON.stringify(nextModels);
         updated += modelChanged;
       }
     }
   }
 
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(PROVIDER_CREDENTIALS_CHANGED_EVENT, { detail: { providerId } }));
-  }
+  return { updated, values };
+}
+
+export function notifyProviderCommit(providerId: string): void {
+  window.dispatchEvent(new CustomEvent(PROVIDER_CREDENTIALS_CHANGED_EVENT, { detail: { providerId } }));
+  window.dispatchEvent(new Event('models_updated'));
+}
+
+export function propagateProviderCredentials(providerId: string, previous: ProviderCredentials, next: ProviderCredentials): { updated: number } {
+  const { values, updated } = providerCredentialChanges(providerId, previous, next);
+  writeLocalConfig(values);
+  notifyProviderCommit(providerId);
   return { updated };
 }

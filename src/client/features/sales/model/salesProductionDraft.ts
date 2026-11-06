@@ -1,6 +1,6 @@
 import type { SalesAdaptedBeat, SalesImitationMode, SalesPresentationMode } from '@shared/domain/sales';
 import { parseSalesPersonaVisualProfile, type SalesPersonaVisualProfile } from '@shared/domain/sales/personaVisualProfile';
-import { parseSalesPendingVideoTask, type SalesPendingVideoTask } from './salesVideoTask';
+import { parseSalesPendingVideoTask, parseSalesPendingMixTask, type SalesPendingVideoTask, type SalesPendingMixTask } from './salesVideoTask';
 import { parseProductFaceEdits, type ProductFaceEdits } from './salesProductFaces';
 
 export interface SalesProductionPlanState {
@@ -42,6 +42,8 @@ export interface SalesProductionPlanState {
   generatedVideoTaskId: string;
   mixedVideoUrl: string;
   pendingVideoTask: SalesPendingVideoTask | null;
+  pendingMixTask: SalesPendingMixTask | null;
+  pendingVoiceTask: SalesPendingMixTask | null;
 }
 
 export function emptySalesProductionPlan(): SalesProductionPlanState {
@@ -84,6 +86,8 @@ export function emptySalesProductionPlan(): SalesProductionPlanState {
     generatedVideoTaskId: '',
     mixedVideoUrl: '',
     pendingVideoTask: null,
+    pendingMixTask: null,
+    pendingVoiceTask: null,
   };
 }
 
@@ -110,6 +114,8 @@ export function planForSelectedScript(plan: SalesProductionPlanState, scriptId: 
     generatedVideoTaskId: '',
     mixedVideoUrl: '',
     pendingVideoTask: null,
+    pendingMixTask: null,
+    pendingVoiceTask: null,
   };
 }
 
@@ -196,5 +202,7 @@ export function parseSalesProductionPlan(value: unknown): SalesProductionPlanSta
     generatedVideoTaskId: asText(raw.generatedVideoTaskId, 500),
     mixedVideoUrl: asText(raw.mixedVideoUrl),
     pendingVideoTask: parseSalesPendingVideoTask(raw.pendingVideoTask),
+    pendingMixTask: parseSalesPendingMixTask(raw.pendingMixTask),
+    pendingVoiceTask: parseSalesPendingMixTask(raw.pendingVoiceTask),
   };
 }

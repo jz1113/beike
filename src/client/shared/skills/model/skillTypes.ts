@@ -37,6 +37,7 @@ export interface SkillItem {
   category: SkillCategory | string;
   badge?: string;
   coverUrl?: string;
+  example?: { prompt: string; referenceImages?: string[] };
   showcaseUrls?: string[];
   tags?: string[];
   genres?: SkillOutputGenre[];

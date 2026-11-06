@@ -8,6 +8,8 @@ export const createViewSlice: StateCreator<AppState, [], [], ViewSlice> = (set, 
   currentView: typeof window === 'undefined' ? 'home' : normalizeAppView(new URLSearchParams(window.location.search).get('view')) ?? 'home',
   previousView: null,
   activeWorkshopTab: 'studio',
+  isWorkshopConfigOpen: false,
+  setIsWorkshopConfigOpen: (isWorkshopConfigOpen) => set({ isWorkshopConfigOpen }),
   setCurrentView: (currentView) => {
     if (currentView === 'workshop') {
       requestEcommerceCanvas();

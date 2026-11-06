@@ -1,4 +1,5 @@
 export type SalesAssetSection = 'script' | 'persona' | 'scene' | 'sound';
+export type SalesEditorView = 'summary' | 'storyboard' | 'delivery';
 
 export interface SalesLibraryChoice {
   type: 'script' | 'persona' | 'scene' | 'voice' | 'bgm';

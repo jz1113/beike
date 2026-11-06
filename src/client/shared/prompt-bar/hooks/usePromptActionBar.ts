@@ -37,6 +37,8 @@ export interface PromptActionBarOptions {
   collapsible?: boolean;
   /** 首页外层已有欢迎区时，避免重复渲染品牌 Hero。 */
   showBrandHero?: boolean;
+  /** Optional surface copy without changing mode-specific placeholders elsewhere. */
+  inputPlaceholder?: string;
   onExpandChange?: (expanded: boolean) => void;
   onSubmitSuccess?: Parameters<typeof usePromptBarSubmit>[0]['onSubmitSuccess'];
   extraSubjects?: SubjectItem[];

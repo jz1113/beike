@@ -41,7 +41,7 @@ import { useLiveWorkshopWorkspace } from './useLiveWorkshopWorkspace';
 import type { WorkshopSnapshot } from '@shared/contracts/workshopWorkspace';
 import { getWorkshopFlow } from '../model/workspace/workshopFlow';
 
-export function useBatchWorkshopRunner() {
+export function useBatchWorkshopRunner(scope?: import('./useWorkshopBatchWorkspace').WorkshopCanvasScope) {
   const [currentStage, setCurrentStage] = useState<number>(1);
 
   // 阶段 1: 批量采编与清洗状态
@@ -272,7 +272,7 @@ export function useBatchWorkshopRunner() {
       actionIds: batchActionIdsRef.current,
       sceneIds: batchSceneIdsRef.current,
     },
-  }, applyWorkspaceSnapshot, () => itemsRef.current);
+  }, applyWorkspaceSnapshot, () => itemsRef.current, scope);
   activeBatchIdRef.current = workspace.activeBatch?.id || 'draft';
 
   useWorkshopTaskRecovery(workspace.ready, activeBatchIdRef.current, itemsRef, setItems, {
@@ -294,7 +294,7 @@ export function useBatchWorkshopRunner() {
     await action();
   };
 
-  const enteringFreshBatch = useFreshWorkshopEntry(workspace.ready, () => whenIdle(workspace.startFreshEntry), showToast);
+  const enteringFreshBatch = useFreshWorkshopEntry(workspace.ready && !scope, () => whenIdle(workspace.startFreshEntry), showToast);
   const pendingAnalysis = new Set(flow.pendingAnalysisIds);
 
   return {

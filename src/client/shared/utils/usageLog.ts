@@ -1,4 +1,13 @@
+export interface UsageScope {
+  workspaceId: string;
+  channelId: string;
+  mediaType: string;
+  epoch?: string;
+}
+
 export interface UsageLogItem {
+  recordId?: string;
+  scope?: UsageScope;
   id: string;
   timestamp: number; // Date.now()
   taskId?: string;

@@ -1,11 +1,16 @@
 import {hasStudioContent, normalizeCanvasProjects} from './canvasProjectDefaults';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { canvasStorage, finishCanvasHydration } from './canvasPersistence';
+import { canvasStorage, finishCanvasHydration, hasCanvasReadFailure, hasCanvasSaveFailure } from './canvasPersistence';
 export type { CanvasProject, CanvasNode, CanvasEdge, NodeRunHistory } from '../model/types';
 import type { CanvasProject, CanvasNode, CanvasEdge, NodeRunHistory } from '../model/types';
 import { appendNodeRun, rollbackNodeRun } from '../model/canvasGraph';
 import { createVideoWorkflowProject, type VideoWorkflowKind } from '../model/videoWorkflowProjects';
+
+import { createWorkshopCanvasProject } from '../model/workshopCanvasProject';
+import { cloneCanvasProject } from '../model/cloneCanvasProject';
+import { copyCanvasMedia } from './copyCanvasMedia';
+import { uniqueCanvasProjectTitle } from '../model/canvasProjectTitles';
 
 interface CanvasStoreState {
   projects: CanvasProject[];
@@ -14,9 +19,10 @@ interface CanvasStoreState {
   activeNodeId: string | null;
   selectProject: (id: string | null) => void;
   selectNode: (id: string | null) => void;
-  createProject: (title?: string, workflow?: VideoWorkflowKind) => CanvasProject;
+  createProject: (title?: string, workflow?: VideoWorkflowKind | 'ecommerce') => CanvasProject;
   updateProjectTitle: (id: string, title: string) => void;
   deleteProject: (id: string) => void;
+  duplicateProject: (id: string) => Promise<CanvasProject>;
   addNode: (projectId: string, node: Omit<CanvasNode, 'id' | 'createdAt'> & { id?: string; createdAt?: number }) => void;
   updateNode: (projectId: string, nodeId: string, patch: Partial<CanvasNode>) => void;
   patchNodes: (projectId: string, patches: Record<string, Partial<CanvasNode>>) => void;
@@ -43,8 +49,10 @@ export const useCanvasStore = create<CanvasStoreState>()(
           if(draft){set({activeProjectId:draft.id});return draft;}
         }
         const timestamp = Date.now();
-        const newProject: CanvasProject = workflow ? createVideoWorkflowProject(workflow, `canvas-proj-${crypto.randomUUID()}`, timestamp) : {
-          id: `canvas-proj-${crypto.randomUUID()}`,
+        const id = `canvas-proj-${crypto.randomUUID()}`;
+        const newProject: CanvasProject = workflow === 'ecommerce' ? createWorkshopCanvasProject(id, timestamp)
+          : workflow ? createVideoWorkflowProject(workflow, id, timestamp) : {
+          id,
           title: customTitle?.trim() || '未命名项目',
           draft:!customTitle?.trim(),
           subtitle: '画布 · 刚刚修改',
@@ -77,6 +85,16 @@ export const useCanvasStore = create<CanvasStoreState>()(
           projects: state.projects.filter((p) => p.id !== id),
           activeProjectId: state.activeProjectId === id ? null : state.activeProjectId,
         }));
+      },
+
+      duplicateProject: async (id) => {
+        if (hasCanvasReadFailure()) throw new Error('请先重试读取本机项目');
+        const source = get().projects.find(project => project.id === id);
+        if (!source) throw new Error('原项目不存在');
+        const copy = cloneCanvasProject(source, `canvas-proj-${crypto.randomUUID()}`);
+        await copyCanvasMedia(id, copy.id);
+        set(state => { copy.title = uniqueCanvasProjectTitle(copy.title, state.projects); return { projects: [copy, ...state.projects] }; });
+        return copy;
       },
 
       addNode: (projectId, nodeData) => {
@@ -234,3 +252,26 @@ export const useCanvasStore = create<CanvasStoreState>()(
     },
   ),
 );
+
+export async function saveCanvasProjects(): Promise<void> {
+  if (hasCanvasReadFailure()) await useCanvasStore.persist.rehydrate();
+  if (hasCanvasReadFailure()) throw new Error('无法读取本机项目，请稍后重试');
+  if (!useCanvasStore.persist.hasHydrated()) throw new Error('项目仍在读取，请稍后重试');
+  const { projects, activeProjectId } = useCanvasStore.getState();
+  await canvasStorage.setItem('beike_canvas_projects_store', JSON.stringify({ state: { projects, activeProjectId }, version: 0 }));
+  if (hasCanvasSaveFailure()) throw new Error('项目保存失败，请检查本机存储空间后重试');
+}
+
+/** Failed deletion keeps its project available for another attempt. */
+export async function deleteCanvasProject(id: string): Promise<void> {
+  if (hasCanvasReadFailure()) await saveCanvasProjects();
+  const before = useCanvasStore.getState();
+  if (!before.projects.some(item => item.id === id)) return;
+  if (!useCanvasStore.persist.hasHydrated()) throw new Error('项目仍在读取，请稍后重试');
+  await canvasStorage.setItem('beike_canvas_projects_store', JSON.stringify({ state: {
+    projects: before.projects.filter(item => item.id !== id),
+    activeProjectId: before.activeProjectId === id ? null : before.activeProjectId,
+  }, version: 0 }));
+  if (hasCanvasSaveFailure()) throw new Error('删除项目未保存，请重试');
+  useCanvasStore.getState().deleteProject(id);
+}

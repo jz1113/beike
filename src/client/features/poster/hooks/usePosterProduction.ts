@@ -1,5 +1,5 @@
 import { editedPosterInput, type PosterInputEdit } from '../model/posterWorkflow';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
 import { loadSystemConfiguredModels } from '@client/shared/models/configuredModels';
 import { isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';
@@ -7,14 +7,14 @@ import { usePosterInputDraft } from './usePosterInputDraft';
 import { loadPosterProductionSettings, persistPosterProductionSettings } from '../model/posterDraft';
 import { loadPosterBatchHistory, resolvePosterWorkspaceScope } from '../model/posterBatchHistory';
 import { normalizeConcurrency, normalizeCoverTitle, makeId, posterPreviewImages } from '../model/posterTypes';
-import type { PosterItem } from '../model/posterTypes';
+import type { PosterItem, PosterProductionSettings } from '../model/posterTypes';
 import { usePosterState } from './usePosterState';
 import { createPosterHistory } from './createPosterHistory';
 import { createPosterImport } from './createPosterImport';
 import { createPosterGeneration } from './createPosterGeneration';
 import { createPosterDownloads } from './createPosterDownloads';
 
-export function usePosterProduction() {
+export function usePosterProduction(projectId?: string) {
   const state = usePosterState();
   const {
     fileInputRef, activeItemsRef, activeAttemptsRef, aliveRef, interruptActiveRef, abortRef,
@@ -32,6 +32,8 @@ export function usePosterProduction() {
   } = state;
   const history = createPosterHistory(state);
   const { persistActiveBatch, restoreHistoryBatch, deleteHistoryBatch, clearItems } = history;
+  const restoreHistoryRef = useRef(restoreHistoryBatch);
+  restoreHistoryRef.current = restoreHistoryBatch;
   useEffect(() => {
     const interruptActive = () => interruptActiveRef.current();
     const abortState = abortRef.current;
@@ -70,7 +72,8 @@ export function usePosterProduction() {
     void (async () => {
       try {
         const secret = getWorkspaceSecret();
-        const scope = await resolvePosterWorkspaceScope(secret);
+        const workspaceScope = await resolvePosterWorkspaceScope(secret);
+        const scope = projectId ? await resolvePosterWorkspaceScope(`${secret}:canvas:${projectId}`) : workspaceScope;
         if (cancelled) return;
         if (secret !== getWorkspaceSecret()) throw new Error('工作区已切换，请刷新页面后再操作大字报。');
         const configured = loadSystemConfiguredModels();
@@ -81,7 +84,8 @@ export function usePosterProduction() {
         restoreInputDraft(scope);
         availableImageModelsRef.current = configured.availableImageModels;
         availableTitleModelsRef.current = titleModels;
-        setHistoryBatches(loadPosterBatchHistory(scope));
+        const records = loadPosterBatchHistory(scope);
+        setHistoryBatches(records);
         setAvailableImageModels(configured.availableImageModels);
         setAvailableTitleModels(titleModels);
         setImageModel(configured.availableImageModels.find(model => model.id === saved.imageModel)?.id
@@ -94,12 +98,13 @@ export function usePosterProduction() {
         setMemorySampleId(saved.memorySampleId || '');
         setSupplementaryRequirements(saved.supplementaryRequirements || '');
         setIsReady(true);
+        if (projectId && records[0] && !cancelled) await restoreHistoryRef.current(records[0]);
       } catch (error) {
         if (!cancelled) setNoticeIfAlive(error instanceof Error ? error.message : '工作区初始化失败，请刷新页面重试。');
       }
     })();
     return () => { cancelled = true; };
-  }, [restoreInputDraft, availableImageModelsRef, availableTitleModelsRef, setAvailableImageModels, setAvailableTitleModels, setConcurrency, setHistoryBatches, setImageModel, setImageQuality, setIsReady, setSupplementaryRequirements, setMemorySampleId, setNoticeIfAlive, setTitleHandling, setTitleModel, workspaceScopeRef, workspaceSecretRef]);
+  }, [projectId, restoreInputDraft, availableImageModelsRef, availableTitleModelsRef, setAvailableImageModels, setAvailableTitleModels, setConcurrency, setHistoryBatches, setImageModel, setImageQuality, setIsReady, setSupplementaryRequirements, setMemorySampleId, setNoticeIfAlive, setTitleHandling, setTitleModel, workspaceScopeRef, workspaceSecretRef]);
 
   useEffect(() => {
     const onWorkspaceChange = (event: StorageEvent) => {
@@ -146,6 +151,16 @@ export function usePosterProduction() {
     // The snapshot must be refreshed for every item and production-setting change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, imageModel, titleModel, titleHandling, imageQuality, concurrency, memorySampleId, supplementaryRequirements]);
+
+  const updateProductionSettings = (patch: Partial<PosterProductionSettings>) => {
+    if (runningRef.current || restoringRef.current || importingRef.current || exportingRef.current || !ensureWorkspaceReady()) return;
+    const next = { ...state.currentSettings(), ...patch };
+    next.concurrency = normalizeConcurrency(next.concurrency);
+    setImageModel(next.imageModel); setTitleModel(next.titleModel); setTitleHandling(next.titleHandling);
+    setImageQuality(next.imageQuality); setConcurrency(next.concurrency); setMemorySampleId(next.memorySampleId);
+    setSupplementaryRequirements(next.supplementaryRequirements || '');
+    if (!persistPosterProductionSettings(next)) setNoticeIfAlive('设置已应用，但本地默认配置保存失败。');
+  };
 
   const openProductionSettings = () => {
     setSettingsDraft({ imageModel, titleModel, titleHandling, imageQuality, concurrency, memorySampleId, supplementaryRequirements });
@@ -305,7 +320,7 @@ export function usePosterProduction() {
     isDraggingFile, setIsDraggingFile,
     items, isReady, isRunning, isImporting, isRestoring, isExporting, notice,
     availableImageModels, availableTitleModels,
-    imageModel, titleModel, titleHandling, imageQuality, concurrency, memorySampleId,
+    imageModel, titleModel, titleHandling, imageQuality, concurrency, memorySampleId, supplementaryRequirements, updateProductionSettings,
     isSettingsOpen, settingsDraft, setSettingsDraft,
     previewState, setPreviewState, previewItem, previewImages,
     completedCount, failedCount, historyBatches, activeBatchId: activeBatchIdRef.current,

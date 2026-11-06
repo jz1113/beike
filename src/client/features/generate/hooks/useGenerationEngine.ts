@@ -1,3 +1,4 @@
+import { useStoredAgentRecovery } from './useStoredAgentRecovery';
 import { useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '@client/store';
 import { useDocumentHidden } from '@client/shared/hooks/useDocumentHidden';
@@ -39,6 +40,7 @@ export function useGenerationEngine() {
   const generationTasks = useAppStore((s) => s.generationTasks);
   const generationHistoryReady = useAppStore((s) => s.generationHistoryReady);
   const updateGenerationTask = useAppStore((s) => s.updateGenerationTask);
+  useStoredAgentRecovery(generationTasks, generationHistoryReady, updateGenerationTask);
   const currentView = useAppStore((s) => s.currentView);
   const documentHidden = useDocumentHidden();
 

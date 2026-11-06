@@ -76,6 +76,12 @@ export async function submitAgentTask(
 
   const currentPrompt = visibleAgentPrompt(task.prompt || '') || task.prompt || '';
   let response: Response;
+  let dispatched = false;
+  const requireRecovery = (message: string) => updateGenerationTask(task.id, {
+    status: 'IN_PROGRESS', submissionRecoveryRequired: true,
+    failReason: `${message}；正在核对原对话结果，不会重复提交`,
+    agentTurn: { ...agentTurn, statusText: '正在恢复原对话结果…' },
+  });
   try {
     const attachments = await persistAssistantMedia(agentMessageAttachments(task), local.signal);
     if (attachments.length) updateGenerationTask(task.id, { referenceImages: attachments.map((item, index) => item.url || task.referenceImages?.[index] || '') });
@@ -105,6 +111,7 @@ export async function submitAgentTask(
     const skillCatalog = composeSkillCatalog(store.getAllAssistantSkills());
     if (!directVideo && skillCatalog.length) requestBody.skillCatalog = skillCatalog;
 
+    dispatched = true;
     response = await apiFetch('/api/assistant/turn/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -119,6 +126,7 @@ export async function submitAgentTask(
       return;
     }
     const msg = err instanceof Error ? err.message : String(err);
+    if (dispatched) { requireRecovery(`提交回执未确认: ${msg}`); return; }
     updateGenerationTask(task.id, {
       status: 'FAILURE',
       submissionRecoveryRequired: false,
@@ -131,10 +139,13 @@ export async function submitAgentTask(
     liveStops.delete(task.id);
     signal?.removeEventListener('abort', stop);
     let errMsg = `请求失败 HTTP ${response.status}`;
+    let unknown = response.status >= 500 || [408, 409].includes(response.status) || response.ok;
     try {
       const errJson = await response.json();
       if (errJson.error) errMsg = errJson.error;
+      unknown ||= errJson.submissionUnknown === true;
     } catch { /* keep the status text */ }
+    if (unknown) { requireRecovery(errMsg); return; }
     updateGenerationTask(task.id, {
       status: 'FAILURE',
       submissionRecoveryRequired: false,
@@ -259,7 +270,8 @@ export async function submitAgentTask(
       completeTask();
       return;
     }
-    const msg = snapshot?.error || (snapshot?.status === 'interrupted' ? '本轮已中断，已生成内容已保留。'
+    if (!snapshot || ['running', 'awaiting_approval'].includes(snapshot.status)) { requireRecovery('原对话结果暂时无法确认'); return; }
+    const msg = snapshot.error || (snapshot?.status === 'interrupted' ? '本轮已中断，已生成内容已保留。'
       : streamErr instanceof Error ? streamErr.message : String(streamErr));
     items = finishInterruptedItems(items, false);
     const view = deriveTurnView(items);

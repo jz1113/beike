@@ -230,6 +230,11 @@ export function useCustomModels({
     setIsFetchingGateway(false); setIsFetchingLianchi(false); setIsFetchingOpenAI(false);
   }, []);
   const setGatewayModalOpen = (open: boolean) => { if (open) setIsGatewayModalOpen(true); else closeGatewayDiscovery(); };
+  const reloadStoredModels = () => {
+    const loaded = loadCustomModels(modelsRef.current);
+    modelsRef.current = loaded.models;
+    setModelsState(loaded.models);
+  };
   const setCustomModels = (action: SetStateAction<WorkflowModel[]>) => {
     commitModels(typeof action === 'function' ? action(modelsRef.current) : action);
   };
@@ -243,6 +248,7 @@ export function useCustomModels({
     closeGatewayDiscovery,
     gatewayModelError, lianchiModelError,
     setCustomModels,
+    reloadStoredModels,
     comflyPrices,
     isFetchingPrices,
     handleRefreshPrices,

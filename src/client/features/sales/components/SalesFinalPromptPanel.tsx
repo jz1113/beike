@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Captions, ChevronDown, Download, ListChecks, Loader2, Mic, Square, Upload, Wand2 } from 'lucide-react';
+import { Captions, ChevronDown, Loader2, Mic, Upload } from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { useSeedancePrecheck } from '@client/shared/api/generation/seedancePrecheck';
 import MarkdownBody from '@client/shared/ui/markdown/MarkdownBody';
@@ -12,7 +12,7 @@ import type { SalesProductionPlanState } from '../model/salesProductionDraft';
 import { useSalesDepthReferences } from '../hooks/useSalesDepthReferences';
 import { isProductFaceSource, productFaceReferences } from '../model/salesProductFaces';
 import { salesSubtitlesSrt } from '../model/salesSubtitles';
-import { salesFocusClass, salesGhostButtonClass, salesPrimaryButtonClass } from './salesChrome';
+import { salesFocusClass, salesGhostButtonClass } from './salesChrome';
 import { SalesScriptCopyButton } from './SalesScriptCopyButton';
 import { SalesReferenceReview } from './SalesReferenceReview';
 import { salesReferenceReviewKey } from '../model/salesReferenceReview';
@@ -22,9 +22,12 @@ import { resolveSalesVideoSettings } from '../model/salesVideoSettings';
 import { SalesVideoDurationNotice } from './SalesVideoDurationNotice';
 import { SalesVideoSettings } from './SalesVideoSettings';
 import { SalesVoiceSettings } from './SalesVoiceSettings';
+import { SalesSubtitleDownload } from './SalesSubtitleDownload';
+import { SalesGenerationControls } from './SalesGenerationControls';
 import '../salesDelivery.css';
 
 interface Props {
+  canvasStage?: 'video' | 'voice' | 'subtitles' | 'export';
   active?: boolean;
   notice?: ReactNode;
   script: SalesScriptDomain;
@@ -56,9 +59,9 @@ interface Props {
 export function SalesFinalPromptPanel({
   active = true, notice, generationSourceError = '', assembled: sourceAssembled, plan, script, beatBindings, musicPicker, backgroundMusicUrl = '',
   onEditMaterials, onEditFaces, onEditStoryboard, onReadaptStoryboard, videoModels, voiceModels, rankedVoices, selectedVoice, onOpenVoiceMaterials, busy, progressText,
-  onPatchPlan, onSynthesizeVoice, onGenerateVideo, onUploadRawVideo, onMixFinal, onCancel,
+  onPatchPlan, onSynthesizeVoice, onGenerateVideo, onUploadRawVideo, onMixFinal, onCancel, canvasStage,
 }: Props) {
-  const depthReferences = useSalesDepthReferences({ active, assembled: sourceAssembled, plan, script });
+  const depthReferences = useSalesDepthReferences({ active: active && (!canvasStage || canvasStage === 'video'), assembled: sourceAssembled, plan, script });
   const faceSources = sourceAssembled.references.filter(isProductFaceSource);
   const assembled = useMemo(() => ({
     ...depthReferences.assembled,
@@ -97,7 +100,7 @@ export function SalesFinalPromptPanel({
     }).map((slot) => ({ url: slot.url, mediaType: slot.mediaType || 'image' })),
     [assembled.references, plan.productFaceEdits, sourceAssembled.references],
   );
-  const precheckMap = useSeedancePrecheck(precheckInputs, active && !preparingReferences && !referencePreparationError && seedanceActive && precheckInputs.length > 0, activeVideoModel);
+  const precheckMap = useSeedancePrecheck(precheckInputs, active && (!canvasStage || canvasStage === 'video') && !preparingReferences && !referencePreparationError && seedanceActive && precheckInputs.length > 0, activeVideoModel);
   const rejectedSlots = useMemo(
     () => (seedanceActive ? assembled.references.filter((slot) => precheckMap.get(slot.url)?.status === 'rejected') : []),
     [assembled.references, precheckMap, seedanceActive],
@@ -114,7 +117,7 @@ export function SalesFinalPromptPanel({
     : assembled.templateError || assembled.voiceError || validationError || generationSourceError || (needsFaceReview ? '等待商品图自动打码完成' : !referencesConfirmed ? '请先勾选确认使用素材' : ''));
 
   return (
-    <section ref={panelRef} className="sales-delivery-shell" aria-label="素材核对、视频生成与成片合成">
+    <section ref={panelRef} className="sales-delivery-shell" data-sales-canvas-stage={canvasStage} aria-label="素材核对、视频生成与成片合成">
       <div className="sales-delivery-main">
         <div className="sales-delivery-stage-col">
           <SalesDeliveryPreview
@@ -183,7 +186,7 @@ export function SalesFinalPromptPanel({
             onEditMaterials={onEditMaterials}
             onEditStoryboard={onEditStoryboard}
           />}
-          <div className="sales-delivery-tools" aria-label="成片设置">
+          <div className="sales-delivery-tools" aria-label="成片设置" data-pet-obstacle>
             <div className="sales-delivery-task-id"><strong>本次异步任务 ID</strong>
               <code>{videoTaskId || (busy === 'video' ? '等待任务回执…' : '暂无任务编号')}</code>
             </div>
@@ -211,7 +214,7 @@ export function SalesFinalPromptPanel({
               {musicPicker}
 
               {assembled.effectiveVoiceMode !== 'none' && (
-                <details
+                <details open={canvasStage === 'voice' || undefined}
                   className="sales-delivery-voice"
                   onToggle={(event) => {
                     if (!event.currentTarget.open) event.currentTarget.querySelector('audio')?.pause();
@@ -268,7 +271,7 @@ export function SalesFinalPromptPanel({
               )}
 
               {!isCleanVisual && assembled.subtitles.length > 0 && (
-                <details className="sales-delivery-subtitles">
+                <details open={canvasStage === 'subtitles' || undefined} className="sales-delivery-subtitles">
                   <summary className={salesFocusClass}>
                     <Captions size={14} aria-hidden />字幕草稿
                     <span>{assembled.subtitles.length} 条</span>
@@ -277,49 +280,28 @@ export function SalesFinalPromptPanel({
                   <div className="sales-delivery-subtitles-body">
                     {assembled.subtitles.map((sub) => <p key={sub.index}><span>{sub.index + 1}</span>{sub.text}</p>)}
                     <p className="sales-card-hint">字幕单独导出为 SRT，尚未加入 MP4，可导入剪辑软件使用。</p>
-                    {subtitleSrt && (
-                      <a
-                        href={`data:application/x-subrip;charset=utf-8,${encodeURIComponent('\uFEFF' + subtitleSrt)}`}
-                        download="ecommerce-subtitles.srt"
-                        className={salesGhostButtonClass}
-                      >
-                        <Download size={13} aria-hidden />下载字幕 SRT
-                      </a>
-                    )}
+                    {subtitleSrt && <SalesSubtitleDownload srt={subtitleSrt} />}
                   </div>
                 </details>
               )}
 
             </section>
           </div>
-          <footer className="sales-delivery-controls" aria-label="成片操作">
-            {statusHint && <p role="status" className="sales-card-hint">{busy === 'adapt' ? progressText : statusHint}</p>}
+          <footer className="sales-delivery-controls" aria-label="成片操作" data-pet-obstacle>
+            {statusHint && (!canvasStage || canvasStage === 'video') && <p role="status" className="sales-card-hint">{busy === 'adapt' ? progressText : statusHint}</p>}
             {generationSourceError && <>
               {onReadaptStoryboard && <button type="button" disabled={working} onClick={onReadaptStoryboard} className={`sales-link-btn ${salesFocusClass}`}>按当前设置重新改写分镜</button>}
               <button type="button" disabled={working} onClick={onEditStoryboard} className={`sales-link-btn ${salesFocusClass}`}>返回分镜调整</button>
             </>}
-            <div>
-              {working && busy !== 'loading' ? (
-                <button type="button" onClick={onCancel} className={salesGhostButtonClass}>
-                  <Square size={12} aria-hidden />停止等待
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={!canGenerate}
-                  title={statusHint || undefined}
-                  onClick={() => { if (canGenerate) onGenerateVideo(); }}
-                  className={salesPrimaryButtonClass}
-                >
-                  <Wand2 size={14} aria-hidden />{plan.generatedVideoUrl ? '重新生成视频' : '生成视频'}
-                </button>
-              )}
-              <button type="button" disabled={working || !(plan.generatedVideoUrl || plan.mixedVideoUrl)}
-                title={plan.generatedVideoUrl || plan.mixedVideoUrl ? undefined : '生成或导入视频后可核查'}
-                onClick={() => setReviewOpen(true)} className={salesGhostButtonClass}>
-                <ListChecks size={14} aria-hidden />音频视频核查
-              </button>
-            </div>
+            {canvasStage && canvasStage !== 'video' ? <>
+              {working && progressText && <p role="status" className="sales-card-hint">{progressText}</p>}
+              {canvasStage === 'export' && <button type="button" className={salesGhostButtonClass} disabled={working || !plan.generatedVideoUrl} onClick={() => setReviewOpen(true)}>音频视频核查与合成</button>}
+              {canvasStage === 'voice' && assembled.effectiveVoiceMode === 'none' && <p>当前选择静音画面，无需口播音色或旁白配音。可在分镜节点更改声音方式。</p>}
+              {canvasStage === 'subtitles' && !subtitleSrt && <p>当前没有字幕，请在分镜节点填写字幕文字。</p>}
+              {working && <button type="button" className={salesGhostButtonClass} onClick={onCancel}>停止等待</button>}
+            </> : <SalesGenerationControls working={working} busy={busy} canGenerate={canGenerate}
+              generated={Boolean(plan.generatedVideoUrl)} hasVideo={Boolean(plan.generatedVideoUrl || plan.mixedVideoUrl)}
+              statusHint={statusHint} onCancel={onCancel} onGenerate={onGenerateVideo} onReview={() => setReviewOpen(true)} />}
           </footer>
         </div>
       </div>

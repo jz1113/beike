@@ -21,7 +21,7 @@ interface Props {
   isFavorite?: boolean;
   onClose: () => void;
   onToggleFavorite?: () => void;
-  onUse: (initialPromptOverride?: string) => void;
+  onUse: (initialPromptOverride?: string, referenceImages?: string[]) => void;
   onDuplicate?: () => void;
   showToast?: (message: string) => void;
 }

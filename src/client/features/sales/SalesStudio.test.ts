@@ -1,3 +1,4 @@
+import { salesSubtitlesSrt } from './model/salesSubtitles';
 import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -147,12 +148,9 @@ describe('single-screen ecommerce image workspace', () => {
     expect(html).toContain('<details open="" class="sales-final-prompt-preview">');
     expect(html).toContain('画外旁白');
     expect(html).toContain('视频预览与下载');
-    expect(html).toContain('download="ecommerce-subtitles.srt"');
+    expect(html).toContain('下载字幕 SRT');
     expect(html).toContain('字幕单独导出为 SRT，尚未加入 MP4');
-    const subtitleLink = html.match(/href="(data:application\/x-subrip[^"]+)"/)?.[1];
-    expect(subtitleLink).toBeDefined();
-    expect(decodeURIComponent(subtitleLink!.slice(subtitleLink!.indexOf(',') + 1)))
-      .toContain('00:00:00,000 --> 00:00:08,000\r\n自带松弛感');
+    expect(salesSubtitlesSrt(assembled.subtitles)).toContain('00:00:00,000 --> 00:00:08,000\r\n自带松弛感');
     const withVideo = { ...props, assembled: { ...assembled, effectiveVoiceMode: 'none' as const }, plan: { ...props.plan, generatedVideoUrl: '/raw-video.mp4' } };
     const rendering = renderToStaticMarkup(createElement(SalesFinalPromptPanel, {
       ...withVideo, busy: 'video', progressText: '渠道生成中 32%',

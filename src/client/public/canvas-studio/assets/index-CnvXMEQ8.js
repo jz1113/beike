@@ -501395,6 +501395,32 @@ function Z7s() {
       enabled: !wA,
       revision: qb,
     });
+  g.useLayoutEffect(() => {
+    const commands = {
+      selectAll: () => {
+        window.getSelection()?.removeAllRanges();
+        pi(null); Ai(new Set(ia.current.map(node => node.id))); nt(null); Ps(null);
+      },
+      group: ungroup => {
+        const selected = new Set(cs.current);
+        if (Wi.current) selected.add(Wi.current);
+        if (ungroup) {
+          const removed = at.current.filter(group => group.id === ht.current || (group.nodeIds.length && group.nodeIds.every(id => selected.has(id))));
+          if (!removed.length) return;
+          const ids = new Set(removed.map(group => group.id));
+          bn(groups => groups.filter(group => !ids.has(group.id)));
+          pi(null); Ai(new Set(removed.flatMap(group => group.nodeIds))); nt(null);
+        } else if (selected.size >= 2) {
+          const existing = at.current.find(group => group.nodeIds.length === selected.size && group.nodeIds.every(id => selected.has(id)));
+          const group = existing || D3([...selected]);
+          if (group) { nt(group.id); pi(null); }
+        }
+      },
+      redo: VZ.redo,
+    };
+    studioHost.editingCommands = commands;
+    return () => { if (studioHost.editingCommands === commands) delete studioHost.editingCommands; };
+  }, [D3,VZ.redo]);
   ((Pt.undoRef.current = VZ.undo),
     (Pt.redoRef.current = VZ.redo),
     xls({

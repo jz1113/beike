@@ -14,6 +14,9 @@ interface UseApiProvidersOptions {
   onProviderRemoved?: (providerId: string) => void;
 }
 
+import { commitProviderConfig, type ProviderCommitOptions } from '../model/providerConfigCommit';
+import type { ProviderCredentials } from '../model/providerCredentialSync';
+
 export function useApiProviders({ isOpen, showToast, onProviderRemoved }: UseApiProvidersOptions) {
   const [providers, setProviders] = useState<ApiProvider[]>(() => loadStoredProviders());
   const [selectedProviderId, setSelectedProviderId] = useState<string>(() => {
@@ -134,7 +137,14 @@ export function useApiProviders({ isOpen, showToast, onProviderRemoved }: UseApi
     }
   }, [providers, selectedProviderId, showToast]);
 
+  const saveProvider = (draft: ApiProvider, previous: ProviderCredentials, options?: ProviderCommitOptions) => {
+    const result = commitProviderConfig(draft, previous, options);
+    setProviders(items => items.map(item => item.id === draft.id ? result.provider : item));
+    return result;
+  };
+
   return {
+    saveProvider,
     providers,
     selectedProviderId,
     setSelectedProviderId,

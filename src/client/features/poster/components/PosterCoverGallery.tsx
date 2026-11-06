@@ -6,6 +6,8 @@ import { PosterCoverCard } from './PosterCoverCard';
 interface Props {
   items: PosterItem[];
   isRunning: boolean;
+  allowRetry?: boolean;
+  allowEditTitle?: boolean;
   compact?: boolean;
   onPreview: (item: PosterItem) => void;
   onDownload: (item: PosterItem, index: number) => void;
@@ -16,7 +18,7 @@ interface Props {
 
 const PAGE_SIZE = 60;
 
-export function PosterCoverGallery({ items, isRunning, compact = false, onPreview, onDownload, onDownloadOriginalScene, onRetry, onEditTitle }: Props) {
+export function PosterCoverGallery({ items, isRunning, allowRetry = true, allowEditTitle = true, compact = false, onPreview, onDownload, onDownloadOriginalScene, onRetry, onEditTitle }: Props) {
   const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
   const galleryRef = useRef<HTMLElement>(null);
@@ -54,7 +56,7 @@ export function PosterCoverGallery({ items, isRunning, compact = false, onPrevie
       <div className={compact
         ? 'grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8'
         : 'grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'}>
-        {items.slice(offset, offset + PAGE_SIZE).map((item, index) => <PosterCoverCard key={item.id} item={item} index={offset + index} isRunning={isRunning} isEditing={editingId === item.id} onPreview={preview} onDownload={download} onDownloadOriginalScene={downloadOriginal} onRetry={retry} onEditTitle={editTitle} onStartEdit={setEditingId} onStopEdit={stopEdit} />)}
+        {items.slice(offset, offset + PAGE_SIZE).map((item, index) => <PosterCoverCard key={item.id} item={item} index={offset + index} isRunning={isRunning} allowRetry={allowRetry} allowEditTitle={allowEditTitle} isEditing={editingId === item.id} onPreview={preview} onDownload={download} onDownloadOriginalScene={downloadOriginal} onRetry={retry} onEditTitle={editTitle} onStartEdit={setEditingId} onStopEdit={stopEdit} />)}
       </div>
       {pageControls}
     </section>

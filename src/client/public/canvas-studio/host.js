@@ -211,6 +211,9 @@ window.addEventListener('message', function initialize(event) {
       ? {...node,isGenerating:false,beikeTaskId:undefined,errorMsg:'上次语音请求尚未回写，请先查看贝壳云图生成历史。'} : node))},
     save: scene => parent.postMessage({kind:'studio:save', projectId, scene}, event.origin),
   };
+  window.addEventListener('keydown', key => {
+    window.beikeCanvasEditingKey?.(key,window.beikeStudio.editingCommands);
+  },true);
   import('./assets/index-CnvXMEQ8.js').catch(error => {
     document.getElementById('root').textContent = '画布加载失败：' + error.message;
   });
