@@ -1,4 +1,4 @@
-import { assertStudioReferenceNumbers, normalizeStudioReferenceNumbers } from './studioReferenceNumbers';
+import { assertStudioReferenceNumbers, assertStudioTextReferences, normalizeStudioReferenceNumbers } from './studioReferenceNumbers';
 import { registerRefMediaKind } from '@client/shared/media/refMediaRegistry';
 import { useAppStore } from '@client/store';
 import { availableBatchModels, buildGenerationPromptBatch } from '@client/shared/agent/buildGenerationPromptBatch';
@@ -43,6 +43,9 @@ export interface StudioRequest {
   duration?: number;
   resolution?: string;
   optimizePrompt?: boolean;
+  videoMode?: string;
+  audio?: boolean;
+  w3Workflow?: boolean;
 }
 
 export function prepareStudioGeneration(request: StudioRequest) {
@@ -61,6 +64,8 @@ export function prepareStudioGeneration(request: StudioRequest) {
     return {id:String(index), name:`参考${type === 'video' ? '视频' : '图'} ${index + 1}`, type, url};
   });
   assertStudioReferenceNumbers(prompt, media);
+  if (request.w3Workflow) assertStudioTextReferences(prompt);
+  const providerPrompt = request.w3Workflow ? prompt.replace(/@文本(\d+)/g, '文本$1') : prompt;
   const settings = currentBatchSettings();
   let aspect = /^\d+:\d+$/.test(request.ratio ?? '') ? request.ratio : undefined;
   let duration = request.duration;
@@ -78,8 +83,10 @@ export function prepareStudioGeneration(request: StudioRequest) {
     const profile = getVideoModelById(model, baseUrl);
     if (profile) {
       const videoCount = media.filter(item => item.type === 'video').length;
-      const mode = resolveVideoMode(model, undefined, media.length - videoCount, videoCount, baseUrl);
+      const mode = resolveVideoMode(model, request.videoMode, media.length - videoCount, videoCount, baseUrl);
       settings.videoRefMode = mode;
+      if (request.audio !== undefined) settings.videoGenerateAudio = request.audio;
+      if (request.videoMode) settings.videoContextIrEnabled = false;
       settings.videoResolution = resolveVideoResolution(request.resolution || settings.videoResolution, videoResolutionOptions(model, mode, baseUrl));
       const requestedDuration = duration ?? settings.videoDuration;
       const options = videoDurationOptions(model, settings.videoResolution, mode, baseUrl);
@@ -91,7 +98,7 @@ export function prepareStudioGeneration(request: StudioRequest) {
     }
   }
   const entry = {
-    id: request.taskId, title: prompt.slice(0, 40), prompt: normalizeStudioReferenceNumbers(prompt, media), mediaType: channel.kind,
+    id: request.taskId, title: prompt.slice(0, 40), prompt: normalizeStudioReferenceNumbers(providerPrompt, media), mediaType: channel.kind,
     referenceIndexes: media.map((_, index) => index),
     aspect, duration,
   };

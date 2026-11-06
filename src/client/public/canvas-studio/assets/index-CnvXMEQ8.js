@@ -499249,7 +499249,7 @@ function Z7s() {
   g.useEffect(() => studioHost.listen(mt, () => ia.current, Pd, (previous, next) => ZCe(
     {...previous, settings:{...previous.settings, generationVersions:Ay(previous), _preGenerateSnapshot:true}},
     next
-  )), [mt]);
+  ), B0), [mt]);
   g.useLayoutEffect(() => {
     const saved = studioHost.load();
     if (saved) {

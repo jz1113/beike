@@ -1,3 +1,4 @@
+import { createNativeCommerceProject, type NativeCommerceKind } from '../model/nativeCommerceProjects';
 import {hasStudioContent, normalizeCanvasProjects} from './canvasProjectDefaults';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
@@ -19,7 +20,7 @@ interface CanvasStoreState {
   activeNodeId: string | null;
   selectProject: (id: string | null) => void;
   selectNode: (id: string | null) => void;
-  createProject: (title?: string, workflow?: VideoWorkflowKind | 'ecommerce') => CanvasProject;
+  createProject: (title?: string, workflow?: VideoWorkflowKind | NativeCommerceKind | 'ecommerce') => CanvasProject;
   updateProjectTitle: (id: string, title: string) => void;
   deleteProject: (id: string) => void;
   duplicateProject: (id: string) => Promise<CanvasProject>;
@@ -51,6 +52,7 @@ export const useCanvasStore = create<CanvasStoreState>()(
         const timestamp = Date.now();
         const id = `canvas-proj-${crypto.randomUUID()}`;
         const newProject: CanvasProject = workflow === 'ecommerce' ? createWorkshopCanvasProject(id, timestamp)
+          : workflow === 'sales' || workflow === 'workshop' || workflow === 'poster' ? createNativeCommerceProject(workflow, id, timestamp)
           : workflow ? createVideoWorkflowProject(workflow, id, timestamp) : {
           id,
           title: customTitle?.trim() || '未命名项目',

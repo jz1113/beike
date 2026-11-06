@@ -41,6 +41,7 @@
     "lint:secrets": "node tools/scripts/quality/check-secrets.mjs",
     "check:go": "node tools/scripts/quality/check-go.mjs",
     "test": "vitest run --config tools/configs/vitest.config.ts",
+    "test:browser": "node tools/scripts/web/test-browser.mjs",
     "db:migrate": "node tools/scripts/db-maintenance/migrate-sqlite.mjs",
     "db:deploy": "node tools/scripts/db-maintenance/migrate-sqlite.mjs",
     "db:backup": "node tools/scripts/db-maintenance/backup-sqlite.mjs",
@@ -57,6 +58,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "1.65.0",
     "@tailwindcss/vite": "^4.1.8",
     "@types/node": "^22.20.5",
     "@types/react": "^19",

@@ -87,6 +87,8 @@ pnpm run lint:boundaries      # 浏览器安全、共享层和功能间依赖方
 
 `pnpm check` 还校验模型目录、共享数据和 OpenAPI，并检查 TypeScript、ESLint、未使用绑定、显式 any、文件长度、依赖循环与密钥。质量基线只允许收紧。正式测试与源码同目录；截图、QA fixture、一次性报告和临时计划放项目外。
 
+浏览器回归：安装 FFmpeg（含 `ffprobe`）后，执行 `pnpm build`、`pnpm exec playwright install chromium`、`pnpm test:browser`。CI 独立运行 Playwright。测试在临时数据库启动真实 Go 服务，模型请求由浏览器拦截并返回模拟结果，W3 成片由本地 FFmpeg 实际处理。
+
 接口调整后运行 `pnpm openapi:write`，同步 `src/shared/contracts/openapi.yaml` 和生成的浏览器类型。前端构建输出到 `tools/build/ui`，Go API 输出到 `tools/build/beike-api`（Windows 为 `.exe`），公开资源 URL 保持稳定。生产启动直接运行产物，缺少产物时提示先构建，不在重启时编译；需在部署目标系统与架构上构建。Go 查找与版本校验统一从 `go.mod` 读取最低版本，支持 `GO_BIN` 指定编译器。
 
 ## 数据与部署

@@ -1,7 +1,11 @@
 import { handleStudioEditingKey } from '../../model/studioEditingKeys';
+import { StudioW3Run } from './StudioW3Run';
+import { videoWorkflowKind } from '../../model/videoWorkflowRecovery';
+import { recoverStudioTaskRecord } from '../../model/studioTaskState';
+import { runW3Analysis, runW3Media } from '../../model/studioW3Commands';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CanvasStoryboardView } from '../storyboard/CanvasStoryboardView';
-import { useCanvasStore } from '../../store/useCanvasStore';
+import { saveCanvasProjects, useCanvasStore } from '../../store/useCanvasStore';
 import { studioPreferenceKeys, studioPreferencePrefix } from '@client/shared/workspace/studioPreferences';
 import { queueSettingsSection } from '@shared/domain/settings/settingsNavigationStorage';
 import { useAppStore } from '@client/store';
@@ -34,6 +38,15 @@ export function StudioWorkspace({projectId, onHome}: {projectId: string; onHome:
   const [storyboard, setStoryboard] = useState(false);
   const storyboardNodes = useMemo(() => studioStoryboardNodes(project?.studioScene), [project?.studioScene]);
   const [failed, setFailed] = useState(hasCanvasSaveFailure);
+  const saveScene = async (scene: StudioScene) => {
+    if (!Array.isArray(scene?.nodes) || !Array.isArray(scene.connections)) throw new Error('画布尚未载入');
+    useCanvasStore.setState(state => ({ projects: state.projects.map(item => item.id !== projectId ? item : {
+      ...item, studioScene: scene, draft: item.draft && !hasStudioContent(scene), updatedAt: Date.now(),
+    }) }));
+    await saveCanvasProjects();
+  };
+  const saveRef = useRef(saveScene);
+  saveRef.current = saveScene;
   useEffect(() => {
     const publishTasks = () => {
       const scene = useCanvasStore.getState().projects.find(item => item.id === projectId)?.studioScene;
@@ -43,11 +56,17 @@ export function StudioWorkspace({projectId, onHome}: {projectId: string; onHome:
       for (const node of scene.nodes) {
         if (!node.beikeTaskId || !node.isGenerating) continue;
         const task = tasks.find(item => item.id === node.beikeTaskId);
-        if (!task || (!task.resultUrl && !isImageTaskFailed(task.status))) continue;
+        if (!task) {
+          const recovered = recoverStudioTaskRecord(node);
+          if (recovered && !submittedHere.has(recovered.id)) state.addGenerationTask(recovered);
+          continue;
+        }
+        if (!task.resultUrl && !isImageTaskFailed(task.status)) continue;
         frame.current?.contentWindow?.postMessage({kind:'studio:result', taskId:task.id, url:task.resultUrl,
           error:task.resultUrl ? undefined : task.failReason || '生成失败，请在贝壳云图的「生成历史」查看详情。'},location.origin);
       }
     };
+    const submittedHere = new Set<string>();
     const unsubscribe = useAppStore.subscribe(publishTasks);
     const updateModels = () => frame.current?.contentWindow?.postMessage({kind:'studio:models',channels:studioChannels()},location.origin);
     const storage = (ev: StorageEvent) => { if (!ev.key || /^(beike_(modality_|api_providers)|custom_models)/.test(ev.key)) updateModels(); };
@@ -59,7 +78,15 @@ export function StudioWorkspace({projectId, onHome}: {projectId: string; onHome:
       const current = store.projects.find(item => item.id === projectId);
       if (!current) return;
       if (event.data?.kind === 'studio:ready') {
-        Object.assign(frame.current!.contentWindow!, {beikeCanvasChat:canvasChatRequest, beikeCanvasSpeech:canvasSpeechRequest, beikeCanvasDownload:downloadMedia, beikeCanvasEditingKey:handleStudioEditingKey});
+        const durableSave = (scene: StudioScene) => saveRef.current(scene);
+        const saveIntent = async (scene: StudioScene) => {
+          for (const node of scene.nodes) if (node.isGenerating && typeof node.beikeTaskId === 'string') submittedHere.add(node.beikeTaskId);
+          await durableSave(scene);
+        };
+        Object.assign(frame.current!.contentWindow!, {beikeCanvasChat:canvasChatRequest, beikeCanvasSpeech:canvasSpeechRequest, beikeCanvasDownload:downloadMedia, beikeCanvasEditingKey:handleStudioEditingKey,
+          beikeCanvasSave: durableSave, beikeCanvasRunW3Analysis: runW3Analysis,
+          beikeCanvasRunW3Media: (commands: Parameters<typeof runW3Media>[0], nodeId: string, readMedia: Parameters<typeof runW3Media>[2]) => runW3Media(commands, nodeId, readMedia, saveIntent),
+        });
         frame.current?.contentWindow?.postMessage({kind:'studio:init', projectId, scene:current.studioScene, channels:studioChannels(), preferenceKeys:Object.values(studioPreferenceKeys), preferencePrefix:studioPreferencePrefix}, location.origin);
       } else if (event.data?.kind === 'studio:generate' && event.data.projectId === projectId) {
         try {
@@ -153,6 +180,7 @@ export function StudioWorkspace({projectId, onHome}: {projectId: string; onHome:
       </details>
     </div>
     {failed && <span role="alert" className="absolute bottom-2 left-1/2 z-30 bg-red-950 p-2 text-white">项目尚未保存，请勿关闭页面。</span>}
+    <StudioW3Run frame={frame} enabled={videoWorkflowKind(project.studioScene) === 'w3-copy'} scene={project.studioScene} onSave={saveScene} />
     <iframe ref={frame} title="贝壳云图项目画布" srcDoc={frameDocument}
       className={storyboard?'hidden':'min-h-0 w-full flex-1 border-0'} />
     {storyboard && <CanvasStoryboardView project={{...project, nodes:storyboardNodes}} onBackToCanvas={nodeId => {
