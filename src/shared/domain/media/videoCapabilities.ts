@@ -1,6 +1,6 @@
 import { canonicalModelId } from '@shared/domain/models/modelCatalog';
 import { getVideoModelById } from './video';
-import { isMetasoH3 } from './videoChannels';
+import { isMetasoH3, isMiniMaxOfficialBase } from './videoChannels';
 import { grokPresetVoicesAllowed } from './grokVoices';
 
 export const VIDEO_GENERATION_MODES = [
@@ -26,7 +26,7 @@ const FRAME_MODES = ['first_frame', 'first_last_frame', 'text'];
 const SEEDANCE_MODES = ['omni', 'first_frame', 'first_last_frame', 'text', 'edit', 'extend'];
 
 /** Expose modes with an implemented payload path, not every vendor marketing feature. */
-export function videoModeIds(model: string) {
+export function videoModeIds(model: string, baseUrl?: string) {
   const id = canonicalModelId(model).toLowerCase();
   if (/seedance/.test(id)) return SEEDANCE_MODES;
   if (id === 'viduq3' || id === 'viduq3-mix') return ['omni'];
@@ -36,16 +36,20 @@ export function videoModeIds(model: string) {
   if (id === 'omni_flash-10s') return ['omni', 'text', 'edit'];
   if (/^veo3\.1/.test(id)) return FULL_MODES;
   if (/sora/.test(id)) return ['first_frame', 'text'];
-  if (/grok/.test(id)) return [...FULL_MODES, 'edit', 'extend'];
+  if (/grok/.test(id)) {
+    let official = false;
+    try { official = new URL(baseUrl || '').hostname === 'api.x.ai'; } catch { /* Invalid routes are checked at submission. */ }
+    return official && grokPresetVoicesAllowed(model) ? FULL_MODES : [...FULL_MODES, 'edit', 'extend'];
+  }
   if (/kling/.test(id)) return id.includes('omni') ? FULL_MODES : FRAME_MODES;
   if (/wan/.test(id)) return FULL_MODES;
   if (/minimax|hailuo/.test(id) || id === 'h3') return FULL_MODES;
   return ['first_frame', 'text'];
 }
 
-export function videoModes(model: string) {
+export function videoModes(model: string, baseUrl?: string) {
   const id = canonicalModelId(model).toLowerCase();
-  return VIDEO_GENERATION_MODES.filter(mode => videoModeIds(model).includes(mode.id)).map(mode => {
+  return VIDEO_GENERATION_MODES.filter(mode => videoModeIds(model, baseUrl).includes(mode.id)).map(mode => {
     if (mode.id !== 'omni') return mode;
     if (id === 'minimax-h3') return { ...mode, desc: '可混合参考图片、视频与音频，一张参考图也不会被当成首帧' };
     if (/minimax|hailuo/.test(id)) return { ...mode, desc: '可混合参考图片与视频，一张参考图也不会被当成首帧' };
@@ -61,14 +65,14 @@ export function videoModeLabel(mode?: string) {
   return VIDEO_GENERATION_MODES.find(item => item.id === mode)?.name || '全能参考';
 }
 
-export function resolveVideoMode(model: string, mode: string | undefined = undefined, imageCount = 0, videoCount = 0) {
+export function resolveVideoMode(model: string, mode: string | undefined = undefined, imageCount = 0, videoCount = 0, baseUrl?: string) {
   if (!mode) {
     const preferred = videoCount || imageCount > 2 ? 'omni' : imageCount === 2 ? 'first_last_frame' : imageCount === 1 ? 'first_frame' : 'text';
-    return videoModes(model).some(item => item.id === preferred) ? preferred : videoModes(model)[0].id;
+    return videoModes(model, baseUrl).some(item => item.id === preferred) ? preferred : videoModes(model, baseUrl)[0].id;
   }
   const normalized = ['multi_frame', 'reference_image'].includes(mode) ? 'omni' : mode;
   // Old sessions used omni for every model, including models with only text / first-frame inputs.
-  if (normalized === 'omni' && !videoModes(model).some(item => item.id === 'omni') && !videoCount && imageCount <= 1) return imageCount ? 'first_frame' : 'text';
+  if (normalized === 'omni' && !videoModes(model, baseUrl).some(item => item.id === 'omni') && !videoCount && imageCount <= 1) return imageCount ? 'first_frame' : 'text';
   return normalized;
 }
 
@@ -77,8 +81,9 @@ export function videoResolutionLabel(model: string, resolution: string, baseUrl?
     ? ({ '720P': '768P', '1080P': '2K' }[resolution] || resolution) : resolution;
 }
 
-export function videoRatioLocked(model: string, mode: string) {
-  return isSeedance25(model) && ['first_frame', 'first_last_frame', 'edit', 'extend'].includes(mode);
+export function videoRatioLocked(model: string, mode: string, baseUrl?: string) {
+  return isSeedance25(model) && ['first_frame', 'first_last_frame', 'edit', 'extend'].includes(mode)
+    || (isMetasoH3(model, baseUrl) || (canonicalModelId(model) === 'minimax-h3' && isMiniMaxOfficialBase(baseUrl))) && ['first_frame', 'first_last_frame'].includes(mode);
 }
 
 export function videoDurationOptions(model: string, resolution: string, mode = 'text', baseUrl?: string) {
@@ -102,7 +107,7 @@ export function videoInputError(input: {
 }): string | null {
   const { model, images = [], videos = [], audios = [], refMode = 'omni' } = input;
   const config = getVideoModelById(model, input.baseUrl);
-  const mode = resolveVideoMode(model, refMode, images.length, videos.length);
+  const mode = resolveVideoMode(model, refMode, images.length, videos.length, input.baseUrl);
   if (/grok/i.test(model) && input.baseUrl) {
     let host = '';
     try { host = new URL(input.baseUrl).hostname.toLowerCase(); } catch { /* Gateway URL validation reports malformed addresses. */ }
@@ -131,7 +136,7 @@ export function videoInputError(input: {
     if (audios.length > maxAudios) return `当前模型最多支持 ${maxAudios} 个参考音频`;
     if (isSeedance(model) && !isSeedance25(model) && !images.length && !videos.length) return 'Seedance 2.0 参考音频需要至少搭配一张图片或一段视频';
   }
-  if (!videoModes(model).some(item => item.id === mode)) return '当前模型尚未接入这种生成方式，请切换模式';
+  if (!videoModes(model, input.baseUrl).some(item => item.id === mode)) return '当前模型尚未接入这种生成方式，请切换模式';
   if (mode === 'text' && (images.length || videos.length)) return '文生视频不使用参考素材，请移除素材或切换生成方式';
   if (mode === 'first_frame' && (images.length !== 1 || videos.length)) return '首帧模式需要一张图片';
   if (mode === 'first_last_frame' && (images.length !== 2 || videos.length)) return '首尾帧模式需要两张图片，分别作为首帧和尾帧';
@@ -163,7 +168,8 @@ export function videoInputError(input: {
     : input.resolution;
   if (/grok/i.test(model) && (['omni', 'first_last_frame'].includes(mode) || input.voiceIds?.length) && resolution?.toUpperCase() === '1080P') return 'Grok 参考生成与首尾帧最高支持 720P，请调整清晰度';
   if (resolution && config && !config.supportedResolutions.some(value => value === resolution.toUpperCase())) return '当前模型不支持所选清晰度，请重新选择';
-  if (input.aspectRatio && config && !config.supportedAspectRatios.includes(input.aspectRatio)) return '当前模型不支持所选比例，请重新选择';
+  if (input.aspectRatio && config && !config.supportedAspectRatios.includes(input.aspectRatio)
+    && !(input.aspectRatio === 'adaptive' && videoRatioLocked(model, mode, input.baseUrl))) return '当前模型不支持所选比例，请重新选择';
   if (input.duration !== undefined && (mode !== 'edit' || canonical === 'omni_flash-10s') && !(input.duration === -1 && (isSeedance(model) || /^wan3/.test(model)))
     && !videoDurationOptions(model, input.resolution?.toUpperCase() || '720P', mode, input.baseUrl).includes(input.duration)) return '当前模型、清晰度与生成方式不支持所选时长，请重新选择';
   return null;

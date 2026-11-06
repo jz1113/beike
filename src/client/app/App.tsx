@@ -1,3 +1,4 @@
+import { CanvasCreateDialog } from '@client/features/canvas/components/projects/CanvasCreateDialog';
 import type { OpenSalesLibrary, SalesAssetSection, SalesLibraryChoice } from '@client/features/sales/model/salesWorkspace';
 import CanvasMediaLibraryHost from './media-library/CanvasMediaLibraryHost';
 import type { PendingMediaInsert } from './media-library/mediaIndex';
@@ -71,6 +72,7 @@ export default function App() {
   const [salesChoice, setSalesChoice] = useState<SalesLibraryChoice | null>(null);
   const [pendingMedia, setPendingMedia] = useState<PendingMediaInsert|null>(null);
   const [homeImageTool, setHomeImageTool] = useState<'image-edit' | 'prompt-reverse' | 'product-angles' | null>(null);
+  const [legacySalesDialog, setLegacySalesDialog] = useState(false);
   const [homeMode, setHomeMode] = useState<'generate' | 'canvas'>('generate');
   const [libraryTab, setLibraryTab] = useState(() => parseAssetLibraryTab(typeof window === 'undefined' ? '' : window.location.search));
   const [routeRevision, setRouteRevision] = useState(0);
@@ -166,6 +168,13 @@ export default function App() {
       const openWorkshop = () => { openEcommerceCanvas(); setRouteReady(true); };
       if (!useCanvasStore.persist.hasHydrated()) return useCanvasStore.persist.onFinishHydration(openWorkshop);
       openWorkshop();
+      return;
+    }
+    if (['video_sales', 'daihuo'].includes(params.get('view') || '')) {
+      setLegacySalesDialog(true);
+      setHomeMode('canvas');
+      setCurrentView('home');
+      setRouteReady(true);
       return;
     }
     const view = parseViewFromSearchParams(initialSearch.current);
@@ -396,6 +405,12 @@ export default function App() {
       </Suspense>
 
 
+      {legacySalesDialog && <CanvasCreateDialog legacySalesEntry onClose={() => setLegacySalesDialog(false)}
+        onCreate={kind => {
+          useCanvasStore.getState().createProject(undefined, kind);
+          setLegacySalesDialog(false);
+          setCurrentView('canvas');
+        }} />}
     </div>
     </GeneratingEffectsProvider>
   );

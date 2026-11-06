@@ -1,3 +1,4 @@
+import { studioVideoSettings } from '../../model/studioVideoSettings';
 import { useRef,useState } from 'react';
 import { useAppStore } from '@client/store';
 import { useModalDialog } from '@client/shared/hooks/useModalDialog';
@@ -10,8 +11,8 @@ import type { VideoPromptOptimization } from '@client/shared/agent/videoPromptOp
 import { studioPromptBadge,studioPromptSkill,studioMatchingPromptOptimization } from '../../model/studioPromptBadge';
 import { VideoPromptSkillBadge } from '../video/VideoPromptSkillDetails';
 
-export function StudioTasksDialog({commands,onStop,onRetry,onResume,onClose,onSave}: {
-  commands:StudioTaskCommands;onStop:(id:string,taskId:string)=>Promise<void>;
+export function StudioTasksDialog({commands,onStop,onRetry,onResume,onClose,onSave,onRun}: {
+  commands:StudioTaskCommands;onRun:(id:string)=>void;onStop:(id:string,taskId:string)=>Promise<void>;
   onRetry:(id:string,taskId:string)=>Promise<void>;onResume:(id:string,taskId:string)=>Promise<void>;onClose:()=>void;onSave:()=>Promise<void>;
 }) {
   const tasks=useAppStore(state=>state.generationTasks),sessions=useAppStore(state=>state.sessions);
@@ -38,16 +39,18 @@ export function StudioTasksDialog({commands,onStop,onRetry,onResume,onClose,onSa
         const status=task ? task.resultUrl?'已完成':active?task.submissionRecoveryRequired?'核对提交结果中':'生成中':task.failReason?.startsWith('已取消')?'已取消':'生成失败'
           :node.isGenerating?node.beikePromptReviewPending?'提示词待确认':node.beikePromptOptimizing?'正在优化提示词':'准备提交':stopped?'已取消':node.errorMsg?'生成失败':node.content?'已有结果':'尚未生成';
         const refs=task?.referenceImages || task?.images || [],videos=task?.referenceVideoUrls||[];
+        const videoSettings = studioVideoSettings(node, scene);
         const versions=(node.settings as {generationVersions?:unknown[]})?.generationVersions?.length||0;
         return <li key={node.id} className="min-w-0" aria-label={studioNodeLabel(node)}><SpotlightCard className="grid min-w-0 gap-2 !rounded-lg !border-white/15 !bg-[#202023] p-3 !shadow-none">
           <h3 className="break-words font-medium">{studioNodeLabel(node)}</h3>
           {node.type==='gen-video' && <VideoPromptSkillBadge skillId={studioPromptSkill(node,scene)?.id} model={studioPromptSkill(node,scene)?.modelIcon} label={studioPromptBadge(node,scene)}/>}
+          {videoSettings && <p className="text-xs text-stone-400">{videoSettings.selectedResolution} · {videoSettings.selectedDuration} · {videoSettings.selectedRatio}</p>}
           <p role="status">{stopped&&status!=='已取消'?'已停止等待 · ':''}{status}{active&&task.progress?` ${task.progress}`:''}</p>
           <p className="text-xs text-stone-400">{versions} 个生成版本 · 本次参考图片 {refs.filter(url=>!videos.includes(url)).length} 张、视频 {videos.length} 段</p>
-          {node.type==='gen-video' && !(node.settings as Record<string,unknown>)?.beikeOperation && <label className="flex min-h-9 items-center gap-2 text-xs">
-            <input type="checkbox" disabled={!!node.isGenerating || busy.includes(node.id)} checked={(node.settings as Record<string,unknown>)?.beikeOptimizePrompt!==false} onChange={event=>{
+          {node.type==='gen-video' && !(node.settings as Record<string,unknown>)?.beikeOperation && (node.settings as Record<string,unknown>)?.beikeVideoWorkflow !== 'w3-copy' && <label className="flex min-h-9 items-center gap-2 text-xs">
+            <input type="checkbox" disabled={!!node.isGenerating || busy.includes(node.id)} checked={(node.settings as Record<string,unknown>)?.beikeOptimizePrompt===true} onChange={event=>{
               const enabled=event.target.checked;
-              void run(node.id,async()=>{commands.update(node.id,node.beikeTaskId as string|undefined,{settings:{...(node.settings as Record<string,unknown>||{}),beikeOptimizePrompt:enabled}});await onSave();});
+              void run(node.id,async()=>{commands.update(node.id,studioNodeTaskId(node),{settings:{...(node.settings as Record<string,unknown>||{}),beikeOptimizePrompt:enabled}});await onSave();});
             }}/>生成前优化提示词（增加一次文本模型调用）
           </label>}
           <VideoPromptOptimizationDetails dark historical={!studioMatchingPromptOptimization(node,scene)} value={node.beikePromptOptimization as VideoPromptOptimization|undefined}/>
@@ -58,7 +61,7 @@ export function StudioTasksDialog({commands,onStop,onRetry,onResume,onClose,onSa
             {stopped&&taskId&&active&&<button disabled={busy.includes(node.id)} className="rounded border border-white/20 px-3 py-2" onClick={()=>void run(node.id,()=>onResume(node.id,taskId))}>继续等待</button>}
             {stopped&&taskId&&task?.resultUrl&&<button disabled={busy.includes(node.id)} className="rounded border border-white/20 px-3 py-2" onClick={()=>void run(node.id,()=>onResume(node.id,taskId))}>恢复任务结果</button>}
             {!node.isGenerating&&taskId&&task&&!active&&!task.resultUrl&&<button disabled={busy.includes(node.id)} className="rounded border border-white/20 px-3 py-2" onClick={()=>void run(node.id,()=>onRetry(node.id,taskId))}>重试本次任务</button>}
-            {!node.isGenerating&&!active&&<button className="rounded border border-white/20 px-3 py-2" onClick={()=>{setError('');void commands.run(node.id).catch(cause=>setError(String(cause)));}}>按当前连线生成</button>}
+            {!node.isGenerating&&!active&&<button className="rounded border border-white/20 px-3 py-2" onClick={()=>{setError('');onRun(node.id);}}>按当前连线生成</button>}
           </div>
         </SpotlightCard></li>;
       })}</ul>

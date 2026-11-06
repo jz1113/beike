@@ -90,7 +90,7 @@ window.addEventListener('message', function initialize(event) {
     if (typeof url !== 'string') throw Error('参考素材缺少地址');
     if (/^(https?:\/\/|\/storage\/)/i.test(url) || url.startsWith('data:' + type + '/')) return {type, url};
     const localId = assetId || (url.startsWith('local-asset://') ? url.slice('local-asset://'.length) : null);
-    let blob = localId && await loadAsset(url, localId);
+    let blob = localId && await loadAsset?.(url, localId);
     if (!blob && url.startsWith('blob:')) {
       const response = await fetch(url);
       if (response.ok) blob = await response.blob();
@@ -105,8 +105,33 @@ window.addEventListener('message', function initialize(event) {
     return {type, url:data};
   }
   const pendingNodes = new Map();
+  const publisher = window.beikeCanvasCreateScenePublisher(update => parent.postMessage({...update, projectId},event.origin));
+  window.addEventListener('pagehide', publisher.flush);
+  let liveScene = scene, renderNodes, renderConnections, loadLocalAsset, visual;
+  const commands = {
+    read: () => liveScene,
+    update(nodeId, expectedTaskId, patch) {
+      if (!liveScene || !renderNodes) throw Error('画布尚未载入');
+      const update = nodes => nodes.map(node => {
+        if (node.id !== nodeId || (node.beikeTaskId || node.beikeLastTaskId) !== expectedTaskId) return node;
+        return {...node, ...patch, settings:{...node.settings, ...patch.settings}};
+      });
+      liveScene = {...liveScene,nodes:update(liveScene.nodes)};
+      renderNodes(update);
+    },
+    run: nodeId => window.beikeCanvasRunW3Media(commands,nodeId,ref => stableReference(ref,loadLocalAsset)),
+    runText: (nodeId,signal) => window.beikeCanvasRunW3Analysis(commands,nodeId,signal,ref => stableReference(ref,loadLocalAsset)),
+    stop(nodeId,taskId) {
+      commands.update(nodeId,taskId,{isGenerating:false,beikeTaskStopped:true,settings:{isGenerating:false}});
+      visual?.(nodeId,false);
+    },
+  };
   window.beikeStudio = {
-    mergeConfigs, modelFor, normalize, chatBase,
+    mergeConfigs, modelFor, normalize, chatBase, taskCommands: commands,
+    execute(nodeId) {
+      window.dispatchEvent(new CustomEvent('jiubanbn-agent-action',{detail:{action:'execute_node',payload:{nodeId}}}));
+    },
+    replaceConnections(scene) { liveScene = scene; renderConnections(scene.connections); },
     libraryMessage(kind, data={}) { parent.postMessage({kind, projectId, ...data},event.origin); },
     async collectMedia(entries, getBlob) {
       const items=[];
@@ -168,12 +193,16 @@ window.addEventListener('message', function initialize(event) {
           throw Error(node.type === 'gen-video' ? '此画布生成入口支持图片和视频参考，请移除其他素材。' : '图片生成需要图片参考，请移除其他类型的素材。');
         }
         const refs = await Promise.all(inputs.map(item => stableReference(item, loadAsset)));
-        parent.postMessage({kind:'studio:generate', projectId, request:{
-          taskId,model:settings.model,prompt,refs,imageQuality:settings.gptImageQuality,ratio:settings.ratio,resolution:settings.resolution,duration:parseFloat(settings.duration) || undefined,
+        parent.postMessage({kind:'studio:generate', projectId, nodeId:node.id, request:{
+          taskId,model:settings.model,prompt,refs,optimizePrompt:node.type === 'gen-video' && settings.beikeOptimizePrompt === true && settings.beikeVideoWorkflow !== 'w3-copy',imageQuality:settings.gptImageQuality,ratio:settings.ratio,resolution:settings.resolution,duration:parseFloat(settings.duration) || undefined,
         }},event.origin);
       } catch(error) { pendingNodes.delete(node.id); setGeneratingVisual(node.id, false); graph.updateNode(node.id,{beikeTaskId:undefined,isGenerating:false,errorMsg:error.message}); }
     },
-    listen(setNodes, getNodes, setGeneratingVisual, recordVersion) {
+    listen(setNodes, getNodes, setGeneratingVisual, recordVersion, loadAsset, setConnections) {
+      renderConnections = setConnections;
+      renderNodes = setNodes;
+      loadLocalAsset = loadAsset;
+      visual = setGeneratingVisual;
       const receive = message => {
         if (message.source !== parent || message.origin !== event.origin) return;
         if (message.data?.kind === 'studio:parameters') {
@@ -194,10 +223,10 @@ window.addEventListener('message', function initialize(event) {
         setNodes(nodes => nodes.map(node => {
           if (node.beikeTaskId !== taskId || !node.isGenerating) return node;
           const settings = {...node.settings, isGenerating:false, progress:url ? 100 : 0, error};
-          const update = {beikeTaskId:undefined, isGenerating:false, errorMsg:error, settings};
+          const update = {beikeTaskId:undefined, beikeLastTaskId:taskId, beikeTaskRecord:undefined, isGenerating:false, errorMsg:error, settings};
           if (!url) return {...node, ...update};
           if (node.type === 'gen-video') return recordVersion(node, {...node, ...update, content:url, videoUrl:url, previewType:'video',
-            settings:{...settings, generatedImages:[]}});
+            settings:{...settings, generatedImages:[], beikeRawVideoUrl:settings.beikeVideoWorkflow === 'w3-copy' ? url : undefined, beikeSilentDelivery:false}});
           const images = [{id:taskId, fullUrl:url, thumbUrl:url, createdAt:Date.now()}];
           return recordVersion(node, {...node, ...update, content:url, imageUrl:url, previewType:'image', generatedImages:images,
             settings:{...settings, generatedImages:images, selectedImageIndex:0}});
@@ -209,8 +238,11 @@ window.addEventListener('message', function initialize(event) {
     },
     load: () => scene && {...scene,nodes:scene.nodes.map(node => normalize(node.type === 'gen-speech' && node.isGenerating
       ? {...node,isGenerating:false,beikeTaskId:undefined,errorMsg:'上次语音请求尚未回写，请先查看贝壳云图生成历史。'} : node))},
-    save: scene => parent.postMessage({kind:'studio:save', projectId, scene}, event.origin),
+    save: scene => { liveScene = scene; publisher.queue(scene); },
   };
+  window.addEventListener('keydown', key => {
+    window.beikeCanvasEditingKey?.(key,window.beikeStudio.editingCommands);
+  },true);
   import('./assets/index-CnvXMEQ8.js').catch(error => {
     document.getElementById('root').textContent = '画布加载失败：' + error.message;
   });

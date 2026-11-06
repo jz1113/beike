@@ -10,6 +10,11 @@ permissions:
 
 jobs:
   check:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        name: [check, Playwright browser regression]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -30,8 +35,21 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
       - name: Full quality gate (same as local)
+        if: matrix.name == 'check'
         run: pnpm run check
+      - name: Build production UI and API for Playwright
+        if: matrix.name == 'Playwright browser regression'
+        run: pnpm build
+      - name: Install Chromium for browser regression
+        if: matrix.name == 'Playwright browser regression'
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          command -v ffmpeg && command -v ffprobe || sudo apt-get install -y ffmpeg
+      - name: Browser regression with simulated model responses
+        if: matrix.name == 'Playwright browser regression'
+        run: pnpm test:browser
       - name: Gitleaks
+        if: matrix.name == 'check' && (success() || failure())
         run: |
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz" | tar -xz -C /tmp
           /tmp/gitleaks detect --no-git --redact --config tools/configs/gitleaks.toml --source . --exit-code 1

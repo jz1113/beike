@@ -111,6 +111,7 @@ export function resolveStudioInputs(scene:StudioScene,targetId:string):{
   const ids=[...new Set(scene.connections.filter(edge=>edge.to===targetId && (!edge.inputType||edge.inputType==='default'))
     .flatMap(edge=>studioEdgeSources(edge,scene)))];
   const texts:string[]=[];
+  const textNames:string[]=[];
   const targetSettings=settingsOf(target);
   const storyboardVideo=targetSettings.beikeVideoWorkflow==='w3-copy';
   const storyboardFirstFrame=storyboardVideo && (!targetSettings.beikeVideoMode || targetSettings.beikeVideoMode==='first_frame');
@@ -126,7 +127,7 @@ export function resolveStudioInputs(scene:StudioScene,targetId:string):{
       const value=(settings.beikeTextResultRequired ? text(settings.textNodeDisplayText) : '')||text(settings.text)||text(source.content)||(settings.beikeTextResultRequired ? '' : text(source.prompt));
       if(!value && settings.beikeTextResultRequired)throw new Error(`请先运行分镜分析并检查结果：${name}`);
       if(!value)throw new Error(`请先填写上游文字节点：${name}`);
-      texts.push(value);continue;
+      texts.push(value);textNames.push(name);continue;
     }
     if(!type)throw new Error(`此参考节点尚未接入生成：${name}`);
     if(storyboardFirstFrame && type!=='image')throw new Error('分镜复刻生成不接收视频或音频，请断开原片连线，只连接分析分镜和目标关键帧');
@@ -142,7 +143,7 @@ export function resolveStudioInputs(scene:StudioScene,targetId:string):{
     refs.sort((a,b)=>(positions.get(a.url)??Infinity)-(positions.get(b.url)??Infinity));
   }
   if(storyboardVideo || targetSettings.beikeStoryboardKeyframe) {
-    const selected=storyboardVideo ? selectVideoCopyStoryboard(texts,text(target.prompt)) : selectVideoCopyKeyframe(texts,text(target.prompt));
+    const selected=storyboardVideo ? selectVideoCopyStoryboard(texts,text(target.prompt),textNames) : selectVideoCopyKeyframe(texts,text(target.prompt),textNames);
     if(storyboardFirstFrame && !refs.length)throw new Error('请先生成并连接本片段的目标关键帧');
     return {...selected,refs};
   }

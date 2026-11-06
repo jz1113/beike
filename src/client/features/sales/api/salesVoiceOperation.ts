@@ -37,7 +37,7 @@ export async function reserveVoiceOperation(input: unknown, regenerate = false):
 }
 
 export async function pollVoiceOperation(id: string, signal: AbortSignal, progress?: (label: string) => void): Promise<Record<string, unknown>> {
-  const key = id.slice(VOICE_OPERATION_PREFIX.length);
+  const key = id;
   while (true) {
     signal.throwIfAborted();
     let response: Response;
@@ -45,7 +45,7 @@ export async function pollVoiceOperation(id: string, signal: AbortSignal, progre
     catch (error) { throw generationRecoveryError(error instanceof Error ? error.message : '原配音暂时无法查询'); }
     const data = await response.json().catch(() => null);
     if (data?.success === true && (data.audioUrl || data.resultUrl)) return data;
-    if (data?.submissionRejected === true) throw Object.assign(new Error(data.error || '原配音请求已被拒绝'), { submissionRejected: true });
+    if (data?.submissionRejected === true || data?.status === 'FAILED' || data?.status === 'FAILURE') throw Object.assign(new Error(data.error || '原配音请求已被拒绝'), { submissionRejected: true });
     if (response.status === 502 || response.status === 404 || response.status === 401 || response.status === 403) {
       throw generationRecoveryError(data?.error || '原配音结果待核对；不会重新合成');
     }

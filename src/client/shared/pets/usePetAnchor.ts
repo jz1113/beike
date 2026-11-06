@@ -1,3 +1,4 @@
+import { usePetObstacles } from './usePetObstacles';
 import { useCallback, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 import {
   clampPetPosition, PET_DRAG_THRESHOLD, petPanelLayout, readPetPosition, writePetPosition,
@@ -16,6 +17,7 @@ export function usePetAnchor(panelOpen: boolean, onDragStart: () => void, canvas
   const rootRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const obstacles = usePetObstacles(rootRef, panelOpen);
   const geometry = useRef<Geometry | null>(null);
   const gesture = useRef<Gesture | null>(null);
   const suppressClick = useRef(false);
@@ -139,10 +141,16 @@ export function usePetAnchor(panelOpen: boolean, onDragStart: () => void, canvas
       event.stopPropagation();
     },
   };
+  const panel = layout ? petPanelLayout(layout.point, layout.size, layout.bounds, layout.panelHeight) : undefined;
+  const overlap = (left: number) => panel && obstacles.some(area => left < area.x + area.width
+    && left + panel.width > area.x && panel.top < area.y + area.height && panel.top + Math.min(layout!.panelHeight, panel.maxHeight) > area.y);
+  const otherEdge = panel && layout
+    ? (panel.left - layout.bounds.left > (layout.bounds.width - panel.width) / 2 ? layout.bounds.left : layout.bounds.width - layout.bounds.right - panel.width)
+    : 0;
   return {
     rootRef, anchorRef, panelRef, moving, pointerProps,
     frame: layout ? { point: layout.point, size: layout.size, bounds: layout.bounds } : null,
     anchorStyle: layout ? { left: layout.point.x, top: layout.point.y } : { right: 16, bottom: 16 },
-    panelStyle: layout ? petPanelLayout(layout.point, layout.size, layout.bounds, layout.panelHeight) : undefined,
+    panelStyle: panel && overlap(panel.left) && !overlap(otherEdge) ? { ...panel, left: otherEdge } : panel,
   };
 }

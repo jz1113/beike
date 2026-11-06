@@ -1,3 +1,4 @@
+import { SKILL_CATEGORIES } from './skillTypes';
 import type { SkillItem, SkillMainTab, SkillPresentation } from './skillTypes';
 import type { SkillRuntime } from '@shared/domain/skills/library';
 
@@ -19,4 +20,10 @@ export function filterSkills(items: SkillItem[], filters: SkillFilters, favorite
     const searchable = [item.title, item.description, item.category, item.author, item.models, ...(item.tags || []), ...(item.genres || [])].join(' ').toLocaleLowerCase();
     return terms.every(term => searchable.includes(term));
   });
+}
+
+export function skillCategories(items: SkillItem[]): string[] {
+  const available = new Set(items.map(item => item.category).filter(value => value && value !== '全部'));
+  const ordered = SKILL_CATEGORIES.filter(value => available.delete(value));
+  return ['全部', ...ordered, ...available];
 }

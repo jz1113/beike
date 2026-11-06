@@ -113,6 +113,7 @@ export function WorkbenchResizeHandle({
 
 export interface ResizableWorkbenchProps extends ResizablePaneOptions {
   sidebar: ReactNode;
+  stacked?: boolean;
   collapsedRail?: ReactNode;
   collapsed?: boolean;
   children: ReactNode;
@@ -124,6 +125,7 @@ export interface ResizableWorkbenchProps extends ResizablePaneOptions {
  */
 export function ResizableWorkbench({
   sidebar,
+  stacked = false,
   collapsedRail,
   collapsed = false,
   children,
@@ -136,15 +138,15 @@ export function ResizableWorkbench({
   const pane = useResizablePane({ storageKey, defaultWidth, minWidth, maxWidth });
 
   return (
-    <div className={`flex min-h-0 flex-1 flex-col lg:flex-row ${pane.dragging ? 'select-none' : ''} ${className}`.trim()}>
+    <div className={`flex min-h-0 flex-1 flex-col ${stacked ? '' : 'lg:flex-row'} ${pane.dragging ? 'select-none' : ''} ${className}`.trim()}>
       {collapsed ? (
         collapsedRail ? <div className="shrink-0">{collapsedRail}</div> : null
       ) : (
         <>
-          <div style={pane.style} className="flex min-h-0 w-full shrink-0 flex-col lg:w-[var(--studio-sidebar-w)]">
+          <div style={stacked ? undefined : pane.style} className={`flex min-h-0 w-full shrink-0 flex-col ${stacked ? '' : 'lg:w-[var(--studio-sidebar-w)]'}`}>
             {sidebar}
           </div>
-          <WorkbenchResizeHandle {...pane.handleProps} />
+          <WorkbenchResizeHandle {...pane.handleProps} hidden={stacked} />
         </>
       )}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>

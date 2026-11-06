@@ -217,7 +217,7 @@ describe('explicit voice selection and speech references', () => {
     expect(Render().error).toContain('音色参考');
     vi.mocked(synthesizeSalesVoiceover).mockResolvedValue({ audioUrl: '/synthesized-reference.mp3', taskId: 'voice-task' });
     await Render().runSynthesizeVoice();
-    expect(synthesizeSalesVoiceover).toHaveBeenCalledWith(expect.objectContaining({ voice: 'voice-code', text: '你好，这是一段人声音色参考，请保持自然清晰的说话方式。' }), expect.any(AbortSignal));
+    expect(synthesizeSalesVoiceover).toHaveBeenCalledWith(expect.objectContaining({ voice: 'voice-code', text: '你好，这是一段人声音色参考，请保持自然清晰的说话方式。' }), expect.any(AbortSignal), expect.any(Function));
     expect(state.productionPlan.adaptedBeats[0].spokenLine).toBe(text);
     expect(Render().assembled!.enginePrompt).toContain(text);
     await Render().runGenerateVideo();
@@ -228,7 +228,7 @@ describe('explicit voice selection and speech references', () => {
     const production = await prepare('speech', { ...sampleVoice, sampleAudioUrl: '' }, text);
     vi.mocked(synthesizeSalesVoiceover).mockResolvedValue({ audioUrl: '/reference.mp3', taskId: 'voice-task' });
     await production.runSynthesizeVoice();
-    expect(synthesizeSalesVoiceover).toHaveBeenCalledWith(expect.objectContaining({ text: '你好，这是一段人声音色参考，请保持自然清晰的说话方式。' }), expect.any(AbortSignal));
+    expect(synthesizeSalesVoiceover).toHaveBeenCalledWith(expect.objectContaining({ text: '你好，这是一段人声音色参考，请保持自然清晰的说话方式。' }), expect.any(AbortSignal), expect.any(Function));
     expect(state.productionPlan.adaptedBeats[0].spokenLine).toBe(text);
     expect(Render().assembled!.narrationText).toBe(text);
     expect(Render().assembled!.enginePrompt).toContain(text);
@@ -253,7 +253,7 @@ describe('explicit voice selection and speech references', () => {
     vi.mocked(synthesizeSalesVoiceover).mockResolvedValue({ audioUrl: '/reference.mp3', taskId: 'voice-task' });
     await production.runSynthesizeVoice();
     expect(state.productionPlan.voiceoverAudioUrl).toBe('/reference.mp3');
-    expect(synthesizeSalesVoiceover).toHaveBeenCalledWith(expect.objectContaining({ text: '你好，这是一段人声音色参考，请保持自然清晰的说话方式。' }), expect.any(AbortSignal));
+    expect(synthesizeSalesVoiceover).toHaveBeenCalledWith(expect.objectContaining({ text: '你好，这是一段人声音色参考，请保持自然清晰的说话方式。' }), expect.any(AbortSignal), expect.any(Function));
     await Render().runGenerateVideo();
     expect(submitAndPollSalesVideo).not.toHaveBeenCalled();
     expect(Render().error).toContain('分镜台词');
@@ -283,7 +283,7 @@ describe('explicit voice selection and speech references', () => {
     const production = await prepare('voiceover', { ...sampleVoice, sampleAudioUrl: '' }, text);
     vi.mocked(synthesizeSalesVoiceover).mockResolvedValue({ audioUrl: '/narration.mp3', taskId: 'voice-task' });
     await production.runSynthesizeVoice();
-    expect(synthesizeSalesVoiceover).toHaveBeenCalledWith(expect.objectContaining({ voice: 'voice-code', text }), expect.any(AbortSignal));
+    expect(synthesizeSalesVoiceover).toHaveBeenCalledWith(expect.objectContaining({ voice: 'voice-code', text }), expect.any(AbortSignal), expect.any(Function));
     expect(Render().assembled!.audios).toEqual([]);
   });
 

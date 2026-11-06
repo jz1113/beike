@@ -36,6 +36,18 @@ export interface AssistantSkillMeta {
 }
 
 export interface AssistantSkill {
+  source?: {
+    kind: 'official' | 'community' | 'platform' | 'local';
+    url: string;
+    revision: string;
+    license: string;
+    downloadUrl?: string;
+    archiveSha256?: string;
+    files: Record<string, string>;
+  };
+  displayDescription?: string;
+  usageGuide?: string;
+  modelIcon?: string;
   id: string;
   /** Server content version, separate from the author's version label. */
   libraryVersion?: string;

@@ -1,4 +1,5 @@
-import { salesMediaResult } from './salesMediaJobs';
+import { pollVoiceOperation, reserveVoiceOperation, VOICE_OPERATION_PREFIX } from './salesVoiceOperation';
+import { waitSalesMediaJob } from './salesMediaJobs';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { apiRequest } from '@client/shared/api/apiRequest';
 import { getGatewayClientHeaders, getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
@@ -122,12 +123,25 @@ export async function adaptSalesScriptPlan(
 export async function synthesizeSalesVoiceover(
   input: { text: string; voice: string; model?: string; speed?: number },
   signal: AbortSignal,
+  onTaskSubmitted?: (taskId: string) => void | Promise<void>,
 ): Promise<{ audioUrl: string; taskId: string }> {
   const selection = (input.model || 'speech-2.8-hd').trim();
   const model = upstreamModalityModelId('voice', selection);
   signal.throwIfAborted();
-  const clientTaskId = `sales_vo_${crypto.randomUUID()}`;
   const gatewayHeaders = getGatewayClientHeaders(selection);
+  const operation = onTaskSubmitted
+    ? await reserveVoiceOperation([input, model, gatewayHeaders], true)
+    : undefined;
+  const clientTaskId = operation?.id || `sales_vo_${crypto.randomUUID()}`;
+  if (operation) {
+    await onTaskSubmitted?.(operation.id);
+    if (!operation.fresh) {
+      const recovered = await pollSalesVoiceTask(operation.id, signal);
+      operation.complete();
+      return recovered;
+    }
+  }
+  signal.throwIfAborted();
   const response = await apiFetch('/api/generate/audio', {
     method: 'POST',
     signal,
@@ -150,9 +164,24 @@ export async function synthesizeSalesVoiceover(
     }),
   });
   const data = await readJSON(response, '旁白语音合成失败');
+  const id = text(record(data.job).id);
+  if (id) {
+    await onTaskSubmitted?.(id);
+    return pollSalesVoiceTask(id, signal);
+  }
+  const result = voiceResult(data);
+  operation?.complete();
+  return result;
+}
+
+function voiceResult(data: Record<string, unknown>) {
   const audioUrl = text(data.audioUrl) || text(data.resultUrl);
   if (!audioUrl) throw new Error('语音合成未返回可播放地址');
   return { audioUrl, taskId: text(data.taskId) };
+}
+
+export async function pollSalesVoiceTask(id: string, signal: AbortSignal, onProgress?: (message: string) => void) {
+  return voiceResult(await (id.startsWith(VOICE_OPERATION_PREFIX) ? pollVoiceOperation(id, signal, onProgress) : waitSalesMediaJob(id, signal, onProgress)));
 }
 
 export async function submitAndPollSalesVideo(
@@ -251,6 +280,7 @@ export async function mixSalesFinalVideo(
     bgmUrl?: string;
   },
   signal: AbortSignal,
+  onTaskSubmitted?: (taskId: string) => void | Promise<void>,
 ): Promise<{ videoUrl: string; durationSec: number; duckedBgm: boolean }> {
   const body = salesAudioMixBodySchema.parse(input);
   const response = await apiRequest('POST', '/api/sales/audio-mix', {
@@ -258,9 +288,23 @@ export async function mixSalesFinalVideo(
     headers: { 'Content-Type': 'application/json', Prefer: 'respond-async', 'X-Sales-Name': encodeURIComponent(input.jobName || '') },
     body: JSON.stringify(body),
   });
-  const parsed = salesAudioMixResponseSchema.safeParse(await salesMediaResult(await readJSON(response, '成片配乐合成失败'), signal));
+  const data = await readJSON(response, '成片配乐合成失败');
+  const id = text(record(data.job).id);
+  if (id) {
+    await onTaskSubmitted?.(id);
+    return pollSalesMixTask(id, signal);
+  }
+  return mixResult(data);
+}
+
+function mixResult(data: Record<string, unknown>) {
+  const parsed = salesAudioMixResponseSchema.safeParse(data);
   if (!parsed.success) throw new Error('成片混音返回结果不完整');
   return parsed.data;
+}
+
+export async function pollSalesMixTask(id: string, signal: AbortSignal, onProgress?: (message: string) => void) {
+  return mixResult(await waitSalesMediaJob(id, signal, onProgress));
 }
 
 export async function uploadSalesCustomAsset(file: File, category: 'assets' | 'videos', signal?: AbortSignal): Promise<string> {

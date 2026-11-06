@@ -85,6 +85,11 @@ export interface StudioScene {
 }
 
 export interface CanvasProject {
+  nativeCommerce?: { kind: 'sales' | 'workshop' | 'poster'; version: 1; legacyScene?: StudioScene };
+  poster?: { version: 1 | 2; hiddenOutputIds?: string[] };
+  sales?: { draftId?: string; draft?: unknown; hiddenOutputIds?: string[] };
+  workshop?: { batchId?: string; sourceBatchId?: string; hiddenOutputIds?: string[] };
+  viewport?: { x: number; y: number; zoom: number };
   studioScene?: StudioScene;
   draft?: boolean;
   id: string;

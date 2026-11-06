@@ -1,7 +1,6 @@
 import { storageConfigHeaders } from '@client/shared/api/apiClient';
-import { recordChatTokens } from '@client/shared/utils/modelUsage';
+import { posterStageRequest } from './posterStageClient';
 import { apiRequest } from '@client/shared/api/apiRequest';
-import { retryWhenLocalApiUnavailable } from '@client/shared/api/localApiRetry';
 import { pollSingleTask, submitImageGenTask } from '@client/shared/api/generation/generationApi';
 import { generationRecoveryError } from '@client/shared/api/generation/generationRecovery';
 import { classifyGenerationPollResult, imageGenBusinessError } from '@client/shared/api/generation/generationErrors';
@@ -30,18 +29,12 @@ function waitForPosterOperation<T>(operation: Promise<T>, signal?: AbortSignal):
 
 export async function rewriteCoverTitle(item: PosterItem, titleModel: string, signal?: AbortSignal): Promise<string> {
   try {
-    const response = await retryWhenLocalApiUnavailable(() => apiRequest('POST', '/api/generate/headline-title', {
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const data = await posterStageRequest('/api/generate/headline-title', {
         model: titleModel,
         originalTitle: item.originalTitle,
         productName: item.productName,
         imageUrls: [posterModelImageUrl(item.sourceImageUrl, window.location.origin)],
-      }),
-      signal,
-    }), { signal });
-    const data = await response.json().catch(() => ({}));
-    if (data?.success) recordChatTokens({ modelId: data.model || titleModel, type: 'chat', usage: data.usage });
+    }, signal);
     const title = normalizeCoverTitle((data?.data as HeadlineTitleResponse | undefined)?.title || '');
     if (data?.success && title.length >= 4 && title.length <= 18) return title;
     throw new Error(data?.error || '标题改写模型没有返回 4–18 字的有效标题');
@@ -65,9 +58,7 @@ export async function directCoverDesign(
 ): Promise<{ design: HeadlineDesignResponse; memorySampleId: string; memoryEntryIds: string[]; memoryUsageId?: string; memoryRevisionId?: string; memoryWarning?: string }> {
   const signal = options?.signal;
   try {
-    const response = await retryWhenLocalApiUnavailable(() => apiRequest('POST', '/api/generate/headline-design', {
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const data = await posterStageRequest('/api/generate/headline-design', {
         model: titleModel,
         originalTitle: item.originalTitle,
         coverTitle,
@@ -81,11 +72,7 @@ export async function directCoverDesign(
         memorySampleId: options?.memorySampleId || 'auto',
         memoryUsageId: options?.memoryUsageId,
         imageUrls: [posterModelImageUrl(item.sourceImageUrl, window.location.origin)],
-      }),
-      signal,
-    }), { signal });
-    const data = await response.json().catch(() => ({}));
-    if (data?.success) recordChatTokens({ modelId: data.model || titleModel, type: 'chat', usage: data.usage });
+    }, signal);
     if (data?.success && data?.data && typeof data.data === 'object') {
       return {
         design: data.data as HeadlineDesignResponse,

@@ -6,7 +6,7 @@ interface Props {
   skill: SkillItem;
   isFavorite?: boolean;
   onToggleFavorite?: (id: string) => void;
-  onUseSkill: (skill: SkillItem) => void;
+  onUseSkill: (skill: SkillItem, example?: boolean) => void;
   onDetail: (skill: SkillItem) => void;
   onEdit: (skill: SkillItem) => void;
   onDelete: (skill: SkillItem) => void;
@@ -124,6 +124,7 @@ export function SkillCard({
             </button>
           </h3>
 
+          {skill.example && <button type="button" onClick={() => onUseSkill(skill, true)} aria-label={`使用示例 ${skill.title}`}>使用示例</button>}
           <button
             type="button"
             onClick={() => onUseSkill(skill)}

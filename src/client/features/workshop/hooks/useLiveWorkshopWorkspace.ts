@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useRef } from 'react';
 import type { WorkshopSnapshot } from '@shared/contracts/workshopWorkspace';
 import { toWorkshopSnapshot, type WorkshopLiveState } from '../model/workspace/workshopSnapshot';
-import { useWorkshopBatchWorkspace } from './useWorkshopBatchWorkspace';
+import { useWorkshopBatchWorkspace, type WorkshopCanvasScope } from './useWorkshopBatchWorkspace';
 
 export function useLiveWorkshopWorkspace(
   state: WorkshopLiveState,
   apply: (snapshot: WorkshopSnapshot) => void,
   getItems: () => WorkshopLiveState['items'],
+  scope?: WorkshopCanvasScope,
 ) {
   const live = useRef(state);
   live.current = state;
@@ -24,5 +25,5 @@ export function useLiveWorkshopWorkspace(
     state.pausedFrom, state.diversityContext, state.pipelineRuns,
   ]);
   const restore = useCallback((value: WorkshopSnapshot) => { apply(value); }, [apply]);
-  return useWorkshopBatchWorkspace(snapshot, restore, readSnapshot);
+  return useWorkshopBatchWorkspace(snapshot, restore, readSnapshot, scope);
 }

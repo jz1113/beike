@@ -7,6 +7,8 @@ interface Props {
   item: PosterItem;
   index: number;
   isRunning: boolean;
+  allowRetry?: boolean;
+  allowEditTitle?: boolean;
   isEditing: boolean;
   onPreview: (item: PosterItem) => void;
   onDownload: (item: PosterItem, index: number) => void;
@@ -24,7 +26,7 @@ function statusClass(status: PosterItem['status']) {
   return 'bg-slate-950/76 text-white';
 }
 
-export const PosterCoverCard = memo(function PosterCoverCard({ item, index, isRunning, isEditing, onPreview, onDownload, onDownloadOriginalScene, onRetry, onEditTitle, onStartEdit, onStopEdit }: Props) {
+export const PosterCoverCard = memo(function PosterCoverCard({ item, index, isRunning, allowRetry = true, allowEditTitle = true, isEditing, onPreview, onDownload, onDownloadOriginalScene, onRetry, onEditTitle, onStartEdit, onStopEdit }: Props) {
   const [editingTitle, setEditingTitle] = useState('');
   const [editingError, setEditingError] = useState<string | null>(null);
   const editButtonRef = useRef<HTMLButtonElement>(null);
@@ -38,7 +40,7 @@ export const PosterCoverCard = memo(function PosterCoverCard({ item, index, isRu
   const fullTitle = item.coverTitle || item.originalTitle || '未填写原标题';
   const characters = Array.from(fullTitle);
   const cardTitle = characters.length > 27 ? `${characters.slice(0, 27).join('')}…` : fullTitle;
-  const canEdit = !isRunning && !item.importError && ['idle', 'failed', 'interrupted', 'complete'].includes(item.status)
+  const canEdit = allowEditTitle && !isRunning && !item.importError && ['idle', 'failed', 'interrupted', 'complete'].includes(item.status)
     && (item.status === 'complete' || Boolean(item.generatedSceneUrl) || (!item.generationRecoveryRequired && !item.imageTaskId));
   const failed = item.status === 'failed' || item.status === 'interrupted';
   const previewUrl = item.resultUrl || item.generatedSceneUrl || item.sourceImageUrl;
@@ -61,7 +63,7 @@ export const PosterCoverCard = memo(function PosterCoverCard({ item, index, isRu
         <span className="absolute left-2 top-2 text-[11px] font-bold text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.9)]">{String(index + 1).padStart(2, '0')}</span>
         <span className={`absolute bottom-2 right-2 inline-flex max-w-[calc(100%-1rem)] items-center gap-1 truncate rounded-md px-1.5 py-1 text-[10px] font-bold backdrop-blur ${statusClass(item.status)}`} title={item.modelFallbackNote ? `${stageLabel(item.status)} · ${item.modelFallbackNote}` : stageLabel(item.status)}>{item.status === 'complete' ? <CheckCircle2 className="h-3 w-3 shrink-0" /> : item.status === 'failed' ? <AlertCircle className="h-3 w-3 shrink-0" /> : item.status !== 'idle' && item.status !== 'interrupted' ? <Loader2 className="h-3 w-3 shrink-0 animate-spin" /> : null}<span className="truncate">{item.modelFallbackNote ? `${stageLabel(item.status)} · ${item.modelFallbackNote}` : stageLabel(item.status)}</span></span>
       </button>
-      {item.resultUrl ? <button type="button" onClick={() => onDownload(item, index)} className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.9)] transition-transform hover:scale-110" aria-label="下载成品" title="下载成品"><Download className="h-4 w-4" /></button> : failed ? <button type="button" onClick={() => onRetry(item, index)} disabled={isRunning || Boolean(item.importError && !item.imageTaskId && !item.generatedSceneUrl && !item.generationRecoveryRequired)} className={`absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center drop-shadow-[0_1px_2px_rgba(15,23,42,0.9)] transition-transform hover:scale-110 hover:text-white disabled:opacity-40 ${item.status === 'failed' ? 'text-rose-100' : 'text-amber-100'}`} aria-label={retryLabel} title={item.importError && !item.imageTaskId && !item.generatedSceneUrl && !item.generationRecoveryRequired ? '请修正表格后重新导入' : retryLabel}><RotateCcw className="h-4 w-4" /></button> : null}
+      {item.resultUrl ? <button type="button" onClick={() => onDownload(item, index)} className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.9)] transition-transform hover:scale-110" aria-label="下载成品" title="下载成品"><Download className="h-4 w-4" /></button> : failed && allowRetry ? <button type="button" onClick={() => onRetry(item, index)} disabled={isRunning || Boolean(item.importError && !item.imageTaskId && !item.generatedSceneUrl && !item.generationRecoveryRequired)} className={`absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center drop-shadow-[0_1px_2px_rgba(15,23,42,0.9)] transition-transform hover:scale-110 hover:text-white disabled:opacity-40 ${item.status === 'failed' ? 'text-rose-100' : 'text-amber-100'}`} aria-label={retryLabel} title={item.importError && !item.imageTaskId && !item.generatedSceneUrl && !item.generationRecoveryRequired ? '请修正表格后重新导入' : retryLabel}><RotateCcw className="h-4 w-4" /></button> : null}
       {!item.resultUrl && item.generatedSceneUrl && <button type="button" onClick={() => onDownloadOriginalScene(item, index)} className="absolute right-10 top-2 inline-flex h-7 w-7 items-center justify-center text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.9)] transition-transform hover:scale-110" aria-label="下载原生图" title="下载原生图，尚未完成成品规格导出"><Download className="h-4 w-4" /></button>}
       {isEditing ? (
         <div className="mt-2 space-y-1.5">

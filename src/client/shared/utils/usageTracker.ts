@@ -1,3 +1,4 @@
+import { findUsageLog, mergeUsageTokens } from './usageMerge';
 import { buildUsageSummary, type UsageRange, type UsageSummary } from './usageSummary';
 // src/lib/usageTracker.ts
 
@@ -197,17 +198,16 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
       const totalTokens = item.totalTokens || (promptTokens + completionTokens) || 0;
       const taskId = item.taskId?.trim() || undefined;
       const localTaskId = item.localTaskId?.trim() || undefined;
-      const existing = logs.find((log) => (localTaskId && log.localTaskId === localTaskId) || (taskId && log.taskId === taskId));
+      const recordId = item.recordId?.trim() || undefined;
+      const existing = item.scope
+        ? findUsageLog(logs, { scope: item.scope, taskId, localTaskId, recordId })
+        : logs.find(log => !log.scope && ((localTaskId && log.localTaskId === localTaskId) || (taskId && log.taskId === taskId)));
       if (existing) {
         let changed = false;
         if (taskId && !existing.taskId) { existing.taskId = taskId; changed = true; }
         if (localTaskId && !existing.localTaskId) { existing.localTaskId = localTaskId; changed = true; }
-        if (totalTokens > 0 && !(existing.totalTokens || 0)) {
-          existing.promptTokens = promptTokens;
-          existing.completionTokens = completionTokens;
-          existing.totalTokens = totalTokens;
-          changed = true;
-        }
+        if (recordId && !existing.recordId) { existing.recordId = recordId; changed = true; }
+        if (totalTokens > 0) changed = mergeUsageTokens(existing, { promptTokens, completionTokens, totalTokens }) || changed;
         if (item.type === 'video' && item.duration !== undefined) {
           const refreshedCost = Number(estimateModelCost(item.modelId, item.type, {
             mediaCount: item.mediaCount,

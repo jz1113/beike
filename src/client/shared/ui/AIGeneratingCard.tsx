@@ -2,6 +2,7 @@ import React, { createContext, useMemo, useRef } from 'react';
 import { getGenerationProgress } from '@client/shared/utils/generationProgress';
 
 interface AIGeneratingCardProps {
+  statusText?: string;
   task?: {
     id?: string;
     model?: string;
@@ -116,6 +117,7 @@ function SoftSkyGeneratingCard({
  * 🌟 AI 生成中卡片入口组件
  */
 function AIGeneratingCard({
+  statusText,
   task,
   progressNumber,
   showProgressBadge = false,
@@ -130,7 +132,7 @@ function AIGeneratingCard({
       formattedProgress={progress === undefined ? '' : `${progress}%`}
       showProgressBadge={showProgressBadge && progress !== undefined}
       badgePosition={badgePosition}
-      statusHint={task?.submissionRecoveryRequired ? '正在核对原任务，请勿重复提交' : task?.failReason}
+      statusHint={task?.submissionRecoveryRequired ? '正在核对原任务，请勿重复提交' : task?.failReason || statusText}
     />
   );
 }

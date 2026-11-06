@@ -18,11 +18,13 @@ import { createSalesDraftSaver } from '../model/salesDraftSaver';
 import { emptySalesCollection, hasSalesCollection, readSalesCollection, type SalesCollectionState } from '../model/salesCollectionDraft';
 import { emptySalesProductionPlan } from '../model/salesProductionDraft';
 import { patchSalesProductionPlan } from '../model/salesProductionOutputs';
+import { readSalesCanvasDraft, writeSalesCanvasDraft, type SalesCanvasScope } from '../model/salesCanvasDraft';
 
 const storageError = '商品资料暂存在当前页面，本地保存失败。请检查浏览器存储空间后点击“重试保存”，保存成功前请勿关闭页面。';
 
-export function useSalesCollection() {
-  const [state, setState] = useState(readSalesCollection);
+export function useSalesCollection(scope?: SalesCanvasScope) {
+  const canvasScoped = Boolean(scope);
+  const [state, setState] = useState(() => scope ? readSalesCanvasDraft(scope) : readSalesCollection());
   const [error, setError] = useState<string | null>(null);
   const [isCollecting, setIsCollecting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -41,6 +43,7 @@ export function useSalesCollection() {
   if (!saverRef.current) saverRef.current = createSalesDraftSaver(
     () => { setSaveStatus('saved'); setError((previous) => previous === storageError ? null : previous); },
     () => { setSaveStatus('error'); setError(storageError); },
+    scope ? value => writeSalesCanvasDraft(scope, value) : undefined,
   );
   useEffect(() => {
     const flush = () => saverRef.current?.flush();
@@ -75,6 +78,7 @@ export function useSalesCollection() {
   }, []);
 
   const commit = useCallback((recipe: (previous: SalesCollectionState) => SalesCollectionState) => {
+    const previousPlan = stateRef.current.productionPlan;
     const next = recipe(stateRef.current);
     if (next === stateRef.current) return;
     if (summaryRef.current) {
@@ -85,7 +89,8 @@ export function useSalesCollection() {
     setState(next);
     setSaveStatus('saving');
     saverRef.current?.queue(next);
-  }, [cancelSummary]);
+    if (canvasScoped && (next.productionPlan.pendingVideoTask !== previousPlan.pendingVideoTask || next.productionPlan.pendingMixTask !== previousPlan.pendingMixTask || next.productionPlan.pendingVoiceTask !== previousPlan.pendingVoiceTask)) saverRef.current?.flush();
+  }, [cancelSummary, canvasScoped]);
   const autoFaces = useSalesAutoProductFaces(state, commit);
   const applyFaceEdit = (url: string, edit: ProductFaceEdit) => commit((current) => {
     if (current.activeProductId !== state.activeProductId || current.collectedProductUrl !== state.collectedProductUrl

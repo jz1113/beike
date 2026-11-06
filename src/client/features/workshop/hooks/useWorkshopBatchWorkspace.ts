@@ -9,12 +9,15 @@ import { serializeWorkspaceSnapshot, WorkspaceSaveSession } from '../model/works
 import { createWorkspaceCheckpoint } from '../model/workspace/workspaceCheckpoint';
 import { downloadWorkspaceDraft } from '../model/workspace/workspaceDraft';
 import { deleteWorkshopBatches } from '../api/batchManagement';
+import { requestCanvasWorkshopBatch } from '../api/canvasBatch';
 
 function parseBatchResponse(data: unknown): WorkshopBatch {
   return workshopBatchSchema.parse((data as { batch?: unknown }).batch);
 }
 
-export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (snapshot: WorkshopSnapshot) => void, readSnapshot: () => WorkshopSnapshot) {
+export interface WorkshopCanvasScope { canvasProjectId: string; sourceBatchId?: string }
+export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (snapshot: WorkshopSnapshot) => void, readSnapshot: () => WorkshopSnapshot, scope?: WorkshopCanvasScope) {
+  const projectID = scope?.canvasProjectId, sourceID = scope?.sourceBatchId;
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState('正在加载当前批次…');
   const [error, setError] = useState('');
@@ -65,7 +68,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
     setReady(false);
     setStatus('正在加载当前批次…');
     try {
-      const response = await apiFetch('/api/catalog/workshop-batches/active');
+      const response = projectID ? await requestCanvasWorkshopBatch({ canvasProjectId: projectID, sourceBatchId: sourceID }) : await apiFetch('/api/catalog/workshop-batches/active');
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '当前批次读取失败');
       if (!alive.current || sequence !== loadSequence.current) return;
@@ -81,7 +84,7 @@ export function useWorkshopBatchWorkspace(snapshot: WorkshopSnapshot, restore: (
       setError(cause instanceof Error ? cause.message : '当前批次读取失败');
       setStatus('批次加载失败，未覆盖本地内容');
     }
-  }, [adoptBatch, refreshHistory, getSnapshot]);
+  }, [adoptBatch, refreshHistory, getSnapshot, projectID, sourceID]);
 
   useEffect(() => {
     alive.current = true;

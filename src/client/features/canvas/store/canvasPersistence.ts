@@ -11,6 +11,8 @@ let writeVersion = 0;
 let lastFailureAt = 0;
 let saveFailed = false;
 let hydrated = false;
+let readFailed = false;
+export const hasCanvasReadFailure = () => readFailed;
 export const finishCanvasHydration = () => { hydrated = true; };
 export const hasCanvasSaveFailure = () => saveFailed;
 function reportFailure() {
@@ -39,17 +41,18 @@ export const canvasStorage: StateStorage = {
     try {
       const db = await database();
       const manifest = await db.get('meta', name);
+      readFailed = false;
       if (manifest) {
         const projects = await Promise.all(manifest.ids.map((id: string) => db.get('projects', id)));
         if (projects.some(project => !project)) throw new Error('项目数据不完整');
         return restoreLegacy(JSON.stringify({ state: { projects }, version: manifest.version }));
       }
       return restoreLegacy(localStorage.getItem(name));
-    } catch { reportFailure(); return restoreLegacy(localStorage.getItem(name)); }
+    } catch { readFailed = true; reportFailure(); return null; }
   },
   async setItem(name, value) {
     // Route/selection updates can happen before IndexedDB hydration. Never persist that empty initial state.
-    if (!hydrated) return;
+    if (!hydrated || readFailed) return;
     const version = ++writeVersion;
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('canvas-save-start'));
     pending = pending.catch(() => {}).then(async () => {
@@ -66,7 +69,10 @@ export const canvasStorage: StateStorage = {
       saveFailed = false;
       if (version === writeVersion && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('canvas-save-complete'));
     });
-    try { await pending; } catch { reportFailure(); }
+    try {
+      let writing: Promise<void>;
+      do { writing = pending; await writing; } while (writing !== pending);
+    } catch { reportFailure(); }
   },
   async removeItem(name) {
     await pending.catch(() => {});

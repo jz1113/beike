@@ -1,3 +1,5 @@
+import { InspirationToolbar } from './InspirationToolbar';
+import { matchesInspirationSearch } from '../../model/inspirationSearch';
 import { visibleJustifiedRows } from '../../model/justifiedRows';
 import { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react';
 import type { InspirationItem, InspirationUseOptions } from '../../model/inspirationItem';
@@ -5,7 +7,7 @@ import { INSPIRATION_ITEMS } from '../../data/inspirationData';
 import { INSPIRATION_EAGER_COUNT, inspirationAspectRatio } from '../../model/inspirationMedia';
 import { LazyFeedVideo } from './LazyFeedVideo';
 import { FeedImage } from './FeedImage';
-import { INSPIRATION_MEDIA_FILTERS, isInspirationVideo, type InspirationMediaFilter } from './inspirationFilters';
+import { isInspirationVideo, type InspirationMediaFilter } from './inspirationFilters';
 import { HOME_PUBLISHED_EVENT, HOME_PUBLISHED_STORAGE_KEY, readPublishedHomeItems, type PublishedHomeItem } from '@client/shared/home-publish/homePublish';
 import { CanvasShowcase } from './CanvasShowcase';
 import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
@@ -24,6 +26,7 @@ const FEED_GAP = 8;
 export default function InspirationFeed({ onUsePrompt }: Props) {
   const isVisible = useViewVisibility();
   const [mediaFilter, setMediaFilter] = useState<InspirationMediaFilter>('image');
+  const [query, setQuery] = useState('');
   const [published, setPublished] = useState<PublishedHomeItem[]>(() => readPublishedHomeItems());
   const [selectedModalItem, setSelectedModalItem] = useState<InspirationItem | null>(null);
   const [selectedCanvasItem, setSelectedCanvasItem] = useState<PublishedHomeItem | null>(null);
@@ -44,8 +47,8 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
   const filteredItems = useMemo(() => {
     const mine = published.filter(item => isInspirationVideo(item) === (mediaFilter === 'video'));
     const seeded = INSPIRATION_ITEMS.filter(item => isInspirationVideo(item) === (mediaFilter === 'video'));
-    return [...mine, ...seeded];
-  }, [published, mediaFilter]);
+    return [...mine, ...seeded].filter(item => matchesInspirationSearch(item, 'all', query));
+  }, [published, mediaFilter, query]);
 
   useEffect(() => {
     const refresh = () => setPublished(readPublishedHomeItems());
@@ -63,7 +66,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
     setHasStartedBrowsing(false);
-  }, [mediaFilter, published]);
+  }, [mediaFilter, published, query]);
 
   // 用户开始滚动后逐批加载；首批不足一屏时只补到页面可以滚动。
   useEffect(() => {
@@ -149,23 +152,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
   return (
     <div className="w-full space-y-3.5 pt-2 select-none">
       <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-white">精选作品</h2>
-      <div role="tablist" aria-label="素材类型" className="inline-flex rounded-full bg-[#F4F5F8] p-1 dark:bg-[#1B1B1E]">
-        {INSPIRATION_MEDIA_FILTERS.map((item) => {
-          const selected = mediaFilter === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => setMediaFilter(item.id)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${selected ? 'bg-white text-slate-900 shadow-sm dark:bg-[#2C2C32] dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:text-[#8E8E93] dark:hover:text-[#EDEDED]'}`}
-            >
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
+      <InspirationToolbar query={query} onQueryChange={setQuery} mediaFilter={mediaFilter} onMediaChange={setMediaFilter} />
 
       {filteredItems.length === 0 ? (
         <div className="py-16 text-center text-sm text-slate-400">

@@ -1,3 +1,5 @@
+import { PromptBarCreationFlow } from './controls/PromptBarCreationFlow';
+import { creationSkillFlow } from '@client/shared/skills/model/creationSkillFlows';
 import { Plus, ArrowUp } from 'lucide-react';
 import { useAppStore } from '@client/store';
 import { resolveSkillKind } from '@shared/domain/assistant/skills/skillPurpose';
@@ -126,7 +128,10 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
             {quickGenMode === 'agent' && (
               <PromptBarAgentFileChips urls={quickRefImages} onRemove={media.handleRemoveRefImage} />
             )}
-            {isActiveCreationSkill && (
+            {isActiveCreationSkill && activeSkill && creationSkillFlow(activeSkill.id) ? (
+              <PromptBarCreationFlow key={activeSkill.id} skill={activeSkill} refImagesCount={visualRefImages.length}
+                onUpload={() => media.fileInputRef.current?.click()} onClear={handleClearActiveSkill} onPrompt={setQuickPrompt} />
+            ) : isActiveCreationSkill && (
               <PromptBarSkillCustomizeBar
                 key={activeSkill?.id}
                 skill={activeSkill}

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
-import { Clapperboard, Film, X } from 'lucide-react';
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref, type ReactNode } from 'react';
+import { X } from 'lucide-react';
 import { StudioSheet } from '@client/shared/ui/studio/StudioSheet';
 import { useSalesScriptTaxonomy } from '../hooks/useSalesScriptTaxonomy';
 import { patchSalesScript } from '../api/salesScripts';
@@ -10,16 +10,18 @@ import { useSalesProduction } from '../hooks/useSalesProduction';
 import { useSalesTextModels } from '../hooks/useSalesTextModels';
 import { salesFocusClass, salesGhostButtonClass, salesPrimaryButtonClass } from './salesChrome';
 import { SalesAssetBindingPanel } from './SalesAssetBindingPanel';
-import { SalesBottomActionBar } from './SalesBottomActionBar';
 import { SalesFinalPromptPanel } from './SalesFinalPromptPanel';
 import { SalesMusicPicker } from './SalesMusicPicker';
 import { SalesPlanAdaptPanel } from './SalesPlanAdaptPanel';
 import { SalesPresentationModePanel } from './SalesPresentationModePanel';
 import { SalesStoryboardBottomBar } from './SalesStoryboardBottomBar';
 import { SalesVideoSettings } from './SalesVideoSettings';
-import type { SalesEditorView } from './SalesEditorNavigation';
+import type { SalesEditorView } from '../model/salesWorkspace';
 
 import type { SalesLibraryChoice } from '../model/salesWorkspace';
+import type { SalesCanvasStage } from '@shared/domain/sales/salesCanvas';
+import type { SalesCanvasProjection } from '@shared/domain/sales/salesCanvas';
+import { salesCanvasProjection } from '../model/salesCanvasProjection';
 
 export interface SalesProductionHandle {
   prepareDelivery: () => Promise<boolean>;
@@ -27,6 +29,8 @@ export interface SalesProductionHandle {
 }
 
 interface Props {
+  renderCanvasNode?: (stage: SalesCanvasStage, content: ReactNode) => ReactNode;
+  onProjection?: (projection: SalesCanvasProjection) => void;
   ref?: Ref<SalesProductionHandle>;
   libraryChoice?: SalesLibraryChoice | null;
   onChoiceHandled?:(accepted:boolean)=>void;
@@ -48,9 +52,12 @@ interface Props {
 
 export function SalesProductionWorkspace({
   ref, libraryChoice, onChoiceHandled, active, sourceBusy, refreshVersion, view, deliveryStep, onViewChange, onBusyChange,
-  state, onChange, onOpenStage, onEditFaces, onOpenPrompt, onOutputProduced, onStoryboardPreview,
+  state, onChange, onOpenStage, onEditFaces, onOpenPrompt, onOutputProduced, onStoryboardPreview, onProjection, renderCanvasNode = (stage, content) => <div key={stage}>{content}</div>,
 }: Props) {
   const prod = useSalesProduction(state, onChange, refreshVersion, onOutputProduced);
+  const projected = JSON.stringify(salesCanvasProjection(state, prod.busy, prod.assembled));
+  const projectionRef = useRef(onProjection); projectionRef.current = onProjection;
+  useEffect(() => { projectionRef.current?.(JSON.parse(projected)); }, [projected]);
   const storyboard = prod.assembled?.storyboardPreview || '';
   useEffect(() => { onStoryboardPreview?.(storyboard); }, [onStoryboardPreview, storyboard]);
   const { model } = useSalesTextModels(state.summaryModel);
@@ -180,39 +187,10 @@ export function SalesProductionWorkspace({
       )}
       {!deliveryNotice && notice}
 
-      <div className="sales-editor-production" hidden={view !== 'storyboard' && view !== 'delivery'}>
-        <div className="sales-editor-production-body">
-          {sourceBusy && <p className="sales-plan-banner" role="status">商品资料正在处理，完成后即可编辑分镜和生成视频。</p>}
-          {!prod.activeScript || !prod.assembled ? (
-            <div className={view === 'storyboard' ? 'sales-sb-workbench' : 'sales-editor-delivery'}>
-              <div className="sales-editor-empty">
-                <div className="sales-editor-empty-mark">{view === 'delivery' ? <Film size={24} aria-hidden /> : <Clapperboard size={24} aria-hidden />}</div>
-                <h2>{view === 'delivery' ? '选定参考脚本后生成成片' : '选择参考脚本开始编排分镜'}</h2>
-                <p>{verifiedScripts.length > 0 ? '选择一条参考脚本模板，自动搭配匹配当前商品人群的人物与场景。' : '请先在资产库的「动作」文件夹导入分析参考脚本模板。'}</p>
-                <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-                  {verifiedScripts[0] && (
-                    <button type="button" disabled={editingLocked} onClick={() => selectScriptId(verifiedScripts[0].id)} className={salesPrimaryButtonClass}>
-                      选用「{verifiedScripts[0].title}」
-                    </button>
-                  )}
-                  <button type="button" disabled={editingLocked} onClick={() => onOpenStage('scripts')} className={salesGhostButtonClass}>
-                    打开动作素材
-                  </button>
-                </div>
-              </div>
-              {view === 'storyboard'
-                ? <aside className="sales-sb-settings" aria-label="分镜制作设置"><h2>制作设置</h2>{storyboardSettings}</aside>
-                : <SalesBottomActionBar ariaLabel="参考脚本选择" left={storyboardSettings} />}
-            </div>
-          ) : (
-            <>
-              <div hidden={view !== 'storyboard'} className="sales-editor-storyboard">
-                {prod.durationPlanning && (
-                  <div className="sales-plan-banner" role={prod.durationPlanning.error ? 'alert' : 'status'} aria-label="成片模型与分镜时长">
-                    原脚本 {prod.durationPlanning.sourceDurationSec} 秒 · 模型最长 {prod.durationPlanning.modelMaxDurationSec} 秒 · 本次生成 {prod.durationPlanning.targetDurationSec} 秒
-                    {(prod.durationPlanning.error || prod.durationPlanning.notice) && <span className="ml-2">{prod.durationPlanning.error || prod.durationPlanning.notice}</span>}
-                  </div>
-                )}
+      {renderCanvasNode('sales-storyboard', <>
+        {prod.error && <p role="alert" className="mb-3 text-rose-400">{prod.error}</p>}
+        {notice}
+        {prod.activeScript && prod.assembled ? <div className="sales-editor-storyboard">
                 <SalesPlanAdaptPanel
                   script={prod.activeScript.script}
                   preferredModel={state.summaryModel}
@@ -244,10 +222,20 @@ export function SalesProductionWorkspace({
                   settings={storyboardSettings}
                   onNextStep={() => onViewChange('delivery')}
                 />
-              </div>
-              <div hidden={view !== 'delivery'} className="sales-editor-delivery">
+        </div> : <div className="space-y-4">
+          <h3 className="font-semibold">选择参考脚本，编排商品分镜</h3>
+          <p className="text-sm text-slate-400">先在商品节点确认参考图，再选择脚本、人物和场景。</p>
+          {verifiedScripts[0] && <button type="button" disabled={editingLocked} onClick={() => selectScriptId(verifiedScripts[0].id)} className={salesPrimaryButtonClass}>选用「{verifiedScripts[0].title}」</button>}
+          <button type="button" disabled={editingLocked} onClick={() => onOpenStage('scripts')} className={salesGhostButtonClass}>选择脚本素材</button>
+          {storyboardSettings}
+        </div>}
+      </>)}
+      {(['voice', 'video', 'subtitles', 'export'] as const).map(canvasStage => renderCanvasNode(`sales-${canvasStage}`, <>
+        {prod.error && <p role="alert" className="mb-3 text-rose-400">{prod.error}</p>}
+        {prod.activeScript && prod.assembled ? <div className="sales-editor-delivery">
                 <SalesFinalPromptPanel
-                  active={active && view === 'delivery'}
+                  canvasStage={canvasStage}
+                  active={active}
                   notice={deliveryNotice ? notice : undefined}
                   script={prod.activeScript.script}
                   beatBindings={prod.beatBindings}
@@ -261,7 +249,7 @@ export function SalesProductionWorkspace({
                       rankedBgms={prod.rankedBgms}
                       selectedBgm={prod.selectedBgm}
                       disabled={editingLocked}
-                      active={active && view === 'delivery'}
+                      active={active}
                       onPatchPlan={prod.patchPlan}
                       onUploadBgm={(file) => { void prod.uploadCustomSlot('bgm', file); }}
                     />
@@ -284,11 +272,8 @@ export function SalesProductionWorkspace({
                   onMixFinal={() => { void prod.runMixFinal(); }}
                   onCancel={prod.cancel}
                 />
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+        </div> : <div className="beike-node-empty"><p>{{ voice: '分镜确认后，在这里选择音色并生成旁白。', video: '分镜与素材准备好后，在这里设置模型和生成视频。', subtitles: '分镜台词确认后，在这里检查与下载字幕。', export: '视频生成后，在这里合成配音、配乐并下载成片。' }[canvasStage]}</p><button type="button" onClick={() => onViewChange('storyboard')} className={salesGhostButtonClass}>定位分镜节点</button></div>}
+      </>))}
 
       {working && view !== 'delivery' && (
         <div className="sales-editor-task-status" role="status">

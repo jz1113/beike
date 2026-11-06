@@ -4,7 +4,7 @@ import type { BatchProductItem } from '../batchTypes';
 
 it('preserves full adapted prompts and source evidence through single and grid formatting', () => {
   const prompts = [1, 2, 3, 4].map(n => ({ shot_no: n, prompt: `窗边木桌真实侧光${n}，不添加人像`, has_human: false,
-    shot_type: 'pure_product', assembly_source: 'group_skeleton', sourcePrompt: `完整原始反推词${n}`,
+    shot_type: 'pure_product' as const, assembly_source: 'group_skeleton' as const, sourcePrompt: `完整原始反推词${n}`,
     sourceReferenceImageUrl: `sample${n}`, sourceGroupId: 'group', sourceShotNo: n }));
   const formatted = formatAnalyzedStoryboard({ data: { prompts }, item: { coverImage: 'product', title: '手机' } as BatchProductItem, imagePayload: ['product'] });
   expect(formatted.formattedPrompts.map(shot => shot.prompt)).toEqual(prompts.map(shot => shot.prompt));
