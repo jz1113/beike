@@ -12,7 +12,8 @@ export function InspirationToolbar({ query, onQueryChange, mediaFilter, onMediaC
       onKeyDown={event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault(); const index = INSPIRATION_MEDIA_FILTERS.findIndex(item => item.id === mediaFilter);
-        const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + 3) % 3;
+        const count = INSPIRATION_MEDIA_FILTERS.length;
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? count - 1 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + count) % count;
         onMediaChange(INSPIRATION_MEDIA_FILTERS[next].id); event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
       }}>
       {INSPIRATION_MEDIA_FILTERS.map(item => <button key={item.id} type="button" role="tab" aria-selected={mediaFilter === item.id} tabIndex={mediaFilter === item.id ? 0 : -1}

@@ -1,3 +1,4 @@
+import { pollVoiceOperation, reserveVoiceOperation, VOICE_OPERATION_PREFIX } from './salesVoiceOperation';
 import { waitSalesMediaJob } from './salesMediaJobs';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { apiRequest } from '@client/shared/api/apiRequest';
@@ -127,8 +128,20 @@ export async function synthesizeSalesVoiceover(
   const selection = (input.model || 'speech-2.8-hd').trim();
   const model = upstreamModalityModelId('voice', selection);
   signal.throwIfAborted();
-  const clientTaskId = `sales_vo_${crypto.randomUUID()}`;
   const gatewayHeaders = getGatewayClientHeaders(selection);
+  const operation = onTaskSubmitted
+    ? await reserveVoiceOperation([input, model, gatewayHeaders], true)
+    : undefined;
+  const clientTaskId = operation?.id || `sales_vo_${crypto.randomUUID()}`;
+  if (operation) {
+    await onTaskSubmitted?.(operation.id);
+    if (!operation.fresh) {
+      const recovered = await pollSalesVoiceTask(operation.id, signal);
+      operation.complete();
+      return recovered;
+    }
+  }
+  signal.throwIfAborted();
   const response = await apiFetch('/api/generate/audio', {
     method: 'POST',
     signal,
@@ -156,7 +169,9 @@ export async function synthesizeSalesVoiceover(
     await onTaskSubmitted?.(id);
     return pollSalesVoiceTask(id, signal);
   }
-  return voiceResult(data);
+  const result = voiceResult(data);
+  operation?.complete();
+  return result;
 }
 
 function voiceResult(data: Record<string, unknown>) {
@@ -166,7 +181,7 @@ function voiceResult(data: Record<string, unknown>) {
 }
 
 export async function pollSalesVoiceTask(id: string, signal: AbortSignal, onProgress?: (message: string) => void) {
-  return voiceResult(await waitSalesMediaJob(id, signal, onProgress));
+  return voiceResult(await (id.startsWith(VOICE_OPERATION_PREFIX) ? pollVoiceOperation(id, signal, onProgress) : waitSalesMediaJob(id, signal, onProgress)));
 }
 
 export async function submitAndPollSalesVideo(

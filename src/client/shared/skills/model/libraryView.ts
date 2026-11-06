@@ -1,3 +1,6 @@
+import { skillDisplayDescription } from '@shared/domain/assistant/skills/skillDisplay';
+import { skillModelLogo } from '@client/shared/icons/assistant/skillModelLogo';
+import { BUILTIN_SKILL_PREVIEWS } from './builtinSkillPreviews';
 import { resolveSkillKind as skillPresentation } from '@shared/domain/assistant/skills/skillPurpose';
 export { skillPresentation };
 import type { SkillLibraryEntry } from '@shared/domain/skills/library';
@@ -37,12 +40,13 @@ export function librarySkillItem(entry: SkillLibraryEntry): SkillItem {
   }
   const skill = entry.content;
   const category = skill.category || skill.meta?.tags?.[0] || '通用';
+  const preview = skill.isBuiltin ? BUILTIN_SKILL_PREVIEWS[skill.id] : undefined;
   return {
     id: skillEntryKey(entry),
     title: skill.displayName || skill.name,
     runtime: entry.kind,
     presentation: skillPresentation(skill),
-    description: skill.description,
+    description: skillDisplayDescription(skill),
     models: [skill.meta?.defaultVideoModel, skill.meta?.defaultImageModel].filter(Boolean).join(' · '),
     category,
     badge: skillPresentation(skill) === 'creation' ? 'AI生成' : skill.isBuiltin ? '官方 · Agent' : 'Agent',
@@ -57,7 +61,8 @@ export function librarySkillItem(entry: SkillLibraryEntry): SkillItem {
     defaultVideoModel: skill.meta?.defaultVideoModel,
     defaultImageModel: skill.meta?.defaultImageModel,
     isOfficial: Boolean(skill.isBuiltin),
-    coverUrl: skill.meta?.coverUrl,
+    coverUrl: skill.meta?.coverUrl || preview?.cover || skillModelLogo(skill),
+    example: preview?.example,
     prompt: skill.markdownDoc || skill.prompt,
     genres: (skill.meta?.genres || []).filter((genre): genre is SkillOutputGenre => ['图片', '视频', '音频', '文本'].includes(genre)),
     isFavorite: content.isFavorite === true,

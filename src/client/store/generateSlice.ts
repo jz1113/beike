@@ -1,3 +1,4 @@
+import { canvasGenerationPayload } from './canvasGenerationSessions';
 /** 生图会话与进行中任务：UI 草稿 + 本地缓存；服务端列表由 TanStack Query 持有 */
 import type { StateCreator } from 'zustand';
 import type { ChatSession, GenerationTask } from '@client/store/appStoreTypes';
@@ -176,6 +177,11 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
   setPreviewQueue: (previewQueue) => setDrawing({ previewQueue }),
 
   addGenerationTask: (task, isNewSession = false) => setDrawing((state) => {
+    const canvas = canvasGenerationPayload([task], state);
+    if (canvas) {
+      persistDrawingStateToStorage(canvas.generationTasks, canvas.sessions, undefined, { immediate: true });
+      return canvas;
+    }
     let sessions = pruneEmptySessions(state.sessions, state.currentSessionId);
     let targetSessionId = state.currentSessionId;
     let currentSessionTitle = deriveSessionTitleFromTasks([task], task.mediaType === 'video' ? '智能视频创作' : 'AI 生图创作');

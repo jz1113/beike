@@ -1,3 +1,6 @@
+import { CanvasArchiveDialog } from './CanvasArchiveDialog';
+import { CanvasScenePreview } from './CanvasScenePreview';
+import { filterCanvasProjects } from '../../model/canvasProjectListing';
 import { CanvasCreateDialog } from './CanvasCreateDialog';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import { useCanvasHydrated } from '../../hooks/useCanvasHydrated';
@@ -66,6 +69,7 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
   };
 
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const handleSelectCard = (id: string) => {
     selectProject(id);
@@ -75,9 +79,8 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
   const [showAll, setShowAll] = useState(false);
   const [query, setQuery] = useState('');
   const search = query.trim().toLocaleLowerCase();
-  const displayedProjects = search
-    ? projects.filter(project => project.title.toLocaleLowerCase().includes(search))
-    : maxDisplay > 0 && !showAll ? projects.slice(0, maxDisplay) : projects;
+  const filtered = filterCanvasProjects(projects, { query, order: 'updated', period: 'all' });
+  const displayedProjects = !search && maxDisplay > 0 && !showAll ? filtered.slice(0, maxDisplay) : filtered;
   const hasRecentProjects = projects.length > 0;
 
   const createCard = (
@@ -96,6 +99,8 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
 
   return (
     <section className={`w-full space-y-4 select-none ${className}`}>
+      {importing && <CanvasArchiveDialog mode="import" onClose={() => setImporting(false)} onRestored={project => handleSelectCard(project.id)} />}
+      {!compact && <button type="button" disabled={!hydrated} onClick={() => setImporting(true)}>导入项目备份</button>}
       {creating && <CanvasCreateDialog onClose={() => setCreating(false)} onCreate={kind => {
         const project = createProject(undefined, kind);
         setCreating(false);
@@ -175,6 +180,7 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
                 <span className="flex h-full flex-col items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                   <LayoutGrid aria-hidden="true" className="h-6 w-6" />{detail}
                 </span>
+                {!cover && <CanvasScenePreview scene={proj.studioScene} />}
                 {cover && <img key={cover} src={cover} loading="lazy" alt=""
                   onError={event => { event.currentTarget.hidden = true; }}
                   className="absolute inset-0 w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-300"

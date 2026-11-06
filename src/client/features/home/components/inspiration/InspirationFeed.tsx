@@ -1,3 +1,4 @@
+import { InspirationToolbar } from './InspirationToolbar';
 import { matchesInspirationSearch } from '../../model/inspirationSearch';
 import { visibleJustifiedRows } from '../../model/justifiedRows';
 import { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react';
@@ -6,7 +7,7 @@ import { INSPIRATION_ITEMS } from '../../data/inspirationData';
 import { INSPIRATION_EAGER_COUNT, inspirationAspectRatio } from '../../model/inspirationMedia';
 import { LazyFeedVideo } from './LazyFeedVideo';
 import { FeedImage } from './FeedImage';
-import { INSPIRATION_MEDIA_FILTERS, isInspirationVideo, type InspirationMediaFilter } from './inspirationFilters';
+import { isInspirationVideo, type InspirationMediaFilter } from './inspirationFilters';
 import { HOME_PUBLISHED_EVENT, HOME_PUBLISHED_STORAGE_KEY, readPublishedHomeItems, type PublishedHomeItem } from '@client/shared/home-publish/homePublish';
 import { CanvasShowcase } from './CanvasShowcase';
 import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
@@ -151,24 +152,7 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
   return (
     <div className="w-full space-y-3.5 pt-2 select-none">
       <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-white">精选作品</h2>
-      <div role="tablist" aria-label="素材类型" className="inline-flex rounded-full bg-[#F4F5F8] p-1 dark:bg-[#1B1B1E]">
-        <input type="search" aria-label="搜索作品" placeholder="搜索作品" value={query} onChange={event => setQuery(event.target.value)} className="rounded-lg border border-current/20 bg-transparent px-3 py-1 text-sm" />
-        {INSPIRATION_MEDIA_FILTERS.map((item) => {
-          const selected = mediaFilter === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => setMediaFilter(item.id)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${selected ? 'bg-white text-slate-900 shadow-sm dark:bg-[#2C2C32] dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:text-[#8E8E93] dark:hover:text-[#EDEDED]'}`}
-            >
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
+      <InspirationToolbar query={query} onQueryChange={setQuery} mediaFilter={mediaFilter} onMediaChange={setMediaFilter} />
 
       {filteredItems.length === 0 ? (
         <div className="py-16 text-center text-sm text-slate-400">

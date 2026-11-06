@@ -23,11 +23,11 @@ interface Props {
   onClose: () => void;
   onReadBatch: (id: string) => Promise<WorkshopBatch>;
   onOpenGenerationView: (batch: WorkshopBatch) => void;
-  onDuplicateBatch: (id: string) => Promise<void>;
-  onClearHistory: () => Promise<void>;
-  onDeleteBatches: (ids: string[]) => Promise<BatchDeleteResult>;
-  onRenameBatch: (id: string, name: string) => Promise<void>;
-  onCreateBatch: () => void;
+  onDuplicateBatch?: (id: string) => Promise<void>;
+  onClearHistory?: () => Promise<void>;
+  onDeleteBatches?: (ids: string[]) => Promise<BatchDeleteResult>;
+  onRenameBatch?: (id: string, name: string) => Promise<void>;
+  onCreateBatch?: () => void;
   onError: (message: string) => void;
 }
 
@@ -113,14 +113,14 @@ export function BatchHistoryPanel({ activeBatch, historyBatches, historyLoading,
     requestAnimationFrame(() => Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>('button[data-batch-id]') || []).find(row => row.dataset.batchId === id)?.focus());
   };
   const duplicate = async () => {
-    if (!selectedBatch || productionBusy || isBusy) return;
+    if (!selectedBatch || productionBusy || isBusy || !onDuplicateBatch) return;
     setIsBusy(true); setActionError('');
     try { await onDuplicateBatch(selectedBatch.id); onClose(); }
     catch (error) { reportError(error, '复制批次失败'); }
     finally { setIsBusy(false); }
   };
   const confirmDelete = async () => {
-    if (!deleteTarget || isBusy) return;
+    if (!deleteTarget || isBusy || !onDeleteBatches || !onClearHistory) return;
     setIsBusy(true); setDeleteError(''); setActionError('');
     try {
       if (deleteTarget === 'all') { await onClearHistory(); readSequence.current++; setSelection(null); setCheckedIds([]); }
@@ -138,7 +138,7 @@ export function BatchHistoryPanel({ activeBatch, historyBatches, historyLoading,
     finally { setIsBusy(false); }
   };
   const saveName = async (name: string) => {
-    if (!selectedBatch || isBusy) return;
+    if (!selectedBatch || isBusy || !onRenameBatch) return;
     setIsBusy(true); setActionError('');
     try {
       await onRenameBatch(selectedBatch.id, name);
@@ -173,12 +173,12 @@ export function BatchHistoryPanel({ activeBatch, historyBatches, historyLoading,
           <div className="history-brand"><span className="history-brand-icon"><Clock3 size={19} strokeWidth={1.6} /></span><div className="history-heading"><h2>历史批次</h2><span>查看、续做和整理已保存的批次</span></div><span className="history-count">{archived.length}</span></div>
           <div className="history-header-actions">
             <button type="button" disabled={historyLoading || isBusy} onClick={() => void onRefresh()} aria-label="刷新批次历史" title="刷新" className="history-icon-button"><RefreshCw size={16} strokeWidth={1.6} className={historyLoading ? 'animate-spin' : ''} /></button>
-            <button type="button" disabled={isBusy || productionBusy} onClick={onCreateBatch} aria-label="新建批次" className="history-secondary-button history-create"><Plus size={15} /><span>新建批次</span></button>
-            <WorkshopActionMenu label="批次操作" icon={<MoreHorizontal size={16} />} disabled={isBusy || historyLoading}>
+            {onCreateBatch && <button type="button" disabled={isBusy || productionBusy} onClick={onCreateBatch} aria-label="新建批次" className="history-secondary-button history-create"><Plus size={15} /><span>新建批次</span></button>}
+            {onDeleteBatches && onClearHistory && <WorkshopActionMenu label="批次操作" icon={<MoreHorizontal size={16} />} disabled={isBusy || historyLoading}>
               <button type="button" className={workshopMenuItemClass} disabled={!archived.length || managing} onClick={() => setManaging(true)}><CheckSquare size={15} />选择批次</button>
               <button type="button" className={workshopMenuItemClass} disabled={!emptyBatches.length} onClick={() => requestDelete({ ids: emptyBatches.map(batch => batch.id), title: `清理 ${emptyBatches.length} 个空批次？` })}><Archive size={15} />清理空批次（{emptyBatches.length}）</button>
               <button type="button" className={workshopMenuItemClass} onClick={() => requestDelete('all')}><Trash2 size={15} />清空全部历史记录</button>
-            </WorkshopActionMenu>
+            </WorkshopActionMenu>}
             <span className="history-header-divider" />
             <button type="button" disabled={isBusy} onClick={onClose} className="history-icon-button" aria-label="关闭批次历史"><X size={19} strokeWidth={1.6} /></button>
           </div>
@@ -210,7 +210,7 @@ export function BatchHistoryPanel({ activeBatch, historyBatches, historyLoading,
               const next = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : Math.max(0, Math.min(rows.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)));
               rows[next]?.focus();
             }}>
-              {visible.length ? <div className="history-record-list">{visible.map(batch => <BatchHistoryRecord key={batch.id} batch={batch} selected={selection?.id === batch.id} selectionMode={managing} checked={checkedIds.includes(batch.id)} disabled={isBusy} onView={() => managing ? toggleChecked(batch.id) : void viewBatch(batch.id)} onRename={() => void renameFromList(batch.id)} />)}</div>
+              {visible.length ? <div className="history-record-list">{visible.map(batch => <BatchHistoryRecord key={batch.id} batch={batch} selected={selection?.id === batch.id} selectionMode={managing} checked={checkedIds.includes(batch.id)} disabled={isBusy} onView={() => managing ? toggleChecked(batch.id) : void viewBatch(batch.id)} onRename={onRenameBatch ? () => void renameFromList(batch.id) : undefined} />)}</div>
                 : <div className="history-list-empty"><Archive size={28} strokeWidth={1.3} /><p>{historyLoading ? '正在读取历史批次…' : query || filter !== 'all' ? '没有符合条件的批次' : '还没有历史批次'}</p>{(query || filter !== 'all') && <button type="button" onClick={() => { setQuery(''); setFilter('all'); }}>重置搜索与筛选</button>}</div>}
             </div>
             {activeBatch && <button type="button" className="history-current" disabled={isBusy} onClick={onClose} aria-label={`返回当前批次 ${batchHistoryTitle(activeBatch)}`}><span className="history-current-dot" /><span className="history-current-label"><span>当前工作批次</span><span title={batchHistoryTitle(activeBatch)}>{batchHistoryTitle(activeBatch)}</span></span><ArrowRight size={14} /></button>}
@@ -220,7 +220,7 @@ export function BatchHistoryPanel({ activeBatch, historyBatches, historyLoading,
             <div ref={detailRef} className="history-detail-scroll">
               {selectedBatch ? <div className="history-detail-content">
                 <section key={selectedBatch.id} className="history-overview">
-                  <div className="history-title-row"><h3>{batchHistoryTitle(selectedBatch)}</h3><button type="button" disabled={isBusy || managing} onClick={() => setEditing(true)} className="history-secondary-button history-rename-button" aria-label="重命名批次"><Pencil size={13} strokeWidth={1.6} />重命名</button></div>
+                  <div className="history-title-row"><h3>{batchHistoryTitle(selectedBatch)}</h3>{onRenameBatch && <button type="button" disabled={isBusy || managing} onClick={() => setEditing(true)} className="history-secondary-button history-rename-button" aria-label="重命名批次"><Pencil size={13} strokeWidth={1.6} />重命名</button>}</div>
                   <div className="history-overview-meta"><BatchHistoryArchiveLabel batch={selectedBatch} /><span>更新于 {formatBatchHistoryDate(selectedBatch.updatedAt)}</span><details className="history-metadata"><summary>信息<ChevronDown size={12} /></summary><div><p className="history-batch-code">{batchHistoryCode(selectedBatch)}</p><p>创建于 {formatBatchHistoryDate(selectedBatch.createdAt)}</p><p className="history-batch-id">完整标识 {selectedBatch.id}</p></div></details></div>
                   <BatchHistoryStats batch={selectedBatch} />
                 </section>
@@ -230,7 +230,7 @@ export function BatchHistoryPanel({ activeBatch, historyBatches, historyLoading,
               </div> : selection ? <div className="history-loading" role={selection.error ? 'alert' : 'status'}>{selection.error ? <><Archive size={32} strokeWidth={1.4} /><p>{selection.error}</p><button type="button" onClick={() => void viewBatch(selection.id)}>重新读取</button></> : <><Loader2 size={24} className="animate-spin" /><p>正在读取批次内容…</p></>}</div>
                 : <div className="history-loading"><Archive size={30} strokeWidth={1.4} /><p>{historyLoading ? '正在读取历史批次…' : !archived.length ? '还没有历史批次' : !visible.length ? '没有符合条件的批次' : '选择批次查看内容'}</p>{!historyLoading && archived.length > 0 && visible.length > 0 && <span className="history-loading-hint">从左侧列表选择一个批次，查看商品、成图和交付状态</span>}</div>}
             </div>
-            {selectedBatch && !managing && <div className="history-detail-footer"><div className="history-footer-actions"><button type="button" disabled={isBusy} aria-label="删除此批次" title="删除此批次" className="history-icon-button history-delete-button" onClick={() => requestDelete({ ids: [selectedBatch.id], title: '删除此批次？' })}><Trash2 size={16} /></button><button type="button" disabled={isBusy || productionBusy || (!selectedBatch.snapshot.items.length && !selectedBatch.snapshot.batchInputText.trim())} onClick={() => void duplicate()} title={productionBusy ? '当前任务结束后可复制' : '创建副本并继续制作'} className="history-secondary-button"><Copy size={15} strokeWidth={1.7} />{isBusy ? '正在处理…' : '复制续做'}</button><button type="button" disabled={isBusy || !hasTasks} onClick={() => { onOpenGenerationView(selectedBatch); onClose(); }} className="history-primary-button">查看交付<ArrowUpRight size={15} /></button></div></div>}
+            {selectedBatch && !managing && <div className="history-detail-footer"><div className="history-footer-actions">{onDeleteBatches && <button type="button" disabled={isBusy} aria-label="删除此批次" title="删除此批次" className="history-icon-button history-delete-button" onClick={() => requestDelete({ ids: [selectedBatch.id], title: '删除此批次？' })}><Trash2 size={16} /></button>}{onDuplicateBatch && <button type="button" disabled={isBusy || productionBusy || (!selectedBatch.snapshot.items.length && !selectedBatch.snapshot.batchInputText.trim())} onClick={() => void duplicate()} title={productionBusy ? '当前任务结束后可复制' : '创建副本并继续制作'} className="history-secondary-button"><Copy size={15} strokeWidth={1.7} />{isBusy ? '正在处理…' : '复制续做'}</button>}<button type="button" disabled={isBusy || !hasTasks} onClick={() => { onOpenGenerationView(selectedBatch); onClose(); }} className="history-primary-button">查看交付<ArrowUpRight size={15} /></button></div></div>}
           </main>
         </div>
         {actionError && !deleteTarget && <footer role="alert" className="history-error"><span>{actionError}</span><button type="button" onClick={() => setActionError('')} aria-label="关闭操作提示"><X size={15} /></button></footer>}

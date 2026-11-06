@@ -1,3 +1,7 @@
+import { useModalDialog } from '@client/shared/hooks/useModalDialog';
+import type { WorkshopBatch } from '@shared/workshopSnapshot';
+import { BatchHistoryPanel } from './components/history/BatchHistoryPanel';
+import { BatchWorkshopHistoryPreview } from './components/history/BatchWorkshopHistoryPreview';
 import { StudioTaskRecordsButton } from '@client/shared/ui/studio/StudioTaskRecords';
 import { useEffect, useRef, useState } from 'react';
 import { workshopCanvasStages, type WorkshopCanvasProjection, type WorkshopCanvasStage } from '@shared/domain/workshop/workshopCanvas';
@@ -19,6 +23,20 @@ export interface WorkshopCanvasControllerProps {
 export default function WorkshopCanvasController({ projectId, sourceBatchId, nodes, blockReasons, onProjection, onSkills }: WorkshopCanvasControllerProps) {
   const runner = useBatchWorkshopRunner({ canvasProjectId: projectId, sourceBatchId });
   const [settings, setSettings] = useState(false);
+  const [history, setHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [historyBatch, setHistoryBatch] = useState<WorkshopBatch>();
+  const [historyExporting, setHistoryExporting] = useState(false);
+  const closeHistoryBatch = () => { if (!historyExporting) setHistoryBatch(undefined); };
+  const historyDialog = useModalDialog(Boolean(historyBatch), closeHistoryBatch);
+  const refreshHistory = async () => {
+    setLoadingHistory(true);
+    setHistoryError('');
+    try { await runner.refreshBatchHistory(); }
+    catch (error) { setHistoryError(error instanceof Error ? error.message : '批次历史读取失败'); }
+    finally { setLoadingHistory(false); }
+  };
   const latest = useRef(onProjection); latest.current = onProjection;
   const projection = runner.workspaceReady && runner.activeBatch ? JSON.stringify(workshopCanvasProjection(runner.activeBatch.id, runner.items, {
     collecting: runner.isCollecting, analyzing: runner.isAnalyzingAll, generating: runner.isGeneratingBatch, exporting: runner.isExportingZip,
@@ -27,12 +45,26 @@ export default function WorkshopCanvasController({ projectId, sourceBatchId, nod
   const focusStage = (stage: WorkshopCanvasStage) => focusCanvasBusinessNode(nodes.find(node => node.stage === stage)?.id);
   return <>
     {nodes.map(node => <CanvasBusinessNodePanel key={node.id} nodeId={node.id} maxHeight={node.stage === 'generate' ? 580 : 680} label={`${workshopCanvasStages[node.stage]}节点操作`}>
-      {node.stage === 'export' && <StudioTaskRecordsButton domain="workshop" />}
+      {node.stage === 'export' && <div className="flex flex-wrap gap-2">
+        <StudioTaskRecordsButton domain="workshop" />
+        <button type="button" onClick={() => { setHistory(true); void refreshHistory(); }}>历史批次</button>
+      </div>}
       <WorkspaceSaveNotice error={runner.workspaceError} status={runner.workspaceStatus} onRetry={runner.workspaceSaveActions.retry} onDownload={runner.workspaceSaveActions.download} onReload={runner.reloadWorkspace} />
       {!runner.workspaceReady ? <div className="p-4" role="status">{runner.workspaceError || '正在读取本项目的商品与任务…'}{runner.workspaceError && <button type="button" onClick={() => void runner.reloadWorkspace()}>重新加载</button>}</div>
         : blockReasons[node.stage] ? <p role="alert" className="p-4 text-rose-400">{blockReasons[node.stage]}</p>
           : <WorkshopCanvasStages runner={runner} stage={node.stage} onStage={focusStage} onSettings={() => setSettings(true)} onSkills={onSkills} />}
     </CanvasBusinessNodePanel>)}
+    {history && <BatchHistoryPanel activeBatch={runner.activeBatch} historyBatches={runner.historyBatches}
+      historyLoading={loadingHistory} historyError={historyError} productionBusy={runner.flow.busy}
+      onClose={() => setHistory(false)} onRefresh={refreshHistory} onReadBatch={runner.readBatch}
+      onOpenGenerationView={setHistoryBatch} onError={runner.showToast} />}
+    {historyBatch && <div className="fixed inset-0 z-[70] grid place-items-center bg-black/60 p-4">
+      <div ref={historyDialog} role="dialog" aria-modal="true" aria-label="历史批次交付" tabIndex={-1}
+        className="max-h-[90vh] w-full max-w-5xl space-y-4 overflow-auto rounded-xl bg-white p-4 dark:bg-[#18191c]">
+        <BatchWorkshopHistoryPreview batch={historyBatch} runner={runner} isHistoryExporting={historyExporting}
+          setIsHistoryExporting={setHistoryExporting} onClose={closeHistoryBatch} />
+      </div>
+    </div>}
     <BatchPreviewLightbox previewImageUrl={runner.previewImageUrl} previewGallery={runner.previewGallery} closeGalleryPreview={runner.closeGalleryPreview} setGalleryIndex={runner.setGalleryIndex} handleDownloadSingleTaskImage={runner.handleDownloadSingleTaskImage} />
     <BatchWorkshopSettings runner={runner} isOpen={settings} onClose={() => setSettings(false)} onOpenSkills={onSkills} />
     {runner.toastMsg && <p role="status" className="fixed bottom-8 left-1/2 z-[70] -translate-x-1/2 rounded-xl bg-slate-900 px-5 py-3 text-sm text-white shadow-xl">{runner.toastMsg}</p>}

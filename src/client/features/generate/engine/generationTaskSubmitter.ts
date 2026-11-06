@@ -2,12 +2,12 @@ import { useAppStore, type GenerationTask } from '@client/store';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { getGatewayClientHeaders, getModelCredentials } from '@client/shared/api/gatewayClient';
 import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
-import { normalizeImageUrlToStandardJpg, formatDisplayModel, getAspectRatioFromSize } from '@shared/domain/media/drawing';
+import { normalizeImageUrlToStandardJpg, getAspectRatioFromSize } from '@shared/domain/media/drawing';
 import { prepareVideoSubmissionInput } from './videoSubmissionInput';
 import { prepareImageSubmission } from './prepareImageSubmission';
 import { isTaskVideoReference } from '@client/shared/media/mediaHelper';
 import { prepareVideoReferences } from './prepareVideoReferences';
-import { recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
+import { recordSubmissionUsage } from './generationSubmissionUsage';
 import { logLatencyAudit } from '@shared/domain/core/latencyAudit';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { loadPromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
@@ -376,19 +376,8 @@ export async function submitSingleGenerationTask(
 
   (pollCounts as any)[`_start_${t.id}`] = Date.now();
 
-  const resolvedModelId = data.model || t.model || (video ? 'doubao-seedance-2.5' : isAudio ? 'speech-2.8-hd' : 'gpt-image-2');
 
-  recordMediaTaskUsage({
-    localTaskId: t.id,
-    taskId: typeof data.taskId === 'string' ? data.taskId : undefined,
-    modelId: resolvedModelId,
-    modelName: formatDisplayModel(resolvedModelId, video),
-    type: isAudio ? 'audio' : video ? 'video' : 'image',
-    mediaCount: 1,
-    duration: video ? (t.videoDuration || 5) : undefined,
-    resolution: video ? t.videoResolution : undefined,
-    usage: data.usage,
-  });
+  recordSubmissionUsage(t, data);
 
   const finalResultUrl = data.resultUrl || data.audioUrl;
   if (finalResultUrl) {

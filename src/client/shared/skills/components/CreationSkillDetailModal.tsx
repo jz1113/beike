@@ -1,3 +1,5 @@
+import { CreationSkillFlowGuide } from './CreationSkillFlowGuide';
+import { creationSkillFlow } from '../model/creationSkillFlows';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -63,6 +65,7 @@ export function CreationSkillDetailModal({
   onClose,
   onUse,
 }: Props) {
+  const flow = creationSkillFlow(item.id.replace(/^assistant:/, ''));
   const dialogRef = useModalDialog(true, onClose);
   const [preview, setPreview] = useState(0);
   const [activeFile, setActiveFile] = useState('SKILL.md');
@@ -254,6 +257,9 @@ export function CreationSkillDetailModal({
         </div>
 
         {/* 固定底部主要操作，长内容滚动时仍可使用技能 */}
+        {flow && <CreationSkillFlowGuide flow={flow} example={item.example && {
+          prompt: item.example.prompt, referenceImages: item.example.referenceImages || [],
+        }} onExample={() => onUse(item.example?.prompt || flow.example, item.example?.referenceImages)} />}
         <footer className="flex shrink-0 items-center justify-end bg-white/95 px-6 pb-5 pt-3 backdrop-blur-md dark:bg-[#18191E]/95">
           <button
             type="button"

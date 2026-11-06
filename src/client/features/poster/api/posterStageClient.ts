@@ -23,7 +23,7 @@ export async function posterStageRequest(path: '/api/generate/headline-title' | 
         if (missing?.code !== 'operation_not_found') throw generationRecoveryError('后端阶段回执接口不可用，请重启后端后核对；本次未提交模型');
       } else response = receipt;
     }
-    if (!response && !sameUsageScope(scope, createUsageScope('chat', selection, scopeHeaders))) throw generationRecoveryError('原操作渠道已变更，请恢复原渠道或开始新操作；本次未提交模型');
+    if (!response && operationKey && !sameUsageScope(scope, createUsageScope('chat', selection, scopeHeaders))) throw generationRecoveryError('原操作渠道已变更，请恢复原渠道或开始新操作；本次未提交模型');
     response ??= await retryWhenLocalApiUnavailable(() => apiRequest('POST', path, {
       headers: { 'Content-Type': 'application/json', ...(operationKey ? { 'x-idempotency-key': operationKey } : {}) },
       body: JSON.stringify(wireBody), signal,

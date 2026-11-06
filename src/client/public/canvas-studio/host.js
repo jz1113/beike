@@ -105,7 +105,9 @@ window.addEventListener('message', function initialize(event) {
     return {type, url:data};
   }
   const pendingNodes = new Map();
-  let liveScene = scene, renderNodes, loadLocalAsset, visual;
+  const publisher = window.beikeCanvasCreateScenePublisher(update => parent.postMessage({...update, projectId},event.origin));
+  window.addEventListener('pagehide', publisher.flush);
+  let liveScene = scene, renderNodes, renderConnections, loadLocalAsset, visual;
   const commands = {
     read: () => liveScene,
     update(nodeId, expectedTaskId, patch) {
@@ -126,6 +128,10 @@ window.addEventListener('message', function initialize(event) {
   };
   window.beikeStudio = {
     mergeConfigs, modelFor, normalize, chatBase, taskCommands: commands,
+    execute(nodeId) {
+      window.dispatchEvent(new CustomEvent('jiubanbn-agent-action',{detail:{action:'execute_node',payload:{nodeId}}}));
+    },
+    replaceConnections(scene) { liveScene = scene; renderConnections(scene.connections); },
     libraryMessage(kind, data={}) { parent.postMessage({kind, projectId, ...data},event.origin); },
     async collectMedia(entries, getBlob) {
       const items=[];
@@ -187,12 +193,13 @@ window.addEventListener('message', function initialize(event) {
           throw Error(node.type === 'gen-video' ? '此画布生成入口支持图片和视频参考，请移除其他素材。' : '图片生成需要图片参考，请移除其他类型的素材。');
         }
         const refs = await Promise.all(inputs.map(item => stableReference(item, loadAsset)));
-        parent.postMessage({kind:'studio:generate', projectId, request:{
-          taskId,model:settings.model,prompt,refs,imageQuality:settings.gptImageQuality,ratio:settings.ratio,resolution:settings.resolution,duration:parseFloat(settings.duration) || undefined,
+        parent.postMessage({kind:'studio:generate', projectId, nodeId:node.id, request:{
+          taskId,model:settings.model,prompt,refs,optimizePrompt:node.type === 'gen-video' && settings.beikeOptimizePrompt === true && settings.beikeVideoWorkflow !== 'w3-copy',imageQuality:settings.gptImageQuality,ratio:settings.ratio,resolution:settings.resolution,duration:parseFloat(settings.duration) || undefined,
         }},event.origin);
       } catch(error) { pendingNodes.delete(node.id); setGeneratingVisual(node.id, false); graph.updateNode(node.id,{beikeTaskId:undefined,isGenerating:false,errorMsg:error.message}); }
     },
-    listen(setNodes, getNodes, setGeneratingVisual, recordVersion, loadAsset) {
+    listen(setNodes, getNodes, setGeneratingVisual, recordVersion, loadAsset, setConnections) {
+      renderConnections = setConnections;
       renderNodes = setNodes;
       loadLocalAsset = loadAsset;
       visual = setGeneratingVisual;
@@ -231,7 +238,7 @@ window.addEventListener('message', function initialize(event) {
     },
     load: () => scene && {...scene,nodes:scene.nodes.map(node => normalize(node.type === 'gen-speech' && node.isGenerating
       ? {...node,isGenerating:false,beikeTaskId:undefined,errorMsg:'上次语音请求尚未回写，请先查看贝壳云图生成历史。'} : node))},
-    save: scene => { liveScene = scene; parent.postMessage({kind:'studio:save', projectId, scene}, event.origin); },
+    save: scene => { liveScene = scene; publisher.queue(scene); },
   };
   window.addEventListener('keydown', key => {
     window.beikeCanvasEditingKey?.(key,window.beikeStudio.editingCommands);

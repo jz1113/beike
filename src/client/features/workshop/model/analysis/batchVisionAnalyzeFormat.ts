@@ -1,3 +1,4 @@
+import type { StoryboardAnalysis } from './storyboardAnalysisTypes';
 import { buildBoundGroupGridPrompt } from '@shared/domain/workshop/workshop-pipeline';
 import type { ShotPrompt } from '@shared/domain/prompts/vision';
 import {
@@ -12,7 +13,7 @@ import {
 import type { BatchProductItem } from '../batchTypes';
 
 export function formatAnalyzedStoryboard(opts: {
-  data: any;
+  data: StoryboardAnalysis;
   item: BatchProductItem;
   imagePayload: string[];
 }): {
@@ -35,7 +36,7 @@ export function formatAnalyzedStoryboard(opts: {
   const productRoleFromApi = data?.productRole || data?.product_role || null;
   const fingerprintFromApi = data?.productFingerprint || data?.product_fingerprint || '';
 
-  const formattedPrompts: ShotPrompt[] = (data.prompts || []).map((p: any, idx: number) => {
+  const formattedPrompts: ShotPrompt[] = (data.prompts || []).map((p, idx) => {
     // 四镜共用同一商品实物锚图；轮换不同商品照片会导致型号和品牌漂移。
     const assignedImg = imagePayload[0] || item.coverImage;
     const rawPrompt = cleanPromptText(p.prompt || p.description || '');
@@ -92,7 +93,7 @@ export function formatAnalyzedStoryboard(opts: {
     formattedPrompts.forEach((p) => {
       if (p.assembly_source === 'group_skeleton' || p.assembly_source === 'skill') return;
       p.prompt = p.has_human !== false
-        ? enforceLookConsistency(p.prompt, canonicalOutfit, productRoleFromApi, fingerprintFromApi)
+        ? enforceLookConsistency(p.prompt, canonicalOutfit, productRoleFromApi ?? undefined, fingerprintFromApi)
         : preventJewelryGlitches(p.prompt, fingerprintFromApi);
     });
   }

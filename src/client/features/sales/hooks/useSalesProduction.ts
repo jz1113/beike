@@ -1,3 +1,5 @@
+import { useSalesVoiceRecovery } from './useSalesVoiceRecovery';
+import { useSalesMix } from './useSalesMix';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   assembleSalesVideoPrompt, bindBeatProductImages, eligibleSalesImages,
@@ -7,7 +9,6 @@ import {
   type AssembleSalesPromptInput,
 } from '@shared/domain/sales';
 import {
-  mixSalesFinalVideo,
   submitAndPollSalesVideo, synthesizeSalesVoiceover, uploadSalesCustomAsset,
   type SalesStudioAssetCatalog,
 } from '../api/salesProduction';
@@ -268,6 +269,10 @@ export function useSalesProduction(
     patchPlan({ imitationMode: mode, scriptVideoReference: mode === 'depth_imitation' ? 'depth' : 'none', customPrompt: '' });
   }, [patchPlan]);
 
+  const rememberVoiceTask = useSalesVoiceRecovery({
+    plan: state.productionPlan, sourceKey: outputKeys?.voice,
+    ready: !resources.loading, busy: taskBusy, patchPlan, runTask,
+  });
   const runSynthesizeVoice = useCallback(async (modelSelection = state.summaryModel) => {
     if (!assembled || assembled.effectiveVoiceMode === 'none') return;
     if (assembled.effectiveVoiceMode === 'voiceover' && (generationSourceError || assembled.templateError)) {
@@ -291,11 +296,11 @@ export function useSalesProduction(
       const audio = await synthesizeSalesVoiceover({
         text: assembled.effectiveVoiceMode === 'speech' ? '你好，这是一段人声音色参考，请保持自然清晰的说话方式。' : assembled.narrationText,
         voice: voiceCode, model: planRef.current.voiceModel,
-      }, signal);
+      }, signal, rememberVoiceTask);
       return { ...audio, review };
     });
-    if (res) patchPlan({ ...res.review, voiceoverAudioUrl: res.audioUrl });
-  }, [activeScript, assembled, beatBindings, durationPlanning, generationSourceError, patchPlan, runTask, selectedVoice, setError, state]);
+    if (res) patchPlan({ ...res.review, voiceoverAudioUrl: res.audioUrl, pendingVoiceTask: null });
+  }, [activeScript, assembled, beatBindings, durationPlanning, generationSourceError, patchPlan, rememberVoiceTask, runTask, selectedVoice, setError, state]);
 
   const runGenerateVideo = useCallback(async (modelSelection = state.summaryModel) => {
     if (!activeScript || !assembled) return;
@@ -343,31 +348,12 @@ export function useSalesProduction(
     }
   }, [activeScript, assembled, beatBindings, durationPlanning, finalVideoPrompt, finalVideoPromptId, generationSourceError, onOutputProduced, patchPlan, reloadAssets, rememberVideoTask, runTask, selectedBgm, selectedImages.length, setError, state]);
 
-  const runMixFinal = useCallback(async () => {
-    const sourceVideo = planRef.current.generatedVideoUrl;
-    if (!sourceVideo || !assembled) {
-      setError('请先生成视频（或上传待合成原片）后再合成配音与背景音乐');
-      return;
-    }
-    if (assembled.effectiveVoiceMode === 'voiceover' && !planRef.current.voiceoverAudioUrl) {
-      setError('请先为当前分镜台词合成配音，再导出旁白成片');
-      return;
-    }
-    const res = await runTask('mix', '正在合成配音与背景音乐…', (signal) =>
-      mixSalesFinalVideo({
-        jobName: [state.productName, assembled.imitationMode === 'depth_imitation' ? '深度视频版' : '纯分镜版'].filter(Boolean).join(' · '),
-        videoUrl: sourceVideo,
-        voiceMode: assembled.effectiveVoiceMode,
-        voiceoverUrl: assembled.effectiveVoiceMode === 'voiceover' && planRef.current.voiceoverAudioUrl ? planRef.current.voiceoverAudioUrl : undefined,
-        bgmId: !planRef.current.customBgmUrl && selectedBgm ? selectedBgm.id : undefined,
-        bgmUrl: planRef.current.customBgmUrl || undefined,
-      }, signal),
-    );
-    if (res) {
-      patchPlan({ mixedVideoUrl: res.videoUrl });
-      onOutputProduced?.();
-    }
-  }, [assembled, onOutputProduced, patchPlan, runTask, selectedBgm, setError, state.productName]);
+  const runMixFinal = useSalesMix({
+    plan: state.productionPlan, sourceKey: JSON.stringify([outputKeys?.mix, state.productionPlan.generatedVideoUrl, state.productionPlan.voiceoverAudioUrl, assembled?.effectiveVoiceMode]),
+    voiceMode: assembled?.effectiveVoiceMode || 'none', bgm: selectedBgm,
+    jobName: [state.productName, assembled?.imitationMode === 'depth_imitation' ? '深度视频版' : '纯分镜版'].filter(Boolean).join(' · '),
+    ready: !resources.loading && Boolean(assembled), busy: taskBusy, patchPlan, runTask, setError, onOutputProduced,
+  });
 
   const uploadCustomSlot = useCallback(async (
     target: 'personaBody' | 'personaFace' | 'scene' | 'bgm' | 'rawVideo',

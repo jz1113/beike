@@ -22,6 +22,7 @@ const revoke = vi.fn();
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.stubGlobal('localStorage', { getItem: () => null });
   vi.stubGlobal('window', { location: { origin: 'http://localhost:5173' } });
   vi.mocked(loadImageForCanvas).mockResolvedValue({ image: {} as HTMLImageElement, revoke });
   vi.mocked(rasterizeCoverImage).mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
