@@ -26,6 +26,14 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if len(os.Args) == 2 && os.Args[1] == "image-retention-preview" {
+		files, records, err := assets.ExpireImages(context.Background(), cfg, time.Now(), true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("过期图片预览：文件 %d，记录 %d", files, records)
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "migrate" {
 		path := cfg.DatabasePath
 		if len(os.Args) > 2 {
@@ -105,6 +113,16 @@ func maintain(cfg config.Config) {
 }
 
 func sweep(cfg config.Config) {
+	if cfg.Production() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		files, records, err := assets.ExpireImages(ctx, cfg, time.Now(), false)
+		cancel()
+		if err != nil {
+			log.Printf("[图片保留] 清理失败，将重试：%v", err)
+		} else if files > 0 || records > 0 {
+			log.Printf("[图片保留] 已清理过期图片 %d 个及记录 %d 条", files, records)
+		}
+	}
 	if _, err := sessions.ExpireSessions(context.Background(), cfg, time.Now()); err != nil {
 		log.Printf("[对话清理] %v", err)
 	}
