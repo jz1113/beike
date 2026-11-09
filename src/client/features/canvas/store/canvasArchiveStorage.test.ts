@@ -263,6 +263,21 @@ describe('canvasPersistence & canvasProjectDefaults', () => {
     expect(studioCover({ ...baseScene, nodes })).toBe('/storage/cover.png');
   });
 
+  it('只显示新版电商视频演示，并保留旧演示的数据及同名普通项目', async () => {
+    vi.doUnmock('./canvasProjectDefaults');
+    vi.resetModules();
+    const { normalizeCanvasProjects, visibleCanvasProjects, withBuiltInCanvasProjects } = await import('./canvasProjectDefaults');
+    const legacy = { ...draft, id: 'canvas-proj-0ce0a1ff-d832-4e8c-bdbc-4958e0173073', title: '电商视频', draft: false };
+    const ordinary = { ...legacy, id: 'ordinary' };
+    const projects = withBuiltInCanvasProjects([legacy, ordinary]);
+    const visible = visibleCanvasProjects(projects);
+
+    expect(visible.map(project => project.id)).not.toContain(legacy.id);
+    expect(visible.map(project => project.title)).toContain('电商视频 · 新版');
+    expect(visible).toContainEqual(ordinary);
+    expect(normalizeCanvasProjects(projects).map(project => project.id)).toContain(legacy.id);
+  });
+
   it('saves an ordinary project when another tab already initialized the same demos', async () => {
     vi.doUnmock('./canvasProjectDefaults');
     vi.resetModules();

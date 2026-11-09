@@ -13,8 +13,12 @@ const builtInProjects = [
 ] as const;
 const retiredSalesProjectId = 'canvas-proj-70fc9c00-d162-423f-b5bf-4d6be5860b0c';
 
+function isRetiredCanvasDemo(id: string): boolean {
+  return id === retiredSalesProjectId || id === legacyCommerceVideoId;
+}
+
 export function isBuiltInCanvasProject(id: string): boolean {
-  return id === retiredSalesProjectId || id === legacyCommerceVideoId || builtInProjects.some(project => project.id === id);
+  return isRetiredCanvasDemo(id) || builtInProjects.some(project => project.id === id);
 }
 
 let generatedSeedIds = new Set<string>();
@@ -363,12 +367,12 @@ export function normalizeCanvasProjects(projects:CanvasProject[]) {
       draft: !rest.nodes.length && !hasStudioContent(rest.studioScene),
     };
   });
-  const visible = normalizeCanvasProjectTitles(normalized.filter(project => project.id !== retiredSalesProjectId));
+  const visible = normalizeCanvasProjectTitles(normalized.filter(project => !isRetiredCanvasDemo(project.id)));
   const byId = new Map(visible.map(project => [project.id, project]));
   return normalized.map(project => byId.get(project.id) ?? project);
 }
 export const visibleCanvasProjects = (projects:CanvasProject[]) => normalizeCanvasProjects(projects)
-  .filter(project => project.id !== retiredSalesProjectId)
+  .filter(project => !isRetiredCanvasDemo(project.id))
   .filter(project => !project.draft || project.nodes.length > 0 || hasStudioContent(project.studioScene))
   .sort((a,b) => b.updatedAt - a.updatedAt);
 
