@@ -15,7 +15,10 @@ import {
 import { readSalesDepthReceipt } from './salesScriptImport';
 
 vi.mock('@client/shared/api/apiClient', () => ({ apiFetch: vi.fn() }));
-vi.mock('@client/shared/api/assetLibraryCache', () => ({ invalidateGlobalAssetCache: vi.fn() }));
+vi.mock('@client/shared/api/assetLibraryCache', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@client/shared/api/assetLibraryCache')>(),
+  invalidateGlobalAssetCache: vi.fn(),
+}));
 vi.mock('./salesAssetJobs', () => ({ submitSalesAssetJob: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
 
