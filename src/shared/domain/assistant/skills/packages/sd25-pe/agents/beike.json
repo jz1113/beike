@@ -1,0 +1,36 @@
+{
+  "id": "sd25-pe",
+  "name": "sd25-pe",
+  "displayName": "Seedance 2.5 官方提示词",
+  "description": "Use when a user asks an Agent to optimize text, stories, or optional multimodal references for Seedance 2.5 text-to-video, multi-reference generation, keyframes, storyboards, blockouts, video editing, audio editing, or extension.",
+  "category": "官方视频提示词",
+  "author": "火山方舟",
+  "version": "0.1.1",
+  "icon": "video",
+  "colorTheme": "amber",
+  "isBuiltin": true,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "tools": [],
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": [
+      "官方原版"
+    ]
+  },
+  "source": {
+    "kind": "official",
+    "url": "https://docs.volcengine.com/docs/ark/seedance-2-5?lang=zh",
+    "revision": "0.1.1",
+    "license": "官方公开下载；未附独立许可证",
+    "files": {
+      "SKILL.md": "ee04557ba9a1c9f5517b574e24fc73d0022b22254373074db4c11f3d0635ea57"
+    },
+    "archiveSha256": "de823de6dc053ad463a3a5ccd2b1a59bf65f06515ebd5badc12a351d59269f85",
+    "downloadUrl": "https://arkdocs.tos-cn-beijing.volces.com/skills/artifacts/video-generation/sd25-pe/0.1.1/sd25-pe-0.1.1.zip"
+  },
+  "modelIcon": "doubao-seedance-2.5",
+  "displayDescription": "为 Seedance 2.5 优化生成、首尾帧、视频编辑与延长提示词，保留剧情和台词，理清多素材职责。",
+  "usageGuide": "### 适合什么任务\n为 Seedance 2.5 编写新视频、首尾帧、多素材参考、故事板、视频编辑或延长的提示词。\n\n### 会怎样优化\n先区分生成、编辑和延长，再梳理主体、素材职责、事件顺序和结束状态。保留用户指定的人物、数量、台词和故事结果，避免无关素材影响成片。\n\n### 怎么使用\n说明想生成什么、修改什么或接着发生什么。有参考素材时逐项写清用途；需要保留原片内容时明确哪些部分不改。\n\n### 在画布中\n选择 Seedance 2.5 视频节点，开启“生成前优化提示词”。优化时增加一次已启用文本模型的调用，先展示可编辑的提示词，确认后才生成视频；优化失败时不会提交视频，重试本次任务会复用已保存的优化稿。"
+}

@@ -4,11 +4,17 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 )
 
 const deconstructBodyLimit = 84_000_000
@@ -331,4 +337,97 @@ func rawKind(raw json.RawMessage) string {
 
 func writeJobError(w http.ResponseWriter, status int, message string, code string) {
 	httpx.WriteJSON(w, status, map[string]any{"success": false, "error": message, "code": code})
+}
+
+type deconstructProgress struct {
+	Stage     string `json:"stage"`
+	Message   string `json:"message"`
+	StartedAt int64  `json:"startedAt"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
+var progressByTask sync.Map
+
+func deconstructProgressHandler(cfg config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		taskID := r.URL.Query().Get("clientTaskId")
+		if taskID == "" || len(taskID) > 160 {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "缺少有效的任务 ID"})
+			return
+		}
+		value, _ := progressByTask.Load(progressKey(httpx.WorkspaceFrom(r), taskID))
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "progress": value})
+	}
+}
+
+func updateDeconstructProgress(workspace, taskID, stage, message string) deconstructProgress {
+	if taskID == "" {
+		return deconstructProgress{}
+	}
+	key := progressKey(workspace, taskID)
+	now := time.Now().UnixMilli()
+	started := now
+	if previous, ok := progressByTask.Load(key); ok {
+		started = previous.(deconstructProgress).StartedAt
+	}
+	next := deconstructProgress{Stage: stage, Message: message, StartedAt: started, UpdatedAt: now}
+	progressByTask.Store(key, next)
+	if stage == "completed" || stage == "failed" {
+		completedAt := now
+		time.AfterFunc(10*time.Minute, func() {
+			if current, ok := progressByTask.Load(key); ok && current.(deconstructProgress).UpdatedAt == completedAt {
+				progressByTask.Delete(key)
+			}
+		})
+	}
+	return next
+}
+
+func progressKey(workspace, taskID string) string {
+	return workspace + ":" + taskID
+}
+
+func deconstructJobsHandler(cfg config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		jobID := r.URL.Query().Get("jobId")
+		if len(jobID) > 160 {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "任务 ID 无效"})
+			return
+		}
+		db, err := database.OpenRequired(cfg.SQLiteFile())
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "读取后台反推任务失败"})
+			return
+		}
+		defer db.Close()
+		if jobID == "" {
+			jobs, err := dbworkshop.ListDeconstructJobs(r.Context(), db, httpx.WorkspaceFrom(r), jobStorageRoot(cfg))
+			if err != nil {
+				httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "读取后台反推任务失败"})
+				return
+			}
+			httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "jobs": jobs})
+			return
+		}
+		job, ok, err := dbworkshop.GetDeconstructJob(r.Context(), db, httpx.WorkspaceFrom(r), jobStorageRoot(cfg), jobID)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "读取后台反推任务失败"})
+			return
+		}
+		if !ok {
+			httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "error": "后台反推任务不存在"})
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "job": job})
+	}
+}
+
+func jobStorageRoot(cfg config.Config) string {
+	if cache := os.Getenv("AZHUO_CACHE_DIR"); cache != "" {
+		return cache
+	}
+	if data := cfg.DataDir(); data != "" {
+		return filepath.Join(data, "storage")
+	}
+	return ""
 }

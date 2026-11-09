@@ -1,10 +1,256 @@
-import {OUTFIT_VIDEO_INSPIRATION} from './outfitVideoInspiration';
-import {FEATURED_VIDEO_INSPIRATIONS} from './featuredVideoInspirations';
-import {GPT_IMAGE_2_GENERATED_ITEMS} from './gptImageGeneratedItems';
-import {WORKBOOK_GENERATED_ITEMS} from './workbookGeneratedItems';
-import {IMPORTED_VIDEO_INSPIRATIONS} from './importedVideoInspirations';
-import {IMPORTED_IMAGE_INSPIRATIONS} from './importedImageInspirations';
+import { WORKBOOK_GENERATED_ITEMS } from './workbookGeneratedItems';
 import type { InspirationItem } from '../model/inspirationItem';
+
+export const GPT_IMAGE_2_GENERATED_ITEMS: InspirationItem[] = [
+  {
+    id: 'item-gpt-image-meituan-fish',
+    category: 'ecommerce',
+    tag: '🐟 商业3D · GPT Image 2',
+    title: '美团 × 半天妖烤鱼 · 3D电影感联名海报',
+    prompt: '3:4尺寸, 3d电影感, C4D风格, 仰视角度, 超大广角, 超大透视, 夸张视觉表现, 广角镜头, 美团 × 半天妖烤鱼。画面聚焦一座橙棕配色的半天妖烤鱼立体门店，门店醒目展示“半天妖烤鱼”标识，内部陈列着清江鱼、湄公鱼等鱼模型，旁边摆放着青花椒、香辣、蒜香等不同口味的调料罐，满满都是烤鱼的鲜香气息。门店顶部堆叠着巨型烤盘，里面躺着裹满酱汁的仿真烤鱼，搭配金针菇、豆腐等配菜，宛如一座“焦香烤鱼塔”。城市背景里，傍晚的天空泛着淡紫霞光。创意元素极具巧思：青花椒造型的绿色热气球、红色辣椒造型的热气球，与黄色美团兔子热气球一同悬浮在空中；白色金针菇、嫩黄色豆腐块造型的气球围绕着门店，透着诱人的烟火气。画面下方，美团黄色兔子IP正提着印双品牌标识的防漏烤鱼打包盒，脚边的黄色配送车旁还放着几份米饭套餐。场景搭配“点半天妖烤鱼 上美团外卖 最快 30 分钟送达”的标语，加上“招牌烤鱼 配菜免费加”的促销信息，营造出便捷解馋的用餐氛围。顶尖商用C4D渲染质感，细节极度丰富。',
+    image: '/inspirations/gen_meituan_fish.png',
+    thumbnail: '/inspirations/thumbnails/gen_meituan_fish.jpg',
+    aspectRatio: '3:4',
+    model: 'gpt-image-2',
+    quality: '4K超清',
+    author: { name: '贝壳云图 · 旗舰AI', badge: 'GPT Image 2' },
+    date: '精选作品',
+  },
+  {
+    id: 'item-gpt-image-royal-cat',
+    category: 'poster',
+    tag: '🐱 萌宠广告 · GPT Image 2',
+    title: '皇家猫粮 · 金渐层鱼眼特写萌宠海报',
+    prompt: '3:4尺寸, 超级超级变形鱼眼变焦镜头，第一人称视角，猫咪探头，画面主体是一只表情好奇、正微微舔舌的金渐层英国短毛猫。它那双颜色迥异的眼睛——一只是清澈的绿宝石色，一像是纯净的蓝宝石色。猫咪圆润饱满的面庞占据画面中心，以极致特写呈现，仿佛超近距离观察它憨厚可爱的神态。周围环绕大量金棕色猫粮颗粒，颗粒从画面边缘呈漩涡状向中心聚拢，巧妙衬托出猫咪浑圆的脸型与短密闪亮的被毛。画面元素同步更新：左上角保留“ROYAL猫粮”品牌标识；左侧大号白色卡通胖字体改为“圆圆圆圆 圆滚滚”；右侧配以“皇家猫粮 好营养！”文字；左下角猫粮包装袋旁标注“金渐层专属营养粮”，底部强调“科学增亮毛色 维持健康体态”。画面风格延续活泼吸睛的宠物宣传风，通过金渐层猫独特的鎏金被毛、绿宝石般眼眸与圆润体态，结合猫粮颗粒的环绕设计，既展现品种的憨萌贵气，又突显产品的精准营养。所有文字保持清晰醒目，品牌信息与背景完美融合。构图坚持中心聚焦原则，金渐层清澈的宝石眼眸成为视觉焦点，“左右眼球不同颜色”，猫粮颗粒的流动感引导视线向中心汇集。文字布局平衡而灵动，完美诠释“天生圆润，邂逅营养”的可爱场景。色彩搭配升级为温暖鎏金被毛与翠绿眼眸的主色调，配以深棕色猫粮与白色文字。金色毛发与深棕猫粮构成温暖和谐的层次，整体营造出既富足又活泼的视觉体验。海报底部保留社交媒体信息与主办方说明，右下角衬线字体“jgdmgjapt”标志依旧位于原处。',
+    image: '/inspirations/gen_royal_cat.png',
+    thumbnail: '/inspirations/thumbnails/gen_royal_cat.jpg',
+    aspectRatio: '3:4',
+    model: 'gpt-image-2',
+    quality: '4K超清',
+    author: { name: '贝壳云图 · 旗舰AI', badge: 'GPT Image 2' },
+    date: '精选作品',
+  },
+  {
+    id: 'item-gpt-image-soup-lily',
+    category: 'social',
+    tag: '🥣 节气食谱 · GPT Image 2',
+    title: '百合莲子绿豆汤 · 夏季清润安神养生方',
+    prompt: '3:4尺寸，10. 百合莲子绿豆汤（夏季燥热、心烦失眠） 食材：百合10g、莲子15g、绿豆20g 做法：绿豆先煮15分钟，再加入百合、莲子继续煮15分钟。 功效：清心除烦、清热安神，适合天热烦躁、入睡难、手心脚心发热。 用法：温凉饮用，晚餐后食用。 禁忌：脾胃虚寒、怕冷、易腹泻者少喝，不宜冰镇饮用。画面主体是一碗晶莹剔透、温润诱人的百合莲子绿豆汤，盛在精致典雅的白瓷汤碗中，碗内绿豆开花酥烂，莲子洁白饱满，百合瓣温润半透明，汤色清亮。木质餐桌与精致餐具，旁边陈列着百合、干莲子、精选绿豆的食材小碟。海报排版典雅清晰，文字排版准确工整，暖调自然光，高清美食摄影。',
+    image: '/inspirations/gen_soup_lily.png',
+    thumbnail: '/inspirations/thumbnails/gen_soup_lily.jpg',
+    aspectRatio: '3:4',
+    model: 'gpt-image-2',
+    quality: '4K超清',
+    author: { name: '贝壳云图 · 旗舰AI', badge: 'GPT Image 2' },
+    date: '精选作品',
+  },
+  {
+    id: 'item-gpt-image-taro-plant',
+    category: 'social',
+    tag: '🌿 趣味科普 · GPT Image 2',
+    title: '芋头植物介绍宣传图 · 乐乐趣手账科普',
+    prompt: '请你帮我生成一个芋头的植物介绍宣传图，类似于乐趣的3:4尺寸。现代清新趣味手绘百科风格。画面中央展示一株健壮完整的芋头植株（硕大碧绿的心形盾状叶片，叶片表面凝结着圆润的水珠，修长粗壮的叶柄），下方为土壤切面展示泥土中肥硕饱满的母芋与周围环绕的小芋头；侧边展示芋头横切面呈现美丽的淡紫色槟榔纹理；画面配有清新有趣的手绘手写体植物科普注释：芋头别名芋艿、叶片莲花效应、香糯细腻营养丰富、烹饪美食（芋泥、排骨炖芋头）以及去皮防手痒小贴士。米色干净背景，图文并茂，生动可爱，层次丰富，3:4竖版海报。',
+    image: '/inspirations/gen_taro_plant.png',
+    thumbnail: '/inspirations/thumbnails/gen_taro_plant.jpg',
+    aspectRatio: '3:4',
+    model: 'gpt-image-2',
+    quality: '4K超清',
+    author: { name: '贝壳云图 · 旗舰AI', badge: 'GPT Image 2' },
+    date: '精选作品',
+  },
+  {
+    id: 'item-gpt-image-ribs-soup',
+    category: 'social',
+    tag: '🍲 古风药膳 · GPT Image 2',
+    title: '今日养生方 · 山药芡实排骨汤古风海报',
+    prompt: '生成古风健康养生图 “今日养生方” 山药芡实排骨汤 健脾养胃、固肾益精 食材：排骨50克、铁棍山药40克、芡实10克、盐少许 做法：排骨焯水去血沫，芡实提前泡软，山药去皮切小块；所有食材放入锅中，加清水小火炖40分钟，出锅前加少许盐调味。实景漂亮有食欲文字准确做在一张图上元素丰富3:4。中式古韵暖调摄影海报，画面中央是一锅热气升腾的砂锅山药芡实排骨靓汤，排骨肉质酥烂，山药洁白软糯，芡实圆润开花，枸杞点缀，汤色金黄清亮；旁边陈列新鲜铁棍山药段与饱满干芡实；古风水墨米色宣纸底纹，工整雅致的书法排版清晰呈现药膳名称、功效、食材与做法。',
+    image: '/inspirations/gen_ribs_soup.png',
+    thumbnail: '/inspirations/thumbnails/gen_ribs_soup.jpg',
+    aspectRatio: '3:4',
+    model: 'gpt-image-2',
+    quality: '4K超清',
+    author: { name: '贝壳云图 · 旗舰AI', badge: 'GPT Image 2' },
+    date: '精选作品',
+  },
+];
+
+const MEDIA_ROOT = '/inspirations/imported-20260910';
+
+export const IMPORTED_VIDEO_INSPIRATIONS: InspirationItem[] = [
+  {
+    id: 'imported-video-candied-persimmon',
+    category: 'video',
+    tag: '美食种草 · 产品特写',
+    title: '流心柿饼 · 晶莹果肉拉开展示',
+    prompt: '竖屏小红书爆款美食种草视频。暖色居家餐桌场景，背景整齐摆放独立包装的柿饼产品并自然虚化。镜头以超近景聚焦双手缓慢掰开一颗橙红色柿饼，晶莹透亮、柔软黏糯的果肉和纤维被清晰拉开，汁润光泽突出新鲜与甜蜜口感。采用明亮柔和的商业美食布光、浅景深、微距镜头和稳定构图，橙色主体饱满诱人，画面干净，节奏利落，配合简洁中文卖点字幕，真实短视频带货质感。',
+    image: `${MEDIA_ROOT}/candied-persimmon.mp4`,
+    video: `${MEDIA_ROOT}/candied-persimmon.mp4`,
+    poster: `${MEDIA_ROOT}/candied-persimmon-poster.png`,
+    mediaType: 'video',
+    actualVideoDuration: 25.834,
+    aspectRatio: '9:16',
+    quality: '720P',
+    author: { name: '贝壳云图', badge: '精选案例' },
+    date: '2026-09-10 | 用户素材',
+  },
+  {
+    id: 'imported-video-spicy-snack',
+    category: 'video',
+    tag: '零食带货 · 食欲特写',
+    title: '香辣素肉 · 撕开展示带货短片',
+    prompt: '竖屏零食带货短视频，便利店货架与橙红色产品包装组成高识别度背景。镜头使用微距特写，戴有精致美甲的双手将一片裹满油亮酱汁的香辣素肉缓慢撕开，强调柔韧纤维、浓郁调味和辣油光泽。高饱和暖橙配色，主体锐利、背景浅景深虚化，灯光明亮通透，画面带真实手机短视频质感。搭配节奏清晰的中文卖点字幕，突出香、辣、越嚼越香的口感，适合电商种草与零食测评。',
+    image: `${MEDIA_ROOT}/spicy-snack.mp4`,
+    video: `${MEDIA_ROOT}/spicy-snack.mp4`,
+    poster: `${MEDIA_ROOT}/spicy-snack-poster.png`,
+    mediaType: 'video',
+    actualVideoDuration: 16.5,
+    aspectRatio: '9:16',
+    quality: '720P',
+    author: { name: '贝壳云图', badge: '精选案例' },
+    date: '2026-09-10 | 用户素材',
+  },
+  {
+    id: 'imported-video-whiskey-gummy',
+    category: 'video',
+    tag: '创意测评 · 氛围酒饮',
+    title: '威士忌软糖 · 暖调居家创意测评',
+    prompt: '竖屏居家氛围感产品测评视频。大理石桌面中央摆放一杯琥珀色威士忌，杯下是原木切片杯垫，背景有暖黄台灯、壁炉火光、绿植与酒瓶。第一人称双手将一条琥珀色软糖放入酒杯或在杯前拉伸展示，突出焦糖般的透明质感和香草甜香联想。使用暖色电影布光、近景固定机位、浅景深和细腻高光，整体高级而松弛；顶部用醒目圆角白底黑字呈现口感卖点，右侧保留理性饮酒提示，商业短视频风格。',
+    image: `${MEDIA_ROOT}/whiskey-gummy.mp4`,
+    video: `${MEDIA_ROOT}/whiskey-gummy.mp4`,
+    poster: `${MEDIA_ROOT}/whiskey-gummy-poster.png`,
+    mediaType: 'video',
+    actualVideoDuration: 26.6,
+    aspectRatio: '9:16',
+    quality: '720P',
+    author: { name: '贝壳云图', badge: '精选案例' },
+    date: '2026-09-10 | 用户素材',
+  },
+];
+
+const prompt=`场景：穿搭达人开箱种草。博主从购物袋掏出衣服展示、瞬间换装旋转、多角度pose。极简白墙卧室，自然日光，活泼有感染力。10秒。
+
+参考占位：
+@image1：博主人物。100%匹配参考图。
+@image4：衣服单品。100%匹配参考图。
+
+镜头1（0-3秒）：
+中景，47°视角。@image1穿着白色基础T恤面对镜头，兴奋地举着购物袋说："我的快递终于到了我直接爱住！"从袋中抽出@image4展开举高展示全貌，瞪大眼睛夸张表达惊喜。
+3秒 匹配剪辑（同位置瞬间换装）
+
+镜头2（3-7秒）：
+中景，47°视角。@image1已穿上@image4，自信原地转一圈，面料随旋转自然飘动。转完面朝镜头双手叉腰说："你们说这是不是也太好看了！"歪头俏皮笑容。
+
+镜头3（7-10秒）硬切：
+全身远景，63°视角，略仰拍。@image1快速连续三个pose——插兜、单手上扬、靠墙随意一倚。说："版型绝了穿着超舒服，尺码和链接我置顶了。"最后一拍手指向上指镜头。
+
+口播台词：
+0-3秒："我的快递终于到了我直接爱住！"（开箱兴奋）
+3-7秒："你们说这是不是也太好看了！"（自信得意）
+7-10秒："版型绝了穿着超舒服，尺码和链接我置顶了。"（真诚推荐）
+
+灯光：右侧大窗自然日光，5500K，柔和有方向性，在身体左侧形成轻微阴影展示面料立体感和垂坠度。白墙反射提供补光。干净、自然、杂志编辑级日光效果。
+
+色彩：干净明亮中性微暖。面料质感高清晰度。白墙纯净不偏蓝。肤色自然健康。衣服色彩完全真实饱和。整体清新、亲切、日光编辑风。
+
+输出：竖屏9:16，10秒，24帧，真实速度。
+
+锁定：@image1外貌全程一致。@image4无论手举还是穿上身都完全一致。白色背景不变。日光方向固定右侧。匹配剪辑转场无缝——剪辑点身体位置完全相同。旋转时面料运动自然。嘴型与台词严格对应。`;
+
+const OUTFIT_VIDEO_INSPIRATION:InspirationItem={
+  id:'video-outfit-unboxing',category:'video',tag:'穿搭种草 · 原始提示词',title:'穿搭开箱 · 连衣裙瞬间换装',
+  prompt,
+  // Only two references are attached here; remap the original fourth slot when applying them.
+  referencePrompt:prompt.replace(/@image4\b/g,'@image2'),
+  image:'/inspirations/outfit-unboxing/poster.jpg',video:'/inspirations/outfit-unboxing/video.mp4',poster:'/inspirations/outfit-unboxing/poster.jpg',mediaType:'video',
+  referenceImages:['/inspirations/outfit-unboxing/person.png','/inspirations/outfit-unboxing/dress.png'],
+  referenceLabels:['博主人物 · 原提示词 @image1','连衣裙 · 原提示词 @image4（使用时为 @image2）'],
+  videoRefMode:'omni',videoDuration:10,actualVideoDuration:10.08,aspectRatio:'9:16',quality:'720P',
+};
+
+const billboardPrompt = (subject: string, action: string) =>
+  `竖版超写实商业街拍合成海报。夜晚城市商业广场，蓝色树灯与红色灯笼形成冷暖对比，湿润街道路面带轻微反光。画面上半部是一块巨型弧形裸眼 3D 户外屏幕，屏幕中为周杰伦风格的黑发男歌手，穿黑黄拼色机车皮衣，坐在银色跑车驾驶位，从车窗递出黄色品牌购物袋；下半部${subject}，${action}。强调人物与巨幕之间的尺度反差、真实透视和自然空间光，高饱和蓝橙电影调色，人物面部清晰，85mm 商业人像质感，细腻皮肤纹理，背景灯光散景，画面锐利、时尚、具有节日氛围与社交媒体打卡感，4K，无多余人物，无肢体畸变。`;
+
+const muralPrompt = (subject: string) =>
+  `竖版潮流商业广告合影。现代玻璃幕墙建筑外立面铺设巨幅汽车广告，周杰伦风格的黑发男歌手穿黑黄赛车皮衣坐在银色跑车内，从车窗递出白黄品牌购物袋；前景${subject}，身穿黑色机车皮衣，以夸张近大远小的透视将一杯奶茶递向镜头，形成与背景明星隔空互动的创意合照。黄、黑、银为主色，夕阳蓝粉渐变天空映在玻璃与车身上，低机位广角构图，商业摄影级布光，人物轮廓干净，皮革、车漆、塑料杯和纸袋材质真实，广告文案清晰，年轻潮酷，适合品牌联名活动宣传，超高清细节。`;
+
+const IMPORTED_IMAGE_INSPIRATIONS: InspirationItem[] = [
+  {
+    id: 'imported-image-jay-collab-01', category: 'photo', tag: '明星合影 · 品牌联名',
+    title: '巨幕车窗递奶茶 · 潮酷联名合照',
+    prompt: muralPrompt('一位短发年轻男生'), image: `${MEDIA_ROOT}/jay-collab-01.jpg`,
+    aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
+  },
+  {
+    id: 'imported-image-jay-collab-05', category: 'photo', tag: '女性街拍 · 巨幕打卡',
+    title: '灯笼夜景巨幕 · 风衣女生手机抓拍',
+    prompt: billboardPrompt('一位长卷发年轻女生站在画面中央', '身穿卡其色长风衣与黑色高领衫，一手查看手机、一手提棕色手袋，神态安静自然'), image: `${MEDIA_ROOT}/jay-collab-05.jpg`,
+    aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
+  },
+  {
+    id: 'imported-image-jay-collab-07', category: 'photo', tag: '冬日穿搭 · 巨幕打卡',
+    title: '灯会咖啡街拍 · 格纹围巾女生',
+    prompt: billboardPrompt('一位盘发年轻女生站在画面中央', '身穿黑色长大衣与格纹围巾，一手插袋、一手拿外带咖啡，肩背棕色手袋，侧望灯会微笑'), image: `${MEDIA_ROOT}/jay-collab-07.jpg`,
+    aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
+  },
+  {
+    id: 'imported-image-jay-collab-09', category: 'photo', tag: '明星合影 · 奶茶广告',
+    title: '城市车窗互动 · 笑容女生递奶茶',
+    prompt: `${muralPrompt('一位长发年轻女生')} 前景女生露出自然灿烂笑容，白色机车夹克搭配黑色短上衣与浅蓝牛仔裤，奶茶杯贴近镜头形成强烈视觉焦点。`, image: `${MEDIA_ROOT}/jay-collab-09.jpeg`,
+    aspectRatio: '3:4', author: { name: '贝壳云图', badge: '精选案例' }, date: '2026-09-10 | 用户素材',
+  },
+];
+
+// Shot descriptions are reconstructed from the supplied videos, not their original generation prompts.
+const FEATURED_VIDEO_INSPIRATIONS:InspirationItem[]=[
+  {
+    id:'video-fold-craft',category:'video',tag:'折叠屏广告 · 镜头拆解',title:'折叠的艺术 · 从纸页到手机',
+    image:'/inspirations/fold-craft/poster.jpg',video:'/inspirations/fold-craft/video.mp4',poster:'/inspirations/fold-craft/poster.jpg',mediaType:'video',
+    aspectRatio:'16:9',actualVideoDuration:33.7,videoDuration:15,quality:'720P',
+    prompt:`【总体设定】16:9 横屏，约 34 秒的折叠屏手机概念广告。以下为参考片的视觉拆解与复刻建议；按镜头分段生成后剪辑，非原片提示词。以“折叠与展开”为贯穿动作，从纸张、地图、书页自然过渡到手机铰链。画面由灰白日光逐步进入纯黑产品摄影，克制、安静、强调手工触感与金属精度。
+
+【摄影与材质】开场以纸张纤维、指尖关节和折痕为重点，侧向柔光，灰白背景。后半段黑色镜面台面，手部与产品由窄条轮廓光勾边；书页和屏幕的亮部成为视觉中心。可用微距和中近景交替，浅景深、平滑推进，保持折叠轴清晰。不要把建议焦段当作原片实拍参数。
+
+【镜头一｜纸张与纸飞机，约 0–6 秒】双手在画面中央举起一张纸，近景展示对折和压折的动作。切到纸飞机侧面特写，再转为灰白空间中的远景，让小小的三角形向远处飞行。构图留出大片空白，用纸的形态变化承接剪辑。
+
+【镜头二｜地图与翻页，约 6–12 秒】浅色桌面上展开旧地图，双手沿折线摊平纸面，近景突出压平动作与褶皱。接书本低角度特写，书页翻起并形成弧面，以纸边的运动连接下一镜。
+
+【镜头三｜书脊的铰链隐喻，约 12–17 秒】黑色环境与镜面桌面中，双手托住竖立的厚书，书脊居中，左右对称。书缓慢展开为 V 字，明亮书页与倒影形成上下呼应，画面稳定，动作连贯。
+
+【镜头四｜展开折叠屏，约 17–25 秒】利用书脊与手机铰链的形状匹配切换：双手以相似姿态握住合拢的手机。先展示纤薄侧面，随后缓慢展开，屏幕亮面从窄缝变为 V 形再趋向平展。重点呈现手指支撑位置、转轴与屏幕边缘，不能凭空增加铰链或改变机身厚度。
+
+【镜头五｜产品定帧，约 25–32 秒】切到纯黑产品台，分别呈现机背和展开的屏幕。暖金色细光描出轮廓，镜面产生柔和倒影，镜头轻缓推进，留出品牌排版空间。
+
+【收尾，约 32–34 秒】黑底留白，短标题与一句简洁标语后期排版，干净结束。
+
+【声音与约束建议】可配纸张摩擦、翻页、轻微铰链声与克制氛围音乐。统一手机外观、摄像头布局和双手比例；禁止多余手指、纸张穿模、产品融化、镜面错位、过曝大光斑。品牌与字幕后期添加，不要求模型生成原片标识。`,
+  },
+  {
+    id:'video-childhood-village',category:'video',tag:'乡村童年 · 叙事镜头拆解',title:'童年 · 土路、游戏与落日',
+    image:'/inspirations/childhood-village/poster.jpg',video:'/inspirations/childhood-village/video.mp4',poster:'/inspirations/childhood-village/poster.jpg',mediaType:'video',
+    aspectRatio:'16:9',actualVideoDuration:167.56,videoDuration:15,quality:'720P',
+    prompt:`【总体设定】16:9 横屏，约 2 分 48 秒的乡村童年叙事短片。以下依据所提供视频的可见画面整理为分段创作提示，非原片提示词；长片需逐段生成并剪辑。围绕身穿旧蓝灰短袖的男孩、村里的同伴与童年游戏展开，用池塘、土路、砖墙、木门、泥水和麦田建立统一空间。
+
+【摄影与色彩】整体低饱和土黄、暖棕与灰蓝，清晨或傍晚的侧逆光、柔和阴影、细腻颗粒。广角交代村庄，儿童视线高度的中景跟随动作，低机位与手部特写捕捉尘土和玩具。不追求每个镜头都金光灿烂，屋内保留自然暗部，皮肤、旧衣和泥土有真实细节。
+
+【第一段｜回到村庄，约 0–16 秒】池塘与低矮村落的远景建立环境，水面映出岸边房屋。切至男孩背后或侧后的中景，让他的视线引向村庄。片名可后期叠加，镜头缓慢、留有停顿。
+
+【第二段｜手里的世界，约 16–32 秒】孩子们围在一起玩泥，低机位中近景展示专注的表情，接双手压实木质模具中泥土的特写。手上的泥、模具边缘和垫面的纹理清晰，动作从揉、压到整理连续完成。
+
+【第三段｜土路上的游戏，约 32–58 秒】切到孩子迈步和跳格子的腿脚近景，影子落在干燥地面上。玻璃弹珠的地面特写与孩子蹲下观察的中景交替；随后是男孩在地上划出的游戏范围内摆弄木棍的画面。注意接地、视线和道具运动方向，避免把不同游戏硬拼成一个连续动作。
+
+【第四段｜纸牌与小玩具，约 58–84 秒】男孩趴低、俯身摆弄纸片，摄影机贴近地面观察手与纸片。插入村落空间和散落在地上的小玩具特写，以大小景别变化保留游戏的节奏。
+
+【第五段｜伙伴与泥水，约 84–104 秒】女孩的侧面中近景表现停顿与观察。切至孩子们赤脚踩过泥水的腿脚特写，水面与脚印保持物理连贯。再让男孩的眼睛从土堆后露出，以前景遮挡形成躲藏感。
+
+【第六段｜好奇与冒险，约 104–132 秒】近景观察男孩低头专注的小动作；用昏暗屋内、木门与窗缝透光的镜头建立空间，再切回男孩站在柴木旁回头张望。室内外曝光变化自然，人物脸部和衣服保持一致。
+
+【第七段｜一个人的傍晚，约 132–154 秒】男孩坐着翻看纸页或本子，侧面中景留出周围空间。切到他背对摄影机站在田边看落日，再接空旷田间小路的远景，人物变小、节奏放慢，利用夕阳与长影收束情绪。
+
+【尾声｜回到游戏，约 154–168 秒】以蹲在地上玩耍的男孩作为回望式结尾，延续柔暖日光和朴素动作，让情绪落在专注与怀念，而不是夸张表演。
+
+【声音与连续性建议】可使用风、虫鸣、脚步、泥水和纸张声，搭配克制的怀旧配乐。避免强行生成方言对白；需要旁白时另行写稿配音。统一男孩面容、发型与服装，保留农村环境的自然杂乱；避免现代高楼、崭新道具、磨皮、手指畸形、玩具悬浮及过度煽情的慢动作。`,
+  },
+];
 
 // 高美感商用爆款案例库（100% 真实 AI 旗舰模型生成）
 export const INSPIRATION_ITEMS: InspirationItem[] = [

@@ -1,7 +1,5 @@
-import { configuredTextProtocol, parseTextProtocol, resolveTextProtocol, type TextProtocol } from './textProtocol';
-import { protocolForBaseUrl, providerTextProtocol } from './modalityProtocol';
+import { configuredTextProtocol, parseTextProtocol, resolveTextProtocol, type TextProtocol } from './deepseek';
 import { domainStorage } from '../core/runtime';
-import { isAvatarDriverModel } from './avatarDrivers';
 import { DEFAULT_MODALITY_MODELS, type ModalityStorageKind, type StoredModalityModelItem } from './modalityDefaults';
 
 export type { ModalityStorageKind, StoredModalityModelItem } from './modalityDefaults';
@@ -12,6 +10,54 @@ export const DISMISSED_DEFAULTS_KEY_PREFIX = 'beike_modality_dismissed_defaults_
 export const API_PROVIDERS_STORAGE_KEY = 'beike_api_providers_v2';
 export const API_REMOVED_PROVIDERS_KEY = 'beike_api_removed_providers_v2';
 export const MODALITY_GLOBAL_CHANNEL_ID = '';
+
+function providerTextProtocol(providerType: string | undefined): TextProtocol | undefined {
+  switch (providerType?.trim().toLowerCase()) {
+    case 'openai':
+    case 'custom':
+    case 'dashscope':
+    case 'template':
+      return 'openai';
+    case 'gemini':
+      return 'gemini';
+    case 'anthropic':
+      return 'anthropic';
+    default:
+      return undefined;
+  }
+}
+
+function normalizedBaseUrl(value: string | undefined): string {
+  return (value || '').trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function protocolForBaseUrl(baseUrl: string | undefined, providers: readonly { baseUrl?: string; providerType?: string; provider?: string }[]): TextProtocol | undefined {
+  const normalized = normalizedBaseUrl(baseUrl);
+  if (!normalized) return undefined;
+  const provider = providers.find((item) => normalizedBaseUrl(item.baseUrl) === normalized);
+  const configured = providerTextProtocol(provider?.providerType || provider?.provider);
+  if (configured) return configured;
+  try {
+    const parsed = new URL(normalized);
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname.toLowerCase();
+    if (host === 'api.anthropic.com' || path.endsWith('/messages')) return 'anthropic';
+    if (host === 'generativelanguage.googleapis.com' || host.endsWith('.googleapis.com') || path.includes('/generatecontent')) return 'gemini';
+    if (host === 'api.openai.com'
+      || host === 'api.deepseek.com'
+      || host === 'api.siliconflow.cn'
+      || host === 'ai.comfly.org'
+      || host === 'ai.comfly.chat'
+      || host === 'shop.comfly.chat'
+      || host === 'dashscope.aliyuncs.com'
+      || host.endsWith('.qianwenaiapi.com')
+      || path.includes('/chat/completions')
+      || path.includes('/compatible-mode/')) return 'openai';
+  } catch {
+    // Keep model-id inference for malformed or non-URL values.
+  }
+  return undefined;
+}
 
 export interface StoredApiProviderCredentials {
   id: string;
@@ -48,10 +94,7 @@ export function isInvalidPlaceholderModalityItem(item: StoredModalityModelItem):
 
 function readStorageItem(key: string): string | null {
   try {
-    const storage = domainStorage();
-    if (storage) return storage.getItem(key);
-    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage.getItem(key);
-    return null;
+    return domainStorage()?.getItem(key) ?? null;
   } catch {
     return null;
   }
@@ -59,12 +102,7 @@ function readStorageItem(key: string): string | null {
 
 function writeStorageItem(key: string, value: string): void {
   try {
-    const storage = domainStorage();
-    if (storage) {
-      storage.setItem(key, value);
-      return;
-    }
-    if (typeof window !== 'undefined' && window.localStorage) window.localStorage.setItem(key, value);
+    domainStorage()?.setItem(key, value);
   } catch {
     // 忽略存储异常
   }
@@ -72,12 +110,7 @@ function writeStorageItem(key: string, value: string): void {
 
 function removeStorageItem(key: string): void {
   try {
-    const storage = domainStorage();
-    if (storage) {
-      storage.removeItem(key);
-      return;
-    }
-    if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem(key);
+    domainStorage()?.removeItem(key);
   } catch {
     // 忽略存储异常
   }
@@ -86,6 +119,7 @@ function removeStorageItem(key: string): void {
 function isStoredModalityModel(item: unknown): item is StoredModalityModelItem {
   if (!item || typeof item !== 'object') return false;
   const row = item as StoredModalityModelItem;
+  if (row.modelId === 'openai/gpt-image-2' || row.channelId === 'lianchi_images' || row.name === '联池image2') return false;
   return Boolean(row.id && row.modelId && !isInvalidPlaceholderModalityItem(row)
     && (row.textProtocol === undefined || parseTextProtocol(row.textProtocol)));
 }
@@ -175,37 +209,8 @@ function withShippedDefaults(kind: ModalityStorageKind, cleaned: StoredModalityM
   return { models: [...cleaned, ...missing], merged: true };
 }
 
-/** 数字人线路尚未建立时，把视频线路里已经保存的对口型模型搬过去。没有可搬的条目时保持未配置。 */
-function migrateVideoDriversToAvatar(): void {
-  const avatarKey = getModalityStorageKey('avatar');
-  if (readStorageItem(avatarKey) !== null) return;
-  const videoKey = getModalityStorageKey('video');
-  const raw = readStorageItem(videoKey);
-  if (raw === null) return;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return;
-  }
-  if (!Array.isArray(parsed)) return;
-  const drivers = parsed.filter((item): item is StoredModalityModelItem => (
-    isStoredModalityModel(item) && isAvatarDriverModel(item.modelId)
-  ));
-  if (drivers.length === 0) return;
-  const driverIds = new Set(drivers.map((item) => item.id));
-  const remaining = parsed.filter((item) => {
-    if (!item || typeof item !== 'object') return true;
-    const id = (item as { id?: unknown }).id;
-    return typeof id !== 'string' || !driverIds.has(id);
-  });
-  writeStorageItem(avatarKey, JSON.stringify(drivers.map((item) => ({ ...item, modality: 'avatar' }))));
-  writeStorageItem(videoKey, JSON.stringify(remaining));
-}
-
 /** 键不存在表示还没同步。空列表和只剩占位项时回退全部默认模型并清掉解除记录。非空列表只并入从未被解除的新官方种子。 */
 export function readEffectiveModalityModels(kind: ModalityStorageKind): EffectiveModalityModels {
-  if (kind === 'avatar') migrateVideoDriversToAvatar();
   const defaults = defaultModalityModels(kind);
   const raw = readStorageItem(getModalityStorageKey(kind));
   if (raw === null) return { configured: false, models: defaults, persist: null };
@@ -286,7 +291,7 @@ export function upstreamModalityModelId(kind: ModalityStorageKind, selection: st
   return matched?.modelId || trimmed;
 }
 
-const MODALITY_LOOKUP_KINDS: ModalityStorageKind[] = ['chat', 'image', 'video', 'three_d', 'music', 'voice', 'avatar'];
+const MODALITY_LOOKUP_KINDS: ModalityStorageKind[] = ['chat', 'image', 'video', 'voice'];
 
 export function findConfiguredModalityModel(value: string): StoredModalityModelItem | null {
   const trimmed = value.trim();

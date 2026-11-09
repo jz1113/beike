@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HOME_PUBLISHED_EVENT, HOME_PUBLISHED_STORAGE_KEY, isMediaPublishedOnHome, publishMediaResult, readPublishedHomeItems, unpublishMediaFromHome } from './homePublish';
+import { HOME_PUBLISHED_EVENT, HOME_PUBLISHED_STORAGE_KEY, isMediaPublishedOnHome, publishCanvasResult, unpublishCanvasResult, publishMediaResult, readPublishedHomeItems, unpublishMediaFromHome } from './homePublish';
 
 const memory = new Map<string, string>();
 
@@ -57,6 +57,30 @@ describe('home showcase publish', () => {
       memory.set(HOME_PUBLISHED_STORAGE_KEY, value);
       expect(readPublishedHomeItems()).toEqual([]);
     }
+  });
+
+  it('updates one snapshot per canvas and keeps it separate from media publication', () => {
+    const node = { id: 'n', type: 'note', x: 0, y: 0, width: 100, height: 100 };
+    const item = { id: '', projectId: 'p', image: '/one.mp4', video: '/one.mp4', publishedKind: 'canvas' as const,
+      category: 'video', tag: '画布', title: '初版', prompt: '', canvasNodes: [node] };
+    publishCanvasResult(item);
+    publishMediaResult({ id: 'media', url: '/one.mp4', prompt: '' });
+    unpublishMediaFromHome('/one.mp4');
+    expect(readPublishedHomeItems()).toHaveLength(1);
+    publishCanvasResult({ ...item, title: '更新', video: '/two.mp4', selectedVideoKey: 'n:current' });
+    expect(readPublishedHomeItems()).toEqual([expect.objectContaining({ title: '更新', video: '/two.mp4', image: '/two.mp4', projectId: 'p' })]);
+    unpublishCanvasResult('p');
+    expect(readPublishedHomeItems()).toEqual([]);
+  });
+
+  it('keeps the old canvas snapshot if updating storage fails', () => {
+    const item = { id: '', projectId: 'p', image: '/one.mp4', video: '/one.mp4', publishedKind: 'canvas' as const,
+      category: 'video', tag: '画布', title: '初版', prompt: '', canvasNodes: [{ id: 'n', type: 'note', x: 0, y: 0, width: 100, height: 100 }] };
+    publishCanvasResult(item);
+    const previous = memory.get(HOME_PUBLISHED_STORAGE_KEY);
+    vi.stubGlobal('localStorage', { getItem: (key: string) => memory.get(key) ?? null, setItem: () => { throw new Error('quota'); } });
+    expect(() => publishCanvasResult({ ...item, title: '更新' })).toThrow('首页展示保存失败');
+    expect(memory.get(HOME_PUBLISHED_STORAGE_KEY)).toBe(previous);
   });
 
   it('reports storage failure and never emits a false publish-success event', () => {

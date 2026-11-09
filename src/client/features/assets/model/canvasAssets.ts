@@ -1,5 +1,5 @@
 import { getAssetTime } from '@client/shared/utils/assetTaskData';
-import type { AssetTaskBatch } from './assetBatch';
+import type { AssetTaskBatch } from './agentAssetFilter';
 
 export interface AssetCanvasNode {
   id: string;

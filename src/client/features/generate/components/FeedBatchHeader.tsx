@@ -78,7 +78,7 @@ export default function FeedBatchHeader({
                 alt="原参考图"
                 className="w-3.5 h-3.5 rounded-xs object-cover border border-black/10 shrink-0"
               />
-              <span className="font-mono text-[11px] text-slate-500 dark:text-zinc-400">image</span>
+              <span className="font-mono text-[11px] text-slate-500 dark:text-zinc-300">image</span>
             </button>
           )}
         </div>
@@ -109,7 +109,7 @@ export default function FeedBatchHeader({
                 alt="原参考图"
                 className="w-3.5 h-3.5 rounded-xs object-cover border border-black/10 shrink-0"
               />
-              <span className="font-mono text-[11px] text-slate-500 dark:text-zinc-400">原图</span>
+              <span className="font-mono text-[11px] text-slate-500 dark:text-zinc-300">原图</span>
             </button>
           )}
         </div>
@@ -124,21 +124,21 @@ export default function FeedBatchHeader({
       )}
 
       {/* 参数规格: 模型 | 画幅比例 | 分辨率 | 详细信息 ⓘ */}
-      <div className="flex items-center gap-x-2 text-[12px] sm:text-[12.5px] text-slate-600 dark:text-zinc-400 font-medium font-sans shrink-0 whitespace-nowrap">
+      <div className="flex items-center gap-x-2 text-[12px] sm:text-[12.5px] text-slate-600 dark:text-zinc-300 font-medium font-sans shrink-0 whitespace-nowrap">
         {isAgentTask ? (
           <>
             <span>{displayModel || 'DeepSeek Flash'}</span>
-            <span className="text-slate-300 dark:text-zinc-600 font-light select-none">|</span>
+            <span className="text-slate-300 dark:text-zinc-500 font-light select-none">|</span>
             <span>需求对齐</span>
-            <span className="text-slate-300 dark:text-zinc-600 font-light select-none">|</span>
+            <span className="text-slate-300 dark:text-zinc-500 font-light select-none">|</span>
             <span className="text-violet-600 font-medium">✦ 20/秒</span>
           </>
         ) : (
           <>
             <span>{isBatchVideo ? `视频 ${displayModel}` : displayModel}</span>
-            <span className="text-slate-300 dark:text-zinc-600 font-light select-none">|</span>
+            <span className="text-slate-300 dark:text-zinc-500 font-light select-none">|</span>
             <span>{displayRatio}</span>
-            <span className="text-slate-300 dark:text-zinc-600 font-light select-none">|</span>
+            <span className="text-slate-300 dark:text-zinc-500 font-light select-none">|</span>
             <span>{displayQuality}</span>
           </>
         )}
@@ -146,11 +146,11 @@ export default function FeedBatchHeader({
         {/* 详细信息 ⓘ (图3标杆同款) */}
         {onShowDetails && (
           <>
-            <span className="text-slate-300 dark:text-zinc-600 font-light select-none">|</span>
+            <span className="text-slate-300 dark:text-zinc-500 font-light select-none">|</span>
             <button
               type="button"
               onClick={onShowDetails}
-              className="inline-flex items-center gap-1 text-slate-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1 text-slate-500 hover:text-indigo-600 dark:text-zinc-300 dark:hover:text-indigo-400 cursor-pointer transition-colors"
               title="查看生成提示词与详细机位参数"
             >
               <span>详细信息</span>

@@ -1,10 +1,12 @@
+import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
 import { apiFetch, readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
-import { getGatewayClientHeaders, getGatewayClientOverrides, getModelCredentials } from '@client/shared/api/gatewayClient';
+import { getGatewayClientHeaders, getModelCredentials } from '@client/shared/api/gatewayClient';
 import { AssetTasksListResponseSchema } from '@shared/contracts/generate';
 import type { AssetHistoryTask } from '@client/shared/api/mapDbTask';
 import { mapDbTaskToGenerationTask } from '@client/shared/api/mapDbTask';
 import { compressImageToDataUrl } from '@client/shared/media/image-utils';
-import { recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
+import { readReportedUsage, recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
+import { createUsageScope, sameUsageScope, operationUsageScope, type UsageScope } from '@client/shared/utils/usageScope';
 import {
   imageGenBusinessError,
   isTransientPollError,
@@ -13,6 +15,19 @@ import {
 } from '@client/shared/api/generation/generationErrors';
 import { generationRecoveryError } from './generationRecovery';
 import { isGenerationCancelled, sleepWhilePolling, throwIfGenerationAborted } from '@client/shared/api/generation/generationAbort';
+
+/** Billing evidence and confirmed image output are independent, cumulative facts. */
+export function recordSharedImageUsage(data: Record<string, unknown>, context: {
+  modelId: string; scope: UsageScope; taskId?: string; recordId?: string; localTaskId?: string;
+}, httpOk = true): void {
+  const complete = httpOk && data.submissionUnknown !== true && data.success !== false && data.status === 'SUCCESS' && typeof data.resultUrl === 'string' && Boolean(data.resultUrl);
+  if (!complete && !readReportedUsage(data.usage)) return;
+  recordMediaTaskUsage({ ...context, type: 'image',
+    taskId: typeof data.taskId === 'string' ? data.taskId : context.taskId,
+    recordId: context.recordId || (typeof data.recordId === 'string' ? data.recordId : undefined),
+    success: complete, mediaCount: complete ? 1 : 0, billableCount: 1, usage: data.usage,
+  });
+}
 
 export async function fetchAssetTasks(page = 1, pageSize = 40, signal?: AbortSignal): Promise<{
   tasks: AssetHistoryTask[];
@@ -41,7 +56,7 @@ export async function pollGenerationTask(
   taskId: string,
   mediaType: 'image' | 'video' = 'image',
   modelId?: string,
-  options?: { modelSelection?: string; signal?: AbortSignal },
+  options?: { modelSelection?: string; signal?: AbortSignal; recordId?: string },
 ) {
   const endpoint = mediaType === 'video' ? '/api/generate/video' : '/api/generate/image';
   const model = modelId ? `&model=${encodeURIComponent(modelId)}` : '';
@@ -50,6 +65,7 @@ export async function pollGenerationTask(
     headers: {
       ...storageConfigHeaders(),
       ...getGatewayClientHeaders(options?.modelSelection || modelId),
+      ...(options?.recordId ? { 'x-task-record-id': options.recordId } : {}),
     },
   });
   if (!res.ok) {
@@ -73,8 +89,10 @@ export async function pollSingleTask(
   taskId: string,
   isAborted: () => boolean,
   isPaused?: () => boolean,
+  modelId?: string,
+  routeSnapshot?: Parameters<typeof pollSingleTaskResult>[4],
 ): Promise<string> {
-  const result = await pollSingleTaskResult(taskId, isAborted, isPaused);
+  const result = await pollSingleTaskResult(taskId, isAborted, isPaused, modelId, routeSnapshot);
   return result.url;
 }
 
@@ -83,26 +101,32 @@ export async function pollSingleTaskResult(
   isAborted: () => boolean,
   isPaused?: () => boolean,
   modelId?: string,
+  routeSnapshot?: { headers: Record<string, string>; modelId?: string; recordId?: string; scope?: UsageScope; localTaskId?: string },
 ): Promise<{ url: string; temporary: boolean }> {
   const timeoutMs = 360000;
   const start = Date.now();
-  const gatewayHeaders = getGatewayClientHeaders(modelId);
+  const gatewayHeaders = routeSnapshot?.headers || getGatewayClientHeaders(modelId);
+  const upstreamModel = routeSnapshot?.modelId || (modelId ? upstreamModalityModelId('image', modelId) : undefined);
   const localUrl = gatewayHeaders['x-custom-base-url'];
+  // A bare historical task ID cannot establish a post-clear accounting epoch.
+  const usageScope = routeSnapshot?.scope || { ...createUsageScope('image', modelId, gatewayHeaders), epoch: 'initial' };
 
   while (Date.now() - start < timeoutMs) {
     throwIfGenerationAborted(isAborted);
     await sleepWhilePolling(2000, isAborted, isPaused);
     try {
-      const model = modelId ? `&model=${encodeURIComponent(modelId)}` : '';
+      const model = upstreamModel ? `&model=${encodeURIComponent(upstreamModel)}` : '';
       const pRes = await apiFetch(`/api/generate/image?taskId=${encodeURIComponent(taskId)}${model}`, {
         headers: {
           ...gatewayHeaders,
+          ...(routeSnapshot?.recordId ? { 'x-task-record-id': routeSnapshot.recordId } : {}),
           ...storageConfigHeaders(),
           ...(localUrl ? { 'x-custom-base-url': localUrl } : {}),
         },
       });
       const pData = await pRes.json().catch(() => null);
 
+      if (pData) recordSharedImageUsage(pData, { taskId, recordId: routeSnapshot?.recordId, localTaskId: routeSnapshot?.localTaskId, modelId: upstreamModel || modelId || 'gpt-image-2', scope: routeSnapshot?.scope || usageScope }, pRes.ok);
       if (!pData) {
         continue;
       }
@@ -128,10 +152,15 @@ export async function pollSingleTaskResult(
   throw generationRecoveryError(`等待结果超时（任务 ${taskId}），请核对原任务，不要重复提交`);
 }
 
+export interface ImageSubmissionReceipt { recordId?: string; scope: UsageScope }
+
 export interface SubmitImageGenTaskDeps {
+  onUsagePrepared?: (scope: UsageScope) => void | Promise<void>;
+  onReceipt?: (receipt: ImageSubmissionReceipt) => void | Promise<void>;
   isAborted: () => boolean;
   isPaused?: () => boolean;
   idempotencyKey?: string;
+  modelSelection?: string;
   onTaskSubmitted?: (taskId: string) => void | Promise<void>;
 }
 
@@ -156,14 +185,17 @@ export async function submitImageGenTaskResult(
   deps: SubmitImageGenTaskDeps
 ): Promise<{ url: string; temporary: boolean }> {
   throwIfGenerationAborted(deps.isAborted);
-  const { customBaseUrl: localUrl, customApiKey: localApiKey } = getGatewayClientOverrides();
   const modelId = typeof payload.model === 'string' ? payload.model : undefined;
-  const modelCreds = getModelCredentials(modelId);
+  const selection = deps.modelSelection || modelId;
+  const modelCreds = getModelCredentials(selection);
+  const gatewayHeaders = getGatewayClientHeaders(selection);
+  const usageScope = operationUsageScope(deps.idempotencyKey, 'image', selection, gatewayHeaders);
 
   const finalPayload: Record<string, unknown> = {
     ...payload,
-    customBaseUrl: localUrl,
-    customApiKey: localApiKey,
+    ...(modelId ? { model: upstreamModalityModelId('image', modelId) } : {}),
+    customBaseUrl: gatewayHeaders['x-custom-base-url'],
+    customApiKey: gatewayHeaders['x-custom-api-key'],
     storageConfig: readClientStorageConfig(),
   };
   if ((modelCreds.protocol === 'dashscope' || modelCreds.protocol === 'template') && finalPayload.customProtocol == null) {
@@ -173,13 +205,15 @@ export async function submitImageGenTaskResult(
     finalPayload.requestTemplate = modelCreds.requestTemplate;
   }
 
+  if (!sameUsageScope(usageScope, createUsageScope('image', selection, gatewayHeaders))) throw generationRecoveryError('原操作渠道已变更，请恢复原渠道后核对；本次未提交模型');
+  await deps.onUsagePrepared?.(usageScope);
   const submit = async () => {
     try {
       return await apiFetch('/api/generate/image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getGatewayClientHeaders(typeof payload.model === 'string' ? payload.model : undefined),
+          ...gatewayHeaders,
           ...storageConfigHeaders(),
           ...(deps.idempotencyKey ? { 'x-idempotency-key': deps.idempotencyKey } : {}),
         },
@@ -202,6 +236,10 @@ export async function submitImageGenTaskResult(
   if (!data) {
     throw generationRecoveryError('生图响应解析失败，提交结果待核对');
   }
+  recordSharedImageUsage(data, { localTaskId: deps.idempotencyKey, scope: usageScope, modelId: String(data.model || payload.model || 'gpt-image-2') }, res.ok);
+  try { await deps.onReceipt?.({ recordId: typeof data.recordId === 'string' ? data.recordId : undefined, scope: usageScope }); }
+  catch (error) { throw generationRecoveryError(`原任务回执保存未确认：${error instanceof Error ? error.message : '保存失败'}，请核对原任务`); }
+
   // Even a persistence-error response can carry a valid upstream task id.
   if (data.taskId) {
     try { await deps.onTaskSubmitted?.(String(data.taskId)); }
@@ -215,16 +253,6 @@ export async function submitImageGenTaskResult(
     );
   }
 
-  try {
-    const resolvedModelId = data.model || payload.model || 'gpt-image-2';
-    recordMediaTaskUsage({
-      taskId: typeof data.taskId === 'string' ? data.taskId : undefined,
-      modelId: String(resolvedModelId),
-      type: 'image',
-      mediaCount: 1,
-      usage: data.usage,
-    });
-  } catch {}
 
   if (data.status === 'SUCCESS' && data.resultUrl) {
     return { url: String(data.resultUrl), temporary: Boolean(data.temporaryUrl) };
@@ -233,7 +261,7 @@ export async function submitImageGenTaskResult(
   if (data.taskId) {
     try {
       throwIfGenerationAborted(deps.isAborted);
-      return await pollSingleTaskResult(data.taskId, deps.isAborted, deps.isPaused, modelId);
+      return await pollSingleTaskResult(data.taskId, deps.isAborted, deps.isPaused, selection, { headers: gatewayHeaders, modelId: typeof finalPayload.model === 'string' ? finalPayload.model : undefined, recordId: typeof data.recordId === 'string' ? data.recordId : undefined, scope: usageScope, localTaskId: deps.idempotencyKey });
     } catch (error) {
       // Cancellation stops waiting, not the upstream generation or its billing.
       if (error instanceof Error && error.name === 'ImageGenBusinessError' && !isGenerationCancelled(error)) throw error;

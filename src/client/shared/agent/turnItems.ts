@@ -1,3 +1,4 @@
+import type { AssistantSSEEvent } from '@shared/domain/assistant/events';
 import type {
   AssistantItem,
   ToolCallItem,
@@ -9,6 +10,11 @@ import type {
   UserMessageItem,
   SubAgentItem,
 } from '@shared/domain/assistant/types';
+
+// Local reducers also accept recorded item events without their routing envelope.
+type ItemViewEvent<T = AssistantSSEEvent> = T extends AssistantSSEEvent
+  ? Omit<T, 'turnId' | 'content'> & { turnId?: string; content?: string }
+  : never;
 
 export interface TurnToolActivity {
   name: string;
@@ -51,7 +57,7 @@ export function finishInterruptedItems(items: AssistantItem[], cancelled: boolea
 /** Apply an item-lifecycle event to the in-memory item list and return the resulting AssistantItem[] */
 export function applyItemEvent(
   items: AssistantItem[],
-  evt: { type: string; [k: string]: any },
+  evt: ItemViewEvent,
 ): AssistantItem[] {
   const next = [...items];
   const findById = (id: string) => next.findIndex((x) => x.id === id);

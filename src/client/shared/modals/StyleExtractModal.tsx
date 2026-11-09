@@ -9,15 +9,14 @@ import {
 import { normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import CategoryManagerModal from './CategoryManagerModal';
-import { RecipeEditorPanel } from './style-extract/RecipeEditorPanel';
+import { RecipeEditorPanel, type BaseStyleSkill } from './style-extract/RecipeEditorPanel';
 import { StyleExtractSourcePanel } from './style-extract/StyleExtractSourcePanel';
 import { useStyleExtractWorkflow } from './style-extract/useStyleExtractWorkflow';
-import type { BaseStyleSkill } from './style-extract/types';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onRecipeCreated?: (recipe: any) => void;
+  onRecipeCreated?: (recipe: unknown) => void;
   initialImages?: string[];
   initialTitle?: string;
   baseSkill?: BaseStyleSkill;

@@ -1,6 +1,6 @@
 # 贝壳云图
 
-面向电商视觉创作的全栈工作台，包含电商视频、电商图文、封面、词包、OSS 视频下载、无限画布和 AI 助手。电商视频重建中，支持商品采集、同屏选图、拖放识别与免费本地文字提取。
+面向电商视觉创作的全栈工作台，包含电商视频、电商图文、封面、无限画布和 AI 助手。支持商品采集、同屏选图、拖放识别与免费本地文字提取。
 
 项目使用一个根 package.json、一份 pnpm-lock.yaml 和一个 Go module。所有安装、启动、检查与构建命令都在仓库根目录执行。
 
@@ -50,7 +50,7 @@
 
 电商视频图片文字识别首次使用需执行 `pnpm setup:ocr`，安装位置及服务配置见[电商视频商品准备](docs/video-sales.md)。
 
-常用功能目录：`poster` 封面、`keywords` 词包、`sales` 电商视频。前后端沿用同一组名称，模型协议适配统一放在后端 `gateway`。
+常用功能目录：`canvas` 画布、`workshop` 电商图文、`sales` 电商视频、`assistant` 助手。前后端沿用同一组名称，模型协议适配统一放在后端 `gateway`。
 
 根目录保留工具链需要发现的依赖清单、锁文件、TypeScript 入口和 `jsrepo.config.mts`，以及说明、工程约定和 Windows / macOS 双击入口。`jsrepo.config.mts` 用于通过 jsrepo 引入背景组件，保留在工具默认发现位置。环境模板、Vite 配置位于 `tools/configs`，HTML 位于 `src/client/index.html`；统一命令会显式选择配置。`.agents`、`.cursor`、`.github` 与 `.vscode` 分别保存技能、规则、CI 和编辑器配置。
 
@@ -72,7 +72,7 @@ pnpm dev                     # 同时启动前端和 Go API
 
 Windows 双击根目录的 [启动贝壳云图.bat](启动贝壳云图.bat)，它调用 `tools/launchers` 中的 PowerShell 实现。macOS 双击根目录的 [启动贝壳云图.command](启动贝壳云图.command)。两个平台各保留一个双击入口。首次缺依赖时按锁文件安装，然后启动服务并打开浏览器。按启动终端中的 Ctrl+C 停止本次服务。
 
-模型网关和采集配置填写在根目录 `.env`；首次启动从 `tools/configs/env.example` 创建，已有配置会保留。浏览器专属凭证通过设置页保存。开发端口和进程记录统一写入 `.local`。启动器继续兼容旧根目录端口缓存，并按 PID、启动时间、项目目录和配置识别自己记录的开发服务。
+模型网关和采集配置填写在根目录 `.env`；双击启动器首次运行时从 `tools/configs/env.example` 创建，已有配置会保留。`pnpm dev` 将该文件作为 Go API 的配置默认值，同名进程环境优先，API 地址、数据库和本机访问令牌仍由启动器设置。隔离开发模式不将根 `.env` 转交给 Go API。浏览器专属凭证通过设置页保存。开发端口和进程记录统一写入 `.local`。启动器继续兼容旧根目录端口缓存，并按 PID、启动时间、项目目录和配置识别自己记录的开发服务。
 
 ## 构建与检查
 
@@ -88,6 +88,15 @@ pnpm run lint:boundaries      # 浏览器安全、共享层和功能间依赖方
 `pnpm check` 还校验模型目录、共享数据和 OpenAPI，并检查 TypeScript、ESLint、未使用绑定、显式 any、文件长度、依赖循环与密钥。质量基线只允许收紧。正式测试与源码同目录；截图、QA fixture、一次性报告和临时计划放项目外。
 
 接口调整后运行 `pnpm openapi:write`，同步 `src/shared/contracts/openapi.yaml` 和生成的浏览器类型。前端构建输出到 `tools/build/ui`，Go API 输出到 `tools/build/beike-api`（Windows 为 `.exe`），公开资源 URL 保持稳定。生产启动直接运行产物，缺少产物时提示先构建，不在重启时编译；需在部署目标系统与架构上构建。Go 查找与版本校验统一从 `go.mod` 读取最低版本，支持 `GO_BIN` 指定编译器。
+
+CI 在生产构建后运行浏览器回归。已构建项目且 PATH 中有 `ffmpeg`、`ffprobe` 时，可在本地复跑：
+
+```bash
+pnpm exec playwright install chromium
+pnpm test:browser
+```
+
+测试启动独立的回环服务（3199 端口）和临时数据库，不读取真实模型凭据。浏览器拦截模型与对象存储请求；W3 的去音轨与成片保存由真实 Go API 和 FFmpeg 执行。失败时命令会打印 Playwright trace 的临时目录。
 
 ## 数据与部署
 

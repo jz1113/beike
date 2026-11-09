@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { ModalityGlobalConfig } from '../../model/modalityModelTypes';
+import type { ModalityGlobalConfig } from '../../model/modalityModelStorage';
 import { Eye, EyeOff, ChevronDown, X } from 'lucide-react';
 
 interface Props {

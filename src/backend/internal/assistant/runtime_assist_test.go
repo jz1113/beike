@@ -101,3 +101,20 @@ func TestShortlistResumesCheckpoint(t *testing.T) {
 		t.Fatalf("selected %d %s", len(selected), report)
 	}
 }
+
+func TestDirectProductID(t *testing.T) {
+	for _, tc := range []struct {
+		input, id, platform string
+		ok                  bool
+	}{
+		{"123456789", "123456789", "jd", true},
+		{"采集淘宝商品ID：123456789", "123456789", "taobao", true},
+		{"1688商品编号 123456789", "123456789", "1688", true},
+		{"帮我分析123456789的商品", "", "", false},
+	} {
+		id, platform, ok := directProductID(tc.input)
+		if id != tc.id || platform != tc.platform || ok != tc.ok {
+			t.Errorf("%q: got %q %q %v", tc.input, id, platform, ok)
+		}
+	}
+}

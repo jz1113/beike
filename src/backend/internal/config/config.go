@@ -16,6 +16,10 @@ type Config struct {
 	AccessToken string
 	AdminToken  string
 
+	CanvasMCPToken     string
+	CanvasMCPWorkspace string
+	CanvasPublicURL    string
+
 	WebDistDir   string
 	DatabasePath string
 	DatabaseURL  string
@@ -40,6 +44,10 @@ func Load() Config {
 		NodeEnv:     nodeEnv,
 		AccessToken: access,
 		AdminToken:  strings.TrimSpace(os.Getenv("ADMIN_ACCESS_TOKEN")),
+
+		CanvasMCPToken:     strings.TrimSpace(os.Getenv("CANVAS_MCP_TOKEN")),
+		CanvasMCPWorkspace: strings.TrimSpace(os.Getenv("CANVAS_MCP_WORKSPACE_ID")),
+		CanvasPublicURL:    strings.TrimSpace(os.Getenv("CANVAS_PUBLIC_URL")),
 
 		WebDistDir:   strings.TrimSpace(os.Getenv("WEB_DIST_DIR")),
 		DatabaseURL:  strings.TrimSpace(os.Getenv("DATABASE_URL")),

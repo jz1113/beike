@@ -4,8 +4,13 @@ import { PromptBarRefImageStack } from './PromptBarRefImageStack';
 import { RefMediaThumb } from './PromptBarRefMediaThumb';
 import { PromptBarRefMediaLightbox } from './PromptBarRefMediaLightbox';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
-import { PromptBarVideoFramesPanel } from './PromptBarVideoFramesPanel';
-import type { PromptBarRefMediaPanelProps, RefMediaLightboxState } from './refMediaPanelTypes';
+import {
+  PromptBarVideoFramesPanel,
+  type PromptBarRefMediaPanelProps,
+  type RefMediaLightboxState,
+} from './PromptBarVideoFramesPanel';
+
+export type { PromptBarRefMediaPanelProps, RefMediaLightboxState };
 
 function refUploadLabel(mode: QuickGenMode): { label: string; title: string } {
   if (mode === 'depth-image') {

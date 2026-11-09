@@ -1,4 +1,4 @@
-import type { AeroState } from './aeroState';
+import type { AeroState } from './aeroResources';
 import { SAMPLES, LEVELS, clamp, ribbonPoint } from './aeroShardModel';
 export function createAeroPaths(state: AeroState) {
   const paths = Array.from({ length: LEVELS }, () => ({

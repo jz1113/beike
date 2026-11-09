@@ -1,18 +1,140 @@
 import { useAppStore } from '@client/store';
-import { resolveSkillKind } from '@shared/domain/assistant/skills/skillPurpose';
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { useScrollLock } from '@client/shared/hooks/useScrollLock';
-import { useDropdownMenu } from '@client/shared/hooks/useDropdownMenu';
+import { resolveSkillKind } from '@shared/domain/assistant/skills/types';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect, type ChangeEvent, type FocusEvent, type RefObject } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { useScrollLock } from '@client/shared/hooks/useSafeTimeout';
 import { 
   VIDEO_ASPECT_RATIOS, 
   VIDEO_REF_MODES,
+  getVideoModelById,
+  resolveVideoResolution,
 } from '@shared/domain/media/video';
-import { videoDurationOptions } from '@shared/domain/media/videoCapabilities';
+import { resolveVideoMode, videoDurationOptions, videoModes, videoRatioLocked, videoResolutionOptions } from '@shared/domain/media/videoCapabilities';
+import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
+import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
+import { readFileAsDataUrl } from '@client/shared/api/mediaUpload';
 import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
-import { useVideoParameterConstraints } from './useVideoParameterConstraints';
 import { matchesStoredModel, usePromptBarWorkflowModels } from './usePromptBarWorkflowModels';
-import { usePromptBarStoreState } from './usePromptBarStoreState';
 import { useAppLayoutMode } from '@client/shared/hooks/useCompactLayout';
+
+export interface DropdownMenuState<T extends HTMLElement = HTMLDivElement> {
+  isOpen: boolean;
+  setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  toggle: () => void;
+  close: () => void;
+  ref: RefObject<T | null>;
+}
+
+/**
+ * 轻量下拉菜单状态 Hook（自包含点击外部关闭逻辑）
+ */
+export function useDropdownMenu<T extends HTMLElement = HTMLDivElement>(
+  initialOpen = false
+): DropdownMenuState<T> {
+  const [isOpen, setIsOpen] = useState<boolean>(initialOpen);
+  const ref = useRef<T | null>(null);
+
+  const toggle = useCallback(() => {
+    setIsOpen((prev) => !prev);
+  }, []);
+
+  const close = useCallback(() => {
+    setIsOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (target instanceof Element && target.closest('[data-dropdown-portal]')) {
+        return;
+      }
+      if (ref.current && !ref.current.contains(target)) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  return {
+    isOpen,
+    setIsOpen,
+    toggle,
+    close,
+    ref,
+  };
+}
+
+const EMPTY_STRING_ARRAY: string[] = [];
+const EMPTY_ANY_ARRAY: unknown[] = [];
+
+export function usePromptBarStoreState() {
+  return useAppStore(
+    useShallow((s) => ({
+      quickGenMode: s.quickGenMode ?? 'agent',
+      setQuickGenMode: s.setQuickGenMode,
+      quickDepthStyle: s.quickDepthStyle ?? 'mocap',
+      setQuickDepthStyle: s.setQuickDepthStyle,
+      quickDepthQuality: s.quickDepthQuality ?? 'standard',
+      setQuickDepthQuality: s.setQuickDepthQuality,
+      quickPrompt: s.quickPrompt,
+      setQuickPrompt: s.setQuickPrompt,
+      quickRefImages: s.quickRefImages ?? EMPTY_STRING_ARRAY,
+      setQuickRefImages: s.setQuickRefImages,
+      addQuickRefImage: s.addQuickRefImage,
+      removeQuickRefImage: s.removeQuickRefImage,
+      quickModel: s.quickModel,
+      setQuickModel: s.setQuickModel,
+      quickAspectId: s.quickAspectId,
+      setQuickAspectId: s.setQuickAspectId,
+      quickQuality: s.quickQuality,
+      setQuickQuality: s.setQuickQuality,
+      quickCount: s.quickCount,
+      setQuickCount: s.setQuickCount,
+      quickAudioModel: s.quickAudioModel ?? '',
+      setQuickAudioModel: s.setQuickAudioModel,
+      quickVideoModel: s.quickVideoModel ?? '',
+      setQuickVideoModel: s.setQuickVideoModel,
+      quickVideoDuration: s.quickVideoDuration ?? 5,
+      quickVideoContextIrEnabled: s.quickVideoContextIrEnabled ?? true,
+      setQuickVideoContextIrEnabled: s.setQuickVideoContextIrEnabled,
+      setQuickVideoDuration: s.setQuickVideoDuration,
+      quickVideoResolution: s.quickVideoResolution ?? '480P',
+      setQuickVideoResolution: s.setQuickVideoResolution,
+      quickVideoAspectId: s.quickVideoAspectId ?? '16:9',
+      setQuickVideoAspectId: s.setQuickVideoAspectId,
+      quickVideoRefMode: s.quickVideoRefMode ?? 'omni',
+      setQuickVideoRefMode: s.setQuickVideoRefMode,
+      quickVideoFirstFrame: s.quickVideoFirstFrame,
+      quickVideoLastFrame: s.quickVideoLastFrame,
+      setQuickVideoFirstFrame: s.setQuickVideoFirstFrame,
+      setQuickVideoLastFrame: s.setQuickVideoLastFrame,
+      swapVideoFirstLastFrames: s.swapVideoFirstLastFrames,
+      quickVideoMultiFrames: s.quickVideoMultiFrames ?? EMPTY_STRING_ARRAY,
+      setQuickVideoMultiFrames: s.setQuickVideoMultiFrames,
+      addQuickVideoMultiFrame: s.addQuickVideoMultiFrame,
+      removeQuickVideoMultiFrame: s.removeQuickVideoMultiFrame,
+      quickVideoCount: s.quickVideoCount ?? 1,
+      setQuickVideoCount: s.setQuickVideoCount,
+      currentView: s.currentView,
+      images: s.images ?? EMPTY_ANY_ARRAY,
+    })),
+  );
+}
 
 import type { RichPromptInputRef } from '@client/shared/prompt-bar/RichPromptInput';
 import { ALL_IMAGE_RATIO_ITEMS, IMAGE_RATIO_ITEMS, type SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
@@ -26,10 +148,8 @@ import {
   resolveUseTopStrip,
   calculateImageDimensions,
 } from '@client/shared/prompt-bar/promptBarDisplay';
-import { usePromptBarVideoFrames } from './usePromptBarVideoFrames';
 import { usePromptBarMedia } from './usePromptBarMedia';
 import { usePromptBarSubmit } from './usePromptBarSubmit';
-import { usePromptBarFocus } from './usePromptBarFocus';
 
 
 export interface PromptActionBarOptions {
@@ -37,6 +157,8 @@ export interface PromptActionBarOptions {
   collapsible?: boolean;
   /** 首页外层已有欢迎区时，避免重复渲染品牌 Hero。 */
   showBrandHero?: boolean;
+  /** Optional surface copy without changing mode-specific placeholders elsewhere. */
+  inputPlaceholder?: string;
   onExpandChange?: (expanded: boolean) => void;
   onSubmitSuccess?: Parameters<typeof usePromptBarSubmit>[0]['onSubmitSuccess'];
   extraSubjects?: SubjectItem[];
@@ -364,4 +486,94 @@ export function usePromptActionBar({
     toastMsg,
     showToast,
   };
+}
+
+/** Restore focus when the collapsed editor is replaced by the expanded editor. */
+function usePromptBarFocus(
+  expanded: boolean,
+  inputRef: RefObject<RichPromptInputRef | null>,
+  setDockFocused: (focused: boolean) => void,
+  setComposerFocused: (focused: boolean) => void,
+) {
+  const restoreFocus = useRef(false);
+  useLayoutEffect(() => {
+    if (expanded && restoreFocus.current) {
+      restoreFocus.current = false;
+      inputRef.current?.focus();
+    }
+  }, [expanded, inputRef]);
+
+  return (event: FocusEvent<HTMLDivElement>) => {
+    const editorFocused = event.target.getAttribute('contenteditable') === 'true';
+    // Keep the collapsed upload button mounted until its click opens the file picker.
+    if (!expanded && !editorFocused) return;
+    if (!expanded && editorFocused) restoreFocus.current = true;
+    setDockFocused(true);
+    setComposerFocused(editorFocused);
+  };
+}
+
+interface UsePromptBarVideoFramesOptions {
+  showToast: (message: string) => void;
+  setQuickVideoFirstFrame: (frame: string | null) => void;
+  setQuickVideoLastFrame: (frame: string | null) => void;
+  addQuickVideoMultiFrame: (frame: string) => void;
+}
+
+function usePromptBarVideoFrames({
+  showToast,
+  setQuickVideoFirstFrame,
+  setQuickVideoLastFrame,
+  addQuickVideoMultiFrame,
+}: UsePromptBarVideoFramesOptions) {
+  const firstFrameInputRef = useRef<HTMLInputElement>(null);
+  const lastFrameInputRef = useRef<HTMLInputElement>(null);
+  const multiFrameInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadFrames = (event: ChangeEvent<HTMLInputElement>, apply: (url: string) => void) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (!files.length) return;
+    void useAppStore.getState().readPromptAttachments(async () => {
+      const urls = await Promise.all(files.map(readFileAsDataUrl));
+      urls.forEach(apply);
+    }).catch(() => showToast('无法读取参考帧，请重新选择图片'));
+  };
+
+  return {
+    firstFrameInputRef,
+    lastFrameInputRef,
+    multiFrameInputRef,
+    handleUploadFirstFrame: (event: ChangeEvent<HTMLInputElement>) => uploadFrames(event, setQuickVideoFirstFrame),
+    handleUploadLastFrame: (event: ChangeEvent<HTMLInputElement>) => uploadFrames(event, setQuickVideoLastFrame),
+    handleUploadMultiFrame: (event: ChangeEvent<HTMLInputElement>) => uploadFrames(event, addQuickVideoMultiFrame),
+  };
+}
+
+/** Keep persisted controls valid when changing model, workflow, or output quality. */
+function useVideoParameterConstraints() {
+  const state = useAppStore(useShallow(s => ({
+    mode: s.quickGenMode, model: s.quickVideoModel, refMode: s.quickVideoRefMode,
+    resolution: s.quickVideoResolution, aspect: s.quickVideoAspectId, duration: s.quickVideoDuration,
+    references: s.quickRefImages,
+  })));
+  const baseUrl = getGatewayClientBaseUrl(state.model);
+  useEffect(() => {
+    if (state.mode !== 'video') return;
+    const modelId = upstreamModalityModelId('video', state.model);
+    const profile = getVideoModelById(modelId, baseUrl);
+    if (!profile) return;
+    const store = useAppStore.getState();
+    const resolved = resolveVideoMode(modelId, state.refMode, state.references.filter(url => !isVideoMediaUrl(url)).length, state.references.filter(isVideoMediaUrl).length);
+    const modes = videoModes(modelId, baseUrl);
+    const mode = modes.some(item => item.id === resolved) ? resolved : modes[0].id;
+    const resolution = resolveVideoResolution(state.resolution, videoResolutionOptions(modelId, mode, baseUrl));
+    const aspect = videoRatioLocked(modelId, mode, baseUrl) ? 'adaptive' : profile.supportedAspectRatios.includes(state.aspect) ? state.aspect : profile.supportedAspectRatios[0];
+    const durations = videoDurationOptions(modelId, resolution, mode, baseUrl);
+    const duration = durations.includes(state.duration) ? state.duration : durations.reduce((best, value) => Math.abs(value - state.duration) < Math.abs(best - state.duration) ? value : best);
+    if (state.refMode !== mode) store.setQuickVideoRefMode(mode);
+    if (state.resolution !== resolution) store.setQuickVideoResolution(resolution);
+    if (state.aspect !== aspect) store.setQuickVideoAspectId(aspect);
+    if (state.duration !== duration) store.setQuickVideoDuration(duration);
+  }, [state, baseUrl]);
 }

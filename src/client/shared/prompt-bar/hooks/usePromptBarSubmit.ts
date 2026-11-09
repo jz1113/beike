@@ -1,12 +1,14 @@
+import { creationSkillFlow, creationSkillInputIssue } from '@client/shared/skills/model/creationSkillFlows';
+import type { AppState, GenerationTask } from '@client/store';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { TOAST_DURATION_MS } from '@client/shared/constants/timing';
+import { TOAST_DURATION_MS } from '@client/shared/hooks/useToast';
 import { registerRefMedia } from '@client/shared/media/refMediaRegistry';
 import { useAppStore } from '@client/store';
 import { buildPromptBarGenerationTasks, canSubmitPromptBar } from '@client/shared/prompt-bar/promptBarSubmit';
 import { registerDepthSubmit } from '@client/shared/api/generation/depthGeneration';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
 import type { SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
-import { claimPromptBarShortcut } from '../promptBarShortcut';
+import { getCanvasWorkspaceSnapshot } from '@client/shared/workspace/canvasWorkspace';
 
 interface UsePromptBarSubmitOptions {
   composerRef: React.RefObject<HTMLElement | null>;
@@ -35,17 +37,43 @@ interface UsePromptBarSubmitOptions {
   availableVideoModelsLength?: number;
   availableAudioModelsLength?: number;
   quickAudioModel?: string;
-  quickDepthStyle: any;
-  quickDepthQuality: any;
+  quickDepthStyle: AppState['quickDepthStyle'];
+  quickDepthQuality: AppState['quickDepthQuality'];
   refMediaFile: File | null;
   depthModelReady: boolean;
   setupCommand: string;
   clearComposerMedia: () => void;
   setActiveSubjects: React.Dispatch<React.SetStateAction<SubjectItem[]>>;
-  onSubmitSuccess?: (info: { prompt: string; refImages: string[]; mode: QuickGenMode; tasks: any[] }) => void;
+  onSubmitSuccess?: (info: { prompt: string; refImages: string[]; mode: QuickGenMode; tasks: GenerationTask[] }) => void;
+}
+
+const handledEvents = new WeakSet<Event>();
+
+/** One visible composer owns each global shortcut; focused composers take priority. */
+function claimPromptBarShortcut(event: Event, composer: HTMLElement | null): boolean {
+  if (!composer || handledEvents.has(event)) return false;
+  const visible = Array.from(document.querySelectorAll<HTMLElement>('[data-prompt-composer]'))
+    .filter(element => element.getClientRects().length > 0 && !element.closest('[aria-hidden="true"]'));
+  const target = visible.find(element => element.contains(document.activeElement)) || visible[0];
+  if (target !== composer) return false;
+  handledEvents.add(event);
+  return true;
 }
 
 const SUBMIT_COOLDOWN_MS = 3000;
+
+function skillSubmitIssue(mode: QuickGenMode, prompt: string, refs: string[], subjects: SubjectItem[]) {
+  if (mode !== 'agent') return;
+  const state = useAppStore.getState();
+  const id = state.getActiveAssistantSkill()?.id;
+  const flow = creationSkillFlow(id);
+  if (!flow) return;
+  const accepts = (url: string) => !url.startsWith('agent-file:') || flow.accept.includes('.pdf');
+  const history = state.sessions.find(session => session.id === state.currentSessionId)?.tasks || [];
+  const hasInput = refs.some(accepts) || subjects.length > 0 || history.some(task => task.referenceImages?.some(accepts));
+  return creationSkillInputIssue(id, prompt, hasInput);
+}
+
 
 export function usePromptBarSubmit({
   composerRef,
@@ -114,6 +142,8 @@ export function usePromptBarSubmit({
 
   const handleSendPrompt = useCallback(() => {
     if (useAppStore.getState().pendingAttachmentReads > 0) return;
+    const inputIssue = skillSubmitIssue(quickGenMode, quickPrompt, quickRefImages, activeSubjects);
+    if (inputIssue) { showToast(inputIssue); return; }
     const now = Date.now();
     if (now - lastSubmitTimeRef.current < SUBMIT_COOLDOWN_MS) {
       console.warn('[usePromptBarSubmit] 拦截 3 秒内的重复提交操作，保障资金安全');
@@ -155,6 +185,16 @@ export function usePromptBarSubmit({
     if (!result.ok) {
       showToast(result.error);
       return;
+    }
+    if (currentView === 'canvas') {
+      const project = getCanvasWorkspaceSnapshot();
+      if (typeof project.projectId !== 'string' || !project.projectId) {
+        showToast('请先打开画布项目');
+        return;
+      }
+      const canvasProjectId = project.projectId;
+      result.tasks = result.tasks.map(task => ({ ...task, canvasProjectId,
+        sessionTitle: typeof project.title === 'string' ? project.title : '画布创作' }));
     }
 
     // 立即打上物理时间戳锁与 UI 禁用锁
@@ -247,7 +287,7 @@ export function usePromptBarSubmit({
     [isDepthMode, handleKeyDown, handleSendPrompt]
   );
 
-  const canSend = !readingAttachments && canSubmitPromptBar({
+  const canSend = !readingAttachments && !skillSubmitIssue(quickGenMode, quickPrompt, quickRefImages, activeSubjects) && canSubmitPromptBar({
     quickGenMode,
     quickPrompt,
     quickRefImages,

@@ -46,8 +46,8 @@ export function MediaDeleteControl({sources, folder, onNotice, onDeleted}: {
   if (!choices.length) return null;
   if (choices.length === 1) {
     const source = choices[0];
-    return <button className="bml-remove" disabled={busy} title={'删除 '+source.name} aria-label={'删除 '+source.name}
-      onClick={()=>void remove(source)}><Trash2 size={14}/>删除</button>;
+    return <button type="button" className="bml-remove" disabled={busy} title={'删除 '+source.name} aria-label={'删除 '+source.name}
+      onClick={()=>void remove(source)}><Trash2 size={13}/><span>删除</span></button>;
   }
   return <select className="bml-remove-source" aria-label="选择要删除的素材记录" disabled={busy} value=""
     onChange={event=>{const source=choices[Number(event.target.value)]; if(source) void remove(source);}}>

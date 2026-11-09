@@ -4,7 +4,7 @@ import {
   getEnabledMultimodalModelsFromSettings, repairWorkflowModelId,
   upstreamModelId, type WorkflowCapability,
 } from './workflowModels';
-import { canonicalModelId } from './modelCatalog';
+import { canonicalModelId, DEFAULT_MULTIMODAL_MODEL_ID, DEFAULT_ASSISTANT_MODEL_ID } from './modelCatalog';
 
 export function resolveEnabledModelId(storedId: string | null | undefined, models: readonly { id: string }[]): string {
   if (!storedId) return models[0]?.id || '';
@@ -48,9 +48,9 @@ export function reconcileStoredWorkflowDefaults(
   if (!storage) throw new Error('浏览器存储不可用');
   const visionModels = getEnabledMultimodalModelsFromSettings(models);
   const assistantModels = getEnabledMultimodalModelsFromSettings(models, 'assistant');
-  const vision = resolveEnabledModelId(requested.vision ?? storage.getItem('ai_multimodal_model') ?? storage.getItem('ai_vision_model'), visionModels);
+  const vision = resolveEnabledModelId(requested.vision ?? storage.getItem('ai_multimodal_model') ?? storage.getItem('ai_vision_model') ?? DEFAULT_MULTIMODAL_MODEL_ID, visionModels);
   const syncAssistant = requested.vision !== undefined && assistantModels.some(model => model.id === vision);
-  const assistant = resolveEnabledModelId(requested.assistant ?? (syncAssistant ? vision : storage.getItem('ai_assistant_model')), assistantModels);
+  const assistant = resolveEnabledModelId(requested.assistant ?? (syncAssistant ? vision : storage.getItem('ai_assistant_model')) ?? DEFAULT_ASSISTANT_MODEL_ID, assistantModels);
   const image = resolveEnabledModelId(requested.image ?? storage.getItem('ai_image_gen_model'), getEnabledImageModelsFromSettings(models) as { id: string }[]);
   const video = resolveEnabledModelId(requested.video ?? storage.getItem('ai_video_gen_model'), getEnabledVideoModelsFromSettings(models) as { id: string }[]);
   const writes: Array<[string, string]> = [

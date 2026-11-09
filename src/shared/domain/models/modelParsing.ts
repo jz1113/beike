@@ -1,3 +1,4 @@
+import { canonicalModelId } from './modelCatalog';
 import { inferVendorId, getVendorDisplayName } from './modelSorting';
 
 export interface ParsedRawModel {
@@ -21,6 +22,9 @@ const FAMILY_DISPLAY_NAMES: Record<string, string> = {
   gpt: 'GPT',
   claude: 'Claude',
   gemini: 'Gemini',
+  'omni-flash': 'Gemini Omni Flash',
+  'grok-imagine-video': 'Grok Imagine Video',
+  'nano-banana': 'Nano Banana',
   grok: 'Grok',
   deepseek: 'DeepSeek',
   doubao: '豆包',
@@ -47,6 +51,8 @@ const FAMILY_DISPLAY_NAMES: Record<string, string> = {
   step: '阶跃星辰',
   stepfun: '阶跃星辰',
   kimi: 'Kimi',
+  muse: 'Muse',
+  llama: 'Llama',
   mimo: '小米',
   xiaomi: '小米',
   yi: '零一万物',
@@ -66,6 +72,8 @@ const FAMILY_DISPLAY_NAMES: Record<string, string> = {
   wanx: '通义万相',
   wan: '通义万相',
   cosyvoice: 'CosyVoice',
+  'minimax-speech': 'MiniMax Speech',
+  'gpt-tts': 'GPT TTS',
   jimeng: '即梦',
   kolors: '可图',
   meshy: 'Meshy',
@@ -89,6 +97,7 @@ const VARIANT_DISPLAY_NAMES: Record<string, string> = {
   exp: '实验版',
   mini: 'Mini',
   fast: '极速版',
+  prime: '高速版',
   nano: 'Nano',
   turbo: 'Turbo',
   schnell: 'Schnell',
@@ -174,10 +183,11 @@ export function isLegacyOrDiscontinuedModel(rawModelId: string): boolean {
  * 解析单个模型 ID，提取家族、代际版本、变体及快照日期
  */
 export function parseModelDetails(modelId: string, kind?: string): ParsedRawModel {
-  void kind;
   const trimmed = modelId.trim();
-  const lower = trimmed.toLowerCase();
-  const vendorId = inferVendorId(trimmed) || 'unknown';
+  const unwrapped = trimmed.slice(trimmed.lastIndexOf('/') + 1).replace(/^net-/i, '');
+  const normalized = kind === 'video' ? canonicalModelId(unwrapped) : kind === 'voice' ? unwrapped : trimmed;
+  const lower = normalized.toLowerCase();
+  const vendorId = inferVendorId(normalized) || 'unknown';
   const vendorName = getVendorDisplayName(vendorId);
   const isArchived = isLegacyOrDiscontinuedModel(trimmed);
 
@@ -213,6 +223,18 @@ export function parseModelDetails(modelId: string, kind?: string): ParsedRawMode
   let rest = cleanId.replace(/^(?:net-|fal-ai\/|openai\/)/i, '');
 
   const compoundFamilies: Array<{ match: RegExp; strip: RegExp; familyId: string }> = [
+    {
+      match: /^(?:gemini[-_])?nano[-_]?banana(?=[-_/]|\d|$)/i,
+      strip: /^(?:gemini[-_])?nano[-_]?banana[-_/]?/i,
+      familyId: 'nano-banana',
+    },
+    { match: /^omni[-_]flash[-_]10s$/i, strip: /^omni[-_]flash[-_]10s$/i, familyId: 'omni-flash' },
+    { match: /^grok[-_]imagine[-_]video(?:[-_]|$)/i, strip: /^grok[-_]imagine[-_]video[-_]?/i, familyId: 'grok-imagine-video' },
+    { match: /^kling[-_]video(?:[-_]|$)/i, strip: /^kling[-_]video[-_]?/i, familyId: 'kling' },
+    { match: /^(?:minimax[-_])?speech[-_]\d/i, strip: /^(?:minimax[-_])?speech[-_]/i, familyId: 'minimax-speech' },
+    { match: /^(?:elevenlabs|eleven)[-_]/i, strip: /^(?:elevenlabs|eleven)[-_]/i, familyId: 'elevenlabs' },
+    { match: /^cosy[-_]?voice[-_]?v?\d/i, strip: /^cosy[-_]?voice[-_]?/i, familyId: 'cosyvoice' },
+    { match: /^gpt[-_]4o[-_]mini[-_]tts$/i, strip: /^gpt[-_]4o[-_]mini[-_]tts$/i, familyId: 'gpt-tts' },
     { match: /^doubao[-_]seedance(?:[-_/]|$)/i, strip: /^doubao[-_]seedance[-_/]?/i, familyId: 'seedance' },
     { match: /^doubao[-_]seedream(?:[-_/]|$)/i, strip: /^doubao[-_]seedream[-_/]?/i, familyId: 'seedream' },
     { match: /^hunyuan[-_]video(?:[-_/]|$)/i, strip: /^hunyuan[-_]video[-_/]?/i, familyId: 'hunyuan-video' },
@@ -235,7 +257,7 @@ export function parseModelDetails(modelId: string, kind?: string): ParsedRawMode
       'deepseek', 'sensenova', 'baichuan', 'stepfun', 'internvl', 'internlm', 'pixtral',
       'recraft', 'minimax', 'hunyuan', 'kling', 'gemini', 'claude', 'doubao', 'qwen',
       'xiaomi', 'jimeng', 'kolors', 'mistral', 'runway', 'sora', 'flux', 'wanx', 'wan',
-      'grok', 'vidu', 'step', 'kimi', 'mimo', 'ernie', 'wenxin', 'baidu', 'luma', 'pika',
+      'grok', 'vidu', 'step', 'kimi', 'muse', 'llama', 'mimo', 'ernie', 'wenxin', 'baidu', 'luma', 'pika',
       'meshy', 'tripo', 'suno', 'gpt', 'veo', 'yi',
     ];
 
@@ -339,6 +361,7 @@ export function parseModelDetails(modelId: string, kind?: string): ParsedRawMode
 
   // 4. 规格变体（如 sol, luna, sonnet, opus, flash, haiku 等）
   // videos / image 这类通道尾缀不是规格，收成标准版，避免「即梦 Videos」
+  if (kind === 'video' && familyId === 'wan') rest = rest.replace(/^video[-_]?/, '');
   const noiseVariants = new Set(['video', 'videos', 'image', 'images', 'img', 'model', 'models', 'default', 'standard', 'std']);
   if (!variantKey) {
     variantKey = rest.replace(/^[-_/]+|[-_/]+$/g, '').replace(/\//g, '-').trim();

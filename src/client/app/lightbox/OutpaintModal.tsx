@@ -24,7 +24,7 @@ export interface OutpaintModalProps {
     prompt: string;
     model: string;
     quality: string;
-  }) => void;
+  }) => void | boolean;
 }
 
 interface RatioOption {
@@ -257,14 +257,14 @@ export const OutpaintModal: React.FC<OutpaintModalProps> = ({
     const normalizedQuality =
       selectedQuality === '1K' ? 'low' : selectedQuality === '4K' ? 'high' : 'medium';
 
-    onSubmitOutpaint({
+    const submitted = onSubmitOutpaint({
       ratio: selectedRatio,
       scale,
       prompt,
       model: selectedModelId || 'gpt-image-2',
       quality: normalizedQuality,
     });
-    onClose();
+    if (submitted !== false) onClose();
   }, [
     selectedRatio,
     scale,

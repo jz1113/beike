@@ -1,13 +1,111 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Copy, Home, Link2, Scissors, Clipboard, CheckSquare } from 'lucide-react';
-import { downloadMediaOrOpen } from '@client/shared/media/downloadMedia';
-import { isMediaPublishedOnHome } from '@client/shared/home-publish/homePublish';
-import { toggleHomeShowcase } from '../homeShowcaseAction';
+import { Download, Copy, Home, Link2 } from 'lucide-react';
+import { downloadMediaOrOpen, fetchMediaBlob } from '@client/shared/media/downloadMedia';
+import { isMediaPublishedOnHome, publishMediaResult, unpublishMediaFromHome } from '@client/shared/home-publish/homePublish';
+import { useAppStore } from '@client/store';
+import { useCanvasStore } from '@client/features/canvas/store/useCanvasStore';
 
-import type { ContextMenuState } from './contextMenuTypes';
-import { cleanOriginalMediaUrl, copyImageToClipboard } from './contextMenuMedia';
-import { useGlobalContextMenuEvents } from './useGlobalContextMenuEvents';
+import { useGlobalContextMenuEvents, type ContextMenuState } from './useGlobalContextMenuEvents';
+
+/** 智能清洗缩略图 URL 还原最高清原始资源 */
+export function cleanOriginalMediaUrl(rawUrl: string): string {
+  if (!rawUrl) return '';
+  try {
+    const base = typeof window !== 'undefined' ? window.location.href : 'http://local.invalid';
+    const parsed = new URL(rawUrl, base);
+    const wrapped = parsed.searchParams.get('url');
+    if (wrapped && parsed.pathname.includes('proxy-image')) return cleanOriginalMediaUrl(wrapped);
+    parsed.searchParams.delete('x-oss-process');
+    parsed.searchParams.delete('thumb');
+    parsed.searchParams.delete('width');
+    parsed.searchParams.delete('height');
+    parsed.searchParams.delete('w');
+    return parsed.toString();
+  } catch {
+    return rawUrl.replace(/[?&]x-oss-process=[^&]+/, '').replace(/[?&]thumb=[^&]+/, '');
+  }
+}
+
+/** 将图像 Blob 写入系统剪贴板（支持在微信/PS/飞书等处直接 Ctrl+V 粘贴） */
+export async function copyImageToClipboard(imageUrl: string): Promise<boolean> {
+  try {
+    const blob = await fetchMediaBlob(imageUrl);
+    let pngBlob = blob;
+
+    // 现代浏览器与操作系统剪贴板对非 png 格式兼容较差，自动转换为标准 PNG Blob
+    if (blob.type !== 'image/png') {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      const objUrl = URL.createObjectURL(blob);
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = objUrl;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('无法初始化 Canvas 2D 绘图上下文');
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(objUrl);
+
+      pngBlob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Canvas 转换 PNG 失败'))), 'image/png');
+      });
+    }
+
+    if (navigator.clipboard && typeof navigator.clipboard.write === 'function') {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': pngBlob,
+        }),
+      ]);
+      return true;
+    }
+  } catch (err) {
+    console.warn('[GlobalContextMenu] 写入系统图像剪贴板失败，自动回退至复制链接:', err);
+  }
+
+  // 极端受限降级：复制图片直链
+  try {
+    await navigator.clipboard.writeText(imageUrl);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function showcaseId(url: string) {
+  let hash = 0;
+  for (const char of url) hash = Math.imul(hash, 31) + char.charCodeAt(0) | 0;
+  return `url-${(hash >>> 0).toString(36)}`;
+}
+
+function toggleHomeShowcase(rawUrl: string, kind: 'image' | 'video'): 'published' | 'removed' {
+  const url = cleanOriginalMediaUrl(rawUrl);
+  if (isMediaPublishedOnHome(url)) {
+    unpublishMediaFromHome(url);
+    return 'removed';
+  }
+  const store = useAppStore.getState();
+  const task = [...store.generationTasks, ...store.sessions.flatMap(session => session.tasks)]
+    .find(item => item.resultUrl && cleanOriginalMediaUrl(item.resultUrl) === url);
+  if (task) {
+    publishMediaResult({ id: task.id || task.taskId || showcaseId(url), prompt: task.prompt || '', title: task.title, url, mediaType: kind });
+    return 'published';
+  }
+  for (const project of useCanvasStore.getState().projects) {
+    const node = project.nodes.find(item =>
+      (item.imageUrl && cleanOriginalMediaUrl(item.imageUrl) === url) || (item.videoUrl && cleanOriginalMediaUrl(item.videoUrl) === url));
+    if (!node) continue;
+    publishMediaResult({ id: `canvas-${node.id}`, prompt: node.content || '', title: node.title || project.title, url, mediaType: kind });
+    return 'published';
+  }
+  publishMediaResult({ id: showcaseId(url), prompt: '', url, mediaType: kind });
+  return 'published';
+}
 
 export default function GlobalContextMenu() {
   const [menu, setMenu] = useState<ContextMenuState>({
@@ -127,49 +225,6 @@ export default function GlobalContextMenu() {
     }
   };
 
-  // 6. 输入框操作：剪切
-  const handleInputCut = async () => {
-    if (!menu.inputElement) return;
-    const el = menu.inputElement;
-    const selStart = el.selectionStart ?? 0;
-    const selEnd = el.selectionEnd ?? 0;
-    if (selEnd > selStart) {
-      const cutText = el.value.slice(selStart, selEnd);
-      await navigator.clipboard.writeText(cutText);
-      el.setRangeText('', selStart, selEnd, 'end');
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      showToast('✂️ 已剪切');
-    }
-    closeMenu();
-  };
-
-  // 7. 输入框操作：粘贴
-  const handleInputPaste = async () => {
-    if (!menu.inputElement) return;
-    const el = menu.inputElement;
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        const selStart = el.selectionStart ?? el.value.length;
-        const selEnd = el.selectionEnd ?? el.value.length;
-        el.setRangeText(text, selStart, selEnd, 'end');
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        showToast('📋 已粘贴');
-      }
-    } catch (err) {
-      console.warn('Clipboard read failed:', err);
-    }
-    closeMenu();
-  };
-
-  // 8. 输入框操作：全选
-  const handleInputSelectAll = () => {
-    if (menu.inputElement) {
-      menu.inputElement.select();
-    }
-    closeMenu();
-  };
-
   if (typeof document === 'undefined') return null;
 
   return createPortal(
@@ -286,52 +341,7 @@ export default function GlobalContextMenu() {
             </div>
           )}
 
-          {/* 输入框快捷菜单 */}
-          {menu.type === 'input' && (
-            <div className="space-y-0.5">
-              {menu.selectedText ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleInputCut}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left hover:bg-blue-600 hover:text-white transition-colors duration-100 group"
-                  >
-                    <Scissors className="w-4 h-4 opacity-75 group-hover:opacity-100 shrink-0" />
-                    <span>剪切</span>
-                  </button>
 
-                  <button
-                    type="button"
-                    onClick={handleCopySelection}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left hover:bg-blue-600 hover:text-white transition-colors duration-100 group"
-                  >
-                    <Copy className="w-4 h-4 opacity-75 group-hover:opacity-100 shrink-0" />
-                    <span>拷贝</span>
-                  </button>
-                </>
-              ) : null}
-
-              <button
-                type="button"
-                onClick={handleInputPaste}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left hover:bg-blue-600 hover:text-white transition-colors duration-100 group"
-              >
-                <Clipboard className="w-4 h-4 opacity-75 group-hover:opacity-100 shrink-0" />
-                <span>粘贴</span>
-              </button>
-
-              <div className="h-px bg-slate-200/70 dark:bg-slate-700/70 my-1 mx-1" />
-
-              <button
-                type="button"
-                onClick={handleInputSelectAll}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left hover:bg-blue-600 hover:text-white transition-colors duration-100 group text-slate-600 dark:text-slate-300"
-              >
-                <CheckSquare className="w-4 h-4 opacity-75 group-hover:opacity-100 shrink-0" />
-                <span>全选</span>
-              </button>
-            </div>
-          )}
         </div>
       )}
     </>,

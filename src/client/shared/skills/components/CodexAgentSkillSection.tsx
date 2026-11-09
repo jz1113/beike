@@ -1,6 +1,6 @@
 import { Check, Pin, Star } from 'lucide-react';
-import { AssistantSkillCardIcon } from '@client/shared/icons';
-import { groupAssistantSkillsByCategory, type AssistantSkill } from '@shared/domain/assistant/skills';
+import { AssistantSkillCardIcon } from '@client/shared/icons/assistant/AssistantIcons';
+import { groupAssistantSkillsByCategory, skillDisplayDescription, type AssistantSkill } from '@shared/domain/assistant/skills';
 import { assistantSkillTitle } from './CodexSkillDetailModal';
 
 export interface CodexAgentSkillSectionProps {
@@ -32,6 +32,7 @@ function SkillRowItem({
   compact?: boolean;
 }) {
   const title = assistantSkillTitle(skill);
+  const description=skillDisplayDescription(skill);
 
   return (
     <div className={`group flex items-center gap-2 rounded-xl px-3 transition-colors ${compact ? 'py-3' : 'py-3.5'} ${isActive ? 'bg-blue-50/60 dark:bg-blue-500/[0.06]' : 'hover:bg-slate-50 dark:hover:bg-white/[0.04]'}`}>
@@ -41,7 +42,7 @@ function SkillRowItem({
           <span className="flex items-center gap-1.5">
             <span className="truncate text-[14px] font-medium text-slate-900 dark:text-slate-100">{title}</span>
           </span>
-          <span className="mt-1 block truncate text-[13px] leading-5 text-slate-500 dark:text-slate-400" title={skill.description}>{skill.description || '暂无描述'}</span>
+          <span className="mt-1 block truncate text-[13px] leading-5 text-slate-500 dark:text-slate-400" title={description}>{description || '暂无描述'}</span>
         </span>
       </button>
 

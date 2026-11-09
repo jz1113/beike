@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Save } from 'lucide-react';
 import { type ApiProvider, PROTOCOL_OPTIONS, type ApiProviderProtocol } from '../../model/apiProviderTypes';
-import type { ImageRequestTemplate } from '@shared/contracts/imageRequestTemplate';
+import type { ImageRequestTemplate } from '@shared/contracts/generate';
 import { parseCurl, qwenAsyncPreset, qwenSyncPreset } from '../../model/curlTemplate';
 
 interface Props {

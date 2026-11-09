@@ -131,6 +131,53 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+  '/api/canvas/drafts/{id}':
+    get:
+      operationId: get_api_canvas_drafts_id
+      summary: 读取工作区的线上草稿，并投影为可编辑的 Studio 项目
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 当前版本的 Studio 项目
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [project]
+                properties:
+                  project:
+                    type: object
+                    additionalProperties: true
+        '401':
+          description: 登录或工作区身份无效
+        '404':
+          description: 当前工作区没有此草稿
+  /api/canvas/mcp:
+    post:
+      operationId: post_api_canvas_mcp
+      summary: 使用独立 Bearer 令牌访问画布 MCP Streamable HTTP 服务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: MCP JSON-RPC 响应
+        '202':
+          description: 已接受 MCP 通知
+        '401':
+          description: MCP 令牌缺失或无效
+        '404':
+          description: MCP 未启用
   '/api/catalog/assets/{type}/{id}/create-version':
     post:
       operationId: post_api_catalog_assets_type_id_create_version
@@ -219,12 +266,6 @@ paths:
           description: 沿用现有 JSON 或二进制响应
     post:
       operationId: post_api_catalog_assets_reviews
-      responses:
-        '200':
-          description: 沿用现有 JSON 或二进制响应
-  /api/catalog/assets/seed:
-    post:
-      operationId: post_api_catalog_assets_seed
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
@@ -537,6 +578,11 @@ paths:
         '200':
           description: 沿用现有 JSON 或二进制响应
   /api/generate/analyze:
+    get:
+      operationId: get_api_generate_analyze
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
     post:
       operationId: post_api_generate_analyze
       responses:
@@ -545,6 +591,23 @@ paths:
   /api/generate/audio:
     get:
       operationId: get_api_generate_audio
+      parameters:
+        - in: query
+          name: taskId
+          schema:
+            type: string
+        - in: query
+          name: taskKey
+          description: 首次回执丢失时使用的原操作标识，与 taskId 二选一
+          schema:
+            type: string
+            maxLength: 256
+        - in: query
+          name: closeMissing
+          description: 使用 taskKey 恢复时原子封闭缺失操作；已有操作不变，封闭失败不得换键重试
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
@@ -553,13 +616,60 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
-  /api/generate/canvas-text:
-    post:
-      operationId: post_api_generate_canvas_text
+  /api/generate/canvas-specialized:
+    get:
+      operationId: get_api_generate_canvas_specialized
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+    post:
+      operationId: post_api_generate_canvas_specialized
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
+  /api/generate/canvas-text:
+    get:
+      operationId: get_api_generate_canvas_text
+      parameters:
+        - in: query
+          name: operationKey
+          required: true
+          schema:
+            type: string
+            maxLength: 256
+      responses:
+        '200':
+          description: 恢复原文本或05分析结果，不调用模型；最终阶段已保存时可恢复外层结算失败的回执
+        '404':
+          description: 原回执尚未找到，保留原标识继续查询，不授权重新提交
+        '409':
+          description: 原操作执行中或结果未知，返回已保存的观察阶段回执及阶段状态，不自动补发
+        '503':
+          description: 回执暂不可读或原阶段结果未知，保留原操作
+    post:
+      operationId: post_api_generate_canvas_text
+      parameters:
+        - in: header
+          name: x-idempotency-key
+          schema:
+            type: string
+            maxLength: 256
+          description: 提交前持久化的操作标识；同工作区同标识原子领取，各阶段最多执行一次
+      responses:
+        '200':
+          description: 文本或聊天结果及 operationKey，重复操作重放原回执
+        '409':
+          description: 原操作执行中、结果未知或同标识参数冲突，不重新调用模型
+        '502':
+          description: 模型或观察阶段结果未知，只查询原回执；已完成观察保留供核对
+        '503':
+          description: 领取或阶段结算未确认，不换键补发
   /api/generate/copywriting:
+    get:
+      operationId: get_api_generate_copywriting
+      responses:
+        '200':
+          description: 沿用现有 JSON 或二进制响应
     post:
       operationId: post_api_generate_copywriting
       responses:
@@ -678,9 +788,34 @@ paths:
   /api/generate/image:
     get:
       operationId: get_api_generate_image
+      parameters:
+        - in: query
+          name: taskId
+          schema:
+            type: string
+        - in: query
+          name: taskKey
+          description: 首次回执丢失时使用的原操作标识，与 taskId 二选一
+          schema:
+            type: string
+            maxLength: 256
+        - in: query
+          name: closeMissing
+          description: 使用 taskKey 恢复时原子封闭缺失操作；已有操作不变，封闭失败不得换键重试
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: requireRoute
+          description: 画布查询要求可验证的原提交渠道；仍允许读取已保存的终态，不向推测渠道发起查询
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+        '409':
+          description: 渠道已改变或原任务缺少可验证的渠道记录
     post:
       operationId: post_api_generate_image
       responses:
@@ -693,11 +828,42 @@ paths:
         '200':
           description: 沿用现有 JSON 或二进制响应
   /api/generate/layer-decomposition:
-    post:
-      operationId: post_api_generate_layer_decomposition
+    get:
+      operationId: get_api_generate_layer_decomposition
+      parameters:
+        - in: query
+          name: operationKey
+          required: true
+          schema:
+            type: string
+            maxLength: 256
       responses:
         '200':
-          description: 沿用现有 JSON 或二进制响应
+          description: 恢复当前工作区原图层分离回执，不调用模型，不依赖当前模型渠道配置
+        '404':
+          description: 原回执不存在，仅允许继续查询，不授权换键重发
+        '409':
+          description: 原操作进行中或结果未知，不重新调用模型
+        '503':
+          description: 回执存储暂不可用，不重新调用模型
+    post:
+      operationId: post_api_generate_layer_decomposition
+      parameters:
+        - in: header
+          name: x-idempotency-key
+          schema:
+            type: string
+            maxLength: 256
+          description: 客户端提交前持久化的操作标识；同工作区同标识只允许调用一次模型
+      responses:
+        '200':
+          description: 图层分离结果及 operationKey；调用后的回执包含实际 model、usageChannelId 及可用的 usage，重复提交重放原回执
+        '409':
+          description: 原操作进行中、结果未知或同标识参数冲突，不重新调用模型
+        '502':
+          description: 上游结果未确认；submissionUnknown 为 true 时只查询原回执
+        '503':
+          description: 原子领取或回执结算未确认，保留原操作标识
   /api/generate/seedance/precheck:
     post:
       operationId: post_api_generate_seedance_precheck
@@ -957,6 +1123,8 @@ paths:
                   type: object
                   properties:
                     taskId:
+                      type: string
+                    recordId:
                       type: string
                     resultUrl:
                       type: string
@@ -1629,6 +1797,8 @@ paths:
       responses:
         '200':
           description: 沿用现有 JSON 或二进制响应
+        '400':
+          description: 请求体格式无效、超出大小限制、配置缺失或连接测试失败
   /api/system/depth-env:
     get:
       operationId: get_api_system_depth_env
@@ -1646,7 +1816,11 @@ paths:
       operationId: post_api_system_local_storage_clear_derived
       responses:
         '200':
-          description: 沿用现有 JSON 或二进制响应
+          description: 派生缓存已清理
+        '401':
+          description: 访问令牌或工作区密钥缺失或无效
+        '403':
+          description: 生产模式下需要管理员令牌
   /api/system/local-storage/stats:
     get:
       operationId: get_api_system_local_storage_stats
@@ -1779,6 +1953,51 @@ components:
           type: string
         imageModel:
           type: string
+    SalesAssetUsageScope:
+      type: object
+      required: [workspaceId, channelId, mediaType, epoch]
+      properties:
+        workspaceId:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        channelId:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        mediaType:
+          type: string
+          enum: [vision, image]
+        epoch:
+          type: string
+          minLength: 1
+          maxLength: 160
+    SalesAssetUsageReceipt:
+      type: object
+      required: [stage, modelId, success]
+      properties:
+        stage:
+          type: string
+          enum: [analysis, main, views]
+        modelId:
+          type: string
+        taskId:
+          type: string
+        recordId:
+          type: string
+        success:
+          type: boolean
+        usage:
+          type: object
+          required: [promptTokens, completionTokens, totalTokens]
+          properties:
+            promptTokens:
+              type: number
+              minimum: 0
+            completionTokens:
+              type: number
+              minimum: 0
+            totalTokens:
+              type: number
+              minimum: 0
     SalesAssetViewJob:
       type: object
       required: [id, key, kind, assetId, model, status, error, images, createdAt, updatedAt]
@@ -1807,6 +2026,14 @@ components:
             type: string
         creation:
           $ref: '#/components/schemas/SalesAssetCreation'
+        usageScopes:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SalesAssetUsageScope'
+        usageReceipts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesAssetUsageReceipt'
         createdAt:
           type: string
         updatedAt:

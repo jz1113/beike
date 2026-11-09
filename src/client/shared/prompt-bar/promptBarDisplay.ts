@@ -15,6 +15,7 @@ export function resolvePromptPlaceholder(params: {
 }): string {
   const { isDepthMode, quickGenMode, quickVideoRefMode, isGenerateDock, hasRefMedia } = params;
 
+  if (quickGenMode === 'collect') return '输入商品链接或京东商品编号';
   if (quickGenMode === 'agent') {
     return '';
   }

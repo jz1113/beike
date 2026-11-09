@@ -1,50 +1,9 @@
-export type CustomAssetCategory = 'character' | 'product' | 'voice' | 'file';
-
-export interface CustomAssetItem {
-  id: string;
-  category: CustomAssetCategory;
-  name: string;
-  description?: string;
-  mediaKind?: 'image' | 'video' | 'audio';
-  folder?: string;
-  collection?: boolean;
-  scriptId?: string;
-  placementKey?: string;
-  placementFolders?: string[];
-  tags?: string[];
-  coverUrl?: string;
-  mediaUrl?: string;
-  fileSize?: string;
-  duration?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-const STORAGE_KEY = 'beike.custom_assets';
-
-function safeParse(json: string | null): CustomAssetItem[] {
-  if (!json) return [];
-  try {
-    const parsed = JSON.parse(json);
-    return Array.isArray(parsed) ? (parsed as CustomAssetItem[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function loadCustomAssets(): CustomAssetItem[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    return safeParse(window.localStorage.getItem(STORAGE_KEY));
-  } catch {
-    return [];
-  }
-}
+import { CUSTOM_ASSET_STORAGE_KEY, loadCustomAssets, type CustomAssetItem } from '@client/shared/media/customAssetStorage';
 
 export function saveCustomAssets(items: CustomAssetItem[]): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    window.localStorage.setItem(CUSTOM_ASSET_STORAGE_KEY, JSON.stringify(items));
     window.dispatchEvent(new CustomEvent('beike:custom_assets_updated'));
   } catch {
     // 忽略本地存储写入失败
@@ -69,8 +28,8 @@ export function addCustomAsset(
 
 export function deleteCustomAsset(id: string): boolean {
   try {
-    const list:CustomAssetItem[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list.filter(item => item.id !== id)));
+    const list:CustomAssetItem[] = JSON.parse(localStorage.getItem(CUSTOM_ASSET_STORAGE_KEY) || '[]');
+    localStorage.setItem(CUSTOM_ASSET_STORAGE_KEY, JSON.stringify(list.filter(item => item.id !== id)));
     window.dispatchEvent(new Event('beike:custom_assets_updated'));
     return true;
   } catch {
@@ -79,19 +38,20 @@ export function deleteCustomAsset(id: string): boolean {
 }
 
 /** 收藏记录只保存引用，导入的本机素材保留自己的来源记录。 */
-export function collectCustomMedia(name:string, url:string, kind:NonNullable<CustomAssetItem['mediaKind']> | 'script', folder:string, collection = true) {
+export function collectCustomMedia(name:string, url:string, kind:NonNullable<CustomAssetItem['mediaKind']> | 'script', folder:string, collection = true, tags?:string[]) {
   if (collection && !readMediaFolders().includes(folder)) throw new Error('收藏文件夹已删除');
-  const list:CustomAssetItem[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const list:CustomAssetItem[] = JSON.parse(localStorage.getItem(CUSTOM_ASSET_STORAGE_KEY) || '[]');
   if (!Array.isArray(list)) throw new Error('本机素材目录读取失败');
   const duplicate = list.some(item => (kind === 'script' ? item.scriptId : item.mediaUrl) === url && item.folder === folder);
   const now = Date.now();
   const item: CustomAssetItem = {id:crypto.randomUUID(), category:'file', name, folder, collection,
+    ...(tags?.length ? {tags} : {}),
     ...(kind === 'script' ? {scriptId:url} : {mediaKind:kind, mediaUrl:url, coverUrl:kind === 'image' ? url : undefined}),
     createdAt:now, updatedAt:now};
   const key = libraryMediaKey({kind, url});
   const updated = list.map(record=>record.placementKey === key
     ? {...record, placementFolders:[...new Set([...(record.placementFolders ?? []),folder])]} : record);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(duplicate ? updated : [item,...updated]));
+  localStorage.setItem(CUSTOM_ASSET_STORAGE_KEY, JSON.stringify(duplicate ? updated : [item,...updated]));
   window.dispatchEvent(new Event('beike:custom_assets_updated'));
 }
 
@@ -129,7 +89,7 @@ export function createMediaFolder(name:string, parent = '我的文件夹', exist
 
 export function removeCollectedMedia(url:string,folder:string) {
   if (!readMediaFolders().includes(folder)) throw new Error('请选择收藏文件夹');
-  const list:CustomAssetItem[]=JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const list:CustomAssetItem[]=JSON.parse(localStorage.getItem(CUSTOM_ASSET_STORAGE_KEY) || '[]');
   const keySuffix = '|'+url;
   const remaining = list.flatMap(item=>{
     if (item.placementKey?.endsWith(keySuffix) && item.placementFolders?.includes(folder)) {
@@ -138,14 +98,14 @@ export function removeCollectedMedia(url:string,folder:string) {
     }
     return isCollection(item) && (item.scriptId ?? item.mediaUrl) === url && item.folder === folder ? [] : [item];
   });
-  localStorage.setItem(STORAGE_KEY,JSON.stringify(remaining));
+  localStorage.setItem(CUSTOM_ASSET_STORAGE_KEY,JSON.stringify(remaining));
   window.dispatchEvent(new Event('beike:custom_assets_updated'));
 }
 
 export function deleteMediaFolder(path:string) {
   const folders = readMediaFolders();
   if (!folders.includes(path)) throw new Error('请选择已创建的文件夹');
-  const assets:CustomAssetItem[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const assets:CustomAssetItem[] = JSON.parse(localStorage.getItem(CUSTOM_ASSET_STORAGE_KEY) || '[]');
   if (!Array.isArray(assets)) throw new Error('本机素材目录读取失败');
   const removed = new Set(folders.filter(folder => folder === path || folder.startsWith(path+'/')));
   const remaining = assets.flatMap(item=>{
@@ -157,7 +117,7 @@ export function deleteMediaFolder(path:string) {
   });
   localStorage.setItem(FOLDER_KEY, JSON.stringify(folders.filter(folder => !removed.has(folder))));
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
+    localStorage.setItem(CUSTOM_ASSET_STORAGE_KEY, JSON.stringify(remaining));
   } catch (error) {
     localStorage.setItem(FOLDER_KEY, JSON.stringify(folders));
     throw error;
@@ -180,7 +140,7 @@ export function relocateMediaFolder(path:string, name:string, parent:string, exi
   for (const value of moved) {
     if (outside.has(target+value.slice(path.length))) throw new Error('目标文件夹下已有同名分类');
   }
-  const assets:CustomAssetItem[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const assets:CustomAssetItem[] = JSON.parse(localStorage.getItem(CUSTOM_ASSET_STORAGE_KEY) || '[]');
   if (!Array.isArray(assets)) throw new Error('本机素材目录读取失败');
   const kind = mediaFolderKinds[parent.split('/')[0]];
   const members = assets.filter(item=>!item.placementKey && isCollection(item) && item.folder && inside(item.folder));
@@ -198,7 +158,7 @@ export function relocateMediaFolder(path:string, name:string, parent:string, exi
   });
   localStorage.setItem(FOLDER_KEY,JSON.stringify(folders.map(value=>inside(value) ? target+value.slice(path.length) : value)));
   try {
-    if (members.length || placements.length) localStorage.setItem(STORAGE_KEY,JSON.stringify(nextAssets));
+    if (members.length || placements.length) localStorage.setItem(CUSTOM_ASSET_STORAGE_KEY,JSON.stringify(nextAssets));
   } catch (error) {
     localStorage.setItem(FOLDER_KEY,JSON.stringify(folders));
     throw error;
@@ -214,13 +174,36 @@ export interface LibraryMediaPlacement {
 
 export const libraryMediaKey = (item:Pick<LibraryMediaPlacement,'kind'|'url'>) => item.kind+'|'+item.url;
 
+/** Preserve URL-based category moves when a source record receives a new file. */
+export function preserveReplacedMediaPlacement(sourceKey:string, oldKey:string) {
+  const list:CustomAssetItem[] = JSON.parse(localStorage.getItem(CUSTOM_ASSET_STORAGE_KEY) || '[]');
+  if (!Array.isArray(list)) throw new Error('本机素材目录读取失败');
+  const changed = list.map(item => item.placementKey === oldKey
+    ? {...item, placementSources:[...new Set([...(item.placementSources ?? []),sourceKey])]} : item);
+  localStorage.setItem(CUSTOM_ASSET_STORAGE_KEY, JSON.stringify(changed));
+  window.dispatchEvent(new Event('beike:custom_assets_updated'));
+}
+
+export function replaceCustomMediaFile(id:string, oldUrl:string, newUrl:string, kind:NonNullable<CustomAssetItem['mediaKind']>) {
+  const list:CustomAssetItem[] = JSON.parse(localStorage.getItem(CUSTOM_ASSET_STORAGE_KEY) || '[]');
+  if (!Array.isArray(list)) throw new Error('本机素材目录读取失败');
+  const item = list.find(item=>item.id === id && !item.placementKey && !item.scriptId);
+  if (!item || (item.mediaUrl || item.coverUrl) !== oldUrl) throw new Error('素材已变化，请刷新后重试');
+  const key=libraryMediaKey({kind,url:oldUrl});
+  const changed=list.map(record=>record.id === id
+    ? {...record,mediaUrl:newUrl,coverUrl:kind === 'image' ? newUrl : undefined,mediaKind:kind,fileSize:undefined,duration:undefined,updatedAt:Date.now()}
+    : record.placementKey === key ? {...record,placementSources:[...new Set([...(record.placementSources ?? []),'local:'+id])]} : record);
+  localStorage.setItem(CUSTOM_ASSET_STORAGE_KEY,JSON.stringify(changed));
+  window.dispatchEvent(new Event('beike:custom_assets_updated'));
+}
+
 /** 整批分类调整一次写入；原始媒体和工作区资产仍由各来源管理。 */
 export function moveLibraryMedia(items:readonly LibraryMediaPlacement[], source:string, target:string, existing:readonly string[]) {
   if (!items.length) throw new Error('请先选择素材');
   if (!new Set([...existing,...readMediaFolders()]).has(target)) throw new Error('目标分类已不存在');
   const required = mediaFolderKinds[target.split('/')[0]];
   if (required && items.some(item=>item.kind !== required)) throw new Error('所选素材的类型与目标分类不符');
-  const list:CustomAssetItem[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const list:CustomAssetItem[] = JSON.parse(localStorage.getItem(CUSTOM_ASSET_STORAGE_KEY) || '[]');
   if (!Array.isArray(list)) throw new Error('本机素材目录读取失败');
   const placements = new Map(list.filter(item=>item.placementKey).map(item=>[item.placementKey!,item]));
   const changes = new Map<string,CustomAssetItem>();
@@ -249,6 +232,6 @@ export function moveLibraryMedia(items:readonly LibraryMediaPlacement[], source:
     collectedAtTarget.add(key);
     return [{...record,folder:target,collection:true,updatedAt:now}];
   });
-  localStorage.setItem(STORAGE_KEY,JSON.stringify([...remaining,...changes.values()]));
+  localStorage.setItem(CUSTOM_ASSET_STORAGE_KEY,JSON.stringify([...remaining,...changes.values()]));
   window.dispatchEvent(new Event('beike:custom_assets_updated'));
 }

@@ -1,5 +1,4 @@
-import { colorPresets } from './palette';
-import { colorField, grouped, selectField, slider, switchField, type StudioSchema } from './types';
+import { colorField, colorPresets, grouped, selectField, slider, switchField, type StudioSchema } from './shards';
 
 export const raysSchema: StudioSchema = {
   fields: [

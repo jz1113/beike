@@ -1,5 +1,6 @@
-import type { ModalityKind, ModalityModelItem, ModalityVendorOption } from './modalityModelTypes';
-import { classifyModel } from './modalityClassifier';
+import { canonicalModelId } from '@shared/domain/models/modelCatalog';
+import { APPROVED_VIDEO_MODELS } from '@shared/domain/models/model-catalog/approvedVideo';
+import { classifyModel, normalizeModelId, type ModalityKind, type ModalityModelItem, type ModalityVendorOption } from './modalityClassifier';
 
 export { isLegacyOrDiscontinuedModel } from '@shared/domain/models/modelParsing';
 
@@ -16,40 +17,28 @@ export const MODALITY_TITLES: Record<ModalityKind, { title: string; subtitle: st
     title: '视频',
     subtitle: '文生视频、图生视频、超分与长镜头视频生成线路配置。',
   },
-  three_d: {
-    title: '3D',
-    subtitle: '混元与 Tripo 的 3D 资产生成。Comfly 调用混元时模型 ID 需带 fal-ai/ 前缀。',
-  },
-  music: {
-    title: '音乐',
-    subtitle: 'Suno、ElevenLabs 与 MiniMax 音乐线路。调用接口稍后接入。',
-  },
   voice: {
     title: '语音',
     subtitle: '高保真文本转语音、克隆声音与智能配音模型。',
   },
-  avatar: {
-    title: '数字人',
-    subtitle: '数字人功能重建中，已保存的驱动模型配置保留。配音仍在语音线路配置。',
-  },
 };
 
 export const GLOBAL_ALL_VENDORS: ModalityVendorOption[] = [
+  { id: 'google', name: 'Google', logoKey: 'gemini', keywords: ['gemini', 'gemma', 'google', 'imagen', 'palm', 'veo', 'banana', 'omni_flash'] },
   { id: 'openai', name: 'OpenAI', logoKey: 'openai', keywords: ['gpt', 'openai', 'chatgpt', 'dall', 'sora'] },
   { id: 'anthropic', name: 'Anthropic', logoKey: 'claude', keywords: ['claude', 'anthropic'] },
-  { id: 'google', name: 'Google', logoKey: 'google', keywords: ['gemini', 'gemma', 'google', 'imagen', 'palm', 'veo', 'banana', 'omni_flash'] },
-  { id: 'deepseek', name: 'DeepSeek', logoKey: 'deepseek', keywords: ['deepseek'] },
-  { id: 'bytedance', name: '字节', logoKey: 'bytedance', keywords: ['doubao', 'jimeng', 'bytedance', 'volc', 'skylark', 'seedream', 'seedance'] },
-  { id: 'qwen', name: 'Qwen', logoKey: 'qwen', keywords: ['qwen', 'tongyi', 'cosyvoice', 'wanx', 'wan', 'z-image', 'dashscope'] },
-  { id: 'flux', name: 'Flux', logoKey: 'flux', keywords: ['flux', 'bfl'] },
   { id: 'xai', name: 'xAI', logoKey: 'grok', keywords: ['grok', 'xai'] },
-  { id: 'moonshot', name: 'Moonshot', logoKey: 'moonshot', keywords: ['moonshot', 'kimi'] },
+  { id: 'deepseek', name: 'DeepSeek', logoKey: 'deepseek', keywords: ['deepseek'] },
+  { id: 'moonshot', name: 'Moonshot', logoKey: 'kimi', keywords: ['moonshot', 'kimi'] },
+  { id: 'qwen', name: 'Qwen', logoKey: 'qwen', keywords: ['qwen', 'tongyi', 'cosyvoice', 'wanx', 'wan', 'z-image', 'dashscope'] },
+  { id: 'meta', name: 'Meta', logoKey: 'meta', keywords: ['llama', 'meta', 'muse'] },
+  { id: 'bytedance', name: '字节', logoKey: 'jimeng', keywords: ['doubao', 'jimeng', 'bytedance', 'volc', 'skylark', 'seedream', 'seedance'] },
+  { id: 'flux', name: 'Flux', logoKey: 'flux', keywords: ['flux', 'bfl'] },
   { id: 'minimax', name: 'MiniMax', logoKey: 'minimax', keywords: ['minimax', 'abab', 'hailuo'] },
   { id: 'glm', name: 'GLM', logoKey: 'zhipu', keywords: ['glm', 'zhipu', 'chatglm', 'cogview'] },
   { id: 'kling', name: 'Kling', logoKey: 'kling', keywords: ['kling', 'kolors', 'keling', 'kuaishou'] },
   { id: 'midjourney', name: 'MJ', logoKey: 'midjourney', keywords: ['midjourney', 'niji', 'mj'] },
   { id: 'vidu', name: 'Vidu', logoKey: 'vidu', keywords: ['vidu', 'shengshu'] },
-  { id: 'meta', name: 'Meta', logoKey: 'meta', keywords: ['llama', 'meta'] },
   { id: 'xiaomi', name: '小米', logoKey: 'xiaomi', keywords: ['xiaomi', 'mimo'] },
   { id: 'yi', name: '零一万物', logoKey: 'yi', keywords: ['yi-', 'yi_', '01.ai', '01ai', '01-ai', 'yi-lightning', 'yi-large'] },
   { id: 'baidu', name: '百度文心', logoKey: 'baidu', keywords: ['ernie', 'baidu', 'wenxin', '文心'] },
@@ -62,11 +51,8 @@ export const GLOBAL_ALL_VENDORS: ModalityVendorOption[] = [
   { id: 'runway', name: 'Runway', logoKey: 'runway', keywords: ['runway', 'gen-2', 'gen-3', 'gen2', 'gen3'] },
   { id: 'pika', name: 'Pika', logoKey: 'pika', keywords: ['pika'] },
   { id: 'recraft', name: 'Recraft', logoKey: 'recraft', keywords: ['recraft'] },
-  { id: 'tripo', name: 'Tripo', logoKey: 'tripo', keywords: ['tripo'] },
-  { id: 'suno', name: 'Suno', logoKey: 'suno', keywords: ['suno'] },
   { id: 'elevenlabs', name: 'ElevenLabs', logoKey: 'elevenlabs', keywords: ['eleven', 'elevenlabs'] },
   { id: 'topaz', name: 'Topaz 超分', logoKey: 'topaz', keywords: ['topaz', 'upscale'] },
-  { id: 'meshy', name: 'Meshy', logoKey: 'meshy', keywords: ['meshy'] },
   { id: 'fal', name: 'Fal.ai', logoKey: 'fal', keywords: ['fal-ai', 'fal.ai', 'fal'] },
   { id: 'siliconflow', name: '硅基流动', logoKey: 'siliconflow', keywords: ['siliconflow', 'siliconcloud', 'silicon'] },
   { id: 'together', name: 'Together', logoKey: 'together', keywords: ['together'] },
@@ -77,16 +63,17 @@ export const GLOBAL_ALL_VENDORS: ModalityVendorOption[] = [
 
 export const MODALITY_VENDORS_BY_KIND: Record<ModalityKind, ModalityVendorOption[]> = {
   chat: [
+    { id: 'google', name: 'Google', logoKey: 'gemini', keywords: ['gemini', 'gemma', 'google', 'imagen', 'palm', 'omni_flash'] },
     { id: 'openai', name: 'OpenAI', logoKey: 'openai', keywords: ['gpt', 'openai', 'chatgpt', 'dall-e', 'dalle'] },
-    { id: 'google', name: 'Google', logoKey: 'google', keywords: ['gemini', 'gemma', 'google', 'imagen', 'palm', 'omni_flash'] },
     { id: 'anthropic', name: 'Anthropic', logoKey: 'claude', keywords: ['claude', 'anthropic'] },
     { id: 'xai', name: 'xAI', logoKey: 'grok', keywords: ['grok', 'xai'] },
     { id: 'deepseek', name: 'DeepSeek', logoKey: 'deepseek', keywords: ['deepseek'] },
-    { id: 'moonshot', name: 'Moonshot', logoKey: 'moonshot', keywords: ['moonshot', 'kimi'] },
+    { id: 'moonshot', name: 'Moonshot', logoKey: 'kimi', keywords: ['moonshot', 'kimi'] },
+    { id: 'qwen', name: 'Qwen', logoKey: 'qwen', keywords: ['qwen', 'tongyi', 'cosyvoice'] },
+    { id: 'meta', name: 'Meta', logoKey: 'meta', keywords: ['llama', 'meta', 'muse'] },
     { id: 'minimax', name: 'MiniMax', logoKey: 'minimax', keywords: ['minimax', 'abab'] },
     { id: 'glm', name: 'GLM', logoKey: 'zhipu', keywords: ['glm', 'zhipu', 'chatglm'] },
-    { id: 'qwen', name: 'Qwen', logoKey: 'qwen', keywords: ['qwen', 'tongyi', 'cosyvoice'] },
-    { id: 'bytedance', name: '字节', logoKey: 'bytedance', keywords: ['doubao', 'jimeng', 'bytedance', 'volc', 'skylark', 'seedream', 'seedance'] },
+    { id: 'bytedance', name: '字节', logoKey: 'jimeng', keywords: ['doubao', 'jimeng', 'bytedance', 'volc', 'skylark', 'seedream', 'seedance'] },
     { id: 'xiaomi', name: '小米', logoKey: 'xiaomi', keywords: ['xiaomi', 'mimo'] },
     { id: 'yi', name: '零一万物', logoKey: 'yi', keywords: ['yi-', 'yi_', '01.ai', '01ai', '01-ai', 'yi-lightning', 'yi-large'] },
     { id: 'baidu', name: '百度文心', logoKey: 'baidu', keywords: ['ernie', 'baidu', 'wenxin', '文心'] },
@@ -96,12 +83,12 @@ export const MODALITY_VENDORS_BY_KIND: Record<ModalityKind, ModalityVendorOption
     { id: 'mistral', name: 'Mistral', logoKey: 'mistral', keywords: ['mistral', 'pixtral'] },
   ],
   image: [
+    { id: 'google', name: 'Google', logoKey: 'gemini', keywords: ['imagen', 'gemini', 'banana', 'google'] },
     { id: 'openai', name: 'OpenAI', logoKey: 'openai', keywords: ['gpt-image', 'dall', 'openai', 'gpt'] },
-    { id: 'google', name: 'Google', logoKey: 'google', keywords: ['imagen', 'gemini', 'banana', 'google'] },
     { id: 'flux', name: 'Flux', logoKey: 'flux', keywords: ['flux', 'bfl'] },
-    { id: 'meta', name: 'Meta', logoKey: 'meta', keywords: ['llama', 'meta'] },
+    { id: 'meta', name: 'Meta', logoKey: 'meta', keywords: ['llama', 'meta', 'muse'] },
     { id: 'midjourney', name: 'MJ', logoKey: 'midjourney', keywords: ['midjourney', 'niji'] },
-    { id: 'bytedance', name: '字节', logoKey: 'bytedance', keywords: ['seedream', 'jimeng', 'doubao', 'bytedance'] },
+    { id: 'bytedance', name: '字节', logoKey: 'jimeng', keywords: ['seedream', 'jimeng', 'doubao', 'bytedance'] },
     { id: 'xai', name: 'xAI', logoKey: 'grok', keywords: ['grok', 'xai'] },
     { id: 'kling', name: 'Kling', logoKey: 'kling', keywords: ['kling', 'kolors'] },
     { id: 'qwen', name: 'Qwen', logoKey: 'qwen', keywords: ['qwen', 'wanx', 'wan', 'z-image'] },
@@ -109,9 +96,9 @@ export const MODALITY_VENDORS_BY_KIND: Record<ModalityKind, ModalityVendorOption
     { id: 'recraft', name: 'Recraft', logoKey: 'recraft', keywords: ['recraft'] },
   ],
   video: [
-    { id: 'bytedance', name: '字节', logoKey: 'bytedance', keywords: ['seedance', 'doubao', 'jimeng', 'bytedance', 'volc'] },
+    { id: 'bytedance', name: '字节', logoKey: 'jimeng', keywords: ['seedance', 'doubao', 'jimeng', 'bytedance', 'volc'] },
     { id: 'openai', name: 'OpenAI', logoKey: 'sora', keywords: ['sora', 'openai'] },
-    { id: 'google', name: 'Google', logoKey: 'google', keywords: ['veo', 'gemini', 'google'] },
+    { id: 'google', name: 'Google', logoKey: 'gemini', keywords: ['veo', 'gemini', 'google'] },
     { id: 'flux', name: 'Flux', logoKey: 'flux', keywords: ['flux', 'bfl'] },
     { id: 'xai', name: 'xAI', logoKey: 'grok', keywords: ['grok', 'xai'] },
     { id: 'minimax', name: 'MiniMax', logoKey: 'minimax', keywords: ['minimax', 'hailuo', 'video-01'] },
@@ -124,32 +111,14 @@ export const MODALITY_VENDORS_BY_KIND: Record<ModalityKind, ModalityVendorOption
     { id: 'midjourney', name: 'MJ', logoKey: 'midjourney', keywords: ['midjourney', 'niji'] },
     { id: 'topaz', name: 'Topaz 超分', logoKey: 'topaz', keywords: ['topaz', 'upscale'] },
   ],
-  three_d: [
-    { id: 'hunyuan', name: 'Hunyuan', logoKey: 'hunyuan', keywords: ['hunyuan', 'fal-ai/hunyuan'] },
-    { id: 'tripo', name: 'Tripo', logoKey: 'tripo', keywords: ['tripo'] },
-    { id: 'meshy', name: 'Meshy', logoKey: 'meshy', keywords: ['meshy'] },
-  ],
-  music: [
-    { id: 'suno', name: 'Suno', logoKey: 'suno', keywords: ['suno', 'chirp'] },
-    { id: 'elevenlabs', name: 'ElevenLabs', logoKey: 'elevenlabs', keywords: ['eleven', 'elevenlabs'] },
-    { id: 'minimax', name: 'MiniMax', logoKey: 'minimax', keywords: ['minimax', 'music'] },
-    { id: 'stability', name: 'Stability', logoKey: 'flux', keywords: ['stable-audio', 'stability'] },
-  ],
   voice: [
     { id: 'qwen', name: 'Qwen', logoKey: 'qwen', keywords: ['qwen', 'cosyvoice'] },
     { id: 'minimax', name: 'MiniMax', logoKey: 'minimax', keywords: ['minimax', 'speech', 't2a'] },
     { id: 'elevenlabs', name: 'ElevenLabs', logoKey: 'elevenlabs', keywords: ['eleven', 'elevenlabs'] },
-    { id: 'bytedance', name: '字节', logoKey: 'bytedance', keywords: ['doubao', 'bytedance', 'volc', 'seed-tts'] },
+    { id: 'bytedance', name: '字节', logoKey: 'jimeng', keywords: ['doubao', 'bytedance', 'volc', 'seed-tts'] },
     { id: 'openai', name: 'OpenAI', logoKey: 'openai', keywords: ['openai', 'tts'] },
     { id: 'xai', name: 'xAI', logoKey: 'grok', keywords: ['grok', 'xai'] },
-    { id: 'google', name: 'Google', logoKey: 'google', keywords: ['gemini', 'google'] },
-  ],
-  avatar: [
-    { id: 'kling', name: '可灵', logoKey: 'kling', keywords: ['kling-lip', 'kling-avatar', 'kling-ident', 'kling', 'keling'] },
-    { id: 'bytedance', name: '字节', logoKey: 'bytedance', keywords: ['omnihuman', 'omni-human', 'jimeng', 'doubao'] },
-    { id: 'qwen', name: '万相', logoKey: 'qwen', keywords: ['wanx-avatar', 'videoretalk', 'wan2.2-s2v', 'emo-detect', 'emo-v', 'wanx'] },
-    { id: 'hedra', name: 'Hedra', logoKey: 'hedra', keywords: ['hedra'] },
-    { id: 'fal', name: 'LatentSync', logoKey: 'fal', keywords: ['latentsync', 'musetalk', 'lip-sync', 'lipsync', 'digital-human'] },
+    { id: 'google', name: 'Google', logoKey: 'gemini', keywords: ['gemini', 'google'] },
   ],
 };
 
@@ -234,6 +203,87 @@ export function normalizeModelVendor(kind: ModalityKind, model: ModalityModelIte
 
 export function isModelMatchModality(rawModelId: string, kind: ModalityKind): boolean {
   return classifyModel(rawModelId) === kind;
+}
+
+// 同步目录的准入规则与已保存模型、官方默认和运行时兼容性分开。
+const MULTIMODAL_SYNC_MINIMUMS: Record<string, readonly [RegExp, number, number]> = {
+  google: [/^gemini-?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 3, 8],
+  openai: [/^gpt-?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 5, 6],
+  anthropic: [/^claude-(?:(?:opus|sonnet|haiku|fable)-)?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 4, 8],
+  xai: [/^grok-?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 4, 6],
+  deepseek: [/^deepseek-v?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 4, 1],
+  moonshot: [/^kimi-k(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 3, 0],
+  qwen: [/^qwen-?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 3, 8],
+  bytedance: [/^doubao-(?:seed-)?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 2, 0],
+  minimax: [/^minimax-m(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 2, 7],
+  glm: [/^glm-?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 5, 2],
+};
+
+const IMAGE_SYNC_MODELS = [
+  /^gemini-3[.-]1-flash-image$/,
+  /^(?:gemini-)?nano-?banana-?2(?:[.-]1)?$/,
+  /^gpt-image-2(?:[.-](?:5|6))?(?:-(?:flare|sunburst))?$/,
+  /^grok-4[.-]2-image$/,
+  /^(?:doubao-)?seedream-v?(?:4[.-]5|5(?:[.-]0)?(?:-(?:pro|flash))?)(?:-\d{6})?$/,
+  /^kling-image-?v?3(?:-omni)?$/,
+];
+
+const VIDEO_SYNC_LEGACY = new Set([
+  'kling-video-v2-5-turbo',
+  'kling-video-v2-6',
+]);
+const VIDEO_SYNC_MODELS = new Set(
+  APPROVED_VIDEO_MODELS.map(({ id }) => id.toLowerCase()).filter((id) => !VIDEO_SYNC_LEGACY.has(id)),
+);
+
+export function videoSyncCandidateKey(modelId: string): string {
+  return canonicalModelId(modelId.trim().replace(/^net-/i, '')).toLowerCase();
+}
+
+const VOICE_SYNC_MODELS = [
+  /^speech-(?:2[.-][89]|[3-9](?:[.-]\d+)?)(?:-(?:hd|turbo))?$/,
+  /^cosyvoice-v?[3-9](?:[.-]\d+)?(?:-(?:flash|plus|pro))?$/,
+  /^eleven-(?:v3|(?:flash|turbo)-v2[.-]5)$/,
+  /^gpt-4o-mini-tts$/,
+  /^(?:grok-voice|gemini-tts|doubao-tts|seed-tts)$/,
+];
+
+export function modalitySyncCandidateKey(modelId: string, kind: ModalityKind): string {
+  if (kind === 'video') return videoSyncCandidateKey(modelId);
+  if (kind !== 'voice') return modelId;
+  return normalizeModelId(modelId.split('/').at(-1) || modelId)
+    .replace(/^minimax-(?=speech-)/, '')
+    .replace(/^cosy-voice-?/, 'cosyvoice-')
+    .replace(/^elevenlabs-(?=v3$|flash-|turbo-)/, 'eleven-')
+    .replace(/^((?:speech|cosyvoice|eleven-(?:flash|turbo))-v?\d+)-(\d)(?=-|$)/, '$1.$2');
+}
+
+export function isModalitySyncCandidate(rawModelId: string, kind: ModalityKind): boolean {
+  if (kind === 'video') return VIDEO_SYNC_MODELS.has(videoSyncCandidateKey(rawModelId));
+  if (kind === 'voice') return VOICE_SYNC_MODELS.some((pattern) => pattern.test(modalitySyncCandidateKey(rawModelId, kind)));
+  // 部分渠道用厂商命名空间包装模型 ID。
+  const id = normalizeModelId(rawModelId.split('/').at(-1) || rawModelId);
+  if (kind === 'image') return IMAGE_SYNC_MODELS.some((pattern) => pattern.test(id));
+
+  const vendor = inferVendorFromModelId(rawModelId, kind);
+  if (!vendor || vendor === 'mistral') return false;
+  const minimum = MULTIMODAL_SYNC_MINIMUMS[vendor];
+  if (!minimum) return isModelMatchModality(rawModelId, kind);
+
+  const modelClass = classifyModel(id);
+  if (modelClass !== 'chat' && modelClass !== 'unknown') return false;
+
+  const [pattern, minimumMajor, minimumMinor] = minimum;
+  const match = id.match(pattern);
+  if (!match) return false;
+  const major = Number(match[1]);
+  const minor = Number(match[2] || 0);
+  if (vendor === 'anthropic' && /(?:^|-)thinking(?:-|$)/.test(id)) return false;
+  const filtersGeminiReasoning = vendor === 'google' && (major === 4 || (major === 3 && minor === 8));
+  if (filtersGeminiReasoning && /(?:^|-)(?:low|medium|high)(?:-|$)/.test(id)) return false;
+  // 渠道把 Grok 4.2 的别名标为 4.20，截图要求同时排除。
+  if (vendor === 'xai' && major === 4 && minor === 20) return false;
+  return major > minimumMajor || (major === minimumMajor && minor >= minimumMinor);
 }
 
 export interface ModelVersionScore {

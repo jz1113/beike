@@ -1,0 +1,38 @@
+{
+  "id": "beike-character-three-view",
+  "name": "beike-character-three-view",
+  "displayName": "人物三视图",
+  "description": "根据人物图或文字设定，生成同一角色正面、侧面与背面的全身设定板。",
+  "category": "人物设定",
+  "author": "贝壳",
+  "version": "1.0.0",
+  "icon": "sparkles",
+  "colorTheme": "cyan",
+  "isBuiltin": true,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "tools": [],
+  "outputFormat": "code_blocks",
+  "usageGuide": "### 使用方式\n上传人物图，或描述角色外观、服装和希望的画风。\n\n输出提示词后，可在对话中的生成面板选择模型、绑定参考素材并提交。",
+  "meta": {
+    "kind": "creation",
+    "genres": [
+      "图片"
+    ],
+    "tags": [
+      "人物设定",
+      "三视图"
+    ],
+    "promptGuide": "上传人物图，或描述角色外观、服装和希望的画风。",
+    "assetGuide": "上传人物图，或描述角色外观、服装和希望的画风。"
+  },
+  "source": {
+    "kind": "local",
+    "url": "/skills",
+    "revision": "1.0.0",
+    "license": "随贝壳项目维护",
+    "files": {
+      "SKILL.md": "88c9756f6eb87566742e05cbaf81f9c04f9895f0775110308102b719b87d94b5"
+    }
+  }
+}

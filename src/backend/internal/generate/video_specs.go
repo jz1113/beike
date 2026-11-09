@@ -90,7 +90,13 @@ func videoSpecError(model, mode, resolution, aspect string, duration float64) st
 	if strings.Contains(strings.ToLower(model), "grok") && (mode == "omni" || mode == "first_last_frame") && resolution == "1080P" {
 		return "Grok 参考生成与首尾帧模式最高支持 720P，请降低清晰度或切换生成方式"
 	}
-	if mode == "edit" && !omniFlash(model) {
+	if mode == "motion_control" && resolution == "4K" {
+		return "动作控制最高支持 1080P，请调整清晰度"
+	}
+	if mode == "motion_control" || mode == "edit" && !omniFlash(model) {
+		return ""
+	}
+	if veoModel(model) && mode == "extend" {
 		return ""
 	}
 	if duration == -1 && (strings.Contains(strings.ToLower(model), "seedance") || strings.HasPrefix(model, "wan3")) {
@@ -153,11 +159,12 @@ func withAdaptive(values []string) []string {
 var videoSpecs = map[string]videoSpec{
 	"veo3.1":                          {[]int{4, 6, 8}, []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16"}},
 	"veo3.1-fast":                     {[]int{4, 6, 8}, []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16"}},
+	"veo3.1-pro":                      {[]int{8}, []string{"720P", "1080P"}, []string{"16:9", "9:16"}},
 	"omni_flash-10s":                  {[]int{10}, []string{"720P"}, []string{"16:9", "9:16"}},
-	"kling-video-v3":                  {ints(3, 15), []string{"720P", "1080P"}, videoRatios},
-	"kling-video-v3-omni":             {ints(3, 15), []string{"720P", "1080P"}, videoRatios},
-	"kling-video-v2-5-turbo":          {[]int{5, 10}, []string{"720P", "1080P"}, videoRatios},
-	"kling-video-v2-6":                {ints(3, 10), []string{"720P", "1080P"}, videoRatios},
+	"kling-video-v3":                  {ints(3, 15), []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16", "1:1"}},
+	"kling-video-v3-omni":             {ints(3, 15), []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16", "1:1"}},
+	"kling-video-v2-5-turbo":          {[]int{5, 10}, []string{"720P", "1080P"}, []string{"16:9", "9:16", "1:1"}},
+	"kling-video-v2-6":                {ints(3, 10), []string{"720P", "1080P"}, []string{"16:9", "9:16", "1:1"}},
 	"doubao-seedance-2-0-260128":      {ints(4, 15), []string{"480P", "720P", "1080P", "4K"}, withAdaptive(videoRatios)},
 	"doubao-seedance-2-0-fast-260128": {ints(4, 15), []string{"480P", "720P"}, withAdaptive(videoRatios)},
 	"doubao-seedance-2.0-mini":        {ints(4, 15), []string{"480P", "720P"}, withAdaptive(videoRatios)},

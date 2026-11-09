@@ -1,3 +1,4 @@
+import { creationSkillFlow, skillActivationPrompt } from '@client/shared/skills/model/creationSkillFlows';
 import { useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '@client/store';
@@ -35,7 +36,10 @@ export function usePromptBarSkillCreator(richInputRef: RefObject<RichPromptInput
       const store = useAppStore.getState();
       store.setQuickGenMode('agent');
       setActiveAssistantSkillId(skill.id);
-      if (initialPromptOverride !== undefined) {
+      if (creationSkillFlow(skill.id)) {
+        store.setQuickPrompt(skillActivationPrompt(skill.id, skill.title, store.quickPrompt || '', initialPromptOverride));
+        richInputRef.current?.focus();
+      } else if (initialPromptOverride !== undefined) {
         store.setQuickPrompt(initialPromptOverride);
       } else if (richInputRef.current) {
         const prev = store.quickPrompt || '';

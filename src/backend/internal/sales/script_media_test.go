@@ -3,6 +3,7 @@ package sales
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"mime/multipart"
@@ -16,7 +17,6 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
-
 	"beike.local/cloud/src/backend/internal/system"
 )
 
@@ -97,5 +97,217 @@ func TestScriptVideoUploadRejectsUnsupportedFiles(t *testing.T) {
 	ScriptVideoUpload(config.Config{}).ServeHTTP(recorder, request)
 	if recorder.Code != 400 {
 		t.Fatalf("gif should be rejected: %d", recorder.Code)
+	}
+}
+
+func TestAnalysisGroupsAnAlreadyTimedAction(t *testing.T) {
+	for _, extra := range []string{
+		`"actionTemplate":"抬手，视线随手抬起","beats":[]`,
+		`"summary":"0.0–14.8 秒｜抬手，视线随手抬起"`,
+	} {
+		raw := `{"durationSec":14.8,"shots":[{"start":0,"end":14.8,"estimated":true,"expression":"抬眼","camera":"固定",` + extra + `}]}`
+		script, err := parseScriptCompletion(scriptCompletion(raw, "stop"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		shot := script["shots"].([]any)[0].(map[string]any)
+		beats := shot["beats"].([]any)
+		beat := beats[0].(map[string]any)
+		if len(beats) != 1 || beat["actionTemplate"] != "抬手，视线随手抬起" && beat["action"] != "抬手，视线随手抬起" || beat["start"] != 0.0 || beat["end"] != 14.8 || beat["estimated"] != true || beat["expression"] != "抬眼" || beat["camera"] != "固定" {
+			t.Fatalf("lost timed observation: %+v", beats)
+		}
+	}
+}
+
+func TestAnalysisRecoversRootBeatsOnlyForSingleShot(t *testing.T) {
+	raw := `{"durationSec":2,"shots":[{"start":0,"end":2}],"beats":[{"start":0,"end":1,"action":"抬手"},{"start":1,"end":2,"action":"收手"}]}`
+	script, err := parseScriptCompletion(scriptCompletion(raw, "stop"))
+	if err != nil || len(script["shots"].([]any)[0].(map[string]any)["beats"].([]any)) != 2 {
+		t.Fatal("single-shot beats not recovered", err)
+	}
+	for _, broken := range []string{
+		strings.Replace(raw, `"end":2}`, `"end":1},{"start":1,"end":2}`, 1),
+		strings.Replace(raw, `"end":1,"action"`, `"end":5,"action"`, 1),
+		`{"durationSec":2,"shots":[{"start":0,"end":2,"summary":"开场展示"}]}`,
+	} {
+		if _, err := parseScriptCompletion(scriptCompletion(broken, "stop")); err == nil {
+			t.Fatal("accepted missing or ambiguous timeline", broken)
+		}
+	}
+}
+
+func TestAnalysisRetainsDetailedOneTakeWithoutSplittingOrTruncating(t *testing.T) {
+	var beats []map[string]any
+	for i := 0; i < 25; i++ {
+		beats = append(beats, map[string]any{"start": i, "end": i + 1, "action": "抬手"})
+	}
+	for _, count := range []int{13, 24, 25} {
+		raw, _ := json.Marshal(map[string]any{"durationSec": count, "shots": []any{map[string]any{"start": 0, "end": count, "beats": beats[:count]}}})
+		script, err := parseScriptCompletion(scriptCompletion(string(raw), "stop"))
+		if count == 25 {
+			if err == nil || !strings.Contains(err.Error(), "25 个动作段") {
+				t.Fatal("missing actual beat count", err)
+			}
+			continue
+		}
+		if err != nil || len(script["shots"].([]any)[0].(map[string]any)["beats"].([]any)) != count {
+			t.Fatal("lost motion", count, err)
+		}
+	}
+}
+
+func TestScriptDepthReceiptPreservesConcurrentReview(t *testing.T) {
+	cfg := setupSalesTestConfig(t)
+	db, err := sql.Open("sqlite", cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	create := httptest.NewRecorder()
+	Scripts(cfg).ServeHTTP(create, httptest.NewRequest(http.MethodPost, "/api/sales/scripts", strings.NewReader(`{"id":"linked","videoUrl":"/storage/local/source.mp4","script":`+validScript+`}`)))
+	if create.Code != 200 {
+		t.Fatal(create.Body.String())
+	}
+	body := &interleavedScriptBody{reader: strings.NewReader(`{"depthVideoUrl":"/storage/local/depth.mp4","depthOperationId":"operation-1"}`), before: func() {
+		if _, err := db.Exec(`UPDATE "SalesReferenceScript" SET "title"='已确认新脚本',"status"='verified',"version"=5 WHERE "id"='linked'`); err != nil {
+			t.Fatal(err)
+		}
+	}}
+	rec := httptest.NewRecorder()
+	patchReferenceScript(rec, httptest.NewRequest(http.MethodPatch, "/api/sales/scripts/linked", body), db, "local", "linked")
+	var response struct {
+		Item storedReferenceScript `json:"item"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &response)
+	if rec.Code != 200 || response.Item.Status != "verified" || response.Item.Version != 5 || response.Item.Title != "已确认新脚本" || response.Item.DepthVideoURL != "/storage/local/depth.mp4" || response.Item.VideoURL != "/storage/local/source.mp4" {
+		t.Fatalf("receipt overwrote review or lost media: %d %s", rec.Code, rec.Body.String())
+	}
+	// A full save from an older editor omits new fields; those linked results stay.
+	replace := httptest.NewRecorder()
+	Scripts(cfg).ServeHTTP(replace, httptest.NewRequest(http.MethodPost, "/api/sales/scripts", strings.NewReader(`{"id":"linked","script":`+validScript+`}`)))
+	_ = json.Unmarshal(replace.Body.Bytes(), &response)
+	if replace.Code != 200 || response.Item.DepthVideoURL != "/storage/local/depth.mp4" || response.Item.VideoURL != "/storage/local/source.mp4" {
+		t.Fatalf("old editor lost media: %s", replace.Body.String())
+	}
+
+	body = &interleavedScriptBody{reader: strings.NewReader(`{"status":"verified"}`), before: func() {
+		if _, err := db.Exec(`UPDATE "SalesReferenceScript" SET "depthVideoUrl"='/storage/local/new-depth.mp4' WHERE "id"='linked'`); err != nil {
+			t.Fatal(err)
+		}
+	}}
+	rec = httptest.NewRecorder()
+	patchReferenceScript(rec, httptest.NewRequest(http.MethodPatch, "/api/sales/scripts/linked", body), db, "local", "linked")
+	_ = json.Unmarshal(rec.Body.Bytes(), &response)
+	if rec.Code != 200 || response.Item.DepthVideoURL != "/storage/local/new-depth.mp4" {
+		t.Fatalf("review overwrote conversion: %s", rec.Body.String())
+	}
+}
+
+func TestScriptMediaLinksCheckWorkspaceAndRegisteredRemoteResults(t *testing.T) {
+	cfg := setupSalesTestConfig(t)
+	db, err := sql.Open("sqlite", cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	_, err = db.Exec(`CREATE TABLE "ActionAsset" ("workspaceId" TEXT,"mediaType" TEXT,"mediaUrl" TEXT);
+CREATE TABLE "ImageTask" ("id" TEXT,"workspaceId" TEXT,"mediaType" TEXT,"status" TEXT,"resultUrl" TEXT);
+INSERT INTO "ActionAsset" VALUES ('a','depth-video','https://cdn.example/owned.mp4'),('b','depth-video','https://cdn.example/foreign.mp4');
+INSERT INTO "ImageTask" VALUES ('task-a','a','depth-video','SUCCESS','https://cdn.example/result.mp4'),('task-b','b','depth-video','SUCCESS','https://cdn.example/foreign-result.mp4');`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range []struct {
+		source, depth, task string
+		allowed             bool
+	}{
+		{"/storage/a/source.mp4", "/storage/a/depth.mp4", "task-a", true},
+		{"", "https://cdn.example/owned.mp4", "", true},
+		{"", "https://cdn.example/result.mp4", "task-a", true},
+		{"/storage/b/source.mp4", "", "", false},
+		{"/storage/a/../b/source.mp4", "", "", false},
+		{"/storage/a/%2e%2e/b/source.mp4", "", "", false},
+		{"", "https://cdn.example/foreign.mp4", "", false},
+		{"", "https://cdn.example/unregistered.mp4", "", false},
+		{"", "/storage/a/depth.mp4", "task-b", false},
+	} {
+		err := validateScriptLinks(context.Background(), db, "a", row.source, row.depth, row.task, "operation")
+		if (err == nil) != row.allowed {
+			t.Fatalf("%+v: %v", row, err)
+		}
+	}
+}
+
+func TestAnalyzedScriptPersistsAndReusesWithoutOverwritingReview(t *testing.T) {
+	cfg := setupSalesTestConfig(t)
+	var script map[string]any
+	_ = json.Unmarshal([]byte(validScript), &script)
+	first, err := persistAnalyzedScript(cfg, "local", "/storage/local/source.mp4", "hash", "model", "prompt", "route", script, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Status != "verified" {
+		t.Fatalf("new analysis is not ready for use: %s", first.Status)
+	}
+	db, err := sql.Open("sqlite", cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`UPDATE "SalesReferenceScript" SET "title"='手动草稿',"status"='draft' WHERE "id"=?`, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	second, err := persistAnalyzedScript(cfg, "local", "/storage/local/source.mp4", "hash", "model", "prompt", "route", script, false)
+	if err != nil || second.ID != first.ID || second.Status != "draft" || second.Title != "手动草稿" {
+		t.Fatalf("repeat analysis overwrote review: %+v %v", second, err)
+	}
+	forced, err := persistAnalyzedScript(cfg, "local", "/storage/local/source.mp4", "hash", "model", "prompt", "route", script, true)
+	if err != nil || forced.ID == first.ID || forced.Status != "verified" {
+		t.Fatalf("forced reanalysis must save a fresh verified script: %+v %v", forced, err)
+	}
+}
+
+func TestSweepOnlyDiscardsIdleScriptUploads(t *testing.T) {
+	cfg := setupPromptExecutionTestConfig(t)
+	root := t.TempDir()
+	t.Setenv("AZHUO_CACHE_DIR", root)
+	key := "local/azhuo/refs/sales-script/202611/0123456789abcdef0123456789abcdef.mp4"
+	unrelated := "local/azhuo/generated/videos/202611/0123456789abcdef0123456789abcdef.mp4"
+	frame := "local/azhuo/refs/sales-script/frames/abcdef/frame.jpg"
+	legacy := "local/azhuo/refs/sales-script/frames/0123456789abcdef0123456789abcdef/beat-00-5.jpg"
+	for _, f := range []string{key, unrelated, frame, legacy} {
+		file := filepath.Join(root, f)
+		if err := os.MkdirAll(filepath.Dir(file), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte("test"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	release := holdScriptSource("local", "/storage/"+key)
+	if n, err := SweepScriptSources(cfg, time.Now()); err != nil || n != 0 {
+		t.Fatal(n, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, legacy)); !os.IsNotExist(err) {
+		t.Fatal("legacy source preview was retained")
+	}
+	holdScriptSource("other", "/storage/"+key)()
+	if _, err := os.Stat(filepath.Join(root, key)); err != nil {
+		t.Fatal(err)
+	}
+	release()
+	if _, err := os.Stat(filepath.Join(root, key)); !os.IsNotExist(err) {
+		t.Fatal("terminal release did not delete source")
+	}
+	if err := os.WriteFile(filepath.Join(root, key), []byte("abandoned"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := SweepScriptSources(cfg, time.Now()); err != nil || n != 1 {
+		t.Fatal(n, err)
+	}
+	for _, f := range []string{unrelated, frame} {
+		if _, err := os.Stat(filepath.Join(root, f)); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

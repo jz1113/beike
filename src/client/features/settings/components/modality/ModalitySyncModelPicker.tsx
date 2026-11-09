@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import type { ModalityKind } from '../../model/modalityModelTypes';
+import type { ModalityKind } from '../../model/modalityModelStorage';
 import {
   inferVendorFromModelId,
   vendorOption,

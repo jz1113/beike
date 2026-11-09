@@ -220,3 +220,149 @@ func TestSummaryResponsesReceivesSkillAndOnlyOCRText(t *testing.T) {
 		t.Fatalf("%d %s", w.Code, w.Body.String())
 	}
 }
+
+func TestSummaryCopyReferencesExistingBuyingPoints(t *testing.T) {
+	input := exampleSummaryRequest().summaryInput
+	for _, test := range []struct {
+		name    string
+		indexes []int
+		valid   bool
+	}{
+		{"one focus", []int{1}, true},
+		{"selected priorities", []int{3, 1}, true},
+		{"three priorities", []int{1, 2, 3}, true},
+		{"missing", nil, false},
+		{"zero based", []int{0}, false},
+		{"negative", []int{-1}, false},
+		{"invented", []int{4}, false},
+		{"duplicate", []int{1, 1}, false},
+		{"too many", []int{1, 2, 3, 1}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			result := exampleSummaryResult()
+			result.Points = append(result.Points, result.Points[0], result.Points[0])
+			result.CopyPointIndexes = test.indexes
+			parsed, err := parseSummaryCompletion(summaryCompletion(result), input)
+			if (err == nil) != test.valid {
+				t.Fatalf("valid=%v error=%v", test.valid, err)
+			}
+			if err == nil && len(parsed.CopyPointIndexes) != len(test.indexes) {
+				t.Fatal("selected buying points lost")
+			}
+		})
+	}
+}
+
+func TestSummaryWithoutBuyingPointsRequestsEvidenceInsteadOfGenericCopy(t *testing.T) {
+	input := exampleSummaryRequest().summaryInput
+	result := summaryResult{Summary: "图片不足以辨认商品", Questions: []string{"请补充商品清晰正面图"}}
+	parsed, err := parseSummaryCompletion(summaryCompletion(result), input)
+	if err != nil || parsed.CopyPointIndexes == nil || len(parsed.CopyPointIndexes) != 0 {
+		t.Fatalf("clarification rejected: %+v %v", parsed, err)
+	}
+	result.Copy = "这款商品兼顾品质与实用，满足日常所需。"
+	if _, err := parseSummaryCompletion(summaryCompletion(result), input); err == nil {
+		t.Fatal("accepted generic copy without supported buying points")
+	}
+}
+
+func TestSummaryAcceptsRegisteredDeepSeekTextModelsOnOfficialRoute(t *testing.T) {
+	for _, model := range []string{"deepseek-flash", "deepseek-v4-pro"} {
+		t.Run(model, func(t *testing.T) {
+			body := exampleSummaryRequest()
+			body.Model, body.CustomBaseURL = "deepseek-official:"+model, "https://api.deepseek.com"
+			handler := summaryHandler(setupPromptExecutionTestConfig(t), func(ctx context.Context, req gateway.TextRequest, responses bool) (int, map[string]any, error) {
+				if req.BaseURL != "https://api.deepseek.com" || req.APIKey != "chosen-key" || req.Payload["model"] != model || req.Protocol != "openai" {
+					t.Fatalf("official text model lost its route or credentials: model=%v base=%q protocol=%q", req.Payload["model"], req.BaseURL, req.Protocol)
+				}
+				messages := req.Payload["messages"].([]any)
+				content := messages[1].(map[string]any)["content"].([]any)
+				if len(content) != 1 || content[0].(map[string]any)["type"] != "text" {
+					t.Fatal("official text model received non-text content")
+				}
+				return http.StatusOK, summaryCompletion(exampleSummaryResult()), nil
+			}, func(context.Context, string, string) ([]byte, error) {
+				t.Fatal("official text model read an image")
+				return nil, nil
+			})
+			if w := serveSummary(handler, body); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), model) {
+				t.Fatalf("%d %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestSummaryDeepSeekRejectsUnknownModelsAndForeignRoutesWithoutDefaultKey(t *testing.T) {
+	t.Setenv("AI_DRAWING_API_KEY", "server-secret")
+	t.Setenv("AI_API_KEY", "server-secret")
+	for _, test := range []struct {
+		name, model, base, key string
+	}{
+		{"unregistered", "deepseek-official:unregistered", "", "chosen-key"},
+		{"foreign base", "deepseek-official:deepseek-v4-pro", "https://foreign.test", "chosen-key"},
+		{"missing official key", "deepseek-official:deepseek-v4-pro", "", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			body := exampleSummaryRequest()
+			body.Model, body.CustomBaseURL, body.CustomAPIKey = test.model, test.base, test.key
+			_, key, _, message := summaryCredentials(config.Config{}, httptest.NewRequest("POST", "/", nil), body)
+			if message == "" || key != "" || strings.Contains(message, "server-secret") {
+				t.Fatalf("invalid official model route accepted or default credential leaked: %q", message)
+			}
+		})
+	}
+}
+
+func TestSummaryReviewRejectsUnsupportedSellingClaims(t *testing.T) {
+	for _, claim := range []string{"聚酯纤维与锦纶保证成衣版型稳定", "日常活动不容易松垮走形", "领口能自然拉长颈部线条", "轻盈不闷厚", "含羊毛所以亲肤保暖", "弹力罗纹收边"} {
+		t.Run(claim, func(t *testing.T) {
+			result := exampleSummaryResult()
+			result.Points[0].Benefit = claim
+			if _, err := parseSummaryCompletion(summaryCompletion(result), exampleSummaryRequest().summaryInput); err == nil {
+				t.Fatalf("unsupported claim accepted: %s", claim)
+			}
+		})
+	}
+}
+
+func TestSummaryReviewRetainsLabelLimitsAndRejectsConflictDecisions(t *testing.T) {
+	input := exampleSummaryRequest().summaryInput
+	input.TextSources[0].Text = "洗护TIPS\n手洗洗涤温度不高于40℃\n不可干洗\n不可漂白\n不可翻转干燥\n在阴凉处平摊晾干\n熨斗底板温度不高于1\n10℃℃"
+	result, err := parseSummaryCompletion(summaryCompletion(exampleSummaryResult()), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"水温不高于40℃", "不可干洗", "不可漂白", "不可翻转干燥", "熨斗底板温度不高于110℃"} {
+		if !strings.Contains(strings.Join(result.Cautions, "\n"), required) {
+			t.Errorf("lost label condition %s", required)
+		}
+	}
+	bad := exampleSummaryResult()
+	bad.Conflicts = []string{"两处比例不同，已采用其中一处成稿"}
+	if _, err := parseSummaryCompletion(summaryCompletion(bad), input); err == nil {
+		t.Fatal("model resolved a conflict without review")
+	}
+}
+
+func TestSummaryFailureStagesAndRedaction(t *testing.T) {
+	key := "private-credential-for-test"
+	for _, status := range []int{400, 401, 404, 429, 503} {
+		err := errors.New("invalid request " + key + " https://relay.test/v1?token=private data:image/png;base64,private-image")
+		failure := classifySummaryFailure(context.Background(), status, err, key)
+		if strings.Contains(failure.Message, key) || strings.Contains(failure.Detail, "relay.test") || strings.Contains(failure.Detail, "private-image") || strings.Contains(failure.Detail, "token=private") {
+			t.Fatal("unsafe diagnostic", failure)
+		}
+		if failure.Code == "model_request" || !strings.Contains(failure.Message, "HTTP") {
+			t.Fatalf("missing upstream classification: %+v", failure)
+		}
+	}
+	if failure := classifySummaryFailure(context.Background(), 200, gateway.ErrInvalidTextJSON, ""); failure.Code != "model_json" {
+		t.Fatal(failure)
+	}
+	if failure := classifySummaryFailure(context.Background(), 403, errors.New("text upstream HTTP 403: Verify your account to continue."), ""); failure.Code != "model_account_verification" || failure.Stage != "channel" {
+		t.Fatal("account verification was disguised as image capability or key failure", failure)
+	}
+	if failure := classifySummaryFailure(context.Background(), 0, &gateway.IndexedImageError{Index: 9, Err: errors.New("invalid image")}, ""); failure.Code != "image_prepare" {
+		t.Fatal(failure)
+	}
+}

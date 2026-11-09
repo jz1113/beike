@@ -1,22 +1,128 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useSyncExternalStore } from 'react';
 import type { PetPose, PetSpriteVersion } from '@shared/domain/pets/atlas';
-import { pointerLookIndex } from '@shared/domain/pets/atlas';
-import { queueSettingsSection } from '@shared/domain/settings/settingsNavigationStorage';
-import { useCanvasPetActivity } from './hooks/useCanvasPetActivity';
-import { resolvePetPose } from '@shared/domain/pets/activity';
+import { pointerLookIndex, resolvePetPose } from '@shared/domain/pets/atlas';
+import { queueSettingsSection } from '@client/features/settings/model/settingsNavigation';
 import { useFileDropZone } from '@client/shared/hooks/useFileDropZone';
 import { useMediaQuery } from '@client/shared/hooks/useMediaQuery';
 import { useAppStore } from '@client/store';
+import { useCanvasStore } from '@client/features/canvas/store/useCanvasStore';
+import type { CanvasProject } from '@client/features/canvas/model/types';
 import { BeikePet } from '@client/shared/pets/BeikePet';
-import { getPetFeed, subscribePetFeed } from '@client/shared/pets/petFeed';
-import { PET_SIZES, beikePhaseFor, updatePetPreferences, usePetPreferences } from '@client/shared/pets/petPreferences';
+import { PET_SIZES, beikePhaseFor, updatePetPreferences, usePetPreferences, type CanvasPetLink } from '@client/shared/pets/petPreferences';
 import { forgetPetSheet, petSheetURL } from '@client/shared/pets/petClient';
 import { petStackLayout, type PetFloatBox, type PetFloatPlacement } from '@client/shared/pets/petGeometry';
 import { PetSprite } from '@client/shared/pets/PetSprite';
 import { usePetAnchor } from '@client/shared/pets/usePetAnchor';
 import { getUsageSummary, USAGE_LOG_EVENT } from '@client/shared/utils/usageTracker';
+
+export interface PetFeedRegistration {
+  enabled: boolean;
+  phase: string;
+  modelLabel: string;
+  open: boolean;
+  onFiles: (files: File[]) => void;
+  onDragging: (dragging: boolean) => void;
+  setOpen: (open: boolean) => void;
+  panel: ReactNode;
+}
+
+let petFeedRegistration: PetFeedRegistration | null = null;
+const petFeedListeners = new Set<() => void>();
+
+export function getPetFeed() {
+  return petFeedRegistration;
+}
+
+export function subscribePetFeed(listener: () => void) {
+  petFeedListeners.add(listener);
+  return () => petFeedListeners.delete(listener);
+}
+
+export function setPetFeed(next: PetFeedRegistration | null) {
+  petFeedRegistration = next;
+  petFeedListeners.forEach((listener) => listener());
+}
+
+function readCanvasActivity(project: CanvasProject) {
+  const pending = new Set<string>();
+  const finished = new Map<string, PetPose>();
+  if (project.studioScene) {
+    for (const node of project.studioScene.nodes) {
+      const settings = node.settings as Record<string, unknown> | undefined;
+      if (node.isGenerating || settings?.textNodeIsAnalyzing || settings?.isGenerating) pending.add(node.id);
+      else if (node.errorMsg || settings?.error) finished.set(node.id, 'failed');
+      else if (node.content || node.videoUrl || node.imageUrl || settings?.audioUrl) finished.set(node.id, 'success');
+    }
+  } else {
+    for (const node of project.nodes) {
+      if (node.status === 'generating') pending.add(node.id);
+      else if (node.status === 'error') finished.set(node.id, 'failed');
+      else if (node.status === 'success') finished.set(node.id, 'success');
+    }
+  }
+  return {
+    pending,
+    finished,
+    nodes: (project.studioScene?.nodes ?? project.nodes).length,
+    edges: (project.studioScene?.connections ?? project.edges ?? []).length,
+  };
+}
+
+export function useCanvasPetActivity(link: CanvasPetLink | null) {
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState<PetPose | null>(null);
+  useEffect(() => {
+    let timer = 0;
+    setBusy(false);
+    setFlash(null);
+    if (!link || link === 'off') return;
+    let previous: ReturnType<typeof readCanvasActivity> | undefined;
+    let lastProject: CanvasProject | undefined;
+    function update() {
+      const state = useCanvasStore.getState();
+      const project = state.projects.find((p) => p.id === state.activeProjectId);
+      if (project === lastProject) return;
+      const same = project && lastProject?.id === project.id;
+      lastProject = project;
+      if (!same) {
+        previous = undefined;
+        window.clearTimeout(timer);
+        setFlash(null);
+      }
+      if (!project) {
+        setBusy(false);
+        return;
+      }
+      const current = readCanvasActivity(project);
+      setBusy(current.pending.size > 0);
+      if (previous) {
+        const completed = [...previous.pending].map((id) => current.finished.get(id));
+        const edit = current.nodes > previous.nodes || current.edges > previous.edges;
+        const next = completed.includes('failed')
+          ? 'failed'
+          : completed.includes('success')
+            ? 'success'
+            : link === 'all' && edit
+              ? 'working'
+              : null;
+        if (next) {
+          window.clearTimeout(timer);
+          setFlash(next);
+          timer = window.setTimeout(() => setFlash(null), 1400);
+        }
+      }
+      previous = current;
+    }
+    update();
+    const stop = useCanvasStore.subscribe(update);
+    return () => {
+      stop();
+      window.clearTimeout(timer);
+    };
+  }, [link]);
+  return { busy, flash };
+}
 
 const CHIP_BOX: PetFloatBox = { width: 144, height: 28 };
 const MENU_BOX: PetFloatBox = { width: 176, height: 96 };
@@ -35,7 +141,10 @@ function usePetFlash() {
       timer = window.setTimeout(() => setFlash(null), 1600);
     };
     window.addEventListener('azhuo:generation-completed', onDone);
-    return () => { window.removeEventListener('azhuo:generation-completed', onDone); window.clearTimeout(timer); };
+    return () => {
+      window.removeEventListener('azhuo:generation-completed', onDone);
+      window.clearTimeout(timer);
+    };
   }, []);
   return flash;
 }
@@ -78,65 +187,93 @@ export function AppPetHost({ canvas = false }: { canvas?: boolean }) {
   const [menu, setMenu] = useState(false);
   const [look, setLook] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ id: string; url: string } | null>(null);
-  const [failedSheet,setFailedSheet] = useState('');
-  const [sheetRetry,setSheetRetry] = useState(0);
+  const [failedSheet, setFailedSheet] = useState('');
+  const [sheetRetry, setSheetRetry] = useState(0);
   const [version, setVersion] = useState<PetSpriteVersion>(2);
   const [floats, setFloats] = useState({ chip: CHIP_BOX, menu: MENU_BOX });
   const menuRef = useRef<HTMLDivElement>(null);
   const chipRef = useRef<HTMLButtonElement>(null);
   const shown = preferences.visible && preferences.petId !== 'none' && !settingsOpen && (!canvas || preferences.canvasVisible);
   const activity = useCanvasPetActivity(canvas && shown ? preferences.canvasLink : null);
-  const pose = resolvePetPose(canvas ? activity : {feedPhase:feed?.phase,flash,busy});
+  const pose = resolvePetPose(canvas ? activity : { feedPhase: feed?.phase, flash, busy });
   const sprite = preferences.petId !== 'beike';
-  const anchor = usePetAnchor(Boolean(shown && feed?.enabled && feed.open), () => { setMenu(false); feed?.setOpen(false); }, canvas);
+  const anchor = usePetAnchor(
+    Boolean(shown && feed?.enabled && feed.open),
+    () => {
+      setMenu(false);
+      feed?.setOpen(false);
+    },
+    canvas,
+    shown,
+  );
   const size = PET_SIZES[preferences.size];
   const drop = useFileDropZone({
-    onFiles: (files) => { if (feed?.enabled) feed.onFiles(files); },
+    onFiles: (files) => {
+      if (feed?.enabled) feed.onFiles(files);
+    },
     disabled: !feed?.enabled || feed.phase === 'uploading' || feed.phase === 'analyzing',
   });
   const chipBox = feed?.enabled ? floats.chip : null;
   const menuBox = menu ? floats.menu : null;
-  const placed = anchor.frame ? petStackLayout(anchor.frame.point, anchor.frame.size, anchor.frame.bounds, [chipBox, menuBox].filter((box): box is PetFloatBox => Boolean(box))) : [];
+  const placed = anchor.frame
+    ? petStackLayout(
+        anchor.frame.point,
+        anchor.frame.size,
+        anchor.frame.bounds,
+        [chipBox, menuBox].filter((box): box is PetFloatBox => Boolean(box)),
+      )
+    : [];
   const chipPlace = chipBox ? placed[0] : undefined;
   const menuPlace = menuBox ? placed[chipBox ? 1 : 0] : undefined;
 
-  useEffect(() => { if (!shown) setMenu(false); }, [shown]);
-  useEffect(() => { if (sprite) feed?.onDragging(drop.isDragging); }, [drop.isDragging, feed, sprite]);
+  useEffect(() => {
+    if (!shown) setMenu(false);
+  }, [shown]);
+  useEffect(() => {
+    if (sprite) feed?.onDragging(drop.isDragging);
+  }, [drop.isDragging, feed, sprite]);
   useEffect(() => {
     if (!sprite || !shown) return undefined;
     let cancel = false;
     setFailedSheet('');
-    petSheetURL(preferences.petId).then((url) => {
-      if (!cancel) setSheet((current) => current?.id === preferences.petId && current.url === url ? current : { id: preferences.petId, url });
-    }).catch(() => { if (!cancel) {setSheet(null);setFailedSheet(preferences.petId);} });
-    return () => { cancel = true; };
-  }, [preferences.petId, sprite, shown,sheetRetry]);
+    petSheetURL(preferences.petId)
+      .then((url) => {
+        if (!cancel) {
+          setSheet((current) =>
+            current?.id === preferences.petId && current.url === url ? current : { id: preferences.petId, url },
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancel) {
+          setSheet(null);
+          setFailedSheet(preferences.petId);
+        }
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [preferences.petId, sprite, shown, sheetRetry]);
   useEffect(() => {
-    if (!shown || pose !== 'idle' || reduced || (sprite && version !== 2)) { setLook(null); return undefined; }
-    const track = (event: Pick<PointerEvent,'clientX'|'clientY'>) => {
+    if (!shown || pose !== 'idle' || reduced || (sprite && version !== 2)) {
+      setLook(null);
+      return undefined;
+    }
+    const track = (event: Pick<PointerEvent, 'clientX' | 'clientY'>) => {
       const rect = anchor.anchorRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const next = pointerLookIndex(event.clientX - (rect.left + rect.width / 2), event.clientY - (rect.top + rect.height / 2), 72);
-      setLook((current) => current === next ? current : next);
+      const next = pointerLookIndex(
+        event.clientX - (rect.left + rect.width / 2),
+        event.clientY - (rect.top + rect.height / 2),
+        72,
+      );
+      setLook((current) => (current === next ? current : next));
     };
-    let frame: HTMLIFrameElement | null = null;
-    const trackFrame = (event: PointerEvent) => {
-      const rect = frame?.getBoundingClientRect();
-      if (rect) track({clientX:rect.left + event.clientX, clientY:rect.top + event.clientY});
-    };
-    const attach = () => {
-      const next = document.querySelector<HTMLIFrameElement>('iframe[title="贝壳云图项目画布"]');
-      if (frame !== next) frame?.contentWindow?.removeEventListener('pointermove', trackFrame);
-      frame = next;
-      frame?.contentWindow?.addEventListener('pointermove', trackFrame);
-    };
-    const onLoad = (event: Event) => {
-      if (event.target instanceof HTMLIFrameElement && event.target.title === '贝壳云图项目画布') attach();
-    };
-    if (canvas) { attach(); document.addEventListener('load', onLoad, true); }
     window.addEventListener('pointermove', track);
-    return () => {window.removeEventListener('pointermove',track);document.removeEventListener('load',onLoad,true);frame?.contentWindow?.removeEventListener('pointermove',trackFrame);};
-  }, [canvas, shown, pose, reduced, version, sprite, anchor.anchorRef]);
+    return () => {
+      window.removeEventListener('pointermove', track);
+    };
+  }, [shown, pose, reduced, version, sprite, anchor.anchorRef]);
   useEffect(() => {
     if (!menu) return undefined;
     const close = (event: Event) => {
@@ -145,7 +282,9 @@ export function AppPetHost({ canvas = false }: { canvas?: boolean }) {
       if (menuRef.current?.contains(target) || anchor.anchorRef.current?.contains(target)) return;
       setMenu(false);
     };
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenu(false); };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenu(false);
+    };
     window.addEventListener('pointerdown', close, true);
     window.addEventListener('keydown', onKey);
     return () => {
@@ -154,12 +293,18 @@ export function AppPetHost({ canvas = false }: { canvas?: boolean }) {
     };
   }, [menu, anchor.anchorRef]);
   useLayoutEffect(() => {
-    const read = (node: HTMLElement | null, fallback: PetFloatBox): PetFloatBox => (
-      node && node.offsetWidth > 0 && node.offsetHeight > 0 ? { width: node.offsetWidth, height: node.offsetHeight } : fallback
-    );
+    const read = (node: HTMLElement | null, fallback: PetFloatBox): PetFloatBox =>
+      node && node.offsetWidth > 0 && node.offsetHeight > 0 ? { width: node.offsetWidth, height: node.offsetHeight } : fallback;
     setFloats((current) => {
       const next = { chip: read(chipRef.current, current.chip), menu: read(menuRef.current, current.menu) };
-      if (next.chip.width === current.chip.width && next.chip.height === current.chip.height && next.menu.width === current.menu.width && next.menu.height === current.menu.height) return current;
+      if (
+        next.chip.width === current.chip.width &&
+        next.chip.height === current.chip.height &&
+        next.menu.width === current.menu.width &&
+        next.menu.height === current.menu.height
+      ) {
+        return current;
+      }
       return next;
     });
   }, [menu, feed?.enabled, feed?.modelLabel, today.prompt, today.completion, today.total]);
@@ -168,16 +313,18 @@ export function AppPetHost({ canvas = false }: { canvas?: boolean }) {
   const activate = () => {
     if (sprite && failedSheet === preferences.petId) {
       forgetPetSheet(preferences.petId);
-      setSheetRetry(value=>value+1);
+      setSheetRetry((value) => value + 1);
       return;
     }
     if (canvas) {
-      const frame = document.querySelector<HTMLIFrameElement>('iframe[title="贝壳云图项目画布"]');
-      if (frame?.offsetWidth && frame.contentWindow) frame.contentWindow.postMessage({kind:'studio:panel',panel:'chat'},location.origin);
-      else useAppStore.getState().setIsAssistantOpen(true);
+      useAppStore.getState().setIsAssistantOpen(true);
       return;
     }
-    if (feed?.enabled) { setMenu(false); feed.setOpen(!feed.open); return; }
+    if (feed?.enabled) {
+      setMenu(false);
+      feed.setOpen(!feed.open);
+      return;
+    }
     setMenu((open) => !open);
   };
   const openMenu = (event: { preventDefault: () => void }) => {
@@ -187,40 +334,128 @@ export function AppPetHost({ canvas = false }: { canvas?: boolean }) {
       useAppStore.getState().navigateToSettings();
       return;
     }
-    setMenu(true);feed?.setOpen(false);
+    setMenu(true);
+    feed?.setOpen(false);
   };
   const lookIndex = pose === 'idle' ? look : null;
   const visualPose: PetPose = lookIndex === null ? pose : 'look';
   const panel = anchor.panelStyle;
-  const petHeight = Math.round(size * 208 / 192);
+  const petHeight = Math.round((size * 208) / 192);
   return createPortal(
-    <div ref={anchor.rootRef} className="pointer-events-none fixed inset-0 z-40 p-[calc(16px+env(safe-area-inset-top))] pr-[calc(16px+env(safe-area-inset-right))] pb-[calc(16px+env(safe-area-inset-bottom))] pl-[calc(16px+env(safe-area-inset-left))]">
+    <div
+      ref={anchor.rootRef}
+      className="pointer-events-none fixed inset-0 z-40 p-[calc(16px+env(safe-area-inset-top))] pr-[calc(16px+env(safe-area-inset-right))] pb-[calc(16px+env(safe-area-inset-bottom))] pl-[calc(16px+env(safe-area-inset-left))]"
+    >
       {feed?.enabled && feed.open && (
-        <div ref={anchor.panelRef} data-panel-side={panel?.side} className="pointer-events-auto absolute z-10 overflow-y-auto overscroll-contain rounded-3xl [&>section]:w-full" style={panel ? { left: panel.left, top: panel.top, width: panel.width, maxHeight: panel.maxHeight } : { visibility: 'hidden' }}>
+        <div
+          ref={anchor.panelRef}
+          data-panel-side={panel?.side}
+          className="pointer-events-auto absolute z-10 overflow-y-auto overscroll-contain rounded-3xl [&>section]:w-full"
+          style={
+            panel
+              ? { left: panel.left, top: panel.top, width: panel.width, maxHeight: panel.maxHeight }
+              : { visibility: 'hidden' }
+          }
+        >
           {feed.panel}
         </div>
       )}
       <div ref={anchor.anchorRef} className="pointer-events-auto absolute" style={anchor.anchorStyle}>
         {sprite ? (
-          <button type="button" {...drop.dropZoneProps} {...anchor.pointerProps} onClick={activate} onContextMenu={openMenu} aria-label="桌宠" style={{ width: size, height: petHeight }} className={`relative block touch-none border-0 bg-transparent p-0 ${anchor.moving ? 'cursor-grabbing' : 'cursor-grab'}`}>
-            {failedSheet === preferences.petId ? <span className="text-xs">桌宠加载失败，点击重试</span> : sheet?.id === preferences.petId ? <PetSprite src={sheet.url} version={version} pose={visualPose} lookIndex={lookIndex} size={size} paused={reduced} onVersion={setVersion} onError={()=>setFailedSheet(preferences.petId)} /> : <span className="text-xs text-slate-400">桌宠加载中</span>}
+          <button
+            type="button"
+            {...drop.dropZoneProps}
+            {...anchor.pointerProps}
+            onClick={activate}
+            onContextMenu={openMenu}
+            aria-label="桌宠"
+            style={{ width: size, height: petHeight }}
+            className={`relative block touch-none border-0 bg-transparent p-0 ${anchor.moving ? 'cursor-grabbing' : 'cursor-grab'}`}
+          >
+            {failedSheet === preferences.petId ? (
+              <span className="text-xs">桌宠加载失败，点击重试</span>
+            ) : sheet?.id === preferences.petId ? (
+              <PetSprite
+                src={sheet.url}
+                version={version}
+                pose={visualPose}
+                lookIndex={lookIndex}
+                size={size}
+                paused={reduced}
+                onVersion={setVersion}
+                onError={() => setFailedSheet(preferences.petId)}
+              />
+            ) : (
+              <span className="text-xs text-slate-400">桌宠加载中</span>
+            )}
           </button>
         ) : (
-          <BeikePet phase={beikePhaseFor(pose, canvas ? null : feed?.phase)} lookIndex={lookIndex} badge={canvas && pose === 'success' ? '已完成' : undefined} label={feed?.enabled && !canvas ? '投喂封面样张' : '桌宠'} disabled={!feed?.enabled || feed.phase === 'uploading' || feed.phase === 'analyzing'} onOpen={activate} onFiles={(files) => { if (feed?.enabled) feed.onFiles(files); }} onDragging={feed?.onDragging} moving={anchor.moving} size={size} onContextMenu={openMenu} pointerProps={anchor.pointerProps} />
+          <BeikePet
+            phase={beikePhaseFor(pose, canvas ? null : feed?.phase)}
+            lookIndex={lookIndex}
+            badge={canvas && pose === 'success' ? '已完成' : undefined}
+            label={feed?.enabled && !canvas ? '投喂封面样张' : '桌宠'}
+            disabled={!feed?.enabled || feed.phase === 'uploading' || feed.phase === 'analyzing'}
+            onOpen={activate}
+            onFiles={(files) => {
+              if (feed?.enabled) feed.onFiles(files);
+            }}
+            onDragging={feed?.onDragging}
+            moving={anchor.moving}
+            size={size}
+            onContextMenu={openMenu}
+            pointerProps={anchor.pointerProps}
+          />
         )}
       </div>
       {feed?.enabled && chipPlace && (
-        <button ref={chipRef} type="button" onClick={() => { setMenu(false); feed.setOpen(true); }} aria-expanded={feed.open} className="pointer-events-auto absolute z-10 max-w-[min(18rem,calc(100vw-32px))] truncate rounded-full border border-violet-200 bg-white/95 px-3 py-1 text-[11px] font-bold text-violet-800 shadow-sm dark:border-violet-300/20 dark:bg-[#16161a] dark:text-violet-100" style={floatStyle(chipPlace)}>{feed.modelLabel}</button>
+        <button
+          ref={chipRef}
+          type="button"
+          onClick={() => {
+            setMenu(false);
+            feed.setOpen(true);
+          }}
+          aria-expanded={feed.open}
+          className="pointer-events-auto absolute z-10 max-w-[min(18rem,calc(100vw-32px))] truncate rounded-full border border-violet-200 bg-white/95 px-3 py-1 text-[11px] font-bold text-violet-800 shadow-sm dark:border-violet-300/20 dark:bg-[#16161a] dark:text-violet-100"
+          style={floatStyle(chipPlace)}
+        >
+          {feed.modelLabel}
+        </button>
       )}
       {menu && menuPlace && (
-        <div ref={menuRef} role="menu" className="pointer-events-auto absolute z-10 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1 text-sm shadow-xl dark:border-white/10 dark:bg-[#1b1b1e]" style={floatStyle(menuPlace)}>
+        <div
+          ref={menuRef}
+          role="menu"
+          className="pointer-events-auto absolute z-10 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1 text-sm shadow-xl dark:border-white/10 dark:bg-[#1b1b1e]"
+          style={floatStyle(menuPlace)}
+        >
           <div className="space-y-1 border-b border-slate-100 px-3 py-2 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
             <p className="font-semibold text-slate-800 dark:text-slate-100">今日 Token</p>
-            <p className="flex justify-between gap-3"><span>输入</span><span className="tabular-nums text-slate-800 dark:text-slate-100">{tokenText(today.prompt)}</span></p>
-            <p className="flex justify-between gap-3"><span>输出</span><span className="tabular-nums text-slate-800 dark:text-slate-100">{tokenText(today.completion)}</span></p>
-            <p className="flex justify-between gap-3 font-semibold text-slate-800 dark:text-slate-100"><span>合计</span><span className="tabular-nums">{tokenText(today.total)}</span></p>
+            <p className="flex justify-between gap-3">
+              <span>输入</span>
+              <span className="tabular-nums text-slate-800 dark:text-slate-100">{tokenText(today.prompt)}</span>
+            </p>
+            <p className="flex justify-between gap-3">
+              <span>输出</span>
+              <span className="tabular-nums text-slate-800 dark:text-slate-100">{tokenText(today.completion)}</span>
+            </p>
+            <p className="flex justify-between gap-3 font-semibold text-slate-800 dark:text-slate-100">
+              <span>合计</span>
+              <span className="tabular-nums">{tokenText(today.total)}</span>
+            </p>
           </div>
-          <button type="button" role="menuitem" className={menuItemClass} onClick={() => { setMenu(false); updatePetPreferences({ visible: false }); }}>隐藏桌宠</button>
+          <button
+            type="button"
+            role="menuitem"
+            className={menuItemClass}
+            onClick={() => {
+              setMenu(false);
+              updatePetPreferences({ visible: false });
+            }}
+          >
+            隐藏桌宠
+          </button>
         </div>
       )}
     </div>,

@@ -2,11 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { SalesAssetViewJob } from '@shared/contracts/salesAssetViews';
 import { readSalesAssetJob, submitSalesAssetJob, waitSalesAssetJob } from '../api/salesAssetJobs';
 import { uploadSalesViewImage } from '../api/salesAssetViews';
-import type { SalesAssetDraftPersistence } from '../model/salesAssetDraft';
-import type { SalesAssetCreation } from '../model/salesAssetCreation';
-import type { AssetViewRequest } from '../model/salesAssetViews';
-import { PERSONA_SHEET_VIEWS, readPersonaViews } from '../model/salesPersonaViews';
-import { SCENE_VIEWS, readSceneViews } from '../model/salesSceneViews';
+import type { SalesAssetDraftPersistence, SalesAssetCreation, AssetViewRequest } from '../model/salesAssetDraft';
+import { PERSONA_SHEET_VIEWS, readPersonaViews, SCENE_VIEWS, readSceneViews } from '../model/salesActionViews';
 import { useSalesAssetViews } from './useSalesAssetViews';
 
 const hooks = vi.hoisted(() => ({ index: 0, slots: [] as unknown[], cleanup: undefined as (() => void) | undefined }));

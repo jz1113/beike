@@ -1,16 +1,17 @@
+// Package gateway adapts vendor generation protocols.
 package gateway
 
 import (
+	"beike.local/cloud/src/backend/internal/platform/network"
 	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
-
-	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
 var ModelHTTP = func() *http.Client { return network.SafeClient() }
@@ -237,4 +238,172 @@ func DecodeObject(text string) map[string]any {
 		return data
 	}
 	return nil
+}
+
+var imageModelIDs = []string{
+	"gpt-image-2.5-flare",
+	"gpt-image-2.5-sunburst",
+	"gpt-image-2",
+	"gemini-nano-banana-2.1",
+	"gemini-3.1-flash-image",
+	"gemini-3.1-flash-lite-image",
+	"gemini-3-pro-image",
+	"gemini-2.5-flash-image",
+	"nano-banana-pro",
+	"nano-banana",
+	"doubao-seedream-4-0-250828",
+	"doubao-seedream-4-5-251128",
+	"doubao-seedream-5-0-260128",
+	"seedream-v5-pro",
+	"qwen-image-max",
+	"z-image-turbo",
+	"qwen-image",
+	"qwen-image-edit",
+	"midjourney",
+	"flux",
+	"flux-pro-max",
+	"grok-4.1-image",
+	"grok-4.2-image",
+	"grok-imagine-image-quality",
+}
+
+var modelAliases = map[string]string{
+	"nano-banana-2.1":                     "gemini-nano-banana-2.1",
+	"nano-banana-2":                       "gemini-3.1-flash-image",
+	"nano-banana-2-lite":                  "gemini-3.1-flash-lite-image",
+	"gemini-3.1-flash-image-preview":      "gemini-3.1-flash-image",
+	"gemini-3.1-flash-lite-image-preview": "gemini-3.1-flash-lite-image",
+	"gemini-3-pro-image-preview":          "gemini-3-pro-image",
+	"gemini-2.5-flash-image-preview":      "gemini-2.5-flash-image",
+	"qwen-image-3":                        "qwen-image-max",
+	"qwen-image-edit-2509":                "qwen-image-edit",
+	"mjv7":                                "midjourney",
+	"mjv8.1":                              "midjourney",
+	"mjv8.2":                              "midjourney",
+	"vidu-q4-preview":                     "viduq4-preview",
+	"viduq4":                              "viduq4-preview",
+}
+
+var videoModelIDs = []string{
+	"veo3.1",
+	"veo3.1-fast",
+	"veo3.1-pro",
+	"omni_flash-10s",
+	"kling-video-v3",
+	"kling-video-v3-omni",
+	"kling-video-v2-5-turbo",
+	"kling-video-v2-6",
+	"doubao-seedance-2-0-260128",
+	"doubao-seedance-2-0-fast-260128",
+	"doubao-seedance-2.0-mini",
+	"doubao-seedance-2.5",
+	"sora-2",
+	"sora-2-pro",
+	"MiniMax-H3",
+	"wan3.0-video",
+	"wan3.0-video-prime",
+	"grok-imagine-video-1.5",
+	"viduq3",
+	"viduq3-mix",
+	"viduq3-turbo",
+	"viduq3-pro",
+	"viduq4-preview",
+}
+
+func IsApprovedImage(id string) bool { return approvedModel(id, imageModelIDs) }
+
+func IsApprovedVideo(id string) bool { return approvedModel(id, videoModelIDs) }
+
+func approvedModel(id string, ids []string) bool {
+	trimmed := strings.TrimSpace(id)
+	if trimmed == "" {
+		return false
+	}
+	known := map[string]struct{}{}
+	for _, item := range ids {
+		known[strings.ToLower(item)] = struct{}{}
+	}
+	if _, ok := known[strings.ToLower(trimmed)]; ok {
+		return true
+	}
+	slash := strings.LastIndex(trimmed, "/")
+	stripped := trimmed
+	if slash >= 0 {
+		stripped = trimmed[slash+1:]
+	}
+	canonical := stripped
+	if alias, ok := modelAliases[stripped]; ok {
+		canonical = alias
+	} else if alias, ok := modelAliases[strings.ToLower(stripped)]; ok {
+		canonical = alias
+	}
+	_, ok := known[strings.ToLower(canonical)]
+	return ok
+}
+
+// CanTryAnotherEndpoint reports whether a failed submit may try the next
+// endpoint. Timeouts, 5xx and missing task ids must not submit again.
+func CanTryAnotherEndpoint(status int) bool {
+	return status == 404 || status == 405 || status == 415
+}
+
+// IsDashScopeGateway reports hosts that speak the Qianwen / DashScope native API.
+func IsDashScopeGateway(raw string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host == "" {
+		return false
+	}
+	if host == "qianwenaiapi.com" || host == "maas.qianwenaiapi.com" || strings.HasSuffix(host, ".qianwenaiapi.com") {
+		return true
+	}
+	return strings.Contains(host, "dashscope") && (host == "aliyuncs.com" || strings.HasSuffix(host, ".aliyuncs.com"))
+}
+
+// ChatCompletionsURL is the OpenAI-compatible chat endpoint for a provider base URL.
+// DashScope hosts use /compatible-mode/v1 unless that prefix is already present.
+func ChatCompletionsURL(base string) string {
+	return openAICompatibleRoot(base) + "/chat/completions"
+}
+
+// ModelsURL is the OpenAI-compatible model catalog endpoint for a provider base URL.
+func ModelsURL(base string) string {
+	return openAICompatibleRoot(base) + "/models"
+}
+
+// DashScopeRoot strips compatible-mode and /api/v1 suffixes so native image paths can be appended.
+func DashScopeRoot(base string) string {
+	root := strings.TrimRight(NormalizeGatewayBaseURL(base), "/")
+	lower := strings.ToLower(root)
+	for _, suffix := range []string{"/compatible-mode", "/api"} {
+		if strings.HasSuffix(lower, suffix) {
+			root = strings.TrimRight(root[:len(root)-len(suffix)], "/")
+			lower = strings.ToLower(root)
+		}
+	}
+	return root
+}
+
+func openAICompatibleRoot(base string) string {
+	trimmed := strings.TrimRight(strings.TrimSpace(base), "/")
+	lower := strings.ToLower(trimmed)
+	if strings.HasSuffix(lower, "/compatible-mode/v1") {
+		return trimmed
+	}
+	if IsDashScopeGateway(trimmed) {
+		return DashScopeRoot(trimmed) + "/compatible-mode/v1"
+	}
+	return strings.TrimRight(NormalizeGatewayBaseURL(trimmed), "/") + "/v1"
+}
+
+func NormalizeGatewayBaseURL(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	trimmed = strings.TrimRight(trimmed, "/")
+	if len(trimmed) >= 3 && strings.EqualFold(trimmed[len(trimmed)-3:], "/v1") {
+		trimmed = trimmed[:len(trimmed)-3]
+	}
+	return trimmed
 }

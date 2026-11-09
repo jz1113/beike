@@ -1,0 +1,36 @@
+{
+  "id": "sd2-pe",
+  "name": "sd2-pe",
+  "displayName": "Seedance 2.0 官方提示词",
+  "description": "Optimizes user prompts for Seedance 2.0 multi-modal video generation. Invoke when a user provides an initial prompt or multimedia assets for video generation, or explicitly requests prompt optimization.",
+  "category": "官方视频提示词",
+  "author": "火山方舟",
+  "version": "0.1.0",
+  "icon": "video",
+  "colorTheme": "amber",
+  "isBuiltin": true,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "tools": [],
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": [
+      "官方原版"
+    ]
+  },
+  "source": {
+    "kind": "official",
+    "url": "https://docs.volcengine.com/docs/ark/seedance-2-0-prompt-guide?lang=zh",
+    "revision": "0.1.0",
+    "license": "官方公开下载；未附独立许可证",
+    "files": {
+      "SKILL.md": "8836cdb2bc4f7d8a329c4ecd33cca19efdcfc71afdd927e8defe6e1f9a2e2b3c"
+    },
+    "archiveSha256": "f396e27b0391ef789bfbdd0c630bcda201403b8d8482eea24df558ba21de8546",
+    "downloadUrl": "https://arkdocs.tos-cn-beijing.volces.com/skills/artifacts/video-generation/sd2-pe/0.1.0/sd2-pe-0.1.0.zip"
+  },
+  "modelIcon": "doubao-seedance-2.0",
+  "displayDescription": "为 Seedance 2.0 梳理主体、场景、动作与运镜，明确图片和视频的参考用途，生成可直接使用的提示词。",
+  "usageGuide": "### 适合什么任务\n把一句话创意、已有提示词或参考素材要求，整理为 Seedance 2.0 能清楚理解的视频描述。\n\n### 会怎样优化\n补齐主体、场景、动作和镜头关系，梳理镜头先后；明确每张图片、每段视频分别提供外观、动作、构图或风格，减少素材之间的干扰。\n\n### 怎么使用\n先写“谁在什么地方做什么”，再补充想要的运镜、风格和声音。使用素材时可写“@图片1 提供人物外观，@视频1 只参考动作”。\n\n### 在画布中\n选择 Seedance 2.0 视频节点，开启“生成前优化提示词”。系统使用已启用的文本模型优化，先展示可编辑的提示词，确认后才生成视频，并保留原文与优化稿；参考数量、时长和分辨率以当前渠道为准。"
+}

@@ -79,6 +79,10 @@ func mustMigrations() []migration {
 		{version: "20261103_01_sales_media_jobs", checksum: file("sales_media_jobs.sql"), apply: script("sales_media_jobs.sql", false)},
 		{version: "20261103_02_sales_prompt_template_version", checksum: file("sales_prompt_template_version.sql"), apply: script("sales_prompt_template_version.sql", false)},
 		{version: "20261103_03_library_preferences", checksum: file("library_preferences.sql"), apply: script("library_preferences.sql", false)},
+		{version: "20261104_01_image_task_route", checksum: file("image_task_route.sql"), apply: script("image_task_route.sql", true)},
+		{version: "20261105_01_generation_submissions", checksum: file("generation_submissions.sql"), apply: script("generation_submissions.sql", false)},
+		{version: "20261106_01_canvas_drafts", checksum: file("canvas_drafts.sql"), apply: script("canvas_drafts.sql", false)},
+		{version: "20261109_01_collection_cache", checksum: file("collection_cache.sql"), apply: script("collection_cache.sql", false)},
 	}
 }
 

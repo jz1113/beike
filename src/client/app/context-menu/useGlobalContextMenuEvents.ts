@@ -1,5 +1,14 @@
 import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react';
-import type { ContextMenuState } from './contextMenuTypes';
+
+export interface ContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  type: 'image' | 'video' | 'selection' | null;
+  mediaUrl?: string;
+  mediaAlt?: string;
+  selectedText?: string;
+}
 
 interface ContextMenuEventOptions {
   setMenu: Dispatch<SetStateAction<ContextMenuState>>;
@@ -7,45 +16,31 @@ interface ContextMenuEventOptions {
   menuRef: RefObject<HTMLDivElement | null>;
 }
 
+const canvasMenuScope = '[data-canvas-context-menu], [data-canvas-node-context], [data-canvas-node-editor]';
+
 export function useGlobalContextMenuEvents({
   setMenu, closeMenu, menuRef,
 }: ContextMenuEventOptions) {
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
-      if (target?.closest('[data-prompt-folder-rename-input]')) {
+      const inCanvas = target?.closest(canvasMenuScope);
+      // Let the browser handle editing, including nested rich-text nodes and
+      // clipboard permissions. Native editing also keeps controlled inputs in sync.
+      if (target?.closest('input, textarea, [contenteditable]:not([contenteditable="false"]), [data-canvas-node-context] [role="textbox"]')) {
         closeMenu();
         return;
       }
-      // 文件夹名称的原位编辑保留浏览器文本菜单，其余区域使用应用菜单。
+      // Folder views handle their own context menus.
       e.preventDefault();
-
       if (!target) return;
-      // 文件夹视图自己提供“重命名 / 新建文件夹”菜单；预览图不能抢成图片菜单。
       if (target.closest('[data-prompt-folder-area], [data-prompt-library-context]')) {
         closeMenu();
         return;
       }
 
-      // 2. 检查是否右键在可编辑文本框中 (input, textarea)
-      if (
-        (target instanceof HTMLInputElement && target.type !== 'range' && target.type !== 'checkbox') ||
-        target instanceof HTMLTextAreaElement ||
-        target.isContentEditable
-      ) {
-        const inputEl = target as HTMLInputElement | HTMLTextAreaElement;
-        const selStart = inputEl.selectionStart ?? 0;
-        const selEnd = inputEl.selectionEnd ?? 0;
-        const hasSelection = selEnd > selStart;
-
-        setMenu({
-          visible: true,
-          x: e.clientX,
-          y: e.clientY,
-          type: 'input',
-          selectedText: hasSelection ? inputEl.value.slice(selStart, selEnd) : '',
-          inputElement: inputEl,
-        });
+      if (inCanvas) {
+        closeMenu();
         return;
       }
 
@@ -69,7 +64,7 @@ export function useGlobalContextMenuEvents({
         if (!mediaImg && typeof document.elementsFromPoint === 'function') {
           const hitElements = document.elementsFromPoint(e.clientX, e.clientY) || [];
           const underImg = hitElements.find(
-            (el): el is HTMLImageElement => el instanceof HTMLImageElement
+            (el): el is HTMLImageElement => el instanceof HTMLImageElement && !el.closest(canvasMenuScope)
           );
           if (underImg) {
             mediaImg = underImg;
@@ -79,7 +74,7 @@ export function useGlobalContextMenuEvents({
         // 4.3 紧凑卡片容器检测 (仅在处于明确的媒体卡片/节点内部时，且点击位于卡片区域内)
         if (!mediaImg) {
           const tightMediaCard = target.closest<HTMLElement>(
-            '[data-media-url], [data-result-url], [data-media-card], .canvas-node-card, .group\\/media, figure'
+            '[data-media-url], [data-result-url], [data-media-card], .group\\/media, figure'
           );
           if (tightMediaCard) {
             const rect = tightMediaCard.getBoundingClientRect?.();
@@ -137,7 +132,7 @@ export function useGlobalContextMenuEvents({
         if (!mediaVideo && typeof document.elementsFromPoint === 'function') {
           const hitElements = document.elementsFromPoint(e.clientX, e.clientY) || [];
           const underVideo = hitElements.find(
-            (el): el is HTMLVideoElement => el instanceof HTMLVideoElement
+            (el): el is HTMLVideoElement => el instanceof HTMLVideoElement && !el.closest(canvasMenuScope)
           );
           if (underVideo) {
             mediaVideo = underVideo;
@@ -146,7 +141,7 @@ export function useGlobalContextMenuEvents({
 
         if (!mediaVideo) {
           const tightVideoCard = target.closest<HTMLElement>(
-            '[data-video-url], [data-video-container], .canvas-node-card'
+            '[data-video-url], [data-video-container]'
           );
           if (tightVideoCard) {
             const rect = tightVideoCard.getBoundingClientRect?.();

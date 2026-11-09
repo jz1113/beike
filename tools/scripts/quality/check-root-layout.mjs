@@ -13,7 +13,7 @@ const workspaceRoot = path.resolve(scriptDir, '../../..');
 const REQUIRED_DIRS = [
   'src/client', 'src/backend', 'src/shared/contracts', 'src/shared/domain', 'src/shared/data',
   'src/client/public', 'tools/configs', 'tools/scripts', 'tools/launchers', 'docs', 'tools/deploy',
-  'src/client/features/poster', 'src/client/features/sales',
+  'src/client/features/sales',
   'src/shared/domain/sales', 'src/backend/internal/gateway',
   'src/backend/internal/generate/poster',
 ];
@@ -30,6 +30,7 @@ const FORBIDDEN_PATHS = [
   '.env.example', '启动贝壳云图.ps1',
   'tools/launchers/启动贝壳云图.bat', 'tools/launchers/启动贝壳云图.command',
   'src/client/features/headline-poster', 'src/client/features/keyword-review',
+  'src/client/features/poster', 'src/client/features/workshop',
   'src/client/features/ppt-generator', 'src/client/features/video-sales', 'src/shared/domain/video-sales',
   'src/backend/internal/keywordreview', 'src/backend/internal/modelgw',
   'src/backend/internal/generate/headline', 'src/backend/internal/generate/videosales',

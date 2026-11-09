@@ -6,15 +6,20 @@ import { useAppStore } from '@client/store';
 import type { GenerationTask } from '@client/store/appStoreTypes';
 import { GENERATION_BATCH_LIMIT } from '@shared/domain/assistant/generationPrompts';
 import type { GenerationPromptSource } from './generationBatchSources';
-import { currentBatchSettings, dispatchGenerationBatch } from './dispatchGenerationBatch';
-import { readGenerationBatchReceipts, type GenerationBatchReceipt } from './generationBatchReceipts';
+import {
+  currentBatchSettings,
+  dispatchGenerationBatch,
+  readGenerationBatchDraft,
+  readGenerationBatchReceipts,
+  saveGenerationBatchDraft,
+  type GenerationBatchReceipt,
+} from './dispatchGenerationBatch';
 import type { BatchGenerationSettings, BatchPromptDraft } from './buildGenerationPromptBatch';
 import GenerationBatchSettings, {
   resolveBatchModelSummary,
   resolvePreferredBatchModel,
   syncBatchSettingsStore,
 } from './GenerationBatchSettings';
-import { readGenerationBatchDraft, saveGenerationBatchDraft } from './generationBatchDrafts';
 
 const ITEM_ASPECT_OPTIONS = [
   { id: '', label: '沿用默认' }, { id: 'smart', label: '智能' }, { id: '1:1', label: '1:1' },

@@ -8,7 +8,7 @@ import {
   persistDrawingStateToStorage,
   isDrawingHistoryReady,
 } from './persist/index';
-import { deferDrawingMutation } from './persist/generationHydration';
+import { deferDrawingMutation } from './persist/generation';
 import type { AppState, GenerateSlice } from '@client/store/types';
 import {
   capGenerationTasks,
@@ -22,6 +22,37 @@ import {
   EMPTY_COMPOSER_MEDIA,
   createBatchGenerationTasksPayload,
 } from './generateSliceHelpers';
+
+/** Keep canvas turns durable without changing the ordinary conversation selection. */
+function canvasGenerationPayload(
+  tasks: GenerationTask[],
+  state: { sessions: ChatSession[]; generationTasks: GenerationTask[] },
+) {
+  const projectId = tasks.find(task => task.canvasProjectId)?.canvasProjectId;
+  if (!projectId) return;
+  if (tasks.some(task => task.canvasProjectId !== projectId)) throw new Error('同一批任务必须属于同一个画布项目');
+  const sessionId = `canvas-session:${projectId}`;
+  const existing = state.sessions.find(session => session.id === sessionId);
+  const title = tasks[0].sessionTitle || existing?.title || '画布创作';
+  const linked = tasks.map(task => ({ ...task, sessionId, sessionTitle: title }));
+  const ids = new Set(linked.map(task => task.id));
+  const remoteIds = new Set(linked.flatMap(task => task.taskId ? [task.taskId] : []));
+  const keep = (task: GenerationTask) => !ids.has(task.id) && (!task.taskId || !remoteIds.has(task.taskId));
+  const session: ChatSession = { ...existing, id: sessionId, canvasProjectId: projectId, title,
+    createdAt: existing?.createdAt ?? Date.now(), tasks: [...linked, ...(existing?.tasks || []).filter(keep)] };
+  // A recovered legacy task may still live in its old conversation. Move its
+  // aliases as well, or deleting that conversation would delete the canvas task.
+  const sessions = state.sessions.map(item => {
+    if (item.id === sessionId) return session;
+    const tasks = item.tasks.filter(keep);
+    return tasks.length === item.tasks.length ? item : { ...item, tasks };
+  });
+  if (!existing) sessions.unshift(session);
+  return {
+    generationTasks: capGenerationTasks([...linked, ...state.generationTasks.filter(keep)]),
+    sessions,
+  };
+}
 
 let lastReplyPersistAt = 0;
 
@@ -39,9 +70,9 @@ const sanitizedInitialSessions = (initialDrawing.sessions || []).map((session) =
 const initialPrunedSessions = sanitizedInitialSessions.length > 0
   ? pruneEmptySessions(sanitizedInitialSessions, initialDrawing.currentId)
   : sanitizedInitialSessions;
-const initialCurrentId = initialPrunedSessions.some(s => s.id === initialDrawing.currentId)
+const initialCurrentId = initialPrunedSessions.some(s => s.id === initialDrawing.currentId && !s.canvasProjectId)
   ? initialDrawing.currentId
-  : initialPrunedSessions[0]?.id || 'session-default';
+  : initialPrunedSessions.find(s => !s.canvasProjectId)?.id || 'session-default';
 
 export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> = (set, get) => {
   const setDrawing = (update: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => {
@@ -176,6 +207,11 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
   setPreviewQueue: (previewQueue) => setDrawing({ previewQueue }),
 
   addGenerationTask: (task, isNewSession = false) => setDrawing((state) => {
+    const canvas = canvasGenerationPayload([task], state);
+    if (canvas) {
+      persistDrawingStateToStorage(canvas.generationTasks, canvas.sessions);
+      return canvas;
+    }
     let sessions = pruneEmptySessions(state.sessions, state.currentSessionId);
     let targetSessionId = state.currentSessionId;
     let currentSessionTitle = deriveSessionTitleFromTasks([task], task.mediaType === 'video' ? '智能视频创作' : 'AI 生图创作');
@@ -230,6 +266,11 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
   }),
 
   addBatchGenerationTasks: (tasks, customTitle, isNewSession = true) => setDrawing((state) => {
+    const canvas = canvasGenerationPayload(tasks, state);
+    if (canvas) {
+      persistDrawingStateToStorage(canvas.generationTasks, canvas.sessions);
+      return canvas;
+    }
     const { updatedGenTasks, sessions, targetSessionId } = createBatchGenerationTasksPayload(
       tasks,
       customTitle,
@@ -250,6 +291,9 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     const current = state.generationTasks.find(matches) || state.sessions.flatMap(session => session.tasks).find(matches);
     // A late timeout/failure cannot downgrade a completed task. Retry creates a new task.
     if (current?.status === 'SUCCESS' && current.resultUrl && updates.status && updates.status !== 'SUCCESS') return state;
+    if (current?.status === 'SUCCESS' && current.resultUrl) {
+      updates = { ...updates, resultUrl: updates.resultUrl || current.resultUrl, progress: '100%', failReason: undefined, submissionRecoveryRequired: false };
+    }
     let updatedGenTasks = state.generationTasks.map(g => matches(g) ? { ...g, ...updates } : g);
     if (current && !state.generationTasks.some(matches) && updates.status === 'IN_PROGRESS') {
       updatedGenTasks = capGenerationTasks([{ ...current, ...updates }, ...updatedGenTasks]);
@@ -262,15 +306,16 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     const shouldPersist = opts?.persist !== false;
     const isTerminal = updates.status === 'SUCCESS' || updates.status === 'FAILURE';
     const linked = Boolean(updates.taskId && updates.taskId !== current?.taskId) || Boolean(updates.dbId && updates.dbId !== current?.dbId);
+    const productWidgetAdded = Boolean(updates.agentTurn?.productWidget && !current?.agentTurn?.productWidget);
     const statusChanged = Boolean(updates.status && updates.status !== current?.status);
     const recoveryChanged = updates.submissionRecoveryRequired !== undefined && updates.submissionRecoveryRequired !== current?.submissionRecoveryRequired;
     const nextReply = updates.agentTurn?.reply?.trim() || '';
     const previousReply = current?.agentTurn?.reply?.trim() || '';
     const now = Date.now();
     const replyDue = Boolean(nextReply) && nextReply !== previousReply && (!previousReply || now - lastReplyPersistAt >= 1000);
-    if (shouldPersist && (isTerminal || linked || statusChanged || recoveryChanged || replyDue)) {
+    if (shouldPersist && (isTerminal || linked || statusChanged || recoveryChanged || replyDue || productWidgetAdded)) {
       if (replyDue) lastReplyPersistAt = now;
-      persistDrawingStateToStorage(updatedGenTasks, updatedSessions, undefined, { immediate: linked || isTerminal || recoveryChanged || replyDue });
+      persistDrawingStateToStorage(updatedGenTasks, updatedSessions, undefined, { immediate: linked || isTerminal || recoveryChanged || replyDue || productWidgetAdded });
     }
     if (shouldPersist && isTerminal) {
       if (typeof window !== 'undefined') {

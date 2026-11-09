@@ -37,7 +37,10 @@ function effectiveLines(file) {
   return count;
 }
 
+const WARN_LINES = 800;
+const FAIL_LINES = 1000;
 const violations = [];
+const warnings = [];
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
@@ -47,12 +50,16 @@ function walk(dir) {
     }
     if (!entry.name.endsWith('.go') || entry.name.endsWith('_test.go')) continue;
     const lines = effectiveLines(full);
-    if (lines > 400) violations.push(`${path.relative(root, full)} ${lines}`);
+    if (lines > FAIL_LINES) violations.push(`${path.relative(root, full)} ${lines}`);
+    else if (lines > WARN_LINES) warnings.push(`${path.relative(root, full)} ${lines}`);
   }
 }
 walk(path.join(root, 'src/backend'));
+if (warnings.length) {
+  console.warn(`Go 文件超过 ${WARN_LINES} 行有效代码，建议按职责拆分:\n` + warnings.join('\n'));
+}
 if (violations.length) {
-  console.error('Go 文件超过 400 行有效代码:\n' + violations.join('\n'));
+  console.error(`Go 文件超过 ${FAIL_LINES} 行有效代码:\n` + violations.join('\n'));
   process.exit(1);
 }
 

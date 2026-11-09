@@ -22,20 +22,26 @@ import (
 )
 
 type depthRuntime struct {
-	Progress string
-	Stage    string
-	Meta     depthMeta
+	Progress  string
+	Stage     string
+	Meta      depthMeta
+	UpdatedAt time.Time
 }
 
+const maxDepthVideoQueueSize = 16
+const depthRuntimeRetainTTL = 10 * time.Minute
+
 type depthVideoJob struct {
-	cfg       config.Config
-	workspace string
-	recordID  string
-	data      []byte
-	dataURL   string
-	videoURL  string
-	style     string
-	quality   string
+	cfg        config.Config
+	workspace  string
+	recordID   string
+	spoolPath  string
+	data       []byte
+	dataURL    string
+	videoURL   string
+	style      string
+	quality    string
+	resolution string
 }
 
 var (
@@ -47,16 +53,43 @@ var (
 	depthVideoState    sync.Map
 )
 
-func acceptDepthVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, data []byte, dataURL, videoURL, style, quality, operation string) {
+func acceptDepthVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, data []byte, dataURL, videoURL, style, quality, resolution, operation string) {
+	if resolution != "" && resolution != "480p" && resolution != "720p" {
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "submissionRejected": true, "error": "深度视频分辨率须为 480p 或 720p"})
+		return
+	}
 	style = resolveDepthStyle(style, "")
 	quality = resolveDepthQuality(quality)
 	fingerprint := depthFingerprint("depth-video", depthInputDigest(append(append([]byte{}, data...), []byte(dataURL+videoURL)...)), style, quality)
+	if resolution != "" {
+		fingerprint = depthFingerprint(fingerprint, resolution)
+	}
 	status, body := guardDepth(cfg, r, "depth-video", operation, fingerprint, func() (int, map[string]any) {
+		depthVideoMu.Lock()
+		full := len(depthVideoQueue) >= maxDepthVideoQueueSize
+		depthVideoMu.Unlock()
+		if full {
+			return http.StatusTooManyRequests, map[string]any{"success": false, "submissionRejected": true, "error": "深度动作捕捉队列已满，请稍后再试"}
+		}
 		recordID, err := createDepthVideoRecord(cfg, r, quality)
 		if err != nil {
 			return http.StatusInternalServerError, map[string]any{"success": false, "submissionRejected": true, "error": "深度动作捕捉任务提交失败"}
 		}
-		enqueueDepthVideo(depthVideoJob{cfg: cfg, workspace: httpx.WorkspaceFrom(r), recordID: recordID, data: append([]byte{}, data...), dataURL: dataURL, videoURL: videoURL, style: style, quality: quality})
+		var spoolPath string
+		if len(data) > 0 {
+			tmp, err := os.CreateTemp("", "depth-video-spool-*.mp4")
+			if err != nil {
+				return http.StatusInternalServerError, map[string]any{"success": false, "submissionRejected": true, "error": "深度动作捕捉任务提交失败"}
+			}
+			spoolPath = tmp.Name()
+			_, writeErr := tmp.Write(data)
+			closeErr := tmp.Close()
+			if writeErr != nil || closeErr != nil {
+				_ = os.Remove(spoolPath)
+				return http.StatusInternalServerError, map[string]any{"success": false, "submissionRejected": true, "error": "深度动作捕捉任务提交失败"}
+			}
+		}
+		enqueueDepthVideo(depthVideoJob{cfg: cfg, workspace: httpx.WorkspaceFrom(r), recordID: recordID, spoolPath: spoolPath, dataURL: dataURL, videoURL: videoURL, style: style, quality: quality, resolution: resolution})
 		return http.StatusOK, map[string]any{"success": true, "taskId": recordID, "recordId": recordID, "status": "IN_PROGRESS", "style": style, "quality": quality}
 	})
 	httpx.WriteJSON(w, status, body)
@@ -81,6 +114,9 @@ func enqueueDepthVideo(job depthVideoJob) {
 	depthVideoMu.Lock()
 	defer depthVideoMu.Unlock()
 	if depthVideoShutdown {
+		if job.spoolPath != "" {
+			_ = os.Remove(job.spoolPath)
+		}
 		return
 	}
 	setDepthRuntime(job.recordID, "queued", "5%", depthMeta{})
@@ -115,8 +151,15 @@ func processDepthVideoQueue() {
 func DrainDepthVideo(timeout time.Duration) {
 	depthVideoMu.Lock()
 	depthVideoShutdown = true
+	queued := depthVideoQueue
+	depthVideoQueue = nil
 	current := depthVideoCurrent
 	depthVideoMu.Unlock()
+	for _, job := range queued {
+		if job.spoolPath != "" {
+			_ = os.Remove(job.spoolPath)
+		}
+	}
 	if current == nil {
 		return
 	}
@@ -129,6 +172,9 @@ func DrainDepthVideo(timeout time.Duration) {
 }
 
 func runDepthVideoJob(job depthVideoJob) {
+	if job.spoolPath != "" {
+		defer os.Remove(job.spoolPath)
+	}
 	work, err := os.MkdirTemp("", "depth-video-")
 	if err != nil {
 		failDepthVideo(job, "深度动作捕捉任务提交失败")
@@ -155,7 +201,7 @@ func runDepthVideoJob(job depthVideoJob) {
 	depthDir := filepath.Join(work, "depth")
 	output := filepath.Join(work, "output.mp4")
 	setDepthRuntime(job.recordID, "extracting", "15%", depthMeta{})
-	count, fps, err := extractDepthFrames(job.cfg.Root, input, frames, profile.maxWidthPx, probe.FPS)
+	count, fps, err := extractDepthFrames(job.cfg.Root, input, frames, profile.maxWidthPx, job.resolution, probe.FPS)
 	if err != nil {
 		failDepthVideo(job, err.Error())
 		return
@@ -201,6 +247,13 @@ func runDepthVideoJob(job depthVideoJob) {
 
 func writeDepthVideoInput(work string, job depthVideoJob) (string, error) {
 	target := filepath.Join(work, "input.mp4")
+	if job.spoolPath != "" {
+		raw, err := os.ReadFile(job.spoolPath)
+		if err != nil {
+			return "", errors.New("深度原片读取失败")
+		}
+		return target, os.WriteFile(target, raw, 0o600)
+	}
 	if len(job.data) > 0 {
 		return target, os.WriteFile(target, job.data, 0o600)
 	}
@@ -284,11 +337,20 @@ func nullable(value string) any {
 }
 
 func setDepthRuntime(id, stage, progress string, meta depthMeta) {
+	now := time.Now()
 	prev, _ := depthVideoState.Load(id)
 	if meta.ModelID == "" {
 		if old, ok := prev.(depthRuntime); ok {
 			meta = old.Meta
 		}
 	}
-	depthVideoState.Store(id, depthRuntime{Progress: progress, Stage: stage, Meta: meta})
+	depthVideoState.Store(id, depthRuntime{Progress: progress, Stage: stage, Meta: meta, UpdatedAt: now})
+	if stage == "done" || stage == "failed" {
+		depthVideoState.Range(func(key, value any) bool {
+			if item, ok := value.(depthRuntime); ok && (item.Stage == "done" || item.Stage == "failed") && now.Sub(item.UpdatedAt) > depthRuntimeRetainTTL {
+				depthVideoState.Delete(key)
+			}
+			return true
+		})
+	}
 }

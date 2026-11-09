@@ -3,6 +3,9 @@ import {
   inferVendorFromModelId,
   vendorOption,
   isModelMatchModality,
+  isModalitySyncCandidate,
+  videoSyncCandidateKey,
+  modalitySyncCandidateKey,
   isLegacyOrDiscontinuedModel,
   compareModelVersionsDesc,
 } from './modalityMeta';
@@ -43,19 +46,12 @@ describe('modalityMeta vendor inference', () => {
     }
   });
 
-  it('correctly matches vendors across three_d and voice', () => {
-    expect(inferVendorFromModelId('meshy-4', 'three_d')).toBe('meshy');
-    expect(vendorOption('three_d', 'meshy')?.name).toBe('Meshy');
-    expect(inferVendorFromModelId('elevenlabs-music', 'music')).toBe('elevenlabs');
-    expect(vendorOption('music', 'elevenlabs')?.name).toBe('ElevenLabs');
+  it('matches voice vendors and keeps retired modalities out of voice', () => {
     expect(inferVendorFromModelId('eleven-multilingual-v2', 'voice')).toBe('elevenlabs');
     expect(vendorOption('voice', 'elevenlabs')?.name).toBe('ElevenLabs');
-    expect(inferVendorFromModelId('kling-lip-sync', 'avatar')).toBe('kling');
-    expect(inferVendorFromModelId('omnihuman-1.5', 'avatar')).toBe('bytedance');
-    expect(inferVendorFromModelId('wanx-avatar', 'avatar')).toBe('qwen');
-    expect(inferVendorFromModelId('hedra-character-3', 'avatar')).toBe('hedra');
-    expect(inferVendorFromModelId('sync-lipsync-2', 'avatar')).toBe('fal');
-    expect(vendorOption('avatar', 'kling')?.name).toBe('可灵');
+    expect(isModelMatchModality('elevenlabs-music', 'voice')).toBe(false);
+    expect(isModelMatchModality('kling-lip-sync', 'voice')).toBe(false);
+    expect(isModelMatchModality('omnihuman-1.5', 'video')).toBe(false);
   });
 
   it('correctly matches image modality for flux and z-image', () => {
@@ -207,23 +203,24 @@ describe('modalityMeta vendor inference', () => {
     expect(isModelMatchModality('gpt-4o-audio-preview', 'chat')).toBe(true);
     expect(isModelMatchModality('gpt-4o-audio-preview', 'voice')).toBe(false);
 
-    // 音乐与音效 (含 Suno, Udio, MiniMax Music, Stable Audio)
-    expect(isModelMatchModality('chirp-v3-0', 'music')).toBe(true);
-    expect(isModelMatchModality('suno-v3.5', 'music')).toBe(true);
-    expect(isModelMatchModality('music-01', 'music')).toBe(true);
-    expect(isModelMatchModality('stable-audio', 'music')).toBe(true);
     expect(isModelMatchModality('chirp-v3-0', 'chat')).toBe(false);
+    expect(isModelMatchModality('chirp-v3-0', 'voice')).toBe(false);
+    expect(isModelMatchModality('suno-v3.5', 'voice')).toBe(false);
     expect(isModelMatchModality('suno', 'voice')).toBe(false);
+    expect(isModelMatchModality('music-01', 'voice')).toBe(false);
     expect(isModelMatchModality('stable-audio', 'voice')).toBe(false);
+    expect(classifyModel('suno-v3.5')).toBe('music');
+    expect(classifyModel('fal-ai/hunyuan-3d/v3.1/pro')).toBe('three_d');
+    expect(classifyModel('omnihuman-1.5')).toBe('avatar');
 
     // MiniMax 语言多模态仅限 abab 系列
     expect(isModelMatchModality('abab6.5s-chat', 'chat')).toBe(true);
     expect(isModelMatchModality('abab6.5s-chat', 'video')).toBe(false);
 
-    // 3D
-    expect(isModelMatchModality('fal-ai/hunyuan-3d/v3.1/pro', 'three_d')).toBe(true);
-    expect(isModelMatchModality('tripo', 'three_d')).toBe(true);
-    expect(isModelMatchModality('flux', 'three_d')).toBe(false);
+    expect(isModelMatchModality('fal-ai/hunyuan-3d/v3.1/pro', 'image')).toBe(false);
+    expect(isModelMatchModality('fal-ai/hunyuan-3d/v3.1/pro', 'video')).toBe(false);
+    expect(isModelMatchModality('tripo', 'image')).toBe(false);
+    expect(isModelMatchModality('flux', 'image')).toBe(true);
   });
 
   it('correctly matches mainstream image models including SD-3.5 and Wanx', () => {
@@ -335,21 +332,20 @@ describe('modalityMeta vendor inference', () => {
 
     expect(isModelMatchModality('ray-2', 'video')).toBe(true);
     expect(isModelMatchModality('aleph', 'video')).toBe(true);
-    expect(isModelMatchModality('omnihuman-1.5', 'avatar')).toBe(true);
     expect(isModelMatchModality('omnihuman-1.5', 'video')).toBe(false);
-    expect(isModelMatchModality('sync-lipsync-2', 'avatar')).toBe(true);
     expect(isModelMatchModality('sync-lipsync-2', 'video')).toBe(false);
-    expect(isModelMatchModality('kling-lip-sync', 'avatar')).toBe(true);
+    expect(isModelMatchModality('kling-lip-sync', 'video')).toBe(false);
     expect(isModelMatchModality('kling-v2-master', 'video')).toBe(true);
     expect(isModelMatchModality('heygen-avatar', 'video')).toBe(true);
-    expect(isModelMatchModality('latentsync', 'avatar')).toBe(true);
+    expect(isModelMatchModality('latentsync', 'video')).toBe(false);
+    expect(classifyModel('latentsync')).toBe('avatar');
     expect(isModelMatchModality('wan2.2-animate-move', 'video')).toBe(true);
     expect(isModelMatchModality('vace-14b', 'video')).toBe(true);
 
     expect(isModelMatchModality('eleven_v3', 'voice')).toBe(true);
     expect(isModelMatchModality('eleven_multilingual_v2', 'voice')).toBe(true);
     expect(isModelMatchModality('fish-audio-s1', 'voice')).toBe(true);
-    expect(isModelMatchModality('eleven_v3', 'music')).toBe(false);
+    expect(isModelMatchModality('eleven_v3', 'video')).toBe(false);
     expect(isModelMatchModality('speech-02-hd', 'voice')).toBe(true);
 
     expect(isModelMatchModality('fal-ai/flux-pro/kontext', 'image')).toBe(true);
@@ -375,6 +371,136 @@ describe('modalityMeta vendor inference', () => {
     expect(inferVendorFromModelId('fal-ai/hunyuan-video', 'video')).toBe('hunyuan');
     expect(inferVendorFromModelId('wan2.1-t2v-14b', 'video')).toBe('qwen');
     expect(inferVendorFromModelId('speech-01-hd', 'voice')).toBe('minimax');
-    expect(inferVendorFromModelId('stable-audio', 'music')).toBe('stability');
+    expect(isModelMatchModality('stable-audio', 'voice')).toBe(false);
+  });
+});
+
+describe('multimodal sync catalog', () => {
+  it.each([
+    ['gemini-3.8-flash', 'gemini-3.7-flash'],
+    ['gemini-3.8-flash', 'gemini-3.7-flash-thinking-low'],
+    ['gemini-3.8-flash', 'gemini-3.7-flash-thinking-medium'],
+    ['gemini-3.8-flash', 'gemini-3.7-flash-thinking-high'],
+    ['gemini-3.8-flash', 'gemini-3.8-flash-thinking-low'],
+    ['gemini-3.8-flash', 'gemini-3.8-flash-thinking-medium'],
+    ['gemini-3.8-flash', 'gemini-3.8-flash-thinking-high'],
+    ['gemini-4-pro', 'gemini-2.5-pro'],
+    ['gemini-4-argon', 'gemini-4-argon-thinking-low'],
+    ['gemini-4-argon', 'net-gemini-4-argon-thinking-medium'],
+    ['gemini-4-argon', 'google/gemini-4-argon-thinking-high'],
+    ['gpt-5.6', 'gpt-5.5'],
+    ['net-gpt-6.1-sol', 'o4-mini'],
+    ['anthropic/claude-opus-4-8-20261001', 'claude-opus-4-7'],
+    ['claude-opus-5-5', 'claude-opus-5-5-thinking'],
+    ['claude-sonnet-5-5', 'net-claude-sonnet-5-5-thinking'],
+    ['claude-haiku-5-5', 'anthropic/claude-haiku-5-5-thinking'],
+    ['claude-opus-4-8', 'claude-opus-4-8-20261001-thinking'],
+    ['grok-4.6', 'grok-4.20'],
+    ['deepseek-v4.1-flash', 'deepseek-v4-flash'],
+    ['kimi-k3', 'kimi-k2.5'],
+    ['qwen3.8-max', 'qwen-turbo-0919'],
+    ['doubao-seed-2-0-pro-261001', 'doubao-seed-1-8'],
+    ['MiniMax-M2.7-highspeed', 'MiniMax-M2.5'],
+    ['glm-5.2', 'glm-5.1'],
+    ['mimo-v2.6', 'mistral-medium'],
+    ['hunyuan-t1', 'mixtral-8x7b'],
+    ['llama-3.2-vision', 'qwq-32b'],
+    ['gpt-6-sol', 'gemini-3.8-image-preview'],
+  ])('includes %s and excludes %s', (included, excluded) => {
+    expect(isModalitySyncCandidate(included, 'chat')).toBe(true);
+    expect(isModalitySyncCandidate(excluded, 'chat')).toBe(false);
+
+  });
+});
+
+describe('image sync catalog', () => {
+  it.each([
+    ['gemini-3.1-flash-image', 'gemini-3.1-pro-image'],
+    ['gemini-3.1-flash-image', 'gemini-3.1-flash-image-preview'],
+    ['nano-banana-2', 'nano-banana-pro'],
+    ['nano-banana-2', 'nano-banana-2-2k'],
+    ['nano-banana-2', 'nano-banana-2-4k'],
+    ['gemini-nano-banana-2.1', 'gemini-nano-banana-2.5'],
+    ['nano-banana-2.1', 'google/nano-banana-2.1-2k'],
+    ['nano-banana-2.1', 'nano-banana-2.1-4k'],
+    ['gpt-image-2', 'gpt-image-1.5'],
+    ['gpt-image-2.5-sunburst', 'gpt-image-2.50'],
+    ['gpt-image-2.6', 'gpt-image-2.7'],
+    ['grok-4.2-image', 'grok-4.2'],
+    ['doubao-seedream-4-5-251128', 'doubao-seedream-4-0-250828'],
+    ['doubao-seedream-5-0-260128', 'seedream-5.1'],
+    ['seedream-v5-pro', 'seedream-v5-pro-layer-decomposition'],
+    ['seedream-5-flash', 'seedream-5-lite'],
+    ['kling-image-v3-omni', 'kling-video-v3-omni'],
+    ['kling-image-v3', 'kling-image-v2'],
+  ])('includes %s and excludes %s', (included, excluded) => {
+    expect(isModalitySyncCandidate(included, 'image')).toBe(true);
+    expect(isModalitySyncCandidate(excluded, 'image')).toBe(false);
+  });
+});
+
+describe('video sync catalog', () => {
+  it.each([
+    ['veo-3.1-generate-001', 'veo3.1'],
+    ['veo-3.1-fast-generate-001', 'veo3.1-fast'],
+    ['doubao-seedance-2-5-260628', 'doubao-seedance-2.5'],
+  ])('recognizes %s as a channel alias of %s', (alias, standard) => {
+    expect(isModalitySyncCandidate(alias, 'video')).toBe(true);
+    expect(videoSyncCandidateKey(alias)).toBe(videoSyncCandidateKey(standard));
+  });
+
+  it.each([
+    ['wan3.0-video', 'wan3.0-video-prime'],
+    ['veo3.1', 'veo3.1-fast', 'veo3.1-pro'],
+    ['doubao-seedance-2-0-260128', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-2.0-mini'],
+    ['kling-video-v3', 'kling-video-v3-omni'],
+    ['sora-2', 'sora-2-pro'],
+    ['viduq3', 'viduq3-mix', 'viduq3-pro', 'viduq3-turbo', 'viduq4-preview'],
+  ].map((ids) => [ids]))('keeps distinct video specs %j', (ids) => {
+    expect(ids.every((id) => isModalitySyncCandidate(id, 'video'))).toBe(true);
+    expect(new Set(ids.map(videoSyncCandidateKey)).size).toBe(ids.length);
+  });
+
+  it('deduplicates gateway aliases while keeping different specs separate', () => {
+    expect(videoSyncCandidateKey('google/gemini-omni-1.1-flash')).toBe(videoSyncCandidateKey('omni_flash-10s'));
+    expect(videoSyncCandidateKey('net-vidu-q4-preview')).toBe(videoSyncCandidateKey('viduq4-preview'));
+    expect(videoSyncCandidateKey('kling-video-v3')).not.toBe(videoSyncCandidateKey('kling-video-v3-omni'));
+  });
+
+  it.each([
+    ['kling-video-v3-omni', 'kling-video-v2-6'],
+    ['doubao-seedance-2-0-260128', 'doubao-seedance-1.5'],
+    ['veo3.1-fast', 'veo-2'],
+    ['veo3.1-pro', 'veo3.1-pro-4k'],
+    ['veo3.1-pro', 'veo3.1-components'],
+    ['wan3.0-video-prime', 'wan2.7-video'],
+    ['viduq3-pro', 'viduq2'],
+    ['google/gemini-omni-1.1-flash', 'gemini-3.8-flash'],
+    ['net-vidu-q4-preview', 'flux-pro'],
+  ])('includes %s and excludes %s', (included, excluded) => {
+    expect(isModalitySyncCandidate(included, 'video')).toBe(true);
+    expect(isModalitySyncCandidate(excluded, 'video')).toBe(false);
+  });
+});
+
+describe('voice sync catalog', () => {
+  it.each([
+    ['speech-2.8-hd', 'speech-2.6-hd'],
+    ['minimax-speech-2.8-turbo', 'speech-02-hd'],
+    ['cosyvoice-v3', 'cosyvoice-v2'],
+    ['eleven_v3', 'eleven_multilingual_v2'],
+    ['eleven_flash_v2_5', 'eleven_flash_v2'],
+    ['gpt-4o-mini-tts', 'tts-1-hd'],
+    ['doubao-tts', 'whisper-1'],
+    ['grok-voice', 'grok-imagine-video-1.5'],
+  ])('includes %s and excludes %s', (included, excluded) => {
+    expect(isModalitySyncCandidate(included, 'voice')).toBe(true);
+    expect(isModalitySyncCandidate(excluded, 'voice')).toBe(false);
+  });
+
+  it('deduplicates aliases without merging separate voice tiers', () => {
+    expect(modalitySyncCandidateKey('minimax/speech-2.8-hd', 'voice')).toBe(modalitySyncCandidateKey('minimax-speech-2-8-hd', 'voice'));
+    expect(modalitySyncCandidateKey('elevenlabs-v3', 'voice')).toBe(modalitySyncCandidateKey('eleven_v3', 'voice'));
+    expect(modalitySyncCandidateKey('speech-2.8-hd', 'voice')).not.toBe(modalitySyncCandidateKey('speech-2.8-turbo', 'voice'));
   });
 });

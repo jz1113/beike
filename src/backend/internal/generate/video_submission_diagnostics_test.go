@@ -1,6 +1,8 @@
 package generate
 
 import (
+	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/httpx"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -12,9 +14,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-
-	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/httpx"
 )
 
 func TestVideoSubmissionDiagnosticsPersistActualEndpointAndAudioWithoutSecrets(t *testing.T) {
@@ -78,7 +77,7 @@ func TestVideoSubmissionDiagnosticsPersistActualEndpointAndAudioWithoutSecrets(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	updateTaskTerminal(context.Background(), db, taskScope{"local", "video"}, "diagnostic-video", "SUCCESS", "https://cdn.example/result.mp4", "", "")
+	updateTaskTerminal(context.Background(), db, taskScope{workspace: "local", media: "video"}, "diagnostic-video", "SUCCESS", "https://cdn.example/result.mp4", "", "")
 	_ = db.Close()
 	// A fresh handler and terminal polling keep the same transport evidence.
 	queried := videoSubmissionTestGet(Video(cfg), "diagnostic-input", "local")
@@ -215,5 +214,33 @@ func TestVideoSubmissionDiagnosticAtomicWritesAndWorkspacePaths(t *testing.T) {
 	files, err := os.ReadDir(filepath.Join(cfg.DataDir(), "submission-receipts", "video"))
 	if err != nil || len(files) != 1 || !strings.HasSuffix(files[0].Name(), ".json") {
 		t.Fatalf("temporary diagnostics remain: files=%v err=%v", files, err)
+	}
+}
+
+func TestVideoSubmitDiagnosticsHideSecretsAndURLs(t *testing.T) {
+	reason := safeVideoSubmitReason("rejected key-value https://host/secret?token=private", "key-value", 503, 1)
+	for _, hidden := range []string{"key-value", "https://host", "private"} {
+		if strings.Contains(reason, hidden) {
+			t.Fatal(reason)
+		}
+	}
+	if !strings.Contains(reason, "HTTP 503") || !strings.Contains(reason, "尝试 1") {
+		t.Fatal(reason)
+	}
+}
+
+func TestVideoSubmitDiagnosisSurvivesOriginalReceiptLookup(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+		_, _ = w.Write([]byte(`{"message":"adapter unavailable"}`))
+	}))
+	defer server.Close()
+	cfg := videoSubmissionTestConfig(t, server)
+	submitted := videoSubmissionTestPost(Video(cfg), server.URL, "diagnostic-key", "商品展示", "local")
+	queried := videoSubmissionTestGet(Video(cfg), "diagnostic-key", "local")
+	for _, response := range []*httptest.ResponseRecorder{submitted, queried} {
+		if !strings.Contains(response.Body.String(), "adapter unavailable") || !strings.Contains(response.Body.String(), "HTTP 503") {
+			t.Fatal(response.Body.String())
+		}
 	}
 }

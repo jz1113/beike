@@ -15,3 +15,12 @@ const controls: Record<string, string> = {
 };
 export const studioPreferencePrefix = 'beike.studio.preferences.';
 export const studioPreferenceKeys = Object.fromEntries(Object.entries(controls).map(([id, suffix]) => [id, 'qiaodoumayi_' + suffix]));
+// These renderer preferences are workspace-wide; per-project values remain a read fallback.
+export const studioSharedPreferenceKeys = [
+  ...Object.values(studioPreferenceKeys),
+  'qiaodoumayi_studio_sidebar_theme',
+  'qiaodoumayi_left_toolbar_dock',
+  'qiaodoumayi_left_toolbar_collapsed',
+  'qiaodoumayi_left_toolbar_sidebar_pins',
+  'qiaodoumayi_left_toolbar_overflow_order',
+];

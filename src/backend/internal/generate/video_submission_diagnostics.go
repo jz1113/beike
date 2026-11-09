@@ -24,6 +24,8 @@ import (
 type videoSubmissionDiagnostics struct {
 	Version             int                             `json:"version"`
 	Model               string                          `json:"model"`
+	RefMode             string                          `json:"refMode,omitempty"`
+	ExtensionStrategy   string                          `json:"extensionStrategy,omitempty"`
 	Family              string                          `json:"family"`
 	GenerateAudio       *bool                           `json:"generateAudio,omitempty"`
 	ContextIREnabled    *bool                           `json:"contextIrEnabled,omitempty"`
@@ -73,7 +75,13 @@ func prepareVideoSubmissionDiagnostics(cfg config.Config, r *http.Request, recor
 	diagnostic := &videoSubmissionDiagnostics{
 		Version: 1, Model: adapted.modelID, Family: adapted.family,
 		AudioReferences: []videoAudioReferenceDiagnostic{}, SubmissionOutcome: "prepared",
-		PreparedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		PreparedAt: time.Now().UTC().Format(time.RFC3339Nano), RefMode: rawString(payload, "ref_mode"),
+	}
+	if adapted.family == "veo" && diagnostic.RefMode == "extend" {
+		diagnostic.ExtensionStrategy = "frame-continuation"
+		if adapted.payload["instances"] != nil {
+			diagnostic.ExtensionStrategy = "native"
+		}
 	}
 	if enabled, ok := adapted.payload["context_ir_enabled"].(bool); ok {
 		diagnostic.ContextIREnabled = &enabled

@@ -1,3 +1,37 @@
+import { domainStorage } from '@shared/domain/core/runtime';
+
+export const PENDING_SETTINGS_SECTION_KEY = 'beike.settings.pendingSection';
+
+let memoryPendingSection: string | null = null;
+
+function queueStorageSection(section: string): void {
+  memoryPendingSection = section;
+  try {
+    domainStorage()?.setItem(PENDING_SETTINGS_SECTION_KEY, section);
+  } catch {
+    /* 打开设置时仍回落到默认分区 */
+  }
+}
+
+function peekStorageSection(): string | null {
+  try {
+    const stored = domainStorage()?.getItem(PENDING_SETTINGS_SECTION_KEY);
+    if (stored) return stored;
+  } catch {
+    return memoryPendingSection;
+  }
+  return memoryPendingSection;
+}
+
+export function clearQueuedSettingsSection(): void {
+  memoryPendingSection = null;
+  try {
+    domainStorage()?.removeItem(PENDING_SETTINGS_SECTION_KEY);
+  } catch {
+    /* 分区提示只影响下一次打开 */
+  }
+}
+
 export type SettingsNavSection =
   | 'library'
   | 'appearance'
@@ -6,10 +40,7 @@ export type SettingsNavSection =
   | 'chat'
   | 'image'
   | 'video'
-  | 'three_d'
-  | 'music'
   | 'voice'
-  | 'avatar'
   | 'canvas'
   | 'pet'
   | 'language'
@@ -40,13 +71,10 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'profile', label: '创作档案', keywords: ['用量', '额度', '余额', '统计', '消耗', 'token', '足迹'] },
   { id: 'library', label: '资产库', keywords: ['素材', '共享', '工作区', '入口', '侧栏'] },
   { id: 'appearance', label: '外观与主题', keywords: ['外观', '深色', '浅色', '主题', '暗黑', '模式', '背景', '夜间', '白天'] },
-  { id: 'api', label: 'API 接入', keywords: ['api', 'comfly', 'openai', 'deepseek', '联池', '网关', 'key', '渠道', '万邦'] },
+  { id: 'api', label: 'API 接入', keywords: ['api', 'comfly', 'openai', 'deepseek', '网关', 'key', '渠道', '万邦'] },
   { id: 'chat', label: '多模态', keywords: ['多模态', '对话', '视觉', '默认', '助手'] },
   { id: 'image', label: '绘画', keywords: ['绘画', '生图', '默认'] },
   { id: 'video', label: '视频', keywords: ['视频', '默认'] },
-  { id: 'three_d', label: '3D', keywords: ['3d', '混元'] },
-  { id: 'music', label: '音乐', keywords: ['音乐', 'suno'] },
-  { id: 'avatar', label: '数字人（重建中）', keywords: ['数字人', '对口型', '口型', '驱动', '重建'] },
   { id: 'voice', label: '语音', keywords: ['语音', '配音'] },
   { id: 'canvas', label: '画布功能', keywords: ['画布', '连线', '节点', '桌宠'] },
   { id: 'language', label: '语言', keywords: ['语言', '中文'] },
@@ -58,15 +86,7 @@ export function settingsSectionLabel(section: SettingsNavSection, canvasPage: Ca
   return SETTINGS_NAV_ITEMS.find(item => item.id === section)?.label || '设置';
 }
 
-import {
-  queueSettingsSection as queueStorageSection,
-  peekQueuedSettingsSection as peekStorageSection,
-  clearQueuedSettingsSection,
-} from '@shared/domain/settings/settingsNavigationStorage';
-
-export { clearQueuedSettingsSection };
-
-export function queueSettingsSection(section: SettingsNavSection) {
+export function queueSettingsSection(section: SettingsNavSection | 'canvas:pet' | string) {
   queueStorageSection(section);
 }
 

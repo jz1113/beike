@@ -1,46 +1,25 @@
-import { classifyPersonaGroup, personaCategory, PERSONA_CATEGORIES, type PersonaCategory } from './salesPersonaClassification';
-import { PERSONA_ANGLES } from './salesAssetViews';
+import { classifyPersonaGroup, extractActionAngleEntries, personaCategory, PERSONA_CATEGORIES, type ActionAngleEntry, type PersonaCategory } from './salesActionViews';
+import { compareSalesAssetNames, PERSONA_ANGLES } from './salesAssetDraft';
 import { audienceDimensions } from '@shared/domain/assets/appearanceAudience';
 import type { SalesActionCandidate, SalesMaterialCatalog, SalesSceneCandidate, SalesVoiceCandidate } from '@shared/domain/sales';
-import { ACTION_MEDIA_LABELS, actionMedia, type ActionMediaType, type DepthActionKind } from './salesActionMedia';
-import { extractActionAngleEntries, type ActionAngleEntry } from './salesActionViews';
-import { compareSalesAssetNames } from './salesAssetNames';
+
+const ACTION_MEDIA_LABELS = { image: '图片', video: '视频', 'depth-image': '深度图片', 'depth-video': '深度视频' } as const;
+type ActionMediaType = keyof typeof ACTION_MEDIA_LABELS;
+type DepthActionKind = 'depth-image' | 'depth-video';
+
+const isActionVideo = (type: ActionMediaType) => type === 'video' || type === 'depth-video';
+export function actionMedia(asset: SalesActionCandidate) {
+  const type = asset.mediaType || 'image';
+  return { type, url: asset.mediaUrl || asset.coverUrl, video: isActionVideo(type) };
+}
 
 export type SalesMaterialKind = 'persona' | 'scene' | 'action' | 'sound';
 export type SalesSceneSpace = 'indoor' | 'outdoor';
-export type ActionCategoryFilter = 'all' | 'unclassified' | `category:${string}`;
-
-export const SCENE_SPACE_TABS: readonly { id: SalesSceneSpace; label: string }[] = [
-  { id: 'outdoor', label: '户外' },
-  { id: 'indoor', label: '室内' },
-];
-
-export const ACTION_DEPTH_TABS: readonly { id: 'all' | DepthActionKind; label: string }[] = [
-  { id: 'all', label: '全部' },
-  { id: 'depth-video', label: '视频' },
-  { id: 'depth-image', label: '图片' },
-];
-
-export const SOUND_KIND_TABS: readonly { id: 'voice' | 'bgm'; label: string }[] = [
-  { id: 'voice', label: '人声' },
-  { id: 'bgm', label: 'BGM' },
-];
 
 export const SCENE_SPACE_LABELS: Record<SalesSceneSpace, string> = {
   outdoor: '户外',
   indoor: '室内',
 };
-
-export const ACTION_PRESET_TAGS = [
-  '全身展示',
-  '半身展示',
-  '转身展示',
-  '走秀台步',
-  '街拍随性',
-  '拎包走动',
-  '近景细节',
-  '插兜站姿',
-] as const;
 
 const SYSTEM_NOISE_ACTION_TAGS = new Set([
   'mocap',
@@ -91,7 +70,7 @@ export interface SalesMaterialCard {
 
 const splitTags = (tags: string): string[] => tags.split(/[,，、]/).map((s) => s.trim()).filter(Boolean);
 
-export function cleanActionTags(rawTags: string | readonly string[]): string[] {
+function cleanActionTags(rawTags: string | readonly string[]): string[] {
   const list = typeof rawTags === 'string' ? splitTags(rawTags) : rawTags.map((s) => s.trim()).filter(Boolean);
   const seen = new Set<string>();
   const result: string[] = [];
@@ -104,7 +83,7 @@ export function cleanActionTags(rawTags: string | readonly string[]): string[] {
   return result;
 }
 
-export function isMachineGeneratedActionTitle(title: string): boolean {
+function isMachineGeneratedActionTitle(title: string): boolean {
   const trimmed = title.trim().replace(/\s*·\s*深度(?:视频|图片)?$/, '').trim();
   if (!trimmed) return true;
   if (/^[0-9a-f]{16,}(?:[_-]\d+)?$/i.test(trimmed)) return true;
@@ -113,51 +92,12 @@ export function isMachineGeneratedActionTitle(title: string): boolean {
   return false;
 }
 
-export function nextSequentialActionName(actions: readonly Pick<SalesActionCandidate, 'title'>[]): string {
-  const used = new Set<number>();
-  let maxNumeric = 0;
-  for (const item of actions) {
-    const trimmed = (item.title || '').trim();
-    if (/^\d+$/.test(trimmed)) {
-      const n = Number(trimmed);
-      if (Number.isInteger(n) && n > 0) {
-        used.add(n);
-        if (n > maxNumeric) maxNumeric = n;
-      }
-    }
-  }
-  const candidate = Math.max(actions.length + 1, maxNumeric + 1);
-  if (!used.has(candidate)) return String(candidate);
-  let seq = 1;
-  while (used.has(seq)) seq += 1;
-  return String(seq);
-}
-
-export function toggleTagInList(rawTags: string, tag: string): string {
-  const current = cleanActionTags(rawTags);
-  const next = current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag];
-  return next.join('，');
-}
-
-export function resolveActionCategoryIds(action: Pick<SalesActionCandidate, 'categoryId' | 'productCategoryIds'>): string[] {
+function resolveActionCategoryIds(action: Pick<SalesActionCandidate, 'categoryId' | 'productCategoryIds'>): string[] {
   const raw = Array.isArray(action.productCategoryIds) ? action.productCategoryIds : [];
   const list = raw.map((s) => s.trim()).filter(Boolean);
   if (list.length > 0) return list;
   const single = action.categoryId?.trim();
   return single ? [single] : [];
-}
-
-export function matchesActionCategoryFilter(
-  card: Pick<SalesMaterialCard, 'categoryId' | 'productCategoryIds'>,
-  filter: ActionCategoryFilter,
-  validCategoryIds: ReadonlySet<string>,
-): boolean {
-  if (filter === 'all') return true;
-  const assigned = (card.productCategoryIds || (card.categoryId ? [card.categoryId] : []))
-    .filter((id) => validCategoryIds.has(id));
-  if (filter === 'unclassified') return assigned.length === 0;
-  const targetId = filter.slice('category:'.length);
-  return assigned.includes(targetId);
 }
 
 const LEGACY_PERSONA_GROUP_TAGS = new Set(['男', '女', '老', '老年', '儿童', '成年女', '成年男']);
@@ -220,6 +160,9 @@ export function salesMaterialCards(catalog: SalesMaterialCatalog): SalesMaterial
     }).sort((a, b) => compareSalesAssetNames(a.title, b.title)),
     ...catalog.scenes.map((s): SalesMaterialCard => {
       const sceneSpace = classifySceneSpace(s);
+      const rawSceneViews = audienceDimensions(audienceDimensions(s.dimensions).sceneViews);
+      const sheetImage = typeof rawSceneViews.sheet === 'string' ? rawSceneViews.sheet.trim() : '';
+      const cover = sheetImage || s.coverUrl;
       return {
         key: `scene:${s.id}`,
         id: s.id,
@@ -228,9 +171,9 @@ export function salesMaterialCards(catalog: SalesMaterialCatalog): SalesMaterial
         title: s.title,
         description: s.description,
         tags: [s.lighting, ...splitTags(s.tags)].filter(Boolean),
-        image: s.coverUrl,
+        image: cover,
         audio: '',
-        badge: s.coverUrl ? '实景参考' : '文字场景',
+        badge: sheetImage ? '九宫格场景' : cover ? '实景参考' : '文字场景',
         subBadge: SCENE_SPACE_LABELS[sceneSpace],
         sourceImages: s.sourceImages,
         editable: true,

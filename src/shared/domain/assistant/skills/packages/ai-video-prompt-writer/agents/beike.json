@@ -1,0 +1,49 @@
+{
+  "id": "ai-video-prompt-writer",
+  "name": "ai-video-prompt-writer",
+  "displayName": "视频提示词写作 · 社区通用",
+  "description": "Turn a rough idea into a production-ready prompt for an AI video model (text-to-video or image-to-video). Use when the user wants to write, improve or adapt a video prompt, pick a video model, choose an aspect ratio or duration, plan the shots of a short video, or asks why a generated clip did not match what they wanted.",
+  "displayDescription": "把简短创意整理为主体、动作、场景、镜头、光线、风格和声音描述；附 Sora、可灵与 Vidu 的家族指南。",
+  "usageGuide": "### 适合什么任务\n把简短创意整理为主体、动作、场景、镜头、光线、风格和声音描述；附 Sora、可灵与 Vidu 的家族指南。\n\n### 会怎样优化\n节点按当前模型只读取对应的 Sora、可灵或 Vidu 指南。Sora 2 使用 Sora 专属资料；可灵 2.5 与 Vidu Q4 使用家族通用写法，不宣称是该版本的官方专用技能。\n\n### 在画布中\n选择对应视频模型并开启“生成前优化提示词”。优化稿会先展示，可修改后再确认生成；取消不提交。实际模式、素材数量、时长和分辨率以当前节点渠道为准。",
+  "category": "社区视频提示词",
+  "author": "muraterdogan0",
+  "version": "22f14022ec1303ad7e48e2ba61c06a92173472cb",
+  "icon": "video",
+  "colorTheme": "amber",
+  "isBuiltin": true,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "tools": [],
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": [
+      "GitHub 社区原版"
+    ]
+  },
+  "source": {
+    "kind": "community",
+    "url": "https://github.com/muraterdogan0/ai-video-prompts/tree/22f14022ec1303ad7e48e2ba61c06a92173472cb/skills/ai-video-prompt-writer",
+    "revision": "22f14022ec1303ad7e48e2ba61c06a92173472cb",
+    "license": "MIT",
+    "files": {
+      "reference.md": "182528c5d92e1f8c9b9db7b1b124d5669a61131efa8db630c8360faa554eec3c",
+      "LICENSE": "305f8ec2731a8b6a4e4dfeb583fa04a5140475554be148a48c73cb5dac70db9a",
+      "SKILL.md": "2e36adb2a68c8ea7d034d0b001e3824314a403d4aea33bc3ab0f8764deb47812",
+      "models/wan.md": "db6a3a9c81133b672a4348eab89f1e93ff979a7455192dc3b2a2a397b7755990",
+      "models/hunyuan-video.md": "ef021dc56499fe743f32d633b4da8bf570415d7bf70501be238c90488ab8a7bf",
+      "models/seedance.md": "657c350501f63745553568bee7e51b6a8b06997f1e9e918d7218cdd3e11117c3",
+      "models/luma-ray.md": "b37cc9969c12ea149a7928062755ce3f3117b08f11032d112ecee807525f1fd9",
+      "models/veo.md": "59093ea324f59fbe4197ee7bed2d021c3af538e73bd002027edb2020419dfb88",
+      "models/pixverse.md": "edf2e1a7a8961c15316813523dc43d81a877c37f00c2532305fb1f4cc50594fc",
+      "models/grok-video.md": "c1cd4537a26dbecfdb322162036dd4e3dc8f0ed1b4781db2702f9fc36c3d7438",
+      "models/README.md": "56c1a1ed2deff64b23113e83360bd55ea2a7b60a1ded1527dad985ac36b5eebb",
+      "models/marey.md": "5d32a153bb0ff4b35daa1e2c14dde92a5fabe4756b5fac7ec3406d2d42c0ff3d",
+      "models/sora-2.md": "4357ca74cc6444620dbbbb6073e089276ccbbbd12598cd7cbfaf42deffc69360",
+      "models/kling.md": "c5b1fceccdf12d94770c3a430b7abe910d69093540fe7387a7a073122dfe4240",
+      "models/hailuo.md": "a021f0f0a88fd39c9144e178375841088793730e21fbf23f4c9e86558b5b46ad",
+      "models/vidu.md": "0183afb0295a1411c0c56b1f78c21e1718959229801cd2c4e52cbc7b8b5007ee",
+      "models/ltx-video.md": "2a4ac63fc47bb2896c5ff05a68edfbaae877dcad64bbc382cf989bb25436f57a"
+    }
+  }
+}

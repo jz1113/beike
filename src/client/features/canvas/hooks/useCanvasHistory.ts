@@ -5,6 +5,8 @@ import type { CanvasNode, CanvasEdge } from '../model/types';
 export interface CanvasHistorySnapshot {
   nodes: CanvasNode[];
   edges?: CanvasEdge[];
+  editedNodes: CanvasNode[];
+  editedEdges?: CanvasEdge[];
   description?: string;
   at: number;
 }
@@ -12,8 +14,8 @@ export interface CanvasHistorySnapshot {
 // Editable properties of a canvas node that represent user layout/design changes
 const editable: (keyof CanvasNode)[] = [
   'x', 'y', 'width', 'height', 'title', 'content', 'drawing',
-  'referenceNodeIds', 'layerHidden', 'layerLocked', 'layerOpacity',
-  'layerOrder', 'layerGroupId', 'groupId',
+  'referenceNodeIds', 'layerHidden', 'layerLocked',
+  'groupId',
   'compareMode', 'compareSplit', 'compareBeforeUrl', 'compareAfterUrl',
   'previewFit', 'savePrefix', 'saveFormat', 'audioUrl',
 ];
@@ -43,9 +45,10 @@ export function useCanvasHistory(projectId: string) {
       if (before.length !== after.length) {
         hasSignificantChange = true;
       } else {
-        for (let i = 0; i < before.length; i++) {
-          const a = before[i];
-          const b = after.find(n => n.id === a.id);
+        const byId = new Map(after.map(node => [node.id, node]));
+        for (const a of before) {
+          const b = byId.get(a.id);
+          if (a === b) continue;
           if (!b) { hasSignificantChange = true; break; }
           const hasDiff = editable.some(key => JSON.stringify(a[key]) !== JSON.stringify(b[key]));
           if (hasDiff && a.status === b.status && a.taskId === b.taskId) {
@@ -61,16 +64,20 @@ export function useCanvasHistory(projectId: string) {
       const last = past.current.at(-1);
 
       // Debounce continuous typing within 600ms
-      const isQuickSuccession = last && (now - last.at < 600) && before.length === last.nodes.length;
+      const isQuickSuccession = last && (now - last.at < 600) && before === last.editedNodes && before.length === last.nodes.length;
       if (isQuickSuccession) {
         // Keep the earlier "before" snapshot as base point
         last.at = now;
+        last.editedNodes = after;
+        last.editedEdges = currProject.edges;
       } else {
         past.current = [
           ...past.current.slice(-49),
           {
-            nodes: JSON.parse(JSON.stringify(before)),
-            edges: prevProject.edges ? JSON.parse(JSON.stringify(prevProject.edges)) : undefined,
+            nodes: before,
+            editedNodes: after,
+            editedEdges: currProject.edges,
+            edges: prevProject.edges,
             at: now,
           },
         ];
@@ -92,31 +99,34 @@ export function useCanvasHistory(projectId: string) {
       const currentProject = useCanvasStore.getState().projects.find(p => p.id === projectId);
       if (!currentProject) return;
 
-      // Save current state into target stack before restoring
       to.current.push({
-        nodes: JSON.parse(JSON.stringify(currentProject.nodes)),
-        edges: currentProject.edges ? JSON.parse(JSON.stringify(currentProject.edges)) : undefined,
+        nodes: targetSnapshot.editedNodes,
+        edges: targetSnapshot.editedEdges,
+        editedNodes: targetSnapshot.nodes,
+        editedEdges: targetSnapshot.edges,
         at: Date.now(),
       });
 
-      // Restore nodes and edges while ensuring no dangling referenceNodeIds
-      const validNodeIds = new Set(targetSnapshot.nodes.map(n => n.id));
-      const sanitizedNodes = targetSnapshot.nodes.map(node => ({
-        ...node,
-        referenceNodeIds: (node.referenceNodeIds || []).filter(id => validNodeIds.has(id)),
-      }));
-
-      useCanvasStore.setState(state => ({
-        projects: state.projects.map(project => {
-          if (project.id !== projectId) return project;
-          return {
-            ...project,
-            nodes: sanitizedNodes,
-            edges: targetSnapshot.edges,
-            updatedAt: Date.now(),
-          };
-        }),
-      }));
+      const currentNodes = new Map(currentProject.nodes.map(node => [node.id, node]));
+      const editedNodes = new Map(targetSnapshot.editedNodes.map(node => [node.id, node]));
+      const validNodeIds = new Set(targetSnapshot.nodes.map(node => node.id));
+      const restoredNodes = targetSnapshot.nodes.map(node => {
+        const current = currentNodes.get(node.id);
+        const edited = editedNodes.get(node.id);
+        const restored = current && edited ? { ...current } : { ...node };
+        if (current && edited) {
+          for (const key of editable) {
+            if (JSON.stringify(node[key]) !== JSON.stringify(edited[key]) &&
+                JSON.stringify(current[key]) === JSON.stringify(edited[key])) {
+              Object.assign(restored, { [key]: node[key] });
+            }
+          }
+        }
+        restored.referenceNodeIds = (restored.referenceNodeIds || []).filter(id => validNodeIds.has(id));
+        return restored;
+      });
+      const edges = targetSnapshot.edges === targetSnapshot.editedEdges ? currentProject.edges : targetSnapshot.edges;
+      useCanvasStore.getState().replaceGraph(projectId, restoredNodes, edges);
     } finally {
       applying.current = false;
       refresh(n => n + 1);

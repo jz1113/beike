@@ -32,7 +32,7 @@ func TestOmniFlashSalesSubmission(t *testing.T) {
 				http.Error(w, "expected file upload", 400)
 				return
 			}
-			if len(r.MultipartForm.Value) != 3 || r.FormValue("model") != "omni_flash-10s" || r.FormValue("prompt") != "按分镜" || r.FormValue("size") != "720x1280" {
+			if len(r.MultipartForm.Value) != 3 || r.FormValue("model") != "omni_flash-10s" || !strings.Contains(r.FormValue("prompt"), "<VIDEO_REF_0>@Video1") || !strings.HasSuffix(r.FormValue("prompt"), "按分镜") || r.FormValue("size") != "720x1280" {
 				t.Error("unexpected fields", r.MultipartForm.Value)
 			}
 			parts := r.MultipartForm.File["input_reference"]

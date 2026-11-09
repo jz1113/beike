@@ -1,9 +1,6 @@
 import type { BrandKitProfile } from '@shared/domain/products/brandKitModels';
 import type { AssistantSkill } from '@shared/domain/assistant/skills/types';
 import type { SkillLibrary } from '@shared/domain/skills/library';
-import type { ShotPrompt, PreviousGroupSignature } from '@shared/domain/prompts/vision';
-import type { OriginalLookParts, OriginalProductRole } from '@shared/domain/media/drawing';
-import type { ProductImage, ProductData } from '@client/types/product';
 import type { ProductWidgetData } from '@client/store/appStoreTypes';
 import type {
   AssistantMessage,
@@ -17,10 +14,26 @@ import type { DepthQuality, DepthVideoStyle, QuickGenMode } from '@shared/domain
 
 export type { AppView } from '@client/store/appView';
 
-export type {
-  ProductImage,
-  ProductData,
-} from '@client/types/product';
+export type ImageCategoryType = 'main' | 'sku' | 'detail';
+
+export interface ProductImage {
+  url: string;
+  type: ImageCategoryType;
+  selected: boolean;
+}
+
+export interface ProductData {
+  id?: string;
+  itemId?: string;
+  skuId?: string;
+  title: string;
+  platform?: string;
+  price?: string | number;
+  picUrl?: string;
+  detailUrls?: string;
+  props?: Record<string, string>;
+  createdAt?: string | Date;
+}
 
 export type {
   GenerationTask,
@@ -31,16 +44,12 @@ export type {
   AssistantSession,
 } from '@client/store/appStoreTypes';
 
-export type WorkshopTab = 'studio' | 'prompt_assets' | 'recipes';
-
 export interface ViewSlice {
   currentView: AppView;
   previousView: AppView | null;
-  activeWorkshopTab: WorkshopTab;
   setCurrentView: (view: AppView) => void;
   navigateToSettings: () => void;
   backFromSettings: () => void;
-  setActiveWorkshopTab: (tab: WorkshopTab | 'categories') => void;
 }
 
 export interface HomeSlice {
@@ -119,173 +128,15 @@ export interface GenerateSlice {
   syncDatabaseTasks: (tasks: GenerationTask[]) => void;
 }
 
-export type WorkshopMode = 'storyboard_generate';
-
-export interface WorkshopModeSession {
-  currentStep: number;
-  product: ProductWidgetData | ProductData | null;
-  images: ProductImage[];
-  apiUsed: string | null;
-  clonedSocialImages: { url: string; selected: boolean }[];
-  socialGalleryTab: 'social' | 'product';
-  generatedPrompts: ShotPrompt[];
-  shotCount: number;
-  productFingerprint: string;
-  productRole: OriginalProductRole | null;
-  masterScene: string;
-  lookBible: string;
-  identityBible: string;
-  styleBible: string;
-  lookParts: OriginalLookParts | null;
-  previousMasterScenes: string[];
-  previousGroupSignatures: PreviousGroupSignature[];
-  sceneAnchorEnabled: boolean;
-  socialPromptSourceKey: string;
-  modelPersona: string;
-  workshopTasks: GenerationTask[];
-  selectedAspectId: string;
-  selectedQuality: 'high' | 'medium' | 'low';
-  useReferenceImage: boolean;
-  isBatchGenerating: boolean;
-  copywritingTitle?: string;
-  copywritingContent?: string;
-  copywritingFull?: string;
-}
-
 export interface WorkshopSlice {
-  /** 兼容旧会话缓存的预留字段。 */
-  socialSessionCache: WorkshopModeSession;
-  /** 原创生成模式独立会话缓存 */
-  originalSessionCache: WorkshopModeSession;
-  currentStep: number;
-  /** 电商图文批次阶段，与 URL ?step= 同步。 */
-  batchStage: number;
   product: ProductWidgetData | ProductData | null;
   images: ProductImage[];
   apiUsed: string | null;
-  isLoading: boolean;
-  error: string | null;
   selectedVisionModel: string;
-  /** 原创批量「拍摄架构」选中项（全局偏好，与 Batch selectedArchId 同步） */
   selectedArchId: string;
-  shotCount: number;
-  isAnalyzing: boolean;
-  productFingerprint: string;
-  /** 原创：商品在画面中的角色 */
-  productRole: OriginalProductRole | null;
-  generatedPrompts: ShotPrompt[];
-  masterScene: string;
-  lookBible: string;
-  identityBible: string;
-  styleBible: string;
-  lookParts: OriginalLookParts | null;
-  previousMasterScenes: string[];
-  previousGroupSignatures: PreviousGroupSignature[];
-  sceneAnchorEnabled: boolean;
-  selectedImageGenModel: string;
-  selectedAspectId: string;
-  selectedQuality: 'high' | 'medium' | 'low';
-  useReferenceImage: boolean;
-  isBatchGenerating: boolean;
-  workshopTasks: GenerationTask[];
-  workshopMode: WorkshopMode;
-  socialGalleryTab: 'social' | 'product';
-  clonedSocialImages: { url: string; selected: boolean }[];
-  modelPersona: string;
-  /** 旧版会话正脸字段。 */
-  anchorFaceImageUrl?: string;
-  isAnchorFaceConfirmed: boolean;
-  /** 原创生成专属正脸（与爆款槽位隔离，避免遗留人脸泄漏） */
-  originalAnchorFaceImageUrl?: string;
-  originalIsAnchorFaceConfirmed: boolean;
-  socialPromptSourceKey: string;
-  /** 提示词库「载入分镜」→ 电商图文的一次性桥接载荷 */
-  pendingBatchPromptImport: {
-    productTitle?: string;
-    productFingerprint?: string;
-    prompts: ShotPrompt[];
-    /** 图组母本及同组参考图：载入后直接带入分镜联动生成。 */
-    referenceImages?: string[];
-    masterImageIndex?: number;
-  } | null;
-  /** 资产中心/配方库载入后跳转电商图文阶段（1–4），消费后清空 */
-  pendingBatchStage: number | null;
-  /** 首页入口的一次性意图，不持久化；刷新仍恢复活跃批次。 */
-  pendingFreshWorkshopEntry: boolean;
-  /** 资产中心「应用」一键桥接锁定到电商图文原子资产（置景/穿搭/人设），消费后清空 */
-  pendingBatchLockedAssets: {
-    sceneId?: string;
-    outfitId?: string;
-    personaId?: string;
-    actionId?: string;
-    fullPromptId?: string;
-  } | null;
-  getEffectiveAnchorFaceImageUrl: () => string | undefined;
-  getEffectiveIsAnchorFaceConfirmed: () => boolean;
-  setWorkshopMode: (mode: WorkshopMode) => void;
-  resetModeSession: (mode?: WorkshopMode) => void;
-  setSocialGalleryTab: (tab: 'social' | 'product') => void;
-  setTargetProductImage: (url: string) => void;
-  setClonedSocialImages: (images: string[]) => void;
-  toggleClonedSocialImage: (index: number) => void;
-  selectAllClonedImages: (select: boolean) => void;
-  setModelPersona: (persona: string) => void;
-  setAnchorFaceImageUrl: (url?: string) => void;
-  setIsAnchorFaceConfirmed: (confirmed: boolean) => void;
-  isSocialPromptSourceStale: () => boolean;
-  getSelectedSocialPromptKey: () => string;
-  setStep: (step: number) => void;
-  setBatchStage: (stage: number) => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
   setProductData: (product: ProductWidgetData | ProductData | null, images: { main: string[]; details: string[]; skus: string[] }, apiUsed?: string) => void;
-  toggleImageSelection: (index: number) => void;
-  selectAllImages: (type?: 'main' | 'detail' | 'sku') => void;
-  clearSelection: () => void;
-  deselectAllImages: () => void;
   setSelectedVisionModel: (model: string) => void;
   setSelectedArchId: (archId: string) => void;
-  setShotCount: (count: number) => void;
-  setIsAnalyzing: (isAnalyzing: boolean) => void;
-  setGeneratedPrompts: (
-    prompts: ShotPrompt[],
-    fingerprint?: string,
-    meta?: {
-      masterScene?: string;
-      lookBible?: string;
-      identityBible?: string;
-      styleBible?: string;
-      lookParts?: OriginalLookParts | null;
-      productRole?: OriginalProductRole | null;
-      actionDigest?: string;
-    }
-  ) => void;
-  setMasterScene: (scene: string) => void;
-  setLookBible: (look: string) => void;
-  setIdentityBible: (identity: string) => void;
-  setStyleBible: (style: string) => void;
-  setLookParts: (parts: OriginalLookParts | null) => void;
-  setProductRole: (role: OriginalProductRole | null) => void;
-  setSceneAnchorEnabled: (enabled: boolean) => void;
-  setPendingBatchPromptImport: (
-    payload: WorkshopSlice['pendingBatchPromptImport'],
-  ) => void;
-  setPendingBatchStage: (stage: number | null) => void;
-  setPendingBatchLockedAssets: (
-    payload: WorkshopSlice['pendingBatchLockedAssets']
-  ) => void;
-  updateShotPrompt: (index: number, newPrompt: Partial<ShotPrompt>) => void;
-  toggleShotSelection: (index: number) => void;
-  addShotPrompt: (prompt?: Partial<ShotPrompt>) => void;
-  deleteShotPrompt: (index: number) => void;
-  setSelectedImageGenModel: (model: string) => void;
-  setSelectedAspectId: (aspectId: string) => void;
-  setSelectedQuality: (quality: 'high' | 'medium' | 'low') => void;
-  setUseReferenceImage: (useRef: boolean) => void;
-  setIsBatchGenerating: (isGenerating: boolean) => void;
-  initWorkshopTasks: (forceReset?: boolean) => void;
-  updateWorkshopTask: (id: string, updates: Partial<GenerationTask>) => void;
-  setAllTasksStatus: (status: 'IDLE' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE') => void;
 }
 
 export interface AssistantSlice {

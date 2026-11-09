@@ -1,0 +1,36 @@
+{
+  "id": "wan3-pe",
+  "name": "wan3-pe",
+  "displayName": "Wan 3.0 官方提示词整理",
+  "description": "Use when a user asks an Agent to organize a video generation request with prompt, image, video, or audio references into a clean, structured video generation request. The skill formats and clarifies the user's own instructions only, without enriching the story.",
+  "category": "官方视频提示词",
+  "author": "阿里云百炼",
+  "version": "0.2.0",
+  "icon": "video",
+  "colorTheme": "amber",
+  "isBuiltin": true,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "tools": [],
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": [
+      "官方原版"
+    ]
+  },
+  "source": {
+    "kind": "official",
+    "url": "https://help.aliyun.cn/zh/model-studio/wan3-video-generation-prompt-guide",
+    "revision": "0.2.0",
+    "license": "官方公开下载；未附独立许可证",
+    "files": {
+      "SKILL.md": "c7b22d8bf902131b3c399a7c5519c158e9ebf7582a76b7e8ef6567a018ee3649"
+    },
+    "archiveSha256": "370cfe7376d7953a62adc5ed3df12a2017f7b89c0ce51ba2841f8047c42dd439",
+    "downloadUrl": "https://g-adoc.alcasset.com/media/maas_docs/sfm-cn/common/files/6a4b3c2d1e0f9f66.zip"
+  },
+  "modelIcon": "wan3.0-video",
+  "displayDescription": "为 Wan 3.0 整理原始视频需求，明确主体、素材、情节、镜头与声音；保留原意，不额外扩写剧情。",
+  "usageGuide": "### 适合什么任务\n把文字创意和已有图片、视频参考要求，整理为 Wan 3.0 可直接使用的结构化生成请求。\n\n### 会怎样优化\n按核心任务、情节概要、音频风格、运镜与核心约束、负面提示词组织内容。只整理已经提出的要求，不擅自增加人物、剧情或通用限制。\n\n### 怎么使用\n描述主体、主要事件、镜头和声音；有参考素材时说明采用什么、不采用什么。图片和视频分别编号，保持与实际上传顺序一致。\n\n### 在画布中\n选择 Wan 3.0 视频节点，开启“生成前优化提示词”。官方 Skill 主要负责规范化整理，直接编辑原视频的模式会跳过。系统保留原文与优化稿，先展示可编辑的提示词，确认后才生成视频；优化失败时不会提交视频。"
+}

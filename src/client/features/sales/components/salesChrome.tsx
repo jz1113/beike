@@ -1,3 +1,5 @@
+import type { SalesAssetDraftStatus as DraftStatus } from '../hooks/useSalesAssetViews';
+
 /**
  * 电商视频（Sales Studio）v5 中性工具美学原子类名
  * 采用克制灰阶、1px 细线分栏、5-6px 紧凑圆角与墨黑/纯白高对比主按钮，杜绝 AI 蓝紫渐变与毛玻璃套框。
@@ -23,3 +25,19 @@ export const salesSurfaceCardClass =
 
 export const salesSubtlePanelClass =
   'rounded-[6px] border border-[#E5E5E3] bg-[#F4F4F3] dark:border-[#2A2A2A] dark:bg-[#141414]';
+
+export function SalesAssetDraftStatus({ status, existing, busy, pending, readOnly = false, onDiscard }: {
+  status: DraftStatus; existing: boolean; busy: boolean; pending: boolean; readOnly?: boolean; onDiscard: () => void;
+}) {
+  const hasDraft = !readOnly && status !== 'idle';
+  const text = pending ? '正在保存到资产库…'
+    : readOnly || status === 'idle' ? existing ? '已入库' : '尚未入库'
+      : status === 'error' ? '草稿暂存失败'
+        : `${status === 'restored' ? '已恢复草稿' : '草稿已暂存'} · ${existing ? '修改待保存' : '未入库'}`;
+  return (
+    <div className="sales-asset-draft-status">
+      <span role="status">{text}</span>
+      {hasDraft && <button type="button" disabled={busy} className={salesFocusClass} onClick={onDiscard}>放弃草稿</button>}
+    </div>
+  );
+}

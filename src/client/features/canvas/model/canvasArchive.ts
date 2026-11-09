@@ -1,14 +1,50 @@
 import JSZip from 'jszip';
+import { cloneCanvasProject } from './creativeWorkflowProjects';
 import type { CanvasProject, StudioScene } from './types';
-import { cloneCanvasProject } from './cloneCanvasProject';
 
 export const canvasArchiveLimit = 500 * 1024 * 1024;
 export interface CanvasArchiveAsset { id: string; blob: Blob }
 export interface CanvasArchive { project: CanvasProject; assets: CanvasArchiveAsset[] }
 type Progress = (message: string) => void;
-const mediaKey = /^(?:content|thumbnail|.*url|.*images|.*videos|.*image|.*video|files|references)$/i;
+const mediaKey = /^(?:content|thumbnail|.*url|referenceAudioUrls|.*images|.*videos|.*image|.*video|files|references)$/i;
 const assetKey = /assetids?$/i;
 const mediaAddress = /^(?:https?:\/\/|blob:|data:(?:image|video|audio)\/|local-asset:\/\/|\/storage\/|\/api\/assets\/storage\/)/i;
+
+/** Rebuild display references from this project's retained files before mounting the renderer. */
+export async function restoreStudioCachedMedia(value: unknown, hasAsset: (id: string) => Promise<boolean>): Promise<unknown> {
+  if (Array.isArray(value)) return Promise.all(value.map(item=>restoreStudioCachedMedia(item,hasAsset)));
+  if (!value || typeof value!=='object') return value;
+  const object:Record<string,unknown>=Object.create(null);
+  const children:Promise<void>[]=[];
+  for(const [key,item] of Object.entries(value)){
+    object[key]=item;
+    if(item && typeof item==='object')children.push(restoreStudioCachedMedia(item,hasAsset).then(result=>{object[key]=result;}));
+  }
+  if(children.length)await Promise.all(children);
+  if (/^(text-node|prompt|note|text|label)$/.test(String(object.type || ''))) return object;
+  const settings=object.settings as Record<string,unknown> | undefined;
+  const needsRecovery=(field:string)=>typeof object[field]==='string' && (!object[field] || object[field].startsWith('blob:'));
+  async function recover(fields:string[],ids:unknown[],missingContent=false) {
+    if (!missingContent && !fields.some(needsRecovery)) return;
+    for (const id of ids) {
+      if (typeof id!=='string' || !id || !await hasAsset(id)) continue;
+      const ref=`local-asset://${encodeURIComponent(id)}`;
+      for (const field of fields) if (needsRecovery(field)) object[field]=ref;
+      if (missingContent) object.content=ref;
+      break;
+    }
+  }
+  await recover(['content','url','originalUrl','fullUrl','imageUrl','videoUrl','audioUrl','_blobUrl'],
+    [object.assetId,object._contentAssetId,object._localCacheAssetId,object._assetId,
+      settings?._localCacheAssetId,settings?._contentAssetId,settings?._assetId],
+    !object.content && /^(input-image|gen-image|gen-video|video-input|preview|gen-speech|gen-music)$/.test(String(object.type)));
+  await recover(['selectedPreviewImage'],[object._selectedImageAssetId]);
+  await recover(['selectedPreviewVideo'],[object._selectedVideoAssetId]);
+  // A video's poster belongs to its own image cache, never to the video's cache ID.
+  await recover(['thumbnailUrl','videoPosterUrl','_canvasDisplayPreviewUrl'],
+    [object.previewAssetId,object._thumbnailAssetId,settings?._thumbnailAssetId]);
+  return object;
+}
 
 /** Visit media fields, including every version/recipe, without treating prompts as downloads. */
 export async function mapCanvasMedia(value: unknown, map: (url: string) => Promise<string>, key = ''): Promise<unknown> {
@@ -17,7 +53,10 @@ export async function mapCanvasMedia(value: unknown, map: (url: string) => Promi
   if (!value || typeof value !== 'object') return value;
   const result: Record<string, unknown> = Object.create(null);
   const textNode = /^(text-node|prompt|note|text|label)$/.test(String((value as {type?:unknown}).type || ''));
-  for (const [field, item] of Object.entries(value)) result[field] = textNode && field === 'content' ? item : await mapCanvasMedia(item, map, field);
+  for (const [field, item] of Object.entries(value)) {
+    if (typeof item === 'string') result[field] = !(textNode && field === 'content') && mediaKey.test(field) && mediaAddress.test(item) ? await map(item) : item;
+    else result[field] = item && typeof item === 'object' && !(textNode && field === 'content') ? await mapCanvasMedia(item, map, field) : item;
+  }
   return result;
 }
 
@@ -167,6 +206,50 @@ function validateProject(value: unknown): CanvasProject {
   return project;
 }
 
+const crcTable = Uint32Array.from({ length: 256 }, (_, index) => {
+  let crc = index;
+  for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  return crc;
+});
+
+function readZipEntry(entry: JSZip.JSZipObject, limit: number, mimeType?: string): Promise<Blob> {
+  // JSZip's browser stream is available in the runtime but omitted from its type declarations.
+  interface ZipStream {
+    on(event: 'data', callback: (chunk: Uint8Array) => void): ZipStream;
+    on(event: 'error', callback: (error: Error) => void): ZipStream;
+    on(event: 'end', callback: () => void): ZipStream;
+    resume(): void;
+    pause(): void;
+  }
+  const source = entry as JSZip.JSZipObject & {
+    internalStream(type: 'uint8array'): ZipStream;
+    _data: { uncompressedSize: number; crc32: number };
+  };
+  if (!source._data || !Number.isSafeInteger(source._data.uncompressedSize) || source._data.uncompressedSize < 0 ||
+      source._data.uncompressedSize > limit) throw new Error('项目素材超过 500 MB');
+  return new Promise((resolve, reject) => {
+    const stream = source.internalStream('uint8array');
+    const chunks: Uint8Array<ArrayBuffer>[] = [];
+    let size = 0, crc = -1;
+    stream.on('data', chunk => {
+      size += chunk.byteLength;
+      if (size > limit || size > source._data.uncompressedSize) {
+        stream.pause();
+        reject(new Error('备份解压大小无效或超过 500 MB'));
+        return;
+      }
+      for (const byte of chunk) crc = (crc >>> 8) ^ crcTable[(crc ^ byte) & 0xff];
+      chunks.push(new Uint8Array(chunk));
+    }).on('error', reject).on('end', () => {
+      if ((crc ^ -1) !== source._data.crc32 || size !== source._data.uncompressedSize) {
+        reject(new Error('备份 CRC32 或文件大小无效'));
+        return;
+      }
+      resolve(new Blob(chunks, { type: mimeType }));
+    }).resume();
+  });
+}
+
 async function parseCanvasArchive(file: Blob, progress: Progress): Promise<CanvasArchive> {
   if (!file.size || file.size > canvasArchiveLimit) throw new Error('请选择小于 500 MB 的完整项目备份');
   const bytes = await file.arrayBuffer();
@@ -175,23 +258,25 @@ async function parseCanvasArchive(file: Blob, progress: Progress): Promise<Canva
   const assets: CanvasArchiveAsset[] = [];
   if (signature[0] === 80 && signature[1] === 75) {
     progress('正在校验项目备份…');
-    const zip = await JSZip.loadAsync(bytes, { checkCRC32: true });
+    const zip = await JSZip.loadAsync(bytes);
     const json = zip.file('project.json');
     if (!json) throw new Error('备份缺少 project.json，请选择完整项目 ZIP');
-    project = validateProject(JSON.parse(await json.async('string')));
+    const projectFile = await readZipEntry(json, canvasArchiveLimit);
+    let remaining = canvasArchiveLimit - projectFile.size;
+    project = validateProject(JSON.parse(await projectFile.text()));
     const manifest = zip.file('manifest.json');
-    const metadata = manifest ? JSON.parse(await manifest.async('string')) : {};
+    const manifestFile = manifest ? await readZipEntry(manifest, remaining) : undefined;
+    remaining -= manifestFile?.size ?? 0;
+    const metadata = manifestFile ? JSON.parse(await manifestFile.text()) : {};
     if (metadata.format === 'beike-canvas' && metadata.version !== 1) throw new Error('备份版本暂不支持，请使用兼容版本重新导出');
-    let total = 0;
     for (const [id, raw] of Object.entries(metadata.assets || {})) {
       const item = raw as {fileName?: string; mimeType?: string; size?: number};
       const entry = item && typeof item.fileName === 'string' && zip.file(item.fileName);
       if (!entry || !/^(image|video|audio)\//.test(item.mimeType || '')) throw new Error('备份中的素材缺失或类型无效，请重新导出');
-      const buffer = await entry.async('arraybuffer');
-      total += buffer.byteLength;
-      if (total > canvasArchiveLimit) throw new Error('项目素材超过 500 MB');
-      if (!buffer.byteLength || (typeof item.size === 'number' && item.size !== buffer.byteLength)) throw new Error('备份中的素材不完整，请重新导出');
-      assets.push({ id, blob: new Blob([buffer], {type:item.mimeType}) });
+      const blob = await readZipEntry(entry, remaining, item.mimeType);
+      remaining -= blob.size;
+      if (!blob.size || (typeof item.size === 'number' && item.size !== blob.size)) throw new Error('备份中的素材不完整，请重新导出');
+      assets.push({ id, blob });
       progress(`已校验 ${assets.length} 个素材`);
     }
   } else {

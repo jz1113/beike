@@ -1,5 +1,8 @@
 import type { SVGProps } from 'react';
 import type { AssistantSkill } from '@shared/domain/assistant/skills/types';
+import { ModelIcon } from '@client/shared/ui/ModelIcons';
+// Brand favicon linked by https://wan.video/; bundled locally for offline display.
+import wanLogo from '@client/assets/model-logos/wan.ico';
 
 export interface AssistantSkillIconProps extends SVGProps<SVGSVGElement> {
   className?: string;
@@ -34,20 +37,13 @@ export function AssistantSkillIcon({
 
 function resolveSkillKind(skill?: Partial<AssistantSkill> | null): string {
   const icon = skill?.icon?.trim().toLowerCase() || '';
-  const id = skill?.id?.trim().toLowerCase() || '';
-  if (icon === 'image' || icon === 'sparkle' || id.includes('gpt-image')) return 'image';
-  if (icon === 'sparkles' || id.includes('reverse')) return 'sparkles';
-  if (icon === 'film' || id.includes('seedance-2-5')) return 'film';
-  if (icon === 'video' || id.includes('seedance-2')) return 'video';
-  if (icon === 'waveform' || id.includes('minimax')) return 'waveform';
-  if (icon === 'camera' || id.includes('kling')) return 'camera';
-  if (icon === 'banana' || id.includes('banana')) return 'banana';
-  if (icon === 'shirt' || id.includes('fashion')) return 'shirt';
-  if (icon === 'poster' || id.includes('poster')) return 'poster';
-  if (icon === 'scissors' || id.includes('teardown')) return 'scissors';
-  if (icon === 'compass' || id.includes('collector')) return 'compass';
-  if (icon === 'table' || id.includes('keyword')) return 'table';
-  if (icon === 'puzzle' || id.includes('creator')) return 'puzzle';
+  if (icon === 'image' || icon === 'sparkle') return 'image';
+  if (icon === 'sparkles') return 'sparkles';
+  if (icon === 'film') return 'film';
+  if (icon === 'video') return 'video';
+  if (icon === 'waveform') return 'waveform';
+  if (icon === 'camera') return 'camera';
+  if (icon === 'shirt') return 'shirt';
   return 'default';
 }
 
@@ -70,6 +66,12 @@ export function AssistantSkillCardIcon({
   }[size];
 
   const kind = resolveSkillKind(skill);
+
+  if(skill?.modelIcon) return <span aria-hidden="true" className={`${sizeClasses} flex shrink-0 items-center justify-center overflow-hidden bg-slate-100 p-1.5 dark:bg-white/[0.06] ${className}`}>
+    {skill.modelIcon.startsWith('wan')
+      ? <img src={wanLogo} alt="" draggable={false} className="h-full w-full object-contain" />
+      : <ModelIcon modelId={skill.modelIcon} className="h-full w-full" />}
+  </span>;
 
   return (
     <svg
@@ -130,61 +132,10 @@ export function AssistantSkillCardIcon({
           <rect x="14" y="9.5" width="6" height="3" rx="1.2" fill="#7C3AED" />
         </>
       )}
-      {kind === 'banana' && (
-        <>
-          <rect width="40" height="40" rx="10" fill="#FEF3C7" />
-          <rect x="8" y="9" width="24" height="22" rx="5" fill="#F59E0B" />
-          <path d="M13 15H24M13 19.5H21M13 24H18" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" />
-          <path d="M23.5 22L29.5 28L26.2 28.8L25.2 31.5L23.5 22Z" fill="#FEF08A" />
-        </>
-      )}
       {kind === 'shirt' && (
         <>
           <rect width="40" height="40" rx="10" fill="#FCE7F3" />
           <path d="M14.5 11L17 13.5C18.6 15 21.4 15 23 13.5L25.5 11L31 15L28.2 19.5L25.5 18V29H14.5V18L11.8 19.5L9 15L14.5 11Z" fill="#EC4899" />
-        </>
-      )}
-      {kind === 'poster' && (
-        <>
-          <rect width="40" height="40" rx="10" fill="#FFEDD5" />
-          <rect x="9" y="8" width="22" height="24" rx="4" fill="#EA580C" />
-          <rect x="12.5" y="11.5" width="15" height="4.2" rx="1.5" fill="#FFFFFF" />
-          <rect x="12.5" y="17.5" width="10" height="2.6" rx="1.3" fill="#FED7AA" />
-          <circle cx="20" cy="25.5" r="4" fill="#FFF7ED" />
-        </>
-      )}
-      {kind === 'scissors' && (
-        <>
-          <rect width="40" height="40" rx="10" fill="#E0E7FF" />
-          <rect x="8" y="10" width="9.5" height="9.5" rx="2.5" fill="#4F46E5" />
-          <rect x="22.5" y="10" width="9.5" height="9.5" rx="2.5" fill="#6366F1" />
-          <rect x="8" y="21.5" width="9.5" height="9.5" rx="2.5" fill="#818CF8" />
-          <rect x="22.5" y="21.5" width="9.5" height="9.5" rx="2.5" fill="#4338CA" />
-        </>
-      )}
-      {kind === 'compass' && (
-        <>
-          <rect width="40" height="40" rx="10" fill="#D1FAE5" />
-          <circle cx="20" cy="20" r="11" fill="#10B981" />
-          <path d="M24.5 15.5L21.8 21.8L15.5 24.5L18.2 18.2L24.5 15.5Z" fill="#FFFFFF" />
-        </>
-      )}
-      {kind === 'table' && (
-        <>
-          <rect width="40" height="40" rx="10" fill="#CCFBF1" />
-          <rect x="8" y="10" width="24" height="20" rx="4" fill="#0D9488" />
-          <path d="M8 16.5H32M16 16.5V30" stroke="#99F6E4" strokeWidth="1.8" />
-          <path d="M20.5 23L22.8 25.3L27.5 20.5" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-        </>
-      )}
-      {kind === 'puzzle' && (
-        <>
-          <rect width="40" height="40" rx="10" fill="#F3E8FF" />
-          <rect x="6" y="6" width="28" height="28" rx="8" fill="#A855F7" />
-          <circle cx="15" cy="14.5" r="2.6" fill="#FFFFFF" />
-          <circle cx="25" cy="14.5" r="2.6" fill="#FFFFFF" />
-          <circle cx="20" cy="25.5" r="2.6" fill="#FFFFFF" />
-          <path d="M15 17.1V20.5C15 21.6 15.9 22.5 17 22.5H23C24.1 22.5 25 21.6 25 20.5V17.1M20 22.5V23" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
         </>
       )}
       {kind === 'default' && (

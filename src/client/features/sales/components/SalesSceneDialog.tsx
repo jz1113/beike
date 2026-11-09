@@ -2,17 +2,27 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2, Trash2, X } from 'lucide-react';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import type { SalesSceneCandidate } from '@shared/domain/sales';
+import { generateSalesAssetGrid } from '../api/salesAssetViews';
 import { createSalesMaterial, deleteSalesMaterial, updateSalesMaterial } from '../api/salesMaterials';
-import { useSalesAssetDraft } from '../hooks/useSalesAssetDraft';
-import { useSalesSceneViews } from '../hooks/useSalesSceneViews';
+import { useSalesAssetDraft, useSalesAssetViews, type SalesAssetBackground } from '../hooks/useSalesAssetViews';
+import { readSalesAssetCreation, readSalesAssetJobId, type SalesAssetDraftPersistence } from '../model/salesAssetDraft';
 import { classifySceneSpace, mergeGroupTag, SCENE_SPACE_LABELS, type SalesSceneSpace } from '../model/salesMaterialCatalog';
-import { SCENE_VIEWS, sceneImageFields } from '../model/salesSceneViews';
-import { SalesAssetDraftStatus } from './SalesAssetDraftStatus';
+import { readSceneViews, SCENE_VIEWS, sceneImageFields, type SceneSupplementView } from '../model/salesActionViews';
 import { SalesAssetViewGallery } from './SalesAssetViewGallery';
 import { SalesLibrarySelect } from './SalesLibrarySelect';
-import { salesFocusClass, salesGhostButtonClass, salesInputClass } from './salesChrome';
+import { SalesAssetDraftStatus, salesFocusClass, salesGhostButtonClass, salesInputClass } from './salesChrome';
 import '../salesAssetDialog.css';
 import '../salesPersona.css';
+
+function useSalesSceneViews(scene?: SalesSceneCandidate, draft?: SalesAssetDraftPersistence, background?: SalesAssetBackground<SceneSupplementView>) {
+  return useSalesAssetViews<SceneSupplementView>({
+    draft, background, creationMode: !scene || Boolean(readSalesAssetCreation(scene.dimensions)),
+    creation: readSalesAssetCreation(scene?.dimensions), jobId: readSalesAssetJobId(scene?.dimensions),
+    initial: () => readSceneViews(scene), definitions: SCENE_VIEWS,
+    referenceKeys: ['main', 'left', 'right', 'reverse'], prefix: 'scene-grid',
+    generate: (request, signal, onStage, onProgress) => generateSalesAssetGrid('scene', request, signal, onStage, onProgress),
+  });
+}
 
 interface Props {
   scene?: SalesSceneCandidate;

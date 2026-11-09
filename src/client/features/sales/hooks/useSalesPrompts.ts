@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { SalesPrompt } from '@shared/contracts/salesPrompts';
-import { listSalesPrompts, SalesPromptRequestError, saveSalesPrompt } from '../api/salesPrompts';
+import type { SalesPrompt } from '@shared/contracts/salesAssetViews';
+import { listSalesPrompts, SalesPromptRequestError, saveSalesPrompt } from '../api/salesMaterials';
 
 const managedPromptIds = new Set(['summary', 'script-analysis', 'plan-adapt', 'spoken-copy', 'spoken-review', 'final-video', 'final-video-depth', 'persona-design', 'scene-design', 'persona-grid', 'scene-grid']);
 const editorText = (item: SalesPrompt) => item.configured ? item.prompt : item.defaultPrompt;

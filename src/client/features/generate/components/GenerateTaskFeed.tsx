@@ -13,7 +13,6 @@ import {
 import { isGenerateVideoTask, type FlatBatchItem } from '../model/generateWorkspaceLayout';
 import { getSingleMediaContainerClass } from '../model/generateCanvasLayout';
 import { useGenerateTaskActions } from '../hooks/useGenerateTaskActions';
-import { dockSafeArea } from '@client/shared/ui/layoutClasses';
 import FeedBatchHeader from './FeedBatchHeader';
 import FeedSingleCard from './FeedSingleCard';
 import FeedExpandedGrid from './FeedExpandedGrid';
@@ -85,7 +84,7 @@ export function GenerateTaskFeed({
       ref={scrollContainerRef}
       data-generate-scroll
       {...pageMediaDropProps}
-      className={`flex-1 min-h-0 overflow-y-auto [overflow-anchor:none] px-4 sm:px-6 py-4 ${dockSafeArea} relative`}
+      className="flex-1 min-h-0 overflow-y-auto [overflow-anchor:none] px-4 sm:px-6 pt-8 sm:pt-10 pb-6 relative"
     >
       {taskBatches.length === 0 && (
         <div className="min-h-[45vh] flex flex-col items-center justify-center gap-2 text-center px-4" role="status" aria-live="polite">
@@ -162,11 +161,14 @@ export function GenerateTaskFeed({
                       primaryTask?.mediaType === 'agent' ||
                       primaryTask?.id.startsWith('agent-task-') ||
                       batch.tasks.some((t) => t.mediaType === 'agent' || t.id.startsWith('agent-task-'));
+                    const isAgentConversation = isAgentTask || batch.tasks.some(
+                      (task) => task.generationOrigin?.sourceId.startsWith('agent:')
+                    );
 
                     return (
                       <div
                         key={`${batch.batchId || 'batch'}-${bIdx}`}
-                        className={`space-y-2.5 w-full transition-all duration-300 ${isAgentTask ? 'max-w-3xl xl:max-w-4xl mx-auto' : ''}`}
+                        className={`space-y-2.5 w-full transition-all duration-300 ${isAgentConversation ? (primaryTask?.agentTurn?.productWidget ? 'max-w-6xl mx-auto' : 'max-w-3xl mx-auto') : ''}`}
                       >
                         {/* 1. 对话轮次元信息标头 (图3标杆同款: 多角度/智能改图/原图胶囊与参数紧凑并列，同行不换行) */}
                         {!isAgentTask && <FeedBatchHeader
@@ -205,7 +207,7 @@ export function GenerateTaskFeed({
                         {/* 2. 媒体内容展示区域 */}
                         {isSingle ? (
                           /* 2.1 单张大图/视频卡片 (单图独立画幅，Agent 模式全居中显示) */
-                          <div className={isAgentTask ? 'w-full max-w-3xl xl:max-w-4xl mx-auto' : getSingleMediaContainerClass(batch.size)}>
+                          <div className={isAgentTask ? 'w-full' : getSingleMediaContainerClass(batch.size)}>
                             <FeedSingleCard
                               primaryTask={primaryTask}
                               batchTasks={batch.tasks}

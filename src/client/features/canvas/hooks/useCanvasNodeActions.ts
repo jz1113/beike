@@ -1,9 +1,15 @@
-import { persistCanvasMedia } from '../model/canvasMediaImport';
-import { buildLightingDerivedNode, buildMultiAngleDerivedNode } from '../model/canvasNodeHelpers';
-import { enqueueCanvasImageTool } from './canvasGenerationActions';
+import {
+  buildLightingDerivedNode,
+  buildMultiAngleDerivedNode,
+  buildQuickCanvasNode,
+  canvasMediaKind,
+  persistCanvasMedia,
+  type LightingParams,
+} from '../model/canvasNodeFactory';
+import { canvasWorkflowUploadError, canvasWorkflowUploadSlot } from '../model/videoWorkflowRecovery';
+import { enqueueCanvasImageTool } from './useCanvasGenerationSync';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import type { CanvasQuickNodeType } from '../model/types';
-import type { LightingParams } from '../model/lighting';
 import { type MultiAngleParams } from '@client/shared/modals/multi-angle/CanvasMultiAngleModal';
 import type { CanvasNode, CanvasProject, CanvasSubject } from '../model/types';
 import type { GenerationTask } from '@client/store/appStoreTypes';
@@ -30,20 +36,18 @@ function isGenerationTaskVideo(task: GenerationTask) {
 
 export function useCanvasNodeActions(options: {
   currentProject: CanvasProject | undefined;
-  pan: { x: number; y: number };
-  zoom: number;
+  readView: () => { pan: { x: number; y: number }; zoom: number };
   canvasViewportRef: RefObject<HTMLDivElement | null>;
   selectedNodeId: string | null;
   setSelectedNodeId: (id: string | null) => void;
   draggingNodeId: string | null;
-  isEditingTitle: boolean;
   addNode: CanvasStore['addNode'];
   updateNode: CanvasStore['updateNode'];
   deleteNode: CanvasStore['deleteNode'];
   generationTasks: GenerationTask[];
 }) {
   const {
-    currentProject, pan, zoom, canvasViewportRef, setSelectedNodeId,
+    currentProject, readView, canvasViewportRef, setSelectedNodeId,
     addNode, updateNode, generationTasks,
   } = options;
 
@@ -118,13 +122,17 @@ export function useCanvasNodeActions(options: {
     replacementNodeRef.current = null;
     e.target.value = '';
     if (!file || !currentProject) return;
+    const { pan, zoom } = readView();
     const viewCenterX = (-pan.x + (canvasViewportRef.current?.clientWidth || 900) / 2) / zoom;
     const viewCenterY = (-pan.y + (canvasViewportRef.current?.clientHeight || 600) / 2) / zoom;
     try {
+      if (replacementId) {
+        const mismatch = canvasWorkflowUploadError(canvasWorkflowUploadSlot(currentProject, replacementId), canvasMediaKind(file));
+        if (mismatch) { window.alert(mismatch); return; }
+      }
       const media = await persistCanvasMedia(file, viewCenterX, viewCenterY);
       if (replacementId) {
-        updateNode(currentProject.id, replacementId, { missingMedia: false, imageUrl: media.imageUrl, videoUrl: media.videoUrl, type: media.type });
-        replacementNodeRef.current = null;
+        updateNode(currentProject.id, replacementId, { missingMedia: media.missingMedia, imageUrl: media.imageUrl, videoUrl: media.videoUrl, audioUrl: media.audioUrl, type: media.type });
       } else addNode(currentProject.id, media);
     } catch (error) {
       window.alert(`素材保存失败，请重新选择文件重试：${error instanceof Error ? error.message : '未知错误'}`);
@@ -132,9 +140,6 @@ export function useCanvasNodeActions(options: {
   };
 
   const nodes = useMemo(() => currentProject?.nodes ?? [], [currentProject?.nodes]);
-  const displayProjectTitle = !currentProject || currentProject.draft || currentProject.title === '新建画布' || (!nodes.length && /^\d+$/.test(currentProject.title.trim()))
-    ? '未命名项目'
-    : currentProject.title;
 
   const canvasSubjects = useMemo<CanvasSubject[]>(() => {
     return nodes
@@ -159,6 +164,7 @@ export function useCanvasNodeActions(options: {
 
   const handleConfirmImportAssets = useCallback((selectedTasks: GenerationTask[]) => {
     if (!currentProject || selectedTasks.length === 0) return;
+    const { pan, zoom } = readView();
     const viewCenterX = (-pan.x + (canvasViewportRef.current?.clientWidth || 900) / 2) / zoom;
     const viewCenterY = (-pan.y + (canvasViewportRef.current?.clientHeight || 600) / 2) / zoom;
 
@@ -194,26 +200,29 @@ export function useCanvasNodeActions(options: {
     });
 
     setShowAssetModal(false);
-  }, [currentProject, pan.x, pan.y, zoom, assetModalTab, addNode, canvasViewportRef]);
+  }, [currentProject, readView, assetModalTab, addNode, canvasViewportRef]);
 
   const handleCreateStarterNode = useCallback((kind: StarterNodeKind) => {
     if (!currentProject) return;
     const viewport = canvasViewportRef.current;
+    const { pan, zoom } = readView();
     const centerX = (-pan.x + (viewport?.clientWidth || 900) / 2) / zoom;
     const centerY = (-pan.y + (viewport?.clientHeight || 600) / 2) / zoom;
     const isImage = kind === 'image-background';
     const title = kind === 'text-video' ? '文字生视频' : kind === 'image-background' ? '图片换背景' : '首帧生成视频';
     const id = crypto.randomUUID();
+    const width = isImage ? 250 : 444;
+    const height = 250;
 
     addNode(currentProject.id, {
       id,
       type: 'drawing',
       generationKind: isImage ? 'image' : 'video',
       title,
-      x: Math.round(centerX - 280),
-      y: Math.round(centerY - 250),
-      width: 560,
-      height: 500,
+      x: Math.round(centerX - width / 2),
+      y: Math.round(centerY - height / 2),
+      width,
+      height,
       drawing: isImage
         ? { model: '', quality: 'medium', aspect: '1:1', count: 1, references: [] }
         : {
@@ -227,69 +236,38 @@ export function useCanvasNodeActions(options: {
     });
     setSelectedNodeId(id);
     setEditingDrawingId(id);
-  }, [addNode, currentProject, pan.x, pan.y, setSelectedNodeId, zoom, canvasViewportRef]);
+  }, [addNode, currentProject, readView, setSelectedNodeId, canvasViewportRef]);
 
   const openNodeMenuAt = useCallback((clientX: number, clientY: number) => {
     const rect = canvasViewportRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const { pan, zoom } = readView();
     setNodeMenu({
       screenX: clientX,
       screenY: clientY,
       x: (clientX - rect.left - pan.x) / zoom,
       y: (clientY - rect.top - pan.y) / zoom,
     });
-  }, [pan.x, pan.y, zoom, canvasViewportRef]);
+  }, [readView, canvasViewportRef]);
 
   const handleCreateQuickNode = useCallback((kind: CanvasQuickNodeType) => {
     if (!currentProject) return;
-    const isImageGeneration = kind === 'image-generation';
-    const isVideoGeneration = kind === 'video-generation';
-    const type = isImageGeneration || isVideoGeneration ? 'drawing' : kind;
     const id = crypto.randomUUID();
-    let dimensions = { width: 560, height: 500 };
-    let title = '新建节点';
+    const { pan, zoom } = readView();
+    const centerX = nodeMenu?.x ?? ((canvasViewportRef.current?.clientWidth || 1000) / 2 - pan.x) / zoom - 150;
+    const centerY = nodeMenu?.y ?? ((canvasViewportRef.current?.clientHeight || 700) / 2 - pan.y) / zoom - 140;
+    const newNode = buildQuickCanvasNode(kind, { x: centerX, y: centerY }, { id });
 
-    if (kind === 'prompt') {
-      dimensions = { width: 300, height: 280 };
-      title = '文本 / 提示词';
-    } else if (kind === 'file') {
-      dimensions = { width: 252, height: 252 };
-      title = '导入素材';
-    } else if (kind === 'compare') {
-      dimensions = { width: 480, height: 400 };
-      title = '前后画质对比';
-    } else if (kind === 'save') {
-      dimensions = { width: 320, height: 280 };
-      title = '批量导出保存';
-    } else if (kind === 'preview') {
-      dimensions = { width: 480, height: 340 };
-      title = '导演监视器';
-    } else if (kind === 'audio') {
-      dimensions = { width: 320, height: 220 };
-      title = 'AI 配音 / 音频';
-    } else if (isImageGeneration) {
-      title = '图片生成';
-    } else if (isVideoGeneration) {
-      title = '视频生成';
-    }
-
-    addNode(currentProject.id, {
-      id,
-      type,
-      generationKind: isImageGeneration ? 'image' : isVideoGeneration ? 'video' : undefined,
-      title,
-      x: nodeMenu?.x ?? ((canvasViewportRef.current?.clientWidth || 1000) / 2 - pan.x) / zoom - dimensions.width / 2,
-      y: nodeMenu?.y ?? ((canvasViewportRef.current?.clientHeight || 700) / 2 - pan.y) / zoom - dimensions.height / 2,
-      ...dimensions,
-    });
+    addNode(currentProject.id, newNode);
     setSelectedNodeId(id);
-    if (isImageGeneration || isVideoGeneration) setEditingDrawingId(id);
+    if (newNode.type === 'drawing' && !newNode.studioSubType) {
+      setEditingDrawingId(id);
+    }
     closeNodeMenu();
-  }, [addNode, closeNodeMenu, currentProject, nodeMenu, setSelectedNodeId, canvasViewportRef, pan.x, pan.y, zoom]);
+  }, [addNode, closeNodeMenu, currentProject, nodeMenu, setSelectedNodeId, canvasViewportRef, readView]);
 
   return {
     nodes,
-    displayProjectTitle,
     canvasSubjects,
     imageAssets,
     videoAssets,

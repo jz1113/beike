@@ -236,3 +236,94 @@ func ProductByID(cfg config.Config) http.HandlerFunc {
 		}
 	}
 }
+
+var errPresetConflict = errors.New("预设编号冲突或不属于当前工作区")
+
+// Persist the preset before replacing the default so a failed write leaves the
+// existing configuration intact. Both changes commit together.
+func saveProductionPreset(ctx context.Context, db *sql.DB, workspace string, item storedPreset) (storedPreset, error) {
+	raw, err := json.Marshal(item.Config)
+	if err != nil {
+		return storedPreset{}, err
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return storedPreset{}, err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `INSERT INTO "SalesProductionPreset" ("id","workspaceId","name","category","configJson","isDefault","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?) ON CONFLICT("id") DO UPDATE SET "name"=excluded."name","category"=excluded."category","configJson"=excluded."configJson","isDefault"=excluded."isDefault","updatedAt"=excluded."updatedAt" WHERE "SalesProductionPreset"."workspaceId"=excluded."workspaceId" AND "SalesProductionPreset"."category"<>?`,
+		item.ID, workspace, item.Name, item.Category, string(raw), item.IsDefault, item.CreatedAt, item.UpdatedAt, customBgmPresetCategory)
+	if err != nil {
+		return storedPreset{}, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return storedPreset{}, err
+	}
+	if count == 0 {
+		return storedPreset{}, errPresetConflict
+	}
+	if item.IsDefault {
+		if _, err := tx.ExecContext(ctx, `UPDATE "SalesProductionPreset" SET "isDefault"=0 WHERE "workspaceId"=? AND "category"=? AND "id"<>?`, workspace, item.Category, item.ID); err != nil {
+			return storedPreset{}, err
+		}
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT "createdAt" FROM "SalesProductionPreset" WHERE "workspaceId"=? AND "id"=?`, workspace, item.ID).Scan(&item.CreatedAt); err != nil {
+		return storedPreset{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return storedPreset{}, err
+	}
+	return item, nil
+}
+
+type libraryPreferences struct {
+	ShowEntry      bool `json:"showEntry"`
+	SharingEnabled bool `json:"sharingEnabled"`
+}
+
+func readLibraryPreferences(ctx context.Context, db *sql.DB, workspace string) (libraryPreferences, error) {
+	prefs := libraryPreferences{ShowEntry: true}
+	err := db.QueryRowContext(ctx, "SELECT showEntry,sharingEnabled FROM WorkspaceLibraryPreferences WHERE workspaceId=?", workspace).Scan(&prefs.ShowEntry, &prefs.SharingEnabled)
+	if errors.Is(err, sql.ErrNoRows) {
+		return prefs, nil
+	}
+	return prefs, err
+}
+
+func LibraryPreferences(cfg config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		db, err := database.OpenRequired(cfg.SQLiteFile())
+		if err != nil {
+			httpx.WriteJSON(w, 500, map[string]any{"error": "无法读取资产库设置"})
+			return
+		}
+		defer db.Close()
+		workspace := httpx.WorkspaceFrom(r)
+		if r.Method == http.MethodPatch {
+			var patch struct {
+				ShowEntry      *bool `json:"showEntry"`
+				SharingEnabled *bool `json:"sharingEnabled"`
+			}
+			d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
+			d.DisallowUnknownFields()
+			if d.Decode(&patch) != nil || d.Decode(new(any)) != io.EOF || (patch.ShowEntry == nil && patch.SharingEnabled == nil) {
+				httpx.WriteJSON(w, 400, map[string]any{"error": "请选择要修改的资产库设置"})
+				return
+			}
+			_, err = db.ExecContext(r.Context(), `INSERT INTO WorkspaceLibraryPreferences(workspaceId,showEntry,sharingEnabled)
+			VALUES(?,COALESCE(?,1),COALESCE(?,0)) ON CONFLICT(workspaceId) DO UPDATE SET
+			showEntry=COALESCE(?,showEntry),sharingEnabled=COALESCE(?,sharingEnabled)`, workspace, patch.ShowEntry, patch.SharingEnabled, patch.ShowEntry, patch.SharingEnabled)
+			if err != nil {
+				httpx.WriteJSON(w, 500, map[string]any{"error": "保存工作区资产库设置失败"})
+				return
+			}
+		}
+		prefs, err := readLibraryPreferences(r.Context(), db, workspace)
+		if err != nil {
+			httpx.WriteJSON(w, 500, map[string]any{"error": "无法读取资产库设置"})
+			return
+		}
+		httpx.WriteJSON(w, 200, prefs)
+	}
+}

@@ -3,8 +3,6 @@
 .settings-workspace .settings-sidebar { background: #f5f6f8; }
 .settings-workspace .settings-sidebar button[aria-current="page"],
 .settings-workspace .settings-canvas-rail button[aria-current="page"] { background: #e8edf5; color: #182438; box-shadow: none; }
-.settings-workspace .settings-sidebar button { font-weight: 500; }
-.settings-workspace .settings-sidebar button[aria-current="page"] { font-weight: 600; }
 .settings-workspace .settings-service-nav { background: #fafbfc; padding-top: 20px; }
 .settings-workspace .settings-service-nav button { padding-top: 13px; padding-bottom: 13px; transition: background .15s; }
 .settings-workspace .settings-page-scroll { background: #f6f7f9; scrollbar-gutter: stable; }
@@ -692,9 +690,9 @@ html.dark .settings-workspace .settings-sync-modal .settings-sync-field:focus-vi
 
 .settings-workspace .settings-sidebar > div:first-child > div {
   color: var(--settings-muted);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
   line-height: 20px;
-  letter-spacing: .02em;
 }
 
 .settings-workspace .settings-sidebar > div:nth-child(2) {
@@ -706,7 +704,9 @@ html.dark .settings-workspace .settings-sync-modal .settings-sync-field:focus-vi
   padding-inline: 12px;
   border-radius: 10px;
   color: var(--settings-muted);
+  font-family: inherit;
   font-size: 14px;
+  font-weight: 500;
   line-height: 20px;
   transition: background .16s ease, color .16s ease, transform .16s ease;
 }
@@ -730,8 +730,10 @@ html.dark .settings-workspace .settings-sync-modal .settings-sync-field:focus-vi
   opacity: 1;
 }
 
-.settings-workspace .settings-sidebar button > span:last-child {
-  color: color-mix(in srgb, var(--settings-muted) 90%, transparent);
+.settings-workspace .settings-sidebar .settings-sidebar-badge {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
   font-size: 12px;
   line-height: 18px;
 }

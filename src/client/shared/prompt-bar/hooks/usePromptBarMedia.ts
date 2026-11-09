@@ -16,10 +16,9 @@ import {
   resolveRefMediaKind,
 } from '@client/shared/media/refMediaRegistry';
 import type { SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
-import { buildPromptBarSubjects } from '@client/shared/prompt-bar/promptBarSubmit';
+import { buildPromptBarSubjects, removePromptReferences, serializeSubjectMention } from '@client/shared/prompt-bar/promptBarSubmit';
 import type { RichPromptInputRef } from '@client/shared/prompt-bar/RichPromptInput';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
-import { removePromptReferences, serializeSubjectMention } from '../promptSubjectReferences';
 
 interface UsePromptBarMediaOptions {
   quickGenMode: QuickGenMode;

@@ -3,6 +3,7 @@ package sales
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"mime/multipart"
@@ -210,5 +211,108 @@ func TestSampledAnalysisCannotPublishAnUnheardTranscript(t *testing.T) {
 	recordScriptObservations([]any{map[string]any{"text": `{"mediaType":"sampled_frames","sampleTimesSec":[0,1.5],"audioProvided":false}`}}, script)
 	if voice["text"] != "" || voice["linePattern"] != "" || voice["uncertain"] != true || len(script["sampleTimesSec"].([]float64)) != 2 {
 		t.Fatal(script)
+	}
+}
+
+func TestAnalysisReturnsCompletedScriptWhenDraftStorageFails(t *testing.T) {
+	cfg := setupPromptExecutionTestConfig(t)
+	t.Setenv("AI_DRAWING_API_KEY", "test-key")
+	db, err := sql.Open("sqlite", cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TRIGGER reject_analyzed_script BEFORE INSERT ON "SalesReferenceScript" BEGIN SELECT RAISE(ABORT,'test write failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	complete := func(context.Context, gateway.TextRequest, bool) (int, map[string]any, error) {
+		calls++
+		return 200, scriptCompletion(validScript, "stop"), nil
+	}
+	rec := httptest.NewRecorder()
+	scriptAnalysisHandler(cfg, complete, func(string, string) (string, error) { return "data:video/mp4;base64,AA==", nil }).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/sales/script-analysis", strings.NewReader(`{"videoUrl":"/storage/local/source.mp4","model":"gemini-2.5-pro","textProtocol":"gemini"}`)))
+	var response struct {
+		Success     bool           `json:"success"`
+		Script      map[string]any `json:"script"`
+		SaveWarning string         `json:"saveWarning"`
+		ExistingID  string         `json:"existingId"`
+		VideoHash   string         `json:"videoHash"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != 200 || !response.Success || response.SaveWarning == "" || response.ExistingID != "" || response.Script == nil {
+		t.Fatalf("lost completed analysis: %d %s", rec.Code, rec.Body.String())
+	}
+	if _, err := validateScriptObject(response.Script); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DROP TRIGGER reject_analyzed_script`); err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(map[string]any{"videoUrl": "/storage/local/source.mp4", "videoHash": response.VideoHash, "script": response.Script})
+	save := httptest.NewRecorder()
+	Scripts(cfg).ServeHTTP(save, httptest.NewRequest(http.MethodPost, "/api/sales/scripts", strings.NewReader(string(body))))
+	if save.Code != 200 || calls != 1 {
+		t.Fatalf("must allow saving completed script without another model call: %d calls=%d %s", save.Code, calls, save.Body.String())
+	}
+}
+
+func TestScriptCompletionRejectsVisualDataThatBrowserWouldErase(t *testing.T) {
+	for _, field := range []string{"styleSummary", "lighting", "cameraFeel", "scene", "subject", "camera", "actionTemplate"} {
+		for _, value := range []any{nil, map[string]any{"detail": "左侧窗光"}, []string{"左侧窗光"}, true, 42} {
+			var script map[string]any
+			_ = json.Unmarshal([]byte(validScript), &script)
+			record := script["shots"].([]any)[0].(map[string]any)["beats"].([]any)[0].(map[string]any)
+			if field == "styleSummary" || field == "lighting" || field == "cameraFeel" {
+				record = map[string]any{}
+				script["visualSpec"] = record
+			}
+			record[field] = value
+			raw, _ := json.Marshal(script)
+			if _, err := parseScriptCompletion(scriptCompletion(string(raw), "stop")); err == nil || !strings.Contains(err.Error(), field) {
+				t.Fatalf("accepted lossy visual field %s=%T: %v", field, value, err)
+			}
+		}
+	}
+}
+
+func TestScriptCompletionKeepsCompleteVisualDescriptions(t *testing.T) {
+	var script map[string]any
+	_ = json.Unmarshal([]byte(validScript), &script)
+	visual := map[string]any{"styleSummary": strings.Repeat("纹", 600), "lighting": strings.Repeat("光", 300), "cameraFeel": strings.Repeat("机", 300)}
+	script["visualSpec"] = visual
+	beat := script["shots"].([]any)[0].(map[string]any)["beats"].([]any)[0].(map[string]any)
+	beat["scene"] = strings.Repeat("景", 600)
+	beat["actionTemplate"] = "手先接触衣摆，松开后回落"
+	delete(beat, "action")
+	raw, _ := json.Marshal(script)
+	parsed, err := parseScriptCompletion(scriptCompletion(string(raw), "stop"))
+	if err != nil {
+		t.Fatal("valid template-only action and visual context rejected", err)
+	}
+	actual, _ := json.Marshal(parsed)
+	if string(actual) != string(raw) {
+		t.Fatal("accepted visual descriptions were changed")
+	}
+	for _, target := range []map[string]any{visual, beat} {
+		key, limit := "lighting", 300
+		if target["scene"] != nil {
+			key, limit = "scene", 600
+		}
+		target[key] = strings.Repeat("字", limit+1)
+		raw, _ := json.Marshal(script)
+		if _, err := parseScriptCompletion(scriptCompletion(string(raw), "stop")); err == nil {
+			t.Fatalf("oversized %s accepted", key)
+		}
+		target[key] = strings.Repeat("字", limit)
+	}
+}
+
+func TestScriptCompletionRejectsEmptyActionBeforeSaving(t *testing.T) {
+	broken := strings.Replace(validScript, `"action":"坐姿看镜头"`, `"action":" ","actionTemplate":""`, 1)
+	if _, err := parseScriptCompletion(scriptCompletion(broken, "stop")); err == nil || !strings.Contains(err.Error(), "缺少动作模板") {
+		t.Fatal("empty motion cannot become a usable reference script", err)
 	}
 }

@@ -1,8 +1,6 @@
 import { init } from 'vgpu';
-import { createAeroResources } from './aeroResources';
-import { createAeroState } from './aeroState';
+import { createAeroCamera, createAeroResources, createAeroState } from './aeroResources';
 import { createAeroPaths } from './aeroPaths';
-import { createAeroCamera } from './aeroCamera';
 import { createAeroFrame } from './aeroFrame';
 import { CANVAS, PLACEMENTS, FOCUS, LEVELS, INTRO_SECONDS, MAX_RINGS, RING_SECONDS, prefersReduced, createShards, AeroSettings } from './aeroShardModel';
 export function mountAeroShards(container: HTMLDivElement, settingsRef: {

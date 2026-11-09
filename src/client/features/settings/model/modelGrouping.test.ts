@@ -2,6 +2,43 @@ import { describe, expect, it } from 'vitest';
 import { parseModelDetails, groupModelsByGeneration } from '@shared/domain/models/modelGrouping';
 
 describe('modelGrouping (generation row structure)', () => {
+  it('groups MiniMax Speech 2.8 HD and Turbo in one generation', () => {
+    const ids = ['speech-2.8-hd', 'minimax/speech-2.8-turbo'];
+    const [section] = groupModelsByGeneration(ids, 'voice');
+    expect(section.vendorId).toBe('minimax');
+    expect(section.rows).toHaveLength(1);
+    expect(section.rows[0]).toMatchObject({
+      generationLabel: 'MiniMax Speech 2.8',
+      allModelIds: ids,
+    });
+  });
+
+  it('groups standard and Omni Kling v3 under the same generation', () => {
+    const ids = ['kling-video-v3', 'kling-video-v3-omni'];
+    const [section] = groupModelsByGeneration(ids, 'video');
+    expect(section.rows).toHaveLength(1);
+    expect(section.rows[0]).toMatchObject({
+      familyId: 'kling',
+      generationLabel: '可灵 3',
+      allModelIds: ids,
+    });
+    expect(section.rows[0].variants.map(({ variantKey }) => variantKey)).toEqual(['default', 'omni']);
+  });
+
+  it.each([
+    ['nano-banana-2', 'Nano Banana 2'],
+    ['gemini-nano-banana-2.1', 'Nano Banana 2.1'],
+  ])('groups %s under the Nano Banana family', (id, label) => {
+    const parsed = parseModelDetails(id, 'image');
+    expect(parsed).toMatchObject({
+      modelId: id,
+      vendorId: 'google',
+      familyId: 'nano-banana',
+      generationLabel: label,
+      variantKey: 'default',
+    });
+  });
+
   it('parses models with accurate generation label and variants', () => {
     const p1 = parseModelDetails('claude-5.5-sonnet', 'chat');
     expect(p1.vendorId).toBe('anthropic');

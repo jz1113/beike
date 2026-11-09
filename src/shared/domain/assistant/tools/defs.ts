@@ -1,18 +1,101 @@
-import { loadMcpTool, readSkillTool, searchMcpToolsTool } from './catalogTools';
-import { generationBatchTool } from './generationBatchTool';
-import { planTool } from './planTool';
-import type { ClientContext, ToolApprovalPolicy, ToolScope } from '../types';
+import type { ToolApprovalPolicy, ToolScope } from '../types';
 
-export type AssistantDocAttachment = {
-  name?: string;
-  extractedText?: string;
+type OpenAITool = {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
 };
 
-export type ToolExecContext = {
-  origin: string;
-  signal?: AbortSignal;
-  documents: AssistantDocAttachment[];
-  clientContext?: ClientContext;
+export const readSkillTool: OpenAITool = {
+  type: 'function',
+  function: {
+    name: 'read_skill',
+    description: '读取本轮技能目录中的一份技能正文和资料路径。用户点名技能，或任务与目录用途明显匹配时，必须先读完再行动。已在系统提示中展开的点选技能视为已读。不要一次读取无关技能，也不要把阅读交给子任务。',
+    parameters: {
+      type: 'object',
+      properties: {
+        skill_id: { type: 'string', description: '技能目录中的 id' },
+      },
+      required: ['skill_id'],
+      additionalProperties: false,
+    },
+  },
+};
+
+export const searchMcpToolsTool: OpenAITool = {
+  type: 'function',
+  function: {
+    name: 'search_mcp_tools',
+    description: '按名称或描述检索本轮已连接的外部 MCP 工具。只返回名称和短描述，不执行工具。外部工具较多或未出现在函数列表中时先检索。',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: '名称或用途关键词，可留空以查看一批工具' },
+        limit: { type: 'number', description: '返回条数，默认 8，最大 20' },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+  },
+};
+
+export const loadMcpTool: OpenAITool = {
+  type: 'function',
+  function: {
+    name: 'load_mcp_tool',
+    description: '把一个尚未直接暴露的 MCP 工具 schema 加入后续轮次。先用 search_mcp_tools 确认名称。加载后从下一轮才能调用。',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'search_mcp_tools 返回的工具名' },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/** A short, user-facing task checklist, never private reasoning. */
+const planTool = {
+  type: 'function' as const,
+  function: {
+    name: 'update_plan',
+    description: '为复杂、多步骤任务维护简短执行清单。首次规划及步骤状态变化时更新；简单问答无需调用。completed 必须附已验证结果，blocked 必须说明阻碍。计划不是执行成功的证明。',
+    parameters: {
+      type: 'object', additionalProperties: false,
+      properties: {
+        steps: { type: 'array', minItems: 1, maxItems: 8, items: {
+          type: 'object', additionalProperties: false,
+          properties: { title: { type: 'string', maxLength: 160 }, status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'blocked'] }, evidence: { type: 'string', maxLength: 600 } },
+          required: ['title', 'status'],
+        } },
+      }, required: ['steps'],
+    },
+  },
+};
+
+const generationBatchTool = {
+  type: 'function' as const,
+  function: {
+    name: 'trigger_generate_batch',
+    description: '仅在用户明确要求生成图片或视频时，请求客户端批量提交本轮 clientContext.generationBatches 清单中的条目。sourceId 和 entryIds 必须来自同一清单，不能从模型正文或任意提示词创建条目；写提示词、整理方案不代表生成授权。每次 1–30 条，重复 ID 将去重。只返回提交请求，客户端校验后执行；不得声称已经提交成功或生成成功。仍须遵守当前技能工具权限。',
+    parameters: {
+      type: 'object',
+      properties: {
+        sourceId: { type: 'string', minLength: 1, maxLength: 255, description: '本轮客户端清单中的来源 ID' },
+        entryIds: {
+          type: 'array', minItems: 1, maxItems: 30,
+          items: { type: 'string', minLength: 1, maxLength: 255 },
+          description: '同一来源内的条目 ID，按提交顺序排列，重复项去重',
+        },
+      },
+      required: ['sourceId', 'entryIds'],
+      additionalProperties: false,
+    },
+  },
 };
 
 export interface ToolDefinition {

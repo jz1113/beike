@@ -18,3 +18,18 @@ export function isMiniMaxOfficialBase(baseUrl?: string): boolean {
     return false;
   }
 }
+
+export function officialVideoProvider(baseUrl?: string): 'seedance' | 'kling' | 'vidu' | 'grok' | undefined {
+  try {
+    const host = new URL(baseUrl || '').hostname.toLowerCase();
+    if (/^ark\.[\w-]+\.volces\.com$/.test(host)) return 'seedance';
+    if (['api.klingai.com', 'api-beijing.klingai.com', 'api-singapore.klingai.com'].includes(host)) return 'kling';
+    if (['api.vidu.cn', 'api.vidu.com'].includes(host)) return 'vidu';
+    if (host === 'api.x.ai' || host.endsWith('.api.x.ai')) return 'grok';
+  } catch { /* Custom gateway URLs are validated by their caller. */ }
+}
+
+export function isComflyVideoBase(baseUrl?: string): boolean {
+  try { return ['ai.comfly.org', 'comfly.org'].includes(new URL(baseUrl || '').hostname.toLowerCase()); }
+  catch { return false; }
+}

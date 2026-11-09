@@ -18,7 +18,22 @@ import {
   Underline,
   X,
 } from 'lucide-react';
-import FormattedMarkdown from '../message/FormattedMarkdown';
+import { subscribeAgentDocument, type AgentDocumentPayload } from '@client/shared/ui/AppErrorBoundary';
+import { FormattedMarkdown } from '../message/AssistantTurnList';
+
+export function AgentDocumentHost() {
+  const [document, setDocument] = useState<AgentDocumentPayload | null>(null);
+  useEffect(() => subscribeAgentDocument(setDocument), []);
+  if (!document) return null;
+  return (
+    <DocumentViewerModal
+      filename={document.filename}
+      content={document.content}
+      createdAt={document.createdAt}
+      onClose={() => setDocument(null)}
+    />
+  );
+}
 
 interface Props {
   filename: string;

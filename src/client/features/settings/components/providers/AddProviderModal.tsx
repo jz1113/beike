@@ -1,13 +1,29 @@
 import React, { useState } from 'react';
 import { X, Plus, Server } from 'lucide-react';
 import { PROTOCOL_OPTIONS, type ApiProviderProtocol, type ApiProvider } from '../../model/apiProviderTypes';
-import { providerPresets } from '../../model/providerPresets';
 import { isDashScopeBase } from '@shared/domain/media/imageCapabilities';
+
+interface ProviderPreset {
+  name: string;
+  protocol: ApiProviderProtocol;
+  baseUrl: string;
+}
+
+/** 手动选择后才填入表单，不改已配置的渠道或密钥。 */
+const providerPresets: readonly ProviderPreset[] = [
+  { name: 'OpenAI', protocol: 'openai', baseUrl: 'https://api.openai.com' },
+  { name: 'Anthropic', protocol: 'anthropic', baseUrl: 'https://api.anthropic.com' },
+  { name: 'Google Gemini', protocol: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com' },
+  { name: 'DeepSeek', protocol: 'openai', baseUrl: 'https://api.deepseek.com' },
+  { name: '阿里云百炼', protocol: 'dashscope', baseUrl: 'https://dashscope.aliyuncs.com' },
+  { name: '硅基流动', protocol: 'openai', baseUrl: 'https://api.siliconflow.cn' },
+  { name: 'OpenRouter', protocol: 'openai', baseUrl: 'https://openrouter.ai/api/v1' },
+];
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (provider: Omit<ApiProvider, 'id' | 'isRemovable'>) => void;
+  onAdd: (provider: Omit<ApiProvider, 'id' | 'isRemovable'>) => string | false;
 }
 
 export function AddProviderModal({ isOpen, onClose, onAdd }: Props) {
@@ -56,7 +72,7 @@ export function AddProviderModal({ isOpen, onClose, onAdd }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onAdd({
+    const added = onAdd({
       name: name.trim(),
       providerType,
       baseUrl: baseUrl.trim(),
@@ -66,6 +82,7 @@ export function AddProviderModal({ isOpen, onClose, onAdd }: Props) {
       isCustom: true,
       description: PROTOCOL_OPTIONS.find(o => o.id === providerType)?.label || '自定义服务商',
     });
+    if (!added) return;
     setName('');
     setApiKey('');
     onClose();

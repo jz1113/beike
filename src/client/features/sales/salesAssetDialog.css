@@ -1,4 +1,8 @@
 .sales-material-dialog.sales-asset-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
   width: min(920px, calc(100% - 32px));
   max-height: 92dvh;
   overflow: hidden;

@@ -1,6 +1,8 @@
 package generate
 
 import (
+	"beike.local/cloud/src/backend/internal/gateway"
+	"beike.local/cloud/src/backend/internal/platform/storage"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -12,9 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"beike.local/cloud/src/backend/internal/gateway"
-	"beike.local/cloud/src/backend/internal/platform/storage"
+	"time"
 )
 
 type SpeechRequest struct {
@@ -39,37 +39,49 @@ func SynthesizeSpeech(ctx context.Context, req SpeechRequest) (SpeechResult, err
 	if strings.TrimSpace(req.APIKey) == "" || strings.TrimSpace(req.Base) == "" {
 		return SpeechResult{}, errors.New("未配置音频网关")
 	}
+	if err := ctx.Err(); err != nil {
+		return SpeechResult{}, &SpeechSubmissionError{Message: "音频提交前已取消"}
+	}
 	attempts := speechAttempts(req)
-	var last error
 	for index, attempt := range attempts {
 		status, raw, contentType, err := postSpeech(ctx, attempt.Endpoint, req.APIKey, attempt.Payload)
 		if err != nil {
-			last = err
-			if index == len(attempts)-1 {
-				return SpeechResult{}, last
-			}
-			continue
+			return SpeechResult{}, &SpeechSubmissionError{Message: err.Error(), Unknown: true}
 		}
 		if status >= 200 && status < 300 {
-			if len(raw) > 0 && raw[0] == '{' {
-				return decodeSpeechJSON(raw)
+			if len(bytes.TrimSpace(raw)) > 0 && bytes.TrimSpace(raw)[0] == '{' {
+				result, decodeErr := decodeSpeechJSON(bytes.TrimSpace(raw))
+				if decodeErr != nil {
+					return result, &SpeechSubmissionError{Message: decodeErr.Error(), Unknown: true}
+				}
+				return result, nil
+			}
+			if len(raw) == 0 {
+				return SpeechResult{}, &SpeechSubmissionError{Message: "音频接口未返回音频数据", Unknown: true}
 			}
 			if contentType == "" {
 				contentType = "audio/mpeg"
 			}
 			return SpeechResult{Bytes: raw, ContentType: contentType}, nil
 		}
-		last = errors.New(speechError(raw, status))
-		retryable := gateway.CanTryAnotherEndpoint(status) || status >= 500
-		if !retryable || index == len(attempts)-1 {
-			return SpeechResult{}, last
+		var data map[string]any
+		_ = json.Unmarshal(raw, &data)
+		usage := gateway.NormalizeUsage(data)
+		// Only an explicit, unbilled unsupported endpoint permits a protocol fallback.
+		if gateway.CanTryAnotherEndpoint(status) && usage == nil && index < len(attempts)-1 {
+			continue
 		}
+		return SpeechResult{Usage: usage}, &SpeechSubmissionError{Message: speechError(raw, status), Unknown: status >= 500 || status == http.StatusRequestTimeout || usage != nil}
 	}
-	if last == nil {
-		last = errors.New("音频接口未返回音频数据")
-	}
-	return SpeechResult{}, last
+	return SpeechResult{}, &SpeechSubmissionError{Message: "音频接口未返回音频数据", Unknown: true}
 }
+
+type SpeechSubmissionError struct {
+	Message string
+	Unknown bool
+}
+
+func (err *SpeechSubmissionError) Error() string { return err.Message }
 
 func postSpeech(ctx context.Context, endpoint, apiKey string, payload any) (int, []byte, string, error) {
 	encoded, err := json.Marshal(payload)
@@ -87,7 +99,10 @@ func postSpeech(ctx context.Context, endpoint, apiKey string, payload any) (int,
 		return 0, nil, "", errors.New("音频网关请求失败")
 	}
 	defer response.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(response.Body, 32<<20))
+	raw, err := io.ReadAll(io.LimitReader(response.Body, (32<<20)+1))
+	if len(raw) > 32<<20 {
+		return response.StatusCode, nil, response.Header.Get("Content-Type"), errors.New("音频响应超过允许大小，提交结果待核对")
+	}
 	return response.StatusCode, raw, response.Header.Get("Content-Type"), err
 }
 
@@ -107,7 +122,7 @@ func decodeSpeechJSON(raw []byte) (SpeechResult, error) {
 		result.Usage = usage
 		return result, nil
 	}
-	return SpeechResult{}, errors.New("音频接口未返回音频数据")
+	return SpeechResult{Usage: usage}, errors.New("音频接口未返回音频数据")
 }
 
 func speechFromMap(data map[string]any) (SpeechResult, bool) {
@@ -203,9 +218,94 @@ func SaveWorkspaceBytes(workspace, folder, filename, contentType string, data []
 	if obj := storage.ResolveObjectConfig(nil); obj != nil {
 		key := strings.Trim(strings.Trim(obj.ApiPrefix, "/"), "") + "/" + rel
 		key = strings.TrimPrefix(key, "/")
-		if err := storage.Objects.Put(context.Background(), *obj, key, contentType, data); err == nil {
+		putCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := storage.Objects.Put(putCtx, *obj, key, contentType, data); err == nil {
 			publicURL = storage.PermanentObjectURL(*obj, key)
 		}
 	}
 	return localURL, publicURL, nil
+}
+
+type speechAttempt struct {
+	Endpoint string
+	Payload  map[string]any
+}
+
+func speechFamily(model string) string {
+	id := strings.ToLower(strings.TrimSpace(model))
+	switch {
+	case strings.Contains(id, "eleven"):
+		return "elevenlabs"
+	case strings.Contains(id, "cosyvoice") || strings.Contains(id, "cosy-voice"):
+		return "cosyvoice"
+	case strings.Contains(id, "doubao") && strings.Contains(id, "tts"):
+		return "doubao"
+	case strings.Contains(id, "speech-") || strings.Contains(id, "minimax") || strings.Contains(id, "t2a"):
+		return "minimax"
+	default:
+		return "openai"
+	}
+}
+
+func speechAttempts(req SpeechRequest) []speechAttempt {
+	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(req.Base), "/")
+	format := strings.ToLower(strings.TrimSpace(req.Format))
+	if format == "" {
+		format = "mp3"
+	}
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		model = "speech-01-hd"
+	}
+	voice := strings.TrimSpace(req.Voice)
+	if voice == "" {
+		voice = "alloy"
+	}
+	speed := req.Speed
+	if speed <= 0 {
+		speed = 1
+	}
+	volume := req.Volume
+	if volume <= 0 {
+		volume = 1
+	}
+	openai := speechAttempt{
+		Endpoint: root + "/v1/audio/speech",
+		Payload: map[string]any{
+			"model": model, "input": req.Text, "voice": voice, "speed": speed, "response_format": format, "volume": volume,
+		},
+	}
+	switch speechFamily(model) {
+	case "minimax":
+		return []speechAttempt{{
+			Endpoint: root + "/v1/t2a_v2",
+			Payload: map[string]any{
+				"model": model, "text": req.Text, "stream": false,
+				"voice_setting": map[string]any{"voice_id": voice, "speed": speed, "vol": volume},
+				"audio_setting": map[string]any{"format": format, "sample_rate": 32000},
+			},
+		}, openai}
+	case "elevenlabs":
+		return []speechAttempt{{
+			Endpoint: root + "/v1/text-to-speech/" + voice,
+			Payload:  map[string]any{"text": req.Text, "model_id": model},
+		}, openai}
+	case "cosyvoice":
+		return []speechAttempt{{
+			Endpoint: root + "/api/v1/services/aigc/text2audio/generation",
+			Payload: map[string]any{
+				"model":      model,
+				"input":      map[string]any{"text": req.Text, "voice": voice},
+				"parameters": map[string]any{"format": format, "rate": speed},
+			},
+		}, openai}
+	case "doubao":
+		return []speechAttempt{{
+			Endpoint: root + "/api/v1/tts",
+			Payload:  map[string]any{"model": model, "text": req.Text, "voice_type": voice, "speed_ratio": speed, "encoding": format},
+		}, openai}
+	default:
+		return []speechAttempt{openai}
+	}
 }

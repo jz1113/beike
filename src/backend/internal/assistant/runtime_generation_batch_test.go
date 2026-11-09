@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -22,6 +23,36 @@ func batchClient(t *testing.T, raw string) map[string]any {
 }
 
 const batchClientJSON = `{"generationBatches":[{"sourceId":"draft:a","entries":[{"id":"image:1","title":"首图","mediaType":"image"},{"id":"video:2","title":"短片","mediaType":"video"}]},{"sourceId":"draft:b","entries":[{"id":"image:3","title":"其他来源","mediaType":"image"}]}]}`
+
+func TestBatchCapabilitiesUseCurrentClientManifest(t *testing.T) {
+	client := batchClient(t, batchClientJSON)
+	client["currentView"] = "canvas"
+	var state struct {
+		WorkshopState map[string]any `json:"workshopState"`
+	}
+	if err := json.Unmarshal([]byte(workshopState(client)), &state); err != nil || !reflect.DeepEqual(state.WorkshopState["generationBatches"], client["generationBatches"]) {
+		t.Fatalf("workshop state lost the current manifest: %s", workshopState(client))
+	}
+	for _, withManifest := range []bool{true, false} {
+		if !withManifest {
+			delete(client, "generationBatches")
+		}
+		var capabilities struct {
+			Actions []string `json:"actions"`
+			Tools   []string `json:"availableTools"`
+		}
+		if err := json.Unmarshal([]byte(viewCapabilities("", client)), &capabilities); err != nil {
+			t.Fatal(err)
+		}
+		expected := []string{"planning_from_workspace_summary"}
+		if withManifest {
+			expected = append(expected, "request_generate_batch")
+		}
+		if !reflect.DeepEqual(capabilities.Actions, expected) || withManifest && !reflect.DeepEqual(capabilities.Tools, []string{"trigger_generate_batch"}) || !withManifest && len(capabilities.Tools) != 0 {
+			t.Fatalf("incorrect batch capability for manifest=%v: %+v", withManifest, capabilities)
+		}
+	}
+}
 
 func TestGenerateBatchArguments(t *testing.T) {
 	invalid := []string{

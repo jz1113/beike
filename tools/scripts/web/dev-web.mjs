@@ -11,6 +11,7 @@ import {
   openBrowser,
   portFree,
   readApiPort,
+  readDevApiDefaults,
   resolveAccessToken,
   resolveAppDataDir,
   resolveCli,
@@ -33,10 +34,17 @@ const appDataDir = resolve(process.env.AZHUO_DATA_DIR || (isolated ? join(resolv
 let gatewayChild = null;
 let viteChild = null;
 
+let shuttingDown = false;
 const shutdown = (code = 0) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   killChild(viteChild);
+  if (!gatewayChild || gatewayChild.exitCode !== null) {
+    process.exit(code);
+  }
+  gatewayChild.once('exit', () => process.exit(code));
   killChild(gatewayChild);
-  process.exit(code);
+  setTimeout(() => process.exit(code), 16000).unref();
 };
 process.on('SIGINT', () => shutdown());
 process.on('SIGTERM', () => shutdown());
@@ -45,6 +53,7 @@ try {
   if (isolated && appDataDir === resolve(resolveAppDataDir())) {
     throw new Error('隔离开发模式不能使用日常用户数据目录，请指定独立的 AZHUO_DATA_DIR');
   }
+  const envDefaults = readDevApiDefaults(workspaceRoot, isolated);
   resolveCli(workspaceRoot, 'vite', 'vite');
   ensureAppDatabase(workspaceRoot, appDataDir);
   const accessToken = resolveAccessToken(workspaceRoot, appDataDir, { isolated });
@@ -67,7 +76,7 @@ try {
     throw new Error(`UI 端口 ${vitePort} 已被未记录的进程占用，请先关闭对应启动终端`);
   }
   writeApiPort(workspaceRoot, apiPort, { isolated });
-  gatewayChild = startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, isolated });
+  gatewayChild = startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, envDefaults, isolated });
   if (!(await waitFor(() => healthOk(apiPort), `Go API http://127.0.0.1:${apiPort}`, 60000, gatewayChild))) shutdown(1);
   if (!reuseVite) viteChild = startViteServer({ workspaceRoot, apiPort, appDataDir, accessToken, vitePort, isolated });
   if (!(await waitFor(() => viteOk(vitePort), `Vite http://127.0.0.1:${vitePort}`, 60000, viteChild))) shutdown(1);

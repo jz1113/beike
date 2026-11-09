@@ -116,7 +116,7 @@ export default function PromptBarSkillsModal({
       title.includes(q) ||
       skill.name.toLowerCase().includes(q) ||
       Boolean(skill.category && skill.category.toLowerCase().includes(q)) ||
-      skill.description.toLowerCase().includes(q)
+      (skill.displayDescription || '').toLowerCase().includes(q) || skill.description.toLowerCase().includes(q)
     );
   });
 
@@ -227,14 +227,47 @@ export default function PromptBarSkillsModal({
 
               {showCreateMenu && (
                 <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-44 rounded-[22px] border border-slate-200/80 bg-white/95 p-2 shadow-[0_16px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-[#22242A]/95 dark:shadow-[0_18px_44px_rgba(0,0,0,0.55)]">
-                  <button type="button" onClick={() => { setShowCreateMenu(false); onClose(); onAgentCreate(); }} className="flex w-full cursor-pointer items-center rounded-xl px-4 py-2.5 text-left text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100/90 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.08] dark:hover:text-white"><span>通过Agent创建</span></button>
-                  <button type="button" onClick={() => uploadFileInputRef.current?.click()} className="flex w-full cursor-pointer items-center rounded-xl px-4 py-2.5 text-left text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100/90 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.08] dark:hover:text-white"><span>上传本地Skill</span></button>
-                  <button type="button" onClick={() => { setShowCreateMenu(false); onClose(); onManualCreate(); }} className="flex w-full cursor-pointer items-center rounded-xl px-4 py-2.5 text-left text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100/90 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.08] dark:hover:text-white"><span>手动创建Skill</span></button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateMenu(false);
+                      onClose();
+                      onAgentCreate();
+                    }}
+                    className="flex w-full cursor-pointer items-center rounded-xl px-4 py-2.5 text-left text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100/90 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.08] dark:hover:text-white"
+                  >
+                    <span>通过Agent创建</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => uploadFileInputRef.current?.click()}
+                    className="flex w-full cursor-pointer items-center rounded-xl px-4 py-2.5 text-left text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100/90 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.08] dark:hover:text-white"
+                  >
+                    <span>上传本地Skill</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateMenu(false);
+                      onClose();
+                      onManualCreate();
+                    }}
+                    className="flex w-full cursor-pointer items-center rounded-xl px-4 py-2.5 text-left text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100/90 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.08] dark:hover:text-white"
+                  >
+                    <span>手动创建Skill</span>
+                  </button>
                 </div>
               )}
             </div>
 
-            <button type="button" onClick={onClose} aria-label="关闭技能窗口" className="cursor-pointer rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/70 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"><X className="h-4 w-4" /></button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="关闭技能窗口"
+              className="cursor-pointer rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/70 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
@@ -310,7 +343,10 @@ export default function PromptBarSkillsModal({
             onClose={() => setSelectedSkillId(null)}
             onToggleActive={handleToggleActive}
             onTryNow={handleTryNow}
-            onDelete={async (skill) => { await deleteAssistantSkill(skill.id); showToast('技能已卸载'); }}
+            onDelete={async (skill) => {
+              await deleteAssistantSkill(skill.id);
+              showToast('技能已卸载');
+            }}
             showToast={showToast}
           />
         )}

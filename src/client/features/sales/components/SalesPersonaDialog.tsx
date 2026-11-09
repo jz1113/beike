@@ -1,20 +1,28 @@
-import { PERSONA_CATEGORIES, type PersonaCategory, classifyPersonaGroup, personaCategory, personaGender } from '../model/salesPersonaClassification';
+import { PERSONA_CATEGORIES, PERSONA_SHEET_VIEWS, type PersonaCategory, classifyPersonaGroup, personaCategory, personaGender, personaImageFields, readPersonaViews, type SupplementView } from '../model/salesActionViews';
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, Trash2, X } from 'lucide-react';
 import { confirmAction } from '@client/shared/utils/confirmAction';
 import type { SalesPersonaCandidate, SalesVoiceCandidate } from '@shared/domain/sales';
+import { generateSalesAssetGrid } from '../api/salesAssetViews';
 import { createSalesMaterial, deleteSalesMaterial, updateSalesMaterial } from '../api/salesMaterials';
-import { useSalesAssetDraft } from '../hooks/useSalesAssetDraft';
-import { useSalesPersonaViews } from '../hooks/useSalesPersonaViews';
+import { useSalesAssetDraft, useSalesAssetViews, type SalesAssetBackground } from '../hooks/useSalesAssetViews';
+import { compareSalesAssetNames, readSalesAssetCreation, readSalesAssetJobId, type SalesAssetDraftPersistence } from '../model/salesAssetDraft';
 import { mergeGroupTag } from '../model/salesMaterialCatalog';
-import { PERSONA_SHEET_VIEWS, personaImageFields } from '../model/salesPersonaViews';
-import { compareSalesAssetNames } from '../model/salesAssetNames';
-import { salesFocusClass, salesGhostButtonClass, salesInputClass } from './salesChrome';
-import { SalesAssetDraftStatus } from './SalesAssetDraftStatus';
+import { SalesAssetDraftStatus, salesFocusClass, salesGhostButtonClass, salesInputClass } from './salesChrome';
 import { SalesAssetViewGallery } from './SalesAssetViewGallery';
 import { SalesLibrarySelect } from './SalesLibrarySelect';
 import '../salesAssetDialog.css';
 import '../salesPersona.css';
+
+function useSalesPersonaViews(persona?: SalesPersonaCandidate, draft?: SalesAssetDraftPersistence, background?: SalesAssetBackground<SupplementView>) {
+  return useSalesAssetViews<SupplementView>({
+    draft, background, creationMode: !persona || Boolean(readSalesAssetCreation(persona.dimensions)),
+    creation: readSalesAssetCreation(persona?.dimensions), jobId: readSalesAssetJobId(persona?.dimensions),
+    initial: () => readPersonaViews(persona), definitions: PERSONA_SHEET_VIEWS,
+    referenceKeys: ['main', 'face'], prefix: 'persona-grid',
+    generate: (request, signal, onStage, onProgress) => generateSalesAssetGrid('persona', request, signal, onStage, onProgress),
+  });
+}
 
 interface Props {
   persona?: SalesPersonaCandidate;

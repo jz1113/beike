@@ -2,23 +2,27 @@ import { getApprovedModel } from './modelCatalog';
 
 /**
  * 厂商权威度与展示优先级清单
+ * 核心顺序：Gemini(Google) -> GPT(OpenAI) -> Claude(Anthropic) -> Grok(xAI) -> DeepSeek -> Kimi(Moonshot) -> Qwen(Alibaba) -> Muse(Meta)
  */
 export const VENDOR_PRIORITY: readonly string[] = [
+  'google',
   'openai',
   'anthropic',
-  'google',
   'xai',
   'deepseek',
-  'bytedance',
+  'moonshot',
   'alibaba',
+  'meta',
+  'bytedance',
   'minimax',
   'zhipu',
   'kuaishou',
-  'moonshot',
   'flux',
   'midjourney',
   'vidu',
-  'meta',
+  'hunyuan',
+  'tripo',
+  'meshy',
   'xiaomi',
   'yi',
   'baidu',
@@ -30,7 +34,7 @@ export const VENDOR_PRIORITY: readonly string[] = [
   'runway',
   'pika',
   'recraft',
-  'tripo',
+  'stability',
   'suno',
   'elevenlabs',
   'topaz',
@@ -89,7 +93,7 @@ const VENDOR_KEYWORD_RULES: Array<{ id: string; keywords: string[] }> = [
   { id: 'kuaishou', keywords: ['kling', 'kolors', 'keling', 'kuaishou'] },
   { id: 'midjourney', keywords: ['midjourney', 'niji', 'mj'] },
   { id: 'vidu', keywords: ['vidu', 'shengshu'] },
-  { id: 'meta', keywords: ['llama', 'meta'] },
+  { id: 'meta', keywords: ['llama', 'meta', 'muse'] },
   { id: 'xiaomi', keywords: ['xiaomi', 'mimo'] },
   { id: 'yi', keywords: ['yi-', 'yi_', '01.ai', '01ai', '01-ai', 'yi-lightning', 'yi-large'] },
   { id: 'baidu', keywords: ['ernie', 'baidu', 'wenxin', '文心'] },
@@ -111,6 +115,10 @@ const VENDOR_KEYWORD_RULES: Array<{ id: string; keywords: string[] }> = [
 ];
 
 const VENDOR_ALIASES: Record<string, string> = {
+  gemini: 'google',
+  gpt: 'openai',
+  claude: 'anthropic',
+  grok: 'xai',
   kling: 'kuaishou',
   qwen: 'alibaba',
   doubao: 'bytedance',
@@ -118,6 +126,8 @@ const VENDOR_ALIASES: Record<string, string> = {
   bfl: 'flux',
   shengshu: 'vidu',
   kimi: 'moonshot',
+  muse: 'meta',
+  llama: 'meta',
   glm: 'zhipu',
   chatglm: 'zhipu',
 };

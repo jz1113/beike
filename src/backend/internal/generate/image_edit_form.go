@@ -1,6 +1,8 @@
 package generate
 
 import (
+	"beike.local/cloud/src/backend/internal/gateway"
+	"beike.local/cloud/src/backend/internal/platform/storage"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -8,15 +10,13 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/textproto"
 	"net/url"
 	"os"
 	"strings"
 	"time"
-
-	"beike.local/cloud/src/backend/internal/gateway"
-	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
 const (
@@ -112,7 +112,7 @@ func normalizeImageRef(ref string) string {
 }
 
 func loadEditImage(ctx context.Context, ref string, index int, workspace string, production bool) (editImageFile, error) {
-	ref = normalizeImageRef(ref)
+	ref = localEditStorageReference(normalizeImageRef(ref))
 	var file editImageFile
 	var err error
 	switch {
@@ -160,11 +160,11 @@ func downloadEditImage(ctx context.Context, ref string) (editImageFile, error) {
 	}
 	response, err := gateway.ModelHTTP().Do(request)
 	if err != nil {
-		return editImageFile{}, errors.New("参考图下载失败")
+		return editImageFile{}, fmt.Errorf("参考图下载失败：%s", gateway.PresentUpstreamError(err.Error()))
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return editImageFile{}, errors.New("参考图下载失败")
+		return editImageFile{}, fmt.Errorf("参考图下载失败（HTTP %d）", response.StatusCode)
 	}
 	raw, err := io.ReadAll(io.LimitReader(response.Body, editImageSourceLimit+1))
 	if err != nil {
@@ -213,6 +213,13 @@ func bytesToEditImage(ctx context.Context, header string, raw []byte) (editImage
 	}
 	mimeType, ext, ok := imageMIME(header, raw)
 	if !ok {
+		if isGIFImage(header, raw) {
+			fitted, fittedType, err := gateway.CompressUploadImage(ctx, raw, "image/gif", editImageMaxBytes)
+			if err != nil {
+				return editImageFile{}, errors.New("不是有效的图片数据")
+			}
+			return editImageFile{filename: "image.jpg", mime: fittedType, data: fitted}, nil
+		}
 		return editImageFile{}, errors.New("请使用 PNG、JPEG 或 WebP")
 	}
 	if len(raw) <= editImageMaxBytes {
@@ -228,6 +235,14 @@ func bytesToEditImage(ctx context.Context, header string, raw []byte) (editImage
 		return editImageFile{}, errors.New("不是有效的图片数据")
 	}
 	return editImageFile{filename: "image.jpg", mime: fittedType, data: fitted}, nil
+}
+
+func isGIFImage(header string, data []byte) bool {
+	media := strings.ToLower(strings.TrimSpace(strings.Split(header, ";")[0]))
+	if media == "image/gif" {
+		return true
+	}
+	return bytes.HasPrefix(data, []byte("GIF87a")) || bytes.HasPrefix(data, []byte("GIF89a"))
 }
 
 func imageMIME(header string, data []byte) (string, string, bool) {
@@ -269,7 +284,7 @@ func storageMIME(path string) string {
 // OpenAI documents multiple edit inputs as image[]. Repeating a single image field drops every file after the first.
 func editImageField(payload map[string]any, count int) string {
 	model := payloadText(payload["model"])
-	if model == "openai/gpt-image-2" || (count > 1 && isGptImageModel(model)) {
+	if count > 1 && isGptImageModel(model) {
 		return "image[]"
 	}
 	return "image"
@@ -290,6 +305,16 @@ func payloadImageRefs(value any) []string {
 			}
 		}
 		return out
+	case []any:
+		var out []string
+		for _, item := range typed {
+			if rawText, ok := item.(string); ok {
+				if text := strings.TrimSpace(rawText); text != "" {
+					out = append(out, text)
+				}
+			}
+		}
+		return out
 	case string:
 		if text := strings.TrimSpace(typed); text != "" {
 			return []string{text}
@@ -303,4 +328,23 @@ func fileExt(name string) string {
 		return name[dot:]
 	}
 	return ""
+}
+
+// A browser expands local /storage paths to its loopback origin. Resolve these
+// through the existing workspace-scoped file reader, never through outbound HTTP.
+func localEditStorageReference(ref string) string {
+	parsed, err := url.Parse(ref)
+	if err != nil || parsed.User != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return ref
+	}
+	host := strings.ToLower(parsed.Hostname())
+	ip := net.ParseIP(host)
+	if host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+		return ref
+	}
+	path := parsed.EscapedPath()
+	if !strings.HasPrefix(path, "/storage/") {
+		return ref
+	}
+	return path
 }

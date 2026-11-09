@@ -44,10 +44,7 @@ export interface TranslationSchema {
       chat: string;
       image: string;
       video: string;
-      three_d: string;
-      music: string;
       voice: string;
-      avatar: string;
       storage: string;
       appearance: string;
       language: string;
@@ -129,9 +126,6 @@ export interface TranslationSchema {
     assetLibrary: string;
     aiGenerated: string;
     myUploads: string;
-    historyView: string;
-    flatView: string;
-    projectView: string;
     noMatchingMaterials: string;
     batchAction: string;
     selectAll: string;

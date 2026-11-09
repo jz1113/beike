@@ -2,17 +2,14 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { apiRequest } from '@client/shared/api/apiRequest';
 import { pollSingleTaskResult, submitImageGenTaskResult } from '@client/shared/api/generation/generationApi';
 import { convertImageToJpeg } from '@client/shared/media/imageJpeg';
-import { PERSONA_VIEWS } from '../model/salesPersonaViews';
-import { SCENE_VIEWS } from '../model/salesSceneViews';
+import { PERSONA_VIEWS, SCENE_VIEWS } from '../model/salesActionViews';
 import { generateSalesAssetGrid, uploadSalesViewImage, type AssetViewRequest } from './salesAssetViews';
-import { listSalesPrompts } from './salesPrompts';
-import { uploadSalesCustomAsset } from './salesProduction';
+import { listSalesPrompts, uploadSalesCustomAsset } from './salesMaterials';
 
 vi.mock('@client/shared/api/apiRequest', () => ({ apiRequest: vi.fn() }));
-vi.mock('@client/shared/api/gatewayClient', () => ({ getModelCredentials: () => ({}) }));
+vi.mock('@client/shared/api/gatewayClient', () => ({ getModelCredentials: () => ({}), getGatewayClientHeaders: () => ({}) }));
 vi.mock('@client/shared/api/generation/generationApi', () => ({ submitImageGenTaskResult: vi.fn(), pollSingleTaskResult: vi.fn() }));
-vi.mock('./salesProduction', () => ({ uploadSalesCustomAsset: vi.fn() }));
-vi.mock('./salesPrompts', () => ({ listSalesPrompts: vi.fn() }));
+vi.mock('./salesMaterials', () => ({ uploadSalesCustomAsset: vi.fn(), listSalesPrompts: vi.fn() }));
 vi.mock('@client/shared/media/imageJpeg', () => ({ convertImageToJpeg: vi.fn() }));
 
 const jpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0xff, 0xd9]);
@@ -77,7 +74,7 @@ it('polls the original task and uses the stored prompt instead of generating aga
   await generateSalesAssetGrid('persona', request, new AbortController().signal);
   expect(submitImageGenTaskResult).not.toHaveBeenCalled();
   expect(listSalesPrompts).not.toHaveBeenCalled();
-  expect(pollSingleTaskResult).toHaveBeenCalledExactlyOnceWith('old-task', expect.any(Function), undefined, request.model);
+  expect(pollSingleTaskResult).toHaveBeenCalledExactlyOnceWith('old-task', expect.any(Function), undefined, request.model, expect.objectContaining({ localTaskId: request.key, headers: {} }));
 });
 
 it('retries failed cropping of a synchronous result without a second paid submission', async () => {

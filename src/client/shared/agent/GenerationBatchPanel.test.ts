@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { extractGenerationPrompts } from '@shared/domain/assistant/generationPrompts';
 import { configureDomainRuntime } from '@shared/domain/core/runtime';
 import GenerationBatchPanel, { initialBatchDraft } from './GenerationBatchPanel';
 import { resolveBatchModelSummary, resolvePreferredBatchModel } from './GenerationBatchSettings';
@@ -79,6 +80,13 @@ describe('GenerationBatchPanel and GenerationBatchSettings', () => {
     expect(draft.settings.imageAspect).toBe('9:16');
     expect(draft.settings.videoAspect).toBe('9:16');
     expect(draft.settings.videoDuration).toBe(8);
+  });
+
+  it('shows the actual UGC aspect and duration instead of the current global defaults', () => {
+    const source = { ...imageSource, entries: extractGenerationPrompts('```video-prompt\n制作一条8秒、9:16竖屏的商品展示视频。0–2秒展示，2–5秒佩戴，5–8秒取下。\n```') };
+    const draft = initialBatchDraft(source);
+    expect(draft.settings).toMatchObject({ videoAspect: '9:16', videoDuration: 8 });
+    expect(draft.drafts[0]).toMatchObject({ aspect: '9:16', duration: 8 });
   });
 
   it('prefers user-saved or custom synced models over the generic gpt-image-2 seed fallback and summarizes display labels', () => {

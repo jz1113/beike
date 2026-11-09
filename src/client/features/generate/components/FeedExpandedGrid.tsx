@@ -136,7 +136,7 @@ export default function FeedExpandedGrid({
                   </div>
                 </div>
               ) : isGenerating ? (
-                /* 正在生成中 (柔光动画卡片) */
+                /* 正在生成中 */
                 <AIGeneratingCard
                   task={task}
                   showProgressBadge={showProgressBadge}

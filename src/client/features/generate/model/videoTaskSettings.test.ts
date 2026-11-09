@@ -1,24 +1,45 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'zustand';
+import { configureDomainRuntime } from '@shared/domain/core/runtime';
 import type { AppState, GenerationTask } from '@client/store';
 import { createHomeSlice } from '@client/store/homeSlice';
 import { sanitizeTaskForStorage } from '@client/store/persist/generation';
 import { GenerationTaskSchema } from '@shared/contracts/generate';
 import { loadPromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
-import { restoreVideoTaskSettings } from './videoTaskSettings';
+import { agentModelName } from '../components/AgentTurn';
+import { restoreVideoTaskSettings } from '../hooks/useGenerateTaskActions';
 
 vi.mock('@client/shared/api/gatewayClient', () => ({ getGatewayClientBaseUrl: () => 'https://metaso.cn/api' }));
 
+const model = 'gemini-custom-flash';
 const createSettingsStore = () => createStore<AppState>()((...args) => createHomeSlice(...args) as AppState);
+
 beforeEach(() => {
   const values = new Map<string, string>();
+  const data = new Map([
+    ['beike_api_providers_v2', JSON.stringify([{ id: 'relay', name: '阿卓反代' }])],
+    ['beike_modality_models_v1_chat', JSON.stringify([
+      { id: 'relay-entry', modelId: model, name: model, channelId: 'relay' },
+      { id: 'global-entry', modelId: model, name: model },
+    ])],
+  ]);
+  configureDomainRuntime({
+    storage: {
+      getItem: key => data.get(key) ?? null,
+      setItem: (key, value) => { data.set(key, value); },
+      removeItem: key => { data.delete(key); },
+    },
+  });
   vi.stubGlobal('window', {});
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => values.set(key, value),
   });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  configureDomainRuntime({ storage: null });
+  vi.unstubAllGlobals();
+});
 
 describe('restored video Context IR preferences', () => {
   it('preserves false through task schema, JSON storage, history reuse and a fresh store', () => {
@@ -45,5 +66,18 @@ describe('restored video Context IR preferences', () => {
       useReferenceImage: false, status: 'SUCCESS', progress: '100%', createdAt: 1 }) as GenerationTask;
     restoreVideoTaskSettings(store.getState(), old);
     expect(store.getState().quickVideoContextIrEnabled).toBe(true);
+  });
+});
+
+describe('agentModelName', () => {
+  it('uses the selected channel when the server reports a shared upstream model', () => {
+    const task = { model, agentTurn: { modelUsed: model } };
+    expect(agentModelName({ ...task, modelRouteKey: 'global-entry' })).toBe(model);
+    expect(agentModelName({ ...task, modelRouteKey: 'relay-entry' })).toBe(model + ' · 阿卓反代');
+    expect(agentModelName(task)).toBe(model);
+  });
+
+  it('shows a different model reported by the server', () => {
+    expect(agentModelName({ model, modelRouteKey: 'relay-entry', agentTurn: { modelUsed: 'fallback-model' } })).toBe('fallback-model');
   });
 });

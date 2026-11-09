@@ -1,6 +1,10 @@
 import { DEEPSEEK_BASE_URL, isDeepSeekRoute, deepSeekModel } from './deepseek';
 import { domainEnv } from '../core/runtime';
-import { normalizeGatewayBaseUrl } from './gatewayUrl';
+
+/** Accept a gateway root or OpenAI /v1 base while preserving reverse-proxy prefixes. */
+export function normalizeGatewayBaseUrl(raw?: string | null): string {
+  return String(raw || '').trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
+}
 
 function isPrivateHostname(hostname: string): boolean {
   const host = hostname.replace(/^\[|\]$/g, '').toLowerCase().replace(/\.$/, '');

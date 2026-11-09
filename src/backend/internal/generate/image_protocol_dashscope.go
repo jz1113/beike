@@ -219,7 +219,7 @@ func dashscopeImageRefs(req imageRequest) ([]string, error) {
 }
 
 func dashscopeImageRef(ctx context.Context, ref string, index int, workspace string, production bool) (string, error) {
-	ref = strings.TrimSpace(ref)
+	ref = localEditStorageReference(normalizeImageRef(ref))
 	lower := strings.ToLower(ref)
 	switch {
 	case strings.HasPrefix(lower, "data:image/"):

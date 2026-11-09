@@ -1,4 +1,4 @@
-import type { UsageLogItem } from './usageLog';
+import type { UsageLogItem } from './usageScope';
 import { resolveModelVendor } from './modelVendor';
 
 export type UsageRange = 'today' | '30d' | '90d' | '1y' | 'all';

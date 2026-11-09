@@ -1,4 +1,4 @@
-import type { ImageRequestTemplate } from '@shared/contracts/imageRequestTemplate';
+import type { ImageRequestTemplate } from '@shared/contracts/generate';
 
 export function dashscopeRoot(baseUrl: string): string {
   return baseUrl

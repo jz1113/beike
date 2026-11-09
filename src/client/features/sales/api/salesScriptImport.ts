@@ -1,13 +1,34 @@
-import { submitDepthVideo } from '@client/shared/api/generation/depthGeneration';
+import { apiFetch } from '@client/shared/api/apiClient';
+import { pollDepthVideoTask, submitDepthVideo } from '@client/shared/api/generation/depthGeneration';
+import { sleepWhilePolling } from '@client/shared/api/generation/generationAbort';
 import { requiresGenerationRecovery } from '@client/shared/api/generation/generationRecovery';
 import { DEPTH_VIDEO_LIMITS } from '@shared/domain/media/depthVideo';
 import {
   analyzeReferenceVideo, fetchSalesScript, patchSalesScript, saveSalesScript,
   uploadScriptVideo, type StoredSalesScript,
 } from './salesScripts';
-import { readSalesDepthReceipt } from './salesDepth';
-import { ScriptDepthFailed, waitScriptDepth } from './salesScriptDepth';
 import type { SalesScriptImportItem } from '../model/salesScriptImport';
+
+export async function readSalesDepthReceipt(video: boolean, operationId: string, signal: AbortSignal): Promise<{ taskId?: string; resultUrl?: string }> {
+  const response = await apiFetch(`/api/generate/depth-${video ? 'video' : 'image'}?taskKey=${encodeURIComponent(operationId)}`, { signal });
+  const data = await response.json();
+  if (!response.ok || !data.success || (!data.taskId && !data.resultUrl)) throw new Error(data.error || '原转换任务结果待核对，请稍后继续查询');
+  return data;
+}
+
+export class ScriptDepthFailed extends Error {}
+async function waitScriptDepth(taskId: string, signal: AbortSignal, onProgress: (text: string) => void): Promise<string> {
+  const deadline = Date.now() + 30 * 60_000;
+  while (!signal.aborted && Date.now() < deadline) {
+    const result = await pollDepthVideoTask(taskId, signal);
+    signal.throwIfAborted();
+    if (result.status === 'FAILURE') throw new ScriptDepthFailed(result.failReason || '深度转换失败');
+    if (result.status === 'SUCCESS' && result.resultUrl) return result.resultUrl;
+    onProgress(`深度动作视频处理中 ${result.progress || ''}`);
+    await sleepWhilePolling(1000, () => signal.aborted);
+  }
+  throw new Error('等待已结束，可继续查询原深度任务');
+}
 
 interface ImportServices {
   upload: typeof uploadScriptVideo;

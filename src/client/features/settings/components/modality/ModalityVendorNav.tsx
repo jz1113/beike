@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import type { ModalityVendorOption } from '../../model/modalityModelTypes';
+import type { ModalityVendorOption } from '../../model/modalityModelStorage';
 import { ModelIcon } from '@client/shared/ui/ModelIcons';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
