@@ -20,8 +20,11 @@ import (
 type workspaceIDKey struct{}
 
 const (
-	localWorkspace     = "local"
-	minWorkspaceSecret = 32
+	publicSessionCookie = "beike_public_session"
+	publicSessionScope  = "beike-public-web-session"
+	publicSessionAge    = 60 * 60 * 24 * 30
+	localWorkspace      = "local"
+	minWorkspaceSecret  = 32
 )
 
 func WriteJSON(w http.ResponseWriter, status int, body any) {
@@ -54,13 +57,36 @@ func Authorized(r *http.Request, cfg config.Config) bool {
 		return false
 	}
 	token := RequestToken(r)
-	if token == "" {
-		return false
-	}
 	if same(token, cfg.AccessToken) || (cfg.AdminToken != "" && same(token, cfg.AdminToken)) {
 		return true
 	}
-	return !cfg.Production() && same(token, "azhuo-local-dev")
+	return (cfg.Production() && cfg.PublicWeb && validPublicSession(r, cfg)) ||
+		(!cfg.Production() && same(token, "azhuo-local-dev"))
+}
+
+func validPublicSession(r *http.Request, cfg config.Config) bool {
+	expiry, signature, ok := strings.Cut(cookieValue(r, publicSessionCookie), ".")
+	if !ok {
+		return false
+	}
+	exp, err := strconv.ParseInt(expiry, 10, 64)
+	return err == nil && mediasign.Verify(publicSessionScope, exp, signature, cfg.AccessToken)
+}
+
+func IssuePublicSession(w http.ResponseWriter, r *http.Request, cfg config.Config) {
+	if cfg.AccessToken == "" || validPublicSession(r, cfg) {
+		return
+	}
+	signature := mediasign.Create(publicSessionScope, cfg.AccessToken, publicSessionAge)
+	http.SetCookie(w, &http.Cookie{
+		Name:     publicSessionCookie,
+		Value:    strconv.FormatInt(signature.Exp, 10) + "." + signature.Sig,
+		Path:     "/",
+		MaxAge:   publicSessionAge,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 func RequestToken(r *http.Request) string {

@@ -188,16 +188,7 @@ func collectHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer db.Close()
-		apiKey := strings.TrimSpace(r.Header.Get("x-wanbang-key"))
-		apiSecret := strings.TrimSpace(r.Header.Get("x-wanbang-secret"))
-		if !cfg.Production() {
-			if apiKey == "" {
-				apiKey = strings.TrimSpace(os.Getenv("WANBANG_API_KEY"))
-			}
-			if apiSecret == "" {
-				apiSecret = strings.TrimSpace(os.Getenv("WANBANG_API_SECRET"))
-			}
-		}
+		apiKey, apiSecret := collect.RequestCredentials(r.Header, !cfg.Production())
 		result := collect.Product(r.Context(), db, httpx.WorkspaceFrom(r), payload, apiKey, apiSecret, network.SafeClient())
 		httpx.WriteJSON(w, result.Status, result.Body)
 	}

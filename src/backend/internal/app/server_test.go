@@ -201,12 +201,47 @@ func TestProductionIndexCookieRequiresTrustedEntryAndSetsHttpOnlySecure(t *testi
 	proxiedBasicAuth.RemoteAddr = "127.0.0.1:43210"
 	proxiedBasicAuth.Header.Set("X-Forwarded-For", "203.0.113.10")
 	proxiedBasicAuth.Header.Set("X-Forwarded-Proto", "https")
-	proxiedBasicAuth.Header.Set("Authorization", "Basic YmVpa2U6c2VjcmV0")
+	proxiedBasicAuth.Header.Set("X-Beike-Web-User", "beike")
 	recTrusted := httptest.NewRecorder()
 	handler.ServeHTTP(recTrusted, proxiedBasicAuth)
 	cookies := recTrusted.Result().Cookies()
 	if len(cookies) != 1 || cookies[0].Name != "app_token" || !cookies[0].HttpOnly || !cookies[0].Secure {
 		t.Fatalf("expected HttpOnly+Secure app_token cookie on authenticated entry, got %+v", cookies)
+	}
+}
+
+func TestPublicWebSessionKeepsWorkspaceProtection(t *testing.T) {
+	dist := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dist, "index.html"), []byte("<html>ok</html>"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	handler := New(config.Config{AccessToken: "prod-secret", NodeEnv: "production", WebDistDir: dist, PublicWeb: true})
+	index := httptest.NewRecorder()
+	handler.ServeHTTP(index, httptest.NewRequest(http.MethodGet, "https://example.test/", nil))
+	cookies := index.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != "beike_public_session" || cookies[0].Value == "prod-secret" || !cookies[0].Secure || !cookies[0].HttpOnly {
+		t.Fatalf("expected a signed Secure HttpOnly public session, got %+v", cookies)
+	}
+
+	for _, tc := range []struct {
+		name, cookie, workspace string
+		want                    int
+	}{
+		{"no session", "", strings.Repeat("w", 32), http.StatusUnauthorized},
+		{"tampered session", cookies[0].Value + "x", strings.Repeat("w", 32), http.StatusUnauthorized},
+		{"no workspace", cookies[0].Value, "", http.StatusUnauthorized},
+		{"valid session and workspace", cookies[0].Value, strings.Repeat("w", 32), http.StatusOK},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/system/models/pricing", nil)
+			req.AddCookie(&http.Cookie{Name: cookies[0].Name, Value: tc.cookie})
+			req.Header.Set("x-workspace-token", tc.workspace)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Fatalf("got HTTP %d, want %d", rec.Code, tc.want)
+			}
+		})
 	}
 }
 

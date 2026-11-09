@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,6 +35,20 @@ type sharedProduct struct {
 
 var productIDPattern = regexp.MustCompile(`^\d{7,20}$`)
 var productLinkPattern = regexp.MustCompile(`(?i)https?://[^\s"'<>，。；）)\]]+`)
+
+func RequestCredentials(headers http.Header, allowEnv bool) (key, secret string) {
+	key = strings.TrimSpace(headers.Get("x-wanbang-key"))
+	secret = strings.TrimSpace(headers.Get("x-wanbang-secret"))
+	if allowEnv {
+		if key == "" {
+			key = strings.TrimSpace(os.Getenv("WANBANG_API_KEY"))
+		}
+		if secret == "" {
+			secret = strings.TrimSpace(os.Getenv("WANBANG_API_SECRET"))
+		}
+	}
+	return key, secret
+}
 
 func Product(ctx context.Context, db *sql.DB, workspace string, body map[string]any, apiKey, apiSecret string, client *http.Client) Result {
 	input, message := resolveProductInput(body)

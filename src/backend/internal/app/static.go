@@ -42,22 +42,6 @@ func protect(cfg config.Config, next http.Handler) http.Handler {
 	})
 }
 
-func webSession(cfg config.Config) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		cookie, err := r.Cookie("app_token")
-		if err == nil {
-			request := r.Clone(r.Context())
-			request.Header = http.Header{"Cookie": {cookie.String()}}
-			if httpx.Authorized(request, cfg) {
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-		}
-		w.WriteHeader(http.StatusUnauthorized)
-	}
-}
-
 func health(cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body := map[string]any{"success": true, "ok": true}
@@ -104,7 +88,11 @@ func staticHandler(cfg config.Config) http.Handler {
 }
 
 func writeIndex(w http.ResponseWriter, r *http.Request, cfg config.Config, index []byte) {
-	if shouldIssueIndexCookie(r, cfg) {
+	if cfg.Production() && cfg.PublicWeb {
+		if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+			httpx.IssuePublicSession(w, r, cfg)
+		}
+	} else if shouldIssueIndexCookie(r, cfg) {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "app_token",
 			Value:    url.QueryEscape(cfg.AccessToken),
@@ -137,7 +125,7 @@ func shouldIssueIndexCookie(r *http.Request, cfg config.Config) bool {
 		return false
 	}
 	if strings.TrimSpace(r.Header.Get("X-Forwarded-For")) != "" || strings.TrimSpace(r.Header.Get("X-Real-IP")) != "" {
-		return strings.TrimSpace(r.Header.Get("Authorization")) != ""
+		return strings.TrimSpace(r.Header.Get("X-Beike-Web-User")) != ""
 	}
 	return true
 }

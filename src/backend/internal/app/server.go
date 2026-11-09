@@ -237,7 +237,6 @@ func New(cfg config.Config) http.Handler {
 	mux.Handle("/api/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "error": "接口不存在"})
 	}))
-	mux.Handle("GET /_beike_session", webSession(cfg))
 	mux.Handle("/storage/", assets.Storage(cfg))
 	if cfg.WebDistDir != "" {
 		mux.Handle("/", staticHandler(cfg))

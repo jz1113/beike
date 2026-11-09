@@ -15,6 +15,7 @@ type Config struct {
 	NodeEnv     string
 	AccessToken string
 	AdminToken  string
+	PublicWeb   bool
 
 	CanvasMCPToken     string
 	CanvasMCPWorkspace string
@@ -44,6 +45,7 @@ func Load() Config {
 		NodeEnv:     nodeEnv,
 		AccessToken: access,
 		AdminToken:  strings.TrimSpace(os.Getenv("ADMIN_ACCESS_TOKEN")),
+		PublicWeb:   env("BEIKE_PUBLIC_WEB", "") == "1",
 
 		CanvasMCPToken:     strings.TrimSpace(os.Getenv("CANVAS_MCP_TOKEN")),
 		CanvasMCPWorkspace: strings.TrimSpace(os.Getenv("CANVAS_MCP_WORKSPACE_ID")),

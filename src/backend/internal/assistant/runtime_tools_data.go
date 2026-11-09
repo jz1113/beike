@@ -4,10 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"os"
 	"strings"
 
-	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/platform/collect"
 	"beike.local/cloud/src/backend/internal/platform/network"
 )
@@ -178,7 +176,7 @@ func urlList(value any) []string {
 	return out
 }
 
-func parseProductTool(ctx context.Context, db *sql.DB, cfg config.Config, workspace, raw string) string {
+func parseProductTool(ctx context.Context, db *sql.DB, workspace, raw, apiKey, apiSecret string) string {
 	if strings.TrimSpace(raw) == "" {
 		return toolJSON(false, "缺少 url")
 	}
@@ -188,8 +186,6 @@ func parseProductTool(ctx context.Context, db *sql.DB, cfg config.Config, worksp
 	if db == nil {
 		return toolJSON(false, "解析请求失败")
 	}
-	apiKey := strings.TrimSpace(os.Getenv("WANBANG_API_KEY"))
-	apiSecret := strings.TrimSpace(os.Getenv("WANBANG_API_SECRET"))
 	result := collect.Product(ctx, db, workspace, map[string]any{"url": raw}, apiKey, apiSecret, network.SafeClient())
 	body, err := json.Marshal(result.Body)
 	if err != nil {
@@ -216,7 +212,6 @@ func parseProductTool(ctx context.Context, db *sql.DB, cfg config.Config, worksp
 		"category": product["category"], "cover": product["picUrl"], "skuId": product["skuId"],
 		"sampleImages": sample, "props": images["props"],
 	})
-	_ = cfg
 	return string(out)
 }
 

@@ -9,7 +9,6 @@ if [[ "$(id -u)" -ne 0 || ! "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ || "$DOMAIN" != *.* ||
   exit 1
 fi
 certbot certonly --webroot -w /var/www/html --non-interactive --agree-tos --email "$EMAIL" -d "$DOMAIN"
-sed "s|__REPO_DIR__|$REPO_DIR|g" "$REPO_DIR/tools/deploy/nginx.web-session.conf" > /etc/nginx/beike-web-session.conf
 sed -e "s|__DOMAIN__|$DOMAIN|g" -e "s|__REPO_DIR__|$REPO_DIR|g" \
   "$REPO_DIR/tools/deploy/nginx.https.conf.example" > /etc/nginx/sites-available/beike-domain
 ln -sfn /etc/nginx/sites-available/beike-domain /etc/nginx/sites-enabled/beike-domain

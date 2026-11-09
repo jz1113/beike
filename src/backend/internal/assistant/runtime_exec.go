@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -136,8 +135,9 @@ func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r
 	noteTurnEvent(workspace, "turn/started", turnID, threadID, model, "", "", started)
 	userText := strings.TrimSpace(lastUserText(messages))
 	refresh := strings.HasPrefix(userText, "重新采集")
+	wanbangKey, wanbangSecret := collect.RequestCredentials(r.Header, !cfg.PublicWeb)
 	if id, platform, ok := directProductID(strings.TrimSpace(strings.TrimPrefix(userText, "重新采集"))); ok {
-		finishProductCollection(ctx, cfg, send, persist, workspace, turnID, threadID, id, platform, refresh)
+		finishProductCollection(ctx, cfg, send, persist, workspace, turnID, threadID, id, platform, refresh, wanbangKey, wanbangSecret)
 		return
 	}
 	intent := detectSocialIntent(lastUserText(messages))
@@ -213,8 +213,8 @@ func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r
 		box: &toolBox{
 			ctx: ctx, db: db, cfg: cfg, workspace: workspace, documents: documents, client: objectField(payload, "clientContext"),
 			plan: plan, results: results, budget: budget, allowed: append([]string{}, names...), skillFiles: skillResources(payload["skillResources"]),
-			pinnedSkillID: pinnedSkill,
-			skills:        catalog, pinnedCeiling: pinnedSkill != "" && len(allowed) > 0, ceiling: append([]string{}, allowed...), visual: &visualBudget{},
+			pinnedSkillID: pinnedSkill, wanbangKey: wanbangKey, wanbangSecret: wanbangSecret,
+			skills: catalog, pinnedCeiling: pinnedSkill != "" && len(allowed) > 0, ceiling: append([]string{}, allowed...), visual: &visualBudget{},
 		},
 		send: send, persist: persist, granted: sessionTools(workspace, threadID), turnID: turnID, threadID: threadID, space: workspace,
 		mu: &sync.Mutex{},
@@ -394,7 +394,7 @@ func directProductID(text string) (string, string, bool) {
 	return m[2], platform, true
 }
 
-func finishProductCollection(ctx context.Context, cfg config.Config, send func(map[string]any), persist func(map[string]any), workspace, turnID, threadID, id, platform string, refresh bool) {
+func finishProductCollection(ctx context.Context, cfg config.Config, send func(map[string]any), persist func(map[string]any), workspace, turnID, threadID, id, platform string, refresh bool, wanbangKey, wanbangSecret string) {
 	send(map[string]any{"type": "status", "message": "正在查询商品资料，缓存未命中时需要等待京东采集服务返回…"})
 	send(map[string]any{"type": "tool_call", "name": "collect_product", "displayName": "万邦商品采集", "status": "running"})
 	var body map[string]any
@@ -403,7 +403,7 @@ func finishProductCollection(ctx context.Context, cfg config.Config, send func(m
 		body = map[string]any{"success": false, "error": "无法打开商品数据库"}
 	} else {
 		defer db.Close()
-		result := collect.Product(ctx, db, workspace, map[string]any{"url": id, "platform": platform, "forceRefresh": refresh}, os.Getenv("WANBANG_API_KEY"), os.Getenv("WANBANG_API_SECRET"), network.SafeClient())
+		result := collect.Product(ctx, db, workspace, map[string]any{"url": id, "platform": platform, "forceRefresh": refresh}, wanbangKey, wanbangSecret, network.SafeClient())
 		encoded, _ := json.Marshal(result.Body)
 		_ = json.Unmarshal(encoded, &body)
 	}
