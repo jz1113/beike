@@ -12,6 +12,7 @@ import (
 
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func protect(cfg config.Config, next http.Handler) http.Handler {
@@ -39,6 +40,48 @@ func protect(cfg config.Config, next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(httpx.WithWorkspace(r.Context(), workspace)))
+	})
+}
+
+func withPublicCatalog(cfg config.Config, pattern string, catalog, protected http.Handler) http.Handler {
+	if !cfg.Production() {
+		return protected
+	}
+	var public http.Handler
+	switch pattern {
+	case "GET /api/catalog/assets/library", "GET /api/sales/studio-assets":
+		public = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Query().Has("export") {
+				protected.ServeHTTP(w, r)
+				return
+			}
+			catalog.ServeHTTP(w, r.WithContext(httpx.WithWorkspace(r.Context(), database.OfficialWorkspace)))
+		})
+	case "GET /api/catalog/skills":
+		// The frontend merges in its bundled public skills.
+		public = publicCatalogResponse(map[string]any{"success": true, "skills": []any{}, "hiddenOfficialRecipes": []any{}})
+	case "GET /api/sales/scripts":
+		public = publicCatalogResponse(map[string]any{"success": true, "items": []any{}})
+	case "GET /api/sales/asset-view-jobs":
+		public = publicCatalogResponse(map[string]any{"success": true, "jobs": []any{}})
+	case "GET /api/library/preferences":
+		public = publicCatalogResponse(map[string]any{"success": true, "showEntry": true, "sharingEnabled": false})
+	default:
+		return protected
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		if r.Method != http.MethodGet || httpx.Authorized(r, cfg) {
+			protected.ServeHTTP(w, r)
+			return
+		}
+		public.ServeHTTP(w, r)
+	})
+}
+
+func publicCatalogResponse(body map[string]any) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		httpx.WriteJSON(w, http.StatusOK, body)
 	})
 }
 
@@ -121,7 +164,7 @@ func shouldIssueIndexCookie(r *http.Request, cfg config.Config) bool {
 		return false
 	}
 	if strings.TrimSpace(r.Header.Get("X-Forwarded-For")) != "" || strings.TrimSpace(r.Header.Get("X-Real-IP")) != "" {
-		return strings.TrimSpace(r.Header.Get("Authorization")) != ""
+		return strings.TrimSpace(r.Header.Get("X-Beike-Web-User")) != ""
 	}
 	return true
 }

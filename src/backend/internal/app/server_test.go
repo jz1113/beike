@@ -191,6 +191,7 @@ func TestProductionIndexCookieRequiresTrustedEntryAndSetsHttpOnlySecure(t *testi
 	proxiedNoAuth := httptest.NewRequest(http.MethodGet, "/", nil)
 	proxiedNoAuth.RemoteAddr = "127.0.0.1:43210"
 	proxiedNoAuth.Header.Set("X-Forwarded-For", "203.0.113.10")
+	proxiedNoAuth.Header.Set("Authorization", "Basic spoofed")
 	recProxiedNoAuth := httptest.NewRecorder()
 	handler.ServeHTTP(recProxiedNoAuth, proxiedNoAuth)
 	if len(recProxiedNoAuth.Result().Cookies()) != 0 {
@@ -202,11 +203,38 @@ func TestProductionIndexCookieRequiresTrustedEntryAndSetsHttpOnlySecure(t *testi
 	proxiedBasicAuth.Header.Set("X-Forwarded-For", "203.0.113.10")
 	proxiedBasicAuth.Header.Set("X-Forwarded-Proto", "https")
 	proxiedBasicAuth.Header.Set("Authorization", "Basic YmVpa2U6c2VjcmV0")
+	proxiedBasicAuth.Header.Set("X-Beike-Web-User", "beike")
 	recTrusted := httptest.NewRecorder()
 	handler.ServeHTTP(recTrusted, proxiedBasicAuth)
 	cookies := recTrusted.Result().Cookies()
 	if len(cookies) != 1 || cookies[0].Name != "app_token" || !cookies[0].HttpOnly || !cookies[0].Secure {
 		t.Fatalf("expected HttpOnly+Secure app_token cookie on authenticated entry, got %+v", cookies)
+	}
+}
+
+func TestPublicCatalogKeepsPrivateReadsAndWritesProtected(t *testing.T) {
+	handler := New(config.Config{AccessToken: "secret", NodeEnv: "production"})
+	for _, test := range []struct {
+		method, path string
+		status       int
+	}{
+		{"GET", "/api/catalog/skills", 200},
+		{"GET", "/api/sales/scripts", 200},
+		{"GET", "/api/sales/asset-view-jobs", 200},
+		{"GET", "/api/library/preferences", 200},
+		{"GET", "/api/catalog/assets/library?type=all&export=1", 401},
+		{"GET", "/api/assistant/sessions", 401},
+		{"POST", "/api/catalog/skills", 401},
+		{"POST", "/api/catalog/assets/library", 401},
+		{"PATCH", "/api/library/preferences", 401},
+	} {
+		req := httptest.NewRequest(test.method, test.path, nil)
+		req.Header.Set("X-Workspace-Token", "anonymous-cannot-select-a-private-workspace")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != test.status {
+			t.Errorf("%s %s: got %d, want %d", test.method, test.path, rec.Code, test.status)
+		}
 	}
 }
 
@@ -336,6 +364,20 @@ func TestProductionWorkspaceIsolationAtHTTPBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO "SceneAsset" ("id","workspaceId","title","description","lighting","updatedAt") VALUES
+		('guest-visible-scene','official','Public fixture','','',CURRENT_TIMESTAMP),
+		('guest-private-scene',?,'Private fixture','','',CURRENT_TIMESTAMP)`, fmt.Sprintf("%x", sha256.Sum256([]byte(workspaceA)))); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/api/sales/studio-assets", "/api/catalog/assets/library?type=all&slim=1"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("X-Workspace-Token", workspaceA)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if body := rec.Body.String(); rec.Code != 200 || !strings.Contains(body, "guest-visible-scene") || strings.Contains(body, "guest-private-scene") {
+			t.Fatalf("public catalog %s leaked data or failed, status %d", path, rec.Code)
+		}
+	}
 	const draftID = "00000000-0000-4000-8000-000000000001"
 	const graph = `{"title":"workspace A draft","nodes":[{"id":"text","type":"text-node","title":"Draft","text":"Fixture"}],"edges":[]}`
 	if _, err := db.Exec(`INSERT INTO canvas_drafts (workspace,id,revision,graph,prompt_changes,created_at,updated_at)
