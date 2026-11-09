@@ -42,6 +42,22 @@ func protect(cfg config.Config, next http.Handler) http.Handler {
 	})
 }
 
+func webSession(cfg config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		cookie, err := r.Cookie("app_token")
+		if err == nil {
+			request := r.Clone(r.Context())
+			request.Header = http.Header{"Cookie": {cookie.String()}}
+			if httpx.Authorized(request, cfg) {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+}
+
 func health(cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body := map[string]any{"success": true, "ok": true}
