@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { isAppView, normalizeAppView } from '@client/store/appView';
 import type { ChatSession, GenerationTask } from '@client/store/appStoreTypes';
-import { buildViewSearchParams, parseAssetLibraryTab, parseViewFromSearchParams } from './routes';
+import { buildViewSearchParams, parseAssetLibraryTab, parseViewFromSearchParams, readRouteSearch, syncViewToHistory } from './routes';
 import { SidebarHistory } from './SidebarHistory';
 
 const state = vi.hoisted(() => ({ sessions: [] as ChatSession[], currentSessionId: 'chat' }));
@@ -41,6 +41,32 @@ describe('asset library tab links', () => {
   it.each(['', '?view=asset_library', '?view=asset_library&tab=unknown'])('keeps legacy and unknown links in the media library: %s', search => {
     expect(parseAssetLibraryTab(search)).toBe('media');
   });
+});
+
+it('consumes old links, hides route details, and records navigation without duplicate entries', () => {
+  const location = { pathname: '/', search: '?view=skills', hash: '' };
+  const history = {
+    state: null as { beikeRoute: string } | null,
+    replaceState: vi.fn((state: { beikeRoute: string }) => {
+      history.state = state;
+      location.search = '';
+    }),
+    pushState: vi.fn((state: { beikeRoute: string }) => { history.state = state; }),
+  };
+  vi.stubGlobal('window', { location, history });
+  try {
+    expect(readRouteSearch(location, { beikeRoute: 'view=canvas' })).toBe('?view=skills');
+    syncViewToHistory('skills', {}, true);
+    expect(history.replaceState).toHaveBeenCalledWith({ beikeRoute: 'view=skills' }, '', '/');
+    syncViewToHistory('assets', { tab: 'canvas' });
+    syncViewToHistory('assets', { tab: 'canvas' });
+    expect(history.pushState).toHaveBeenCalledExactlyOnceWith({ beikeRoute: 'view=assets&tab=canvas' }, '', '/');
+    const restored = readRouteSearch(location, history.state);
+    expect(parseViewFromSearchParams(restored)).toBe('assets');
+    expect(parseAssetLibraryTab(restored)).toBe('canvas');
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 describe('sidebar conversation history', () => {

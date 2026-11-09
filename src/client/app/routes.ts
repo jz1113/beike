@@ -86,11 +86,21 @@ export function buildViewSearchParams(view: AppView, extra?: Record<string, stri
   return params.toString();
 }
 
-export function syncViewToUrl(view: AppView, extra?: Record<string, string>) {
+export function readRouteSearch(location: Pick<Location, 'search'>, state: unknown): string {
+  if (location.search) return location.search;
+  if (state && typeof state === 'object' && 'beikeRoute' in state && typeof state.beikeRoute === 'string') {
+    return state.beikeRoute;
+  }
+  return '';
+}
+
+export function syncViewToHistory(view: AppView, extra?: Record<string, string>, replace = false) {
   if (typeof window === 'undefined') return;
   const next = buildViewSearchParams(view, extra);
-  const current = window.location.search.replace(/^\?/, '');
-  if (current === next) return;
-  const url = next ? `${window.location.pathname}?${next}` : window.location.pathname || '/';
-  window.history.replaceState(null, '', url);
+  const { history, location } = window;
+  if (!location.search && history.state?.beikeRoute === next) return;
+  const state = { ...history.state, beikeRoute: next };
+  const url = `${location.pathname}${location.hash}`;
+  if (replace || location.search) history.replaceState(state, '', url);
+  else history.pushState(state, '', url);
 }

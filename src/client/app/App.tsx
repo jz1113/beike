@@ -23,7 +23,7 @@ import { AppPetHost } from '@client/app/AppPetHost';
 import { GeneratingEffectsProvider } from '@client/shared/ui/AIGeneratingCard';
 import { usePerformanceMode } from '@client/shared/utils/performancePreference';
 import { useDesktopShortcuts } from '@client/shared/hooks/useDesktopShortcuts';
-import { buildViewSearchParams, lazyWithRetry, parseAssetLibraryTab, parseViewFromSearchParams, syncViewToUrl } from '@client/app/routes';
+import { lazyWithRetry, parseAssetLibraryTab, parseViewFromSearchParams, readRouteSearch, syncViewToHistory } from '@client/app/routes';
 import { deleteCanvasProject, useCanvasStore } from '@client/features/canvas/store/useCanvasStore';
 import { isBuiltInCanvasProject } from '@client/features/canvas/store/canvasProjectDefaults';
 import { CanvasLoadingSurface, openCloudDraft } from '@client/features/canvas/store/canvasArchiveStorage';
@@ -169,12 +169,15 @@ export default function App() {
   const [pendingMedia, setPendingMedia] = useState<PendingMediaInsert|null>(null);
   const [legacySalesEntry, setLegacySalesEntry] = useState(false);
   const [homeMode, setHomeMode] = useState<'generate' | 'canvas'>('generate');
-  const [libraryTab, setLibraryTab] = useState(() => parseAssetLibraryTab(typeof window === 'undefined' ? '' : window.location.search));
+  const [libraryTab, setLibraryTab] = useState(() => parseAssetLibraryTab(
+    typeof window === 'undefined' ? '' : readRouteSearch(window.location, window.history.state),
+  ));
   const [routeRevision, setRouteRevision] = useState(0);
   const [routeReady, setRouteReady] = useState(false);
   const [cloudDraftError, setCloudDraftError] = useState<string | null>(null);
   const [cloudDraftLoading, setCloudDraftLoading] = useState(false);
-  const initialSearch = useRef(typeof window === 'undefined' ? '' : window.location.search);
+  const initialSearch = useRef(typeof window === 'undefined' ? '' : readRouteSearch(window.location, window.history.state));
+  const replaceRoute = useRef(true);
   const mountAssistant = useMountedAfterFirstOpen(useAppStore((s) => s.isAssistantOpen));
   const mountPreview = useMountedAfterFirstOpen(useAppStore((s) => Boolean(s.previewTask)));
 
@@ -203,16 +206,15 @@ export default function App() {
   }, [currentView]);
   const navigateAssetTab = (tab: AssetWorkspaceTab | 'media') => {
     const view = tab === 'media' ? 'asset_library' : 'assets';
-    const search = buildViewSearchParams(view, tab === 'canvas' ? { tab } : undefined);
-    if (window.location.search.slice(1) !== search) window.history.pushState(null, '', `${window.location.pathname}?${search}`);
     setLibraryTab(tab === 'canvas' ? 'canvas' : 'media');
     setCurrentView(view);
   };
   useEffect(() => {
-    const restoreRoute = () => {
+    const restoreRoute = (event: PopStateEvent) => {
       setRouteReady(false);
-      initialSearch.current = window.location.search;
-      setLibraryTab(parseAssetLibraryTab(window.location.search));
+      replaceRoute.current = true;
+      initialSearch.current = readRouteSearch(window.location, event.state);
+      setLibraryTab(parseAssetLibraryTab(initialSearch.current));
       setRouteRevision(value => value + 1);
     };
     window.addEventListener('popstate', restoreRoute);
@@ -285,6 +287,7 @@ export default function App() {
       return;
     }
     const view = parseViewFromSearchParams(initialSearch.current);
+    if (view === 'home') setHomeMode(params.get('mode') === 'canvas' ? 'canvas' : 'generate');
     const project = params.get('project');
     if (view === 'canvas') {
       const openCanvasRoute = () => {
@@ -322,8 +325,10 @@ export default function App() {
     const extra: Record<string, string> = {};
     if (currentView === 'assets' && libraryTab === 'canvas') extra.tab = 'canvas';
     else if (currentView === 'canvas' && activeCanvasProjectId) extra.project = activeCanvasProjectId;
-    syncViewToUrl(currentView, Object.keys(extra).length ? extra : undefined);
-  }, [routeReady, currentView, activeCanvasProjectId, libraryTab]);
+    else if (currentView === 'home' && homeMode === 'canvas') extra.mode = 'canvas';
+    syncViewToHistory(currentView, extra, replaceRoute.current);
+    replaceRoute.current = false;
+  }, [routeReady, currentView, activeCanvasProjectId, libraryTab, homeMode]);
 
   // 🌟 AI 助手仅在画布视图开放，离开画布时自动收起助手抽屉
   useEffect(() => {
@@ -344,7 +349,7 @@ export default function App() {
     <main className="grid min-h-screen place-content-center gap-4 p-8 text-center">
       <p role="alert">{cloudDraftError}</p>
       <button type="button" onClick={() => setRouteRevision(value => value + 1)}>重试打开草稿</button>
-      <a href="/?view=home">返回首页</a>
+      <a href="/">返回首页</a>
     </main>
   );
 
