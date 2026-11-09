@@ -280,3 +280,183 @@ func TestJointPlanUsesSavedWritingPromptAndEditedCopy(t *testing.T) {
 		t.Fatal(rec.Code, calls, rec.Body.String())
 	}
 }
+
+func TestPlanAdaptReadsPersonaImageAndBindsVisibleObservations(t *testing.T) {
+	t.Setenv("AI_DRAWING_API_KEY", "test-key")
+	t.Setenv("AZHUO_CACHE_DIR", t.TempDir())
+	cfg := setupPromptExecutionTestConfig(t)
+	url, err := storeAssetCreationBytes(t.Context(), assetGridFixture(t, 600, 900), "persona", "local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := planAdaptRequest{ProductName: "针织衫", Model: "vision-model", VoiceMode: "none", PresentationMode: "clean_visual",
+		PersonaReferenceImageURL: url, PersonaPresence: "full_presenter",
+		Beats: []planAdaptBeatInput{{Index: 0, Start: 0, End: 3, RefAction: "举手后回落", Expression: "抬眼后浅笑"}}}
+	input, _ := json.Marshal(body)
+	rec := httptest.NewRecorder()
+	planAdaptHandler(cfg, func(_ context.Context, req gateway.TextRequest, _ bool) (int, map[string]any, error) {
+		messages := req.Payload["messages"].([]any)
+		content, ok := messages[1].(map[string]any)["content"].([]any)
+		if !ok || len(content) != 2 {
+			t.Fatal("adaptation did not send the actual persona image")
+		}
+		text := content[0].(map[string]any)["text"].(string)
+		if !strings.Contains(text, `"personaReferenceImageSupplied":true`) || !strings.Contains(text, `"personaPresence":"full_presenter"`) {
+			t.Fatal("visual extraction lost reference scope")
+		}
+		image := content[1].(map[string]any)["image_url"].(map[string]any)["url"].(string)
+		if !strings.HasPrefix(image, "data:image/jpeg;base64,") || strings.Contains(image, url) {
+			t.Fatal("local image must be read and encoded, not forwarded as an unreachable path")
+		}
+		return 200, scriptCompletion(`{"personaVisualProfile":{"imageUrl":"wrong-person.jpg","presence":"hands_only","temperament":"眉眼舒展，视觉上清爽从容","gaze":"目光聚焦镜头","expression":"嘴角轻提，笑容幅度小","posture":"肩线自然，躯干挺直","limitations":"静态参考，不能判断动作速度"},"beats":[{"index":0,"subject":"肩线自然，穿当前针织衫","action":"改成跳跃","expression":"全程大笑"}]}`, "stop"), nil
+	}).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/sales/plan-adapt", strings.NewReader(string(input))))
+	var output struct {
+		Profile *planPersonaVisualProfile `json:"personaVisualProfile"`
+		Beats   []adaptedBeatOutput       `json:"beats"`
+	}
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &output) != nil || output.Profile == nil {
+		t.Fatalf("visual adaptation failed: %d %s", rec.Code, rec.Body.String())
+	}
+	if output.Profile.ImageURL != url || output.Profile.Presence != "full_presenter" || output.Profile.Gaze != "目光聚焦镜头" {
+		t.Fatalf("model changed the source identity or observations disappeared: %+v", output.Profile)
+	}
+	if len(output.Beats) != 1 || output.Beats[0].Action != "举手后回落" || output.Beats[0].Expression != "抬眼后浅笑" {
+		t.Fatal("static image analysis overwrote timed source performance", output.Beats)
+	}
+}
+
+func TestPlanPersonaImageReadRejectsCrossWorkspaceAndInvalidImages(t *testing.T) {
+	t.Setenv("AZHUO_CACHE_DIR", t.TempDir())
+	url, err := storeAssetCreationBytes(t.Context(), assetGridFixture(t, 300, 400), "persona", "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, source := range []string{url, "file:///etc/passwd", "http://127.0.0.1:1/image.jpg", "data:image/png;base64,bm90LWFuLWltYWdl"} {
+		if _, err := planPersonaContent(t.Context(), "other", planAdaptRequest{PersonaReferenceImageURL: source}, "facts"); err == nil {
+			t.Fatalf("unsafe or invalid persona image accepted: %s", source)
+		}
+	}
+}
+
+func TestPlanPersonaVisualRequiresObservedFieldsAndNeverInventsAnUnboundProfile(t *testing.T) {
+	body := planAdaptRequest{PersonaReferenceImageURL: "/storage/local/main.jpg", PersonaPresence: "hands_only"}
+	for _, text := range []string{`{}`, `{"personaVisualProfile":null}`, `{"personaVisualProfile":{"temperament":42}}`,
+		`{"personaVisualProfile":{"limitations":"看不清"}}`, `{"personaVisualProfile":{"gaze":"` + strings.Repeat("长", 601) + `"}}`} {
+		if _, err := parsePlanPersonaVisual(scriptCompletion(text, "stop"), body); err == nil {
+			t.Fatal("missing or invalid visual profile accepted", text)
+		}
+	}
+	if profile, err := parsePlanPersonaVisual(scriptCompletion(`{"personaVisualProfile":{"gaze":"虚构的观察"}}`, "stop"), planAdaptRequest{}); err != nil || profile != nil {
+		t.Fatal("unbound visual profile must be discarded", profile, err)
+	}
+	if err := validatePlanPersonaInput(&planAdaptRequest{PersonaReferenceImageURL: body.PersonaReferenceImageURL, PersonaPresence: "none"}); err == nil {
+		t.Fatal("product-only request may not attach a persona")
+	}
+	content, err := planPersonaContent(t.Context(), "local", planAdaptRequest{}, "legacy facts")
+	if err != nil || content != "legacy facts" {
+		t.Fatal("legacy text-only requests changed", content, err)
+	}
+}
+
+func TestPlanPersonaVisualHandsOnlyDiscardsFacialObservations(t *testing.T) {
+	body := planAdaptRequest{PersonaReferenceImageURL: "/storage/local/main.jpg", PersonaPresence: "hands_only"}
+	profile, err := parsePlanPersonaVisual(scriptCompletion(`{"personaVisualProfile":{"temperament":"手部放松","gaze":"注视镜头","expression":"微笑","posture":"手指舒展"}}`, "stop"), body)
+	if err != nil || profile.Gaze != "" || profile.Expression != "" || profile.Posture != "手指舒展" {
+		t.Fatal("hands-only analysis leaked a face", profile, err)
+	}
+}
+
+func TestPlanAdaptPreservesExclusionRolesAcrossModelRequestAndEveryOutputField(t *testing.T) {
+	t.Setenv("AI_DRAWING_API_KEY", "test-key")
+	input := `{"productName":"当前开衫","model":"gpt-4o","voiceMode":"speech","sceneSummary":"当前室内客厅","sourceExclusions":[{"term":"旧外套","type":"product"},{"term":"旧人物","type":"person_appearance"},{"term":"暮色背景","type":"scene"},{"term":"旧手袋","type":"prop"},{"term":"旧花字","type":"text"},"历史商品"],"beats":[{"index":0,"start":0,"end":3,"refAction":"保持动作","expression":"抬眼后回落","transition":"延续末姿势","sourceVoiceText":"原片台词","sourceLinePattern":"开场介绍","sourceSubtitle":"原片字幕"}]}`
+	content := "旧外套，旧人物，暮色背景，旧手袋，旧花字，历史商品，保持动作"
+	response, _ := json.Marshal(map[string]any{"beats": []map[string]any{{
+		"index": 0, "subject": content, "action": content, "expression": content,
+		"transition": content, "spokenLine": content, "subtitle": content,
+	}}})
+	recorder := httptest.NewRecorder()
+	planAdaptHandler(setupPromptExecutionTestConfig(t), func(_ context.Context, req gateway.TextRequest, _ bool) (int, map[string]any, error) {
+		messages := req.Payload["messages"].([]any)
+		user := messages[1].(map[string]any)["content"].(string)
+		var forwarded planAdaptRequest
+		if err := json.Unmarshal([]byte(user[strings.Index(user, "{"):]), &forwarded); err != nil {
+			t.Fatal(err)
+		}
+		if len(forwarded.Beats) != 1 || forwarded.Beats[0].SourceVoiceText != "原片台词" || forwarded.Beats[0].SourceLinePattern != "开场介绍" || forwarded.Beats[0].SourceSubtitle != "原片字幕" {
+			t.Fatalf("reference speech did not reach the first model: %+v", forwarded.Beats)
+		}
+		wantTypes := []string{"product", "person_appearance", "scene", "prop", "text", "product"}
+		for i, want := range wantTypes {
+			if forwarded.SourceExclusions[i].Type != want {
+				t.Fatalf("exclusion %d lost its role: %+v", i, forwarded.SourceExclusions)
+			}
+		}
+		return 200, scriptCompletion(string(response), "stop"), nil
+	}).ServeHTTP(recorder, httptest.NewRequest("POST", "/api/sales/plan-adapt", strings.NewReader(input)))
+	var result struct {
+		Beats []adaptedBeatOutput `json:"beats"`
+	}
+	if recorder.Code != 200 || json.Unmarshal(recorder.Body.Bytes(), &result) != nil || len(result.Beats) != 1 {
+		t.Fatalf("typed adaptation failed: %d %s", recorder.Code, recorder.Body.String())
+	}
+	beat := result.Beats[0]
+	if beat.Action != "保持动作" || beat.Expression != "抬眼后回落" || beat.Transition != "延续末姿势" {
+		t.Fatalf("model performance replaced the reference: %+v", beat)
+	}
+	for _, field := range []string{beat.Subject, beat.SpokenLine, beat.Subtitle} {
+		if strings.Count(field, "当前开衫") != 2 {
+			t.Fatalf("only current and legacy product terms may become the product name: %q", field)
+		}
+		for _, term := range []string{"旧外套", "旧人物", "暮色背景", "旧手袋", "旧花字", "历史商品"} {
+			if strings.Contains(field, term) {
+				t.Fatalf("source entity leaked into adaptation: %q", field)
+			}
+		}
+	}
+}
+
+func TestAdaptedExclusionsRemoveEveryNonProductRole(t *testing.T) {
+	var emptyLegacy planSourceExclusion
+	if err := json.Unmarshal([]byte(`""`), &emptyLegacy); err != nil || scrubAdaptedTerms("保持动作", []planSourceExclusion{emptyLegacy}, "开衫") != "保持动作" {
+		t.Fatalf("legacy blank exclusions must remain harmless: %+v %v", emptyLegacy, err)
+	}
+	for _, role := range []string{"person_appearance", "person", "scene", "prop", "text", "accessory", "brand_signage", "copy_claim", "future-role"} {
+		t.Run(role, func(t *testing.T) {
+			if got := scrubAdaptedTerms("旧元素展示当前商品", []planSourceExclusion{{Term: "旧元素", Type: role}}, "开衫"); got != "展示当前商品" {
+				t.Fatalf("non-product entity must be removed instead of becoming a product: %q", got)
+			}
+		})
+	}
+	if got := scrubAdaptedTerms("展示针织开衫", []planSourceExclusion{{Term: "针织", Type: "product"}}, "针织开衫"); got != "展示针织开衫" {
+		t.Fatalf("a term in the selected product must not replace itself: %q", got)
+	}
+}
+
+func TestPlanAdaptRejectsUntypedExclusionObjectsBeforeCallingModel(t *testing.T) {
+	for _, exclusion := range []string{`{"term":"旧人物"}`, `{"term":"旧人物","type":""}`, `{"term":"","type":"scene"}`, `{"term":"旧人物","type":7}`} {
+		recorder := httptest.NewRecorder()
+		planAdaptHandler(setupPromptExecutionTestConfig(t), func(context.Context, gateway.TextRequest, bool) (int, map[string]any, error) {
+			t.Fatal("invalid exclusions must not trigger generation")
+			return 0, nil, nil
+		}).ServeHTTP(recorder, httptest.NewRequest("POST", "/api/sales/plan-adapt", strings.NewReader(`{"productName":"商品","sourceExclusions":[`+exclusion+`],"beats":[{"index":0,"start":0,"end":3}]}`)))
+		if recorder.Code != 400 {
+			t.Fatalf("invalid exclusion accepted: %d %s", recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
+func TestPlanAdaptPromptSeparatesReplacedSceneFromReferencePhotography(t *testing.T) {
+	for _, rule := range []string{"subject / action / expression / transition", "原室内外属性", "空间与光源位置以当前场景为准", "不能替成商品名"} {
+		if !strings.Contains(planAdaptPrompt, rule) {
+			t.Fatalf("default adaptation prompt lost scene/entity isolation: %s", rule)
+		}
+	}
+}
+
+func TestReferenceAnalysisKeepsSourceSceneryAndEndCardsSeparateFromMotion(t *testing.T) {
+	for _, rule := range []string{"原地点、室内外属性、天空天幕与背景为 scene", "片尾文字卡为 copy_claim", "最后一个实质动作结束的时点", "片尾卡是独立剪辑内容", "purpose 写 other", "不虚构不存在的正常收势"} {
+		if !strings.Contains(scriptOutputFields, rule) {
+			t.Fatalf("reference analysis lost scene/end-card separation: %s", rule)
+		}
+	}
+}

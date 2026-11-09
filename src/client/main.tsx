@@ -1,13 +1,36 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { configureDomainRuntime } from '@shared/domain/core/runtime';
-import { StrictMode } from 'react';
+import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './app/App';
 import { useAppStore } from './store';
 import { bootstrapAppStore } from './store/bootstrap';
-import { AppProviders } from '@client/app/providers';
+import { AppThemeProvider } from '@client/shared/hooks/useAppTheme';
 import AppErrorBoundary from '@client/shared/ui/AppErrorBoundary';
 import './styles/globals.css';
 import { applyViewportDensity, getViewportDensity } from '@client/shared/hooks/useMediaQuery';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: true,
+      retry: 1,
+    },
+  },
+});
+
+export function AppProviders({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppThemeProvider>
+        {children}
+      </AppThemeProvider>
+    </QueryClientProvider>
+  );
+}
+
+export { queryClient };
 
 // 拦截旧 Chunk 404/失效错误并无缝自动重载
 if (typeof window !== 'undefined') {

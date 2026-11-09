@@ -1,8 +1,8 @@
 /** Decode SSE records across arbitrary UTF-8 chunks, including the last record at EOF. */
-export async function* readSseEvents(
+export async function* readSseEvents<T extends { type: string } = { type: string; [key: string]: unknown }>(
   body: ReadableStream<Uint8Array>,
   signal: AbortSignal,
-): AsyncGenerator<{ type: string; [key: string]: any }> {
+): AsyncGenerator<T> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -26,7 +26,7 @@ export async function* readSseEvents(
         const payload = data.join('\n');
         data = [];
         if (payload === '[DONE]') {
-          yield { type: 'done' };
+          yield { type: 'done' } as T;
           continue;
         }
         let event: unknown;
@@ -36,7 +36,7 @@ export async function* readSseEvents(
           throw new Error('事件格式异常，请稍后重试。');
         }
         if (!event || typeof event !== 'object' || !('type' in event) || typeof event.type !== 'string') continue;
-        yield event as { type: string; [key: string]: any };
+        yield event as T;
       }
       if (done) break;
     }

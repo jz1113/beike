@@ -2,7 +2,7 @@ import { useEffect, useId, type HTMLAttributes } from 'react';
 import { motion } from 'motion/react';
 import { useFileDropZone } from '@client/shared/hooks/useFileDropZone';
 import { useMediaQuery } from '@client/shared/hooks/useMediaQuery';
-import { beikePetMotion, type BeikePetPhase } from './beikeMotion';
+import { beikePetMotion, type BeikePetPhase } from './petPreferences';
 
 interface Props {
   phase: BeikePetPhase;

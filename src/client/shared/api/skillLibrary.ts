@@ -1,9 +1,8 @@
 import { apiFetch } from './apiClient';
 import { getWorkspaceSecret } from './workspaceClient';
-import { invalidateCatalogCache } from './catalogCache';
 import type { AssistantSkill } from '@shared/domain/assistant/skills/types';
 import type { SkillLibrary, SkillLibraryEntry } from '@shared/domain/skills/library';
-import { skillLibraryResponseSchema, savedSkillResponseSchema } from '@shared/contracts/skills';
+import { skillLibraryResponseSchema, savedSkillResponseSchema } from '@shared/contracts/assistant';
 
 const imports = new Map<string, Promise<void>>();
 
@@ -14,9 +13,7 @@ async function readResponse<T>(response: Response): Promise<T> {
 }
 
 export function announceSkillLibraryChange() {
-  invalidateCatalogCache('recipes');
   window.dispatchEvent(new Event('skill-library-changed'));
-  window.dispatchEvent(new Event('workshop-recipes-changed'));
 }
 
 /** The legacy vault is an import source only; never overwrite or remove it. */

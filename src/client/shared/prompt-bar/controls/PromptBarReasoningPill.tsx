@@ -12,6 +12,8 @@ interface PromptBarReasoningPillProps {
   isUp?: boolean;
   disabled?: boolean;
   onOpenChange?: (open: boolean) => void;
+  value?: ReasoningEffort;
+  onChange?: (effort: ReasoningEffort) => void;
 }
 
 export const PromptBarReasoningPill = function PromptBarReasoningPill({
@@ -19,12 +21,15 @@ export const PromptBarReasoningPill = function PromptBarReasoningPill({
   isUp = true,
   disabled = false,
   onOpenChange,
+  value: controlledValue,
+  onChange: onControlledChange,
 }: PromptBarReasoningPillProps) {
   const [open, setOpen] = useState(false);
-  const [effort, setEffort] = useAssistantReasoning(assistantModel);
+  const [storedEffort, setStoredEffort] = useAssistantReasoning(assistantModel);
+  const effort = controlledValue ?? storedEffort;
   const buttonRef = useRef<HTMLButtonElement>(null);
   const isOpen = open && !disabled;
-  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(isOpen, isUp, buttonRef, 300, 132, false, true);
+  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(isOpen, isUp, buttonRef, 256, 100, false, true, { alignEnd: true, offsetX: 48 });
   const capability = reasoningCapability(assistantModel);
   const levels = capability.levels;
   const supported = levels.length > 1;
@@ -89,13 +94,13 @@ export const PromptBarReasoningPill = function PromptBarReasoningPill({
       style={panelStyle}
       role="dialog"
       aria-label="思考强度"
-      className={`fixed z-[10010] overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 px-3.5 py-2.5 text-left shadow-[0_12px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl animate-fade-in dark:border-white/10 dark:bg-[#1c1c1f]/96 dark:text-slate-100 dark:shadow-[0_12px_32px_rgba(0,0,0,0.4)] ${
+      className={`fixed z-[10010] overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 px-3 py-2 text-left shadow-[0_12px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl animate-fade-in dark:border-white/10 dark:bg-[#1c1c1f]/96 dark:text-slate-100 dark:shadow-[0_12px_32px_rgba(0,0,0,0.4)] ${
         opensUp ? 'origin-bottom' : 'origin-top'
       }`}
     >
       <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
         <span>思考强度</span>
-        <strong className="text-sm font-semibold text-purple-600 dark:text-[#d8b4fe]">{label}</strong>
+        <strong className="text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</strong>
       </div>
       {supported ? (
         <div
@@ -120,7 +125,8 @@ export const PromptBarReasoningPill = function PromptBarReasoningPill({
             aria-valuetext={REASONING_EFFORT_LABELS[resolved]}
             onChange={(event) => {
               const next = levels[Number(event.target.value)];
-              setEffort(next);
+              setStoredEffort(next);
+              onControlledChange?.(next);
               persistReasoning({ reasoningEffort: next });
             }}
           />

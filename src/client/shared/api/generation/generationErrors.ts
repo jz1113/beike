@@ -44,6 +44,7 @@ export function classifyGenerationPollResult(
   if (canonical === 'failed' || canonical === 'cancelled' || canonical === 'expired') return 'failure';
   // A failed status query does not terminate the original generation.
   if (data.retryable === true || data.submissionUnknown === true || rawStatus.toUpperCase() === 'QUERY_FAILED'
+    || (options?.httpStatus !== undefined && [401, 403, 429].includes(options.httpStatus))
     || (options?.httpStatus !== undefined && options.httpStatus >= 500)) return 'pending';
   if (options?.httpOk === false && (data.error || data.success === false)) return 'failure';
   if (data.failReason && !resultUrl && canonical !== 'running' && (canonical !== 'queued' || !rawStatus)) {

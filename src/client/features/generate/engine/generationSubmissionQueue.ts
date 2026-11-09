@@ -54,6 +54,12 @@ export class GenerationSubmissionQueue {
     // Remounts/new batches must not overlap a still-finishing submission.
   }
 
+  /** Stop one queued/preparing job without interrupting other canvas nodes. */
+  cancelTask(id: string): void {
+    this.pending.delete(id);
+    this.active.get(id)?.controller.abort();
+  }
+
   /** Removing a task must interrupt its preparation before a generation request is sent. */
   retain(taskIds: ReadonlySet<string>): void {
     for (const id of this.pending.keys()) if (!taskIds.has(id)) this.pending.delete(id);

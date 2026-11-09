@@ -67,7 +67,7 @@ export function SalesAssetJobsPanel({ onSaved, kind, assetIds, onJobsLoaded }: {
       <span>{job.name || `${job.kind === 'persona' ? '人物' : '场景'} ${job.assetId.slice(-6)}`} · {STATUS[job.status]}</span>
       {job.error && <span className="text-red-600">{job.error}</span>}
       {job.status === 'failed' && <button type="button" disabled={Boolean(retrying)} className={salesGhostButtonClass} onClick={() => void retry(job)}>
-        <RefreshCw size={12} className={retrying === job.id ? 'animate-spin' : ''} />继续处理原任务
+        <RefreshCw size={12} className={retrying === job.id ? 'animate-spin' : ''} />{job.creation && !job.creation.prompt ? '查询原分析回执' : '继续处理原任务'}
       </button>}
     </div>)}
     {currentJobs.length > 8 && <button type="button" className={salesGhostButtonClass} onClick={() => setExpanded((value) => !value)}>{expanded ? '收起任务' : `查看全部 ${currentJobs.length} 项任务`}</button>}

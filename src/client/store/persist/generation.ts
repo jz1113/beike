@@ -1,18 +1,36 @@
+import { agentHistorySnapshot } from '../agentHistory';
 import type { ChatSession, GenerationTask } from '@client/store/appStoreTypes';
-import { isProjectAutosaveEnabled } from '@client/shared/utils/localStoragePrefs';
+import { isProjectAutosaveEnabled } from '@client/shared/media/idbMediaCache';
 import { isImageTaskActive } from '@shared/domain/core/taskStatus';
-import { retainGenerationTasks, STARTUP_TASK_SUMMARY_COUNT } from '../generationLimits';
-import { hasDrawingArchive, mapTaskMedia, readDrawingArchive, restoreArchivedMedia, saveDrawingArchive, type DrawingSnapshot } from './generationArchive';
-import { mergeDrawingSnapshots } from './generationSnapshotMerge';
 import {
   generationDeletedKeys,
-  isSessionDeleted,
-  markSessionDeleted,
+  hasDrawingArchive,
   isGenerationDeleted,
+  isSessionDeleted,
   loadGenerationTombstones,
-  persistGenerationTombstones,
+  mapTaskMedia,
   markGenerationDeleted,
-} from './generationTombstones';
+  markSessionDeleted,
+  mergeDrawingSnapshots,
+  persistGenerationTombstones,
+  readDrawingArchive,
+  restoreArchivedMedia,
+  revokeSnapshotBlobUrls,
+  saveDrawingArchive,
+  type DrawingSnapshot,
+} from './generationArchive';
+
+/** 已结束任务的内存预算；进行中的任务始终保留。 */
+export const MAX_GENERATION_TASKS_IN_MEMORY = 200;
+
+/** localStorage 启动恢复时首屏任务条数（不含大 resultUrl） */
+export const STARTUP_TASK_SUMMARY_COUNT = 20;
+
+export function retainGenerationTasks(tasks: GenerationTask[], limit = MAX_GENERATION_TASKS_IN_MEMORY): GenerationTask[] {
+  const active = tasks.filter(task => isImageTaskActive(task.status));
+  const recent = new Set(tasks.filter(task => !isImageTaskActive(task.status)).slice(0, Math.max(0, limit - active.length)));
+  return tasks.filter(task => isImageTaskActive(task.status) || recent.has(task));
+}
 
 export {
   generationDeletedKeys,
@@ -24,6 +42,18 @@ export {
   markGenerationDeleted,
 };
 
+const waitingMutations: Array<() => void> = [];
+
+/** Session mutations wait for the complete archive, so a light cache never overwrites its media. */
+export function deferDrawingMutation(mutation: () => void) {
+  waitingMutations.push(mutation);
+}
+
+export function finishDrawingHydration() {
+  const mutations = waitingMutations.splice(0);
+  mutations.forEach(mutation => mutation());
+}
+
 const SNAPSHOT_KEY = 'drawing_history_v2';
 const LEGACY_KEYS = ['drawing_all_generations', 'drawing_sessions', 'drawing_current_session_id'];
 let latestSnapshot: DrawingSnapshot | undefined;
@@ -31,19 +61,35 @@ let flushedLocalSnapshot: DrawingSnapshot | undefined;
 let saveDrawingTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function sanitizeTaskForStorage(task: GenerationTask): GenerationTask {
-  const inputMedia = [task.referenceImageUrl, task.sourceImageUrl, task.productImageUrl, ...(task.referenceImages || []), ...(task.images || [])];
+  const inputMedia = [task.referenceImageUrl, task.sourceImageUrl, task.productImageUrl, task.firstFrameImage, task.lastFrameImage, ...(task.referenceImages || []), ...(task.referenceAudioUrls || []), ...(task.images || [])];
   const referenceMediaMissing = task.referenceMediaMissing || inputMedia.some(url => url && (/^(data:|blob:)/i.test(url) || url.includes('...[stripped]')));
   return { ...mapTaskMedia(task, url => /^(data:|blob:)/i.test(url) || url.includes('...[stripped]') ? undefined : url), referenceMediaMissing };
 }
 
 function sanitizeTaskForStartup(task: GenerationTask, stripMedia = true, failMissingMedia = true): GenerationTask {
   const clean = stripMedia ? sanitizeTaskForStorage(task) : task;
+  if (clean.model === 'direct-collection' && isImageTaskActive(clean.status)) {
+    return { ...clean, status: 'FAILURE', progress: '0%', submissionRecoveryRequired: false, failReason: '采集连接已中断，结果未确认；请检查商品库后再重试' };
+  }
   if ((clean.mediaType === 'agent' || clean.id.startsWith('agent-task-')) && isImageTaskActive(clean.status)) {
+    const turnId = clean.agentTurn?.turnId || clean.taskId;
+    const threadId = clean.agentTurn?.threadId || clean.sessionId;
+    if (turnId && threadId) return {
+      ...clean, taskId: turnId, status: 'IN_PROGRESS', submissionRecoveryRequired: true,
+      failReason: '正在核对原对话结果…',
+      agentTurn: { ...clean.agentTurn, turnId, threadId, statusText: '正在恢复对话进度…' },
+    };
     return { ...clean, status: 'FAILURE', progress: '0%', submissionRecoveryRequired: false, failReason: '对话已中断，可重试' };
   }
+  // A canvas task may have reached Go immediately before this tab closed.
+  // Recover its original idempotency receipt before considering another attempt.
+  if ((clean.canvasProjectId || clean.id.startsWith('studio-')) && ['image','video'].includes(clean.mediaType || '')
+    && isImageTaskActive(clean.status) && !clean.taskId && !clean.resultUrl) {
+    return { ...clean, submissionRecoveryRequired: true, failReason: '正在核对画布原任务，请勿重复生成' };
+  }
   // A missing local input cannot be resubmitted with the original operation ID.
-  if (failMissingMedia && isImageTaskActive(clean.status) && !clean.submissionRecoveryRequired && !clean.taskId && clean.useReferenceImage
-    && (clean.referenceMediaMissing || (!clean.referenceImageUrl && !clean.referenceImages?.length && !clean.images?.length && !clean.productImageUrl && !clean.sourceImageUrl))) {
+  if (failMissingMedia && isImageTaskActive(clean.status) && !clean.submissionRecoveryRequired && !clean.taskId && (clean.useReferenceImage || clean.referenceMediaMissing || clean.referenceAudioUrls?.length)
+    && (clean.referenceMediaMissing || (!clean.referenceImageUrl && !clean.referenceImages?.length && !clean.referenceAudioUrls?.length && !clean.images?.length && !clean.productImageUrl && !clean.sourceImageUrl && !clean.firstFrameImage && !clean.lastFrameImage))) {
     return { ...clean, status: 'FAILURE', failReason: '参考素材未恢复，请重新上传后再次生成' };
   }
   return clean;
@@ -94,14 +140,14 @@ export function flushDrawingStateToStorage() {
   if (!latestSnapshot) return;
   if (saveDrawingTimer) clearTimeout(saveDrawingTimer);
   saveDrawingTimer = null;
-  const snapshot = latestSnapshot;
+  const snapshot = agentHistorySnapshot(latestSnapshot);
   const base = flushedLocalSnapshot || snapshot;
   const direct = nextFlushDirect;
   nextFlushDirect = false;
 
-  const lightweight = direct
+  const lightweight = agentHistorySnapshot(direct
     ? lightSnapshot(snapshot)
-    : mergeDrawingSnapshots(lightSnapshot(base), lightSnapshot(snapshot), readStoredSnapshot());
+    : mergeDrawingSnapshots(lightSnapshot(base), lightSnapshot(snapshot), readStoredSnapshot()));
 
   let cached = false;
   try {
@@ -195,7 +241,10 @@ export async function restoreDrawingArchive() {
   try {
     const archive = await readDrawingArchive(0);
     // Do not replace a new session or task created while the archive was loading.
-    if (latestSnapshot !== original) return null;
+    if (latestSnapshot !== original) {
+      revokeSnapshotBlobUrls(archive);
+      return null;
+    }
     latestSnapshot = archive && archive.updatedAt >= original.updatedAt
       ? archive : archive ? restoreArchivedMedia(original, archive) : original;
     return adoptDrawingView(latestSnapshot, false);

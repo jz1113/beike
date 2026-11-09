@@ -114,133 +114,9 @@ export function getAspectRatioFromSize(sizeStr?: string): string {
   return '3:4';
 }
 
-/**
- * 4K 超清尺寸升级映射字典 (确保全通道直通 4K Ultra 生成管线)
- */
-const RESOLUTION_4K_UPGRADE_MAP: Record<string, string> = {
-  '1760x2348': '2448x3264',
-  '2348x1760': '3264x2448',
-  '1440x2560': '2160x3840',
-  '2560x1440': '3840x2160',
-  '1600x2400': '2160x3240',
-  '2400x1600': '3240x2160',
-  '1080x1920': '2160x3840',
-  '1920x1080': '3840x2160'
-};
-
 // 🌟 Re-export prompt-engine for 100% backward compatibility
-export * from '../prompts/prompt-engine';
-import {
-  cleanPromptText,
-  ensureOriginalPromptSlots,
-  getDynamicNegativePrompt,
-} from '../prompts/prompt-engine';
-
-
-
-
-
-
-
-/**
- * 适配不同模型的生图参数
- */
-export function formatModelPayload(modelId: string, params: {
-  prompt: string;
-  size?: string;
-  quality?: string;
-  n?: number;
-  hasHuman?: boolean;
-  shotType?: string;
-  hasFace?: boolean;
-  plainMode?: boolean;
-  omitQuality?: boolean;
-  productImage?: string;
-  primaryImage?: string;
-  images?: unknown[];
-}) {
-  const resolvedModelId = (modelId && modelId.trim()) ? modelId.trim() : 'gpt-image-2';
-  const isGptImage = resolvedModelId.toLowerCase().includes('gpt-image');
-  const known =
-    IMAGE_GEN_MODELS.find((m) => m.id === resolvedModelId) ||
-    (isGptImage && resolvedModelId.endsWith('-2k')
-      ? IMAGE_GEN_MODELS.find((m) => m.id === 'gpt-image-2-2k')
-      : undefined) ||
-    (isGptImage && resolvedModelId.endsWith('-4k')
-      ? IMAGE_GEN_MODELS.find((m) => m.id === 'gpt-image-2-4k')
-      : undefined);
-  // 未登记模型仍用列表默认尺寸做参数推断，但必须保留真实 modelId
-  const modelConfig = known || (isGptImage ? IMAGE_GEN_MODELS.find((m) => m.id === 'gpt-image-2') : undefined) || IMAGE_GEN_MODELS[0];
-
-  // 校验并自适应 Quality
-  let targetQuality: string | undefined;
-  if (params.omitQuality) {
-    targetQuality = undefined;
-  } else if (params.quality !== undefined && params.quality !== null && params.quality !== '') {
-    targetQuality = params.quality;
-    if (!modelConfig.supportedQualities.includes(targetQuality as 'max' | 'xhigh' | 'high' | 'medium' | 'low')) {
-      targetQuality = modelConfig.supportedQualities[0] || 'medium';
-    }
-  } else {
-    targetQuality = isGptImage ? 'medium' : 'high';
-    if (!modelConfig.supportedQualities.includes(targetQuality as 'max' | 'xhigh' | 'high' | 'medium' | 'low')) {
-      targetQuality = modelConfig.supportedQualities[0] || 'medium';
-    }
-  }
-
-  // 🌟 核心：智能解析用户指定或分镜自带的比例/尺寸，保证绝不发生 1:1 混乱
-  const inputSize = params.size && params.size !== 'auto' ? params.size : modelConfig.defaultSize;
-  const targetRatio = getAspectRatioFromSize(inputSize);
-  const isExplicitPixelSize = /^\d+\s*x\s*\d+$/i.test(String(inputSize).trim());
-
-  let targetResolution: string;
-  if (isGptImage && isExplicitPixelSize) {
-    // gpt-image：尊重显式像素，禁止 ratio 表强制升到 2448x3264
-    targetResolution = String(inputSize).trim().replace(/\s+/g, '');
-  } else if (isExplicitPixelSize) {
-    targetResolution = String(inputSize).trim().replace(/\s+/g, '');
-    if (params.quality === 'high' && RESOLUTION_4K_UPGRADE_MAP[targetResolution]) {
-      targetResolution = RESOLUTION_4K_UPGRADE_MAP[targetResolution];
-    }
-  } else {
-    targetResolution = RATIO_TO_RESOLUTION_MAP[targetRatio] || modelConfig.defaultSize;
-    if (RESOLUTION_4K_UPGRADE_MAP[targetResolution]) {
-      targetResolution = RESOLUTION_4K_UPGRADE_MAP[targetResolution];
-    }
-  }
-
-  const hasProductRef = Boolean(
-    params.productImage ||
-    params.primaryImage ||
-    (params.images && params.images.length > 0)
-  );
-  const isWorkshopOriginal = !params.plainMode && hasProductRef;
-
-  const cleanedPrompt = params.plainMode || !isWorkshopOriginal
-    ? cleanPromptText(params.prompt)
-    : ensureOriginalPromptSlots(cleanPromptText(params.prompt), {
-          hasHuman: params.hasHuman,
-          hasFace: params.hasFace,
-        });
-  const dynamicNegative = getDynamicNegativePrompt({
-    hasHuman: params.plainMode ? false : params.hasHuman,
-    shotType: params.plainMode ? 'pure_product' : params.shotType,
-    plainMode: params.plainMode,
-  });
-
-  return {
-    model: resolvedModelId,
-    prompt: cleanedPrompt,
-    negative_prompt: dynamicNegative,
-    negativePrompt: dynamicNegative,
-    size: targetResolution,
-    aspect_ratio: targetRatio,
-    aspectRatio: targetRatio,
-    ar: targetRatio,
-    ...(targetQuality !== undefined ? { quality: targetQuality } : {}),
-    n: params.n || 1
-  };
-}
+export * from '../prompts/prompt-engine/mentions';
+export * from '../prompts/prompt-engine/multiAngle';
 
 /**
  * 统一画质标签：API 枚举 low/medium/high → 1K/2K/4K
@@ -342,6 +218,4 @@ export function formatPromptParagraphs(prompt?: string): string[] {
 
   return paragraphs.length > 0 ? paragraphs : [text];
 }
-
-export * from '../prompts/prompt-engine';
 

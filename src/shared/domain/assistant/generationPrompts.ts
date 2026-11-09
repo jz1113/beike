@@ -24,12 +24,12 @@ const KNOWN_PROMPT_ASPECTS = new Set([
 ]);
 
 function aspectFrom(text: string): string | undefined {
-  const explicit = text.match(/(?:--ar\s+|比例\s*[：:]?\s*|画幅\s*[：:]?\s*)(\d{1,2})\s*[:：]\s*(\d{1,2})(?!\d)/im);
+  const explicit = text.match(/(?:--ar\s+|(?:比例|宽高比|纵横比|画幅|横向|纵向|横版|竖版|横屏|竖屏)\s*[：:]?\s*)(\d{1,2})\s*[:：]\s*(\d{1,2})(?!\d)/im);
   if (explicit && Number(explicit[1]) > 0 && Number(explicit[2]) > 0) {
     const candidate = `${Number(explicit[1])}:${Number(explicit[2])}`;
     if (KNOWN_PROMPT_ASPECTS.has(candidate)) return candidate;
   }
-  for (const match of text.matchAll(/(?:^|[\s，,。；;（(])(\d{1,2})\s*[:：]\s*(\d{1,2})(?!\d)/gm)) {
+  for (const match of text.matchAll(/(?:^|[\s，,。；;、（(])(\d{1,2})\s*[:：]\s*(\d{1,2})(?!\d)/gm)) {
     const candidate = `${Number(match[1])}:${Number(match[2])}`;
     if (KNOWN_PROMPT_ASPECTS.has(candidate)) return candidate;
   }
@@ -79,7 +79,8 @@ export function extractGenerationPrompts(content: string): GenerationPromptEntry
         const mediaType = isGenerationPrompt(prompt, lang, `${blockHeading}\n${blockContext}`);
         if (prompt && mediaType && !blockExcluded) {
           const ordinal = entries.length + 1;
-          const durationText = prompt.match(/(?:总时长|视频时长|时长|duration)\s*[：:=]?\s*(\d+(?:\.\d+)?)\s*(?:秒|s)?/i);
+          const durationText = prompt.match(/(?:总时长|视频时长|时长|duration)\s*(?:严格(?:为|控制在)|控制在|为|是)?\s*[：:=]?\s*(?:大约|约)?\s*(\d+(?:\.\d+)?)\s*(?:秒|s)?/i)
+            || (mediaType === 'video' ? prompt.match(/^(?:(?:制作|生成|创作|拍摄)(?:一条|一段|一个)?|一条|一段)?\s*(?:大约|约)?\s*(\d+(?:\.\d+)?)\s*秒(?=[、，,\s]|视频|竖|横|$)/) : null);
           const dependent = /(?:使用|引用|基于|等待|采用|以).{0,12}(?:上(?:面|述|一)[^\n]{0,8}(?:生成|成品)|第\s*\d+\s*(?:项|张).{0,8}(?:生成结果|成品))/.test(prompt);
           entries.push({
             id: `prompt-${ordinal}-${promptFingerprint(`${mediaType}\n${prompt}`)}`,

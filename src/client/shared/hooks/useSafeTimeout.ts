@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 export type SafeTimerId = ReturnType<typeof setTimeout>;
 
@@ -61,4 +61,44 @@ export function useSafeTimeout(): SafeTimeoutController {
     clearSafeTimeout,
     clearAllSafeTimeouts,
   };
+}
+
+export function useDocumentHidden(): boolean {
+  const [hidden, setHidden] = useState(
+    () => typeof document !== 'undefined' && document.hidden,
+  );
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onVisibilityChange = () => setHidden(document.hidden);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []);
+  return hidden;
+}
+
+/**
+ * Lock scroll on a target container (by CSS selector) when `locked` is true.
+ * Restores previous `overflow` value on unlock/unmount.
+ */
+export function useScrollLock(locked: boolean, selector: string) {
+  useEffect(() => {
+    if (!locked || typeof document === 'undefined') return;
+
+    const el = document.querySelector<HTMLElement>(selector);
+    if (!el) return;
+
+    const prevOverflow = el.style.overflow;
+    el.style.overflow = 'hidden';
+
+    return () => {
+      el.style.overflow = prevOverflow;
+    };
+  }, [locked, selector]);
+}
+
+export const ViewVisibilityContext = createContext(true);
+
+/** Hidden keep-alive views retain their state but suspend foreground interactions. */
+export function useViewVisibility() {
+  return useContext(ViewVisibilityContext);
 }

@@ -9,7 +9,7 @@ import { getEnabledImageModelsFromSettings, getEnabledVideoModelsFromSettings, r
 import { resolveVideoMode } from '@shared/domain/media/videoCapabilities';
 import { prepareAssistantImagePrompt, prepareBatchVideoPrompt } from './batchReferences';
 
-export interface BatchPromptDraft extends GenerationPromptEntry { referenceIndexes?: number[] }
+export interface BatchPromptDraft extends GenerationPromptEntry { referenceIndexes?: number[]; referenceAudioUrls?: string[] }
 export interface BatchGenerationSettings {
   imageModel: string;
   imageAspect: string;
@@ -72,7 +72,7 @@ export function buildGenerationPromptBatch(entries: BatchPromptDraft[], media: M
       const aspect = entry.aspect || (video ? settings.videoAspect : settings.imageAspect);
       const input: PromptBarSubmitInput = {
         quickGenMode: video ? 'video' : 'image', quickPrompt: prepared.prompt.replace(/--ar\s+\d+:\d+/g, '').trim(),
-        quickRefImages: prepared.urls, activeSubjects: [], allSubjects: [], quickVideoRefMode: mode,
+        quickRefImages: prepared.urls, quickVideoAudioRefs: entry.referenceAudioUrls, activeSubjects: [], allSubjects: [], quickVideoRefMode: mode,
         quickVideoFirstFrame: imageRefs[0] || null, quickVideoLastFrame: imageRefs.length >= 2 ? imageRefs.at(-1)! : null,
         quickVideoMultiFrames: imageRefs, quickCount: 1, quickVideoCount: 1,
         quickModel: settings.imageModel, quickVideoModel: settings.videoModel,

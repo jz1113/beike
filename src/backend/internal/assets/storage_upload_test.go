@@ -1,6 +1,9 @@
 package assets
 
 import (
+	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/storage"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -10,10 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/httpx"
-	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
 func TestLocalUploadStoresDataURL(t *testing.T) {
@@ -62,7 +61,7 @@ func TestStorageTestReportsIncompleteConfig(t *testing.T) {
 	request.Header.Set("x-app-token", "user")
 	response = httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
-	if response.Code != http.StatusUnauthorized {
+	if response.Code != http.StatusForbidden {
 		t.Fatalf("admin status %d", response.Code)
 	}
 }
@@ -129,5 +128,56 @@ func TestProductionUploadRemainsReadableOnlyInItsWorkspace(t *testing.T) {
 		if result.Code != expected {
 			t.Fatalf("scoped read status=%d expected=%d: %s", result.Code, expected, result.Body.String())
 		}
+	}
+}
+
+func TestLocalUploadSupportsParameterizedDataURLAndGIFContentType(t *testing.T) {
+	t.Setenv("AZHUO_CACHE_DIR", t.TempDir())
+	cfg := config.Config{NodeEnv: "development"}
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/assets/storage/upload", strings.NewReader(`{"category":"canvas-library","dataUrl":"data:image/gif;charset=utf-8;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\n"}`))
+	storageUploadHandler(cfg).ServeHTTP(w, req)
+	var data struct {
+		URL string `json:"url"`
+	}
+	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &data) != nil || !strings.HasSuffix(data.URL, ".gif") {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	readW := httptest.NewRecorder()
+	readReq := httptest.NewRequest(http.MethodGet, data.URL, nil)
+	storageHandler(cfg).ServeHTTP(readW, readReq)
+	if readW.Code != http.StatusOK || readW.Header().Get("Content-Type") != "image/gif" {
+		t.Fatalf("read gif status=%d content-type=%s", readW.Code, readW.Header().Get("Content-Type"))
+	}
+}
+
+func TestClearDerivedStorageRemovesFiles(t *testing.T) {
+	root := t.TempDir()
+	nested := filepath.Join(root, "derived", "images")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "a.jpg"), []byte("1234"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AZHUO_CACHE_DIR", root)
+	response := httptest.NewRecorder()
+	clearDerivedStorageHandler(config.Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/system/local-storage/clear-derived", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", response.Code, response.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["success"] != true || body["clearedFileCount"] != float64(1) || body["clearedBytes"] != float64(4) || body["message"] != "已清理派生磁盘缓存" {
+		t.Fatalf("body %#v", body)
+	}
+	if _, err := os.Stat(filepath.Join(root, "derived")); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(filepath.Join(root, "derived"))
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("derived entries %#v err %v", entries, err)
 	}
 }

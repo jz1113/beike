@@ -45,6 +45,10 @@ func migrateFullPromptNumberSnapshots(ctx context.Context, db execer, workspaceI
 		}
 		tables[name] = true
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
 	rows.Close()
 	specs := []struct{ table, column, format string }{
 		{"WorkshopWorkspace", "snapshotJson", "workshop"},
@@ -75,6 +79,10 @@ func migrateFullPromptNumberSnapshots(ctx context.Context, db execer, workspaceI
 				return err
 			}
 			pending = append(pending, item)
+		}
+		if err := records.Err(); err != nil {
+			records.Close()
+			return err
 		}
 		records.Close()
 		for _, item := range pending {

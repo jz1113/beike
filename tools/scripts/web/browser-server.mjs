@@ -13,6 +13,10 @@ execFileSync('ffmpeg', ['-nostdin', '-v', 'error', '-y',
   '-f', 'lavfi', '-i', 'sine=frequency=800:duration=15.083333',
   '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', '-shortest', join(fixtureDir, 'source.mp4'),
 ]);
+execFileSync('ffmpeg', ['-nostdin', '-v', 'error', '-y',
+  '-f', 'lavfi', '-i', 'testsrc2=size=160x90:rate=24:duration=12',
+  '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', join(fixtureDir, 'timeline.mp4'),
+]);
 const child = spawn(gatewayBinary(root), [], {
   cwd: root,
   stdio: 'inherit',
@@ -21,7 +25,7 @@ const child = spawn(gatewayBinary(root), [], {
     PATH: process.env.PATH,
     NODE_ENV: 'development',
     HOSTNAME: '127.0.0.1',
-    PORT: process.env.BEIKE_BROWSER_PORT || '3199',
+    PORT: '3199',
     LOCAL_ACCESS_TOKEN: 'browser-test-fixture',
     AZHUO_DATA_DIR: dir,
     DATABASE_URL: 'file:' + join(dir, 'browser.db'),

@@ -51,14 +51,17 @@ const gateway = startGateway({
   build: false,
 });
 
-const stop = (signal) => {
+let stopping = false;
+const stop = () => {
+  if (stopping) return;
+  stopping = true;
   killChild(gateway);
-  if (signal) process.exit(0);
+  setTimeout(() => process.exit(0), 16000).unref();
 };
-process.on('SIGTERM', () => stop('SIGTERM'));
-process.on('SIGINT', () => stop('SIGINT'));
+process.on('SIGTERM', stop);
+process.on('SIGINT', stop);
 gateway.on('exit', (code, signal) => {
-  process.exit(code ?? (signal ? 1 : 0));
+  process.exit(stopping ? 0 : (code ?? (signal ? 1 : 0)));
 });
 if (!(await waitFor(() => healthOk(apiPort), `Go API http://127.0.0.1:${apiPort}`, 60000, gateway))) {
   killChild(gateway);

@@ -12,8 +12,8 @@ export type { ApprovedModel, ModelCapability, ModelVendorId, VideoAudioSupportTy
 
 export const DEFAULT_IMAGE_MODEL_ID = 'gpt-image-2';
 export const DEFAULT_VIDEO_MODEL_ID = 'doubao-seedance-2.0-mini';
-export const DEFAULT_MULTIMODAL_MODEL_ID = 'gpt-5.6-luna';
-export const DEFAULT_ASSISTANT_MODEL_ID = 'gemini-3.7-flash';
+export const DEFAULT_MULTIMODAL_MODEL_ID = 'gpt-6-luna';
+export const DEFAULT_ASSISTANT_MODEL_ID = DEFAULT_MULTIMODAL_MODEL_ID;
 
 export const APPROVED_MODELS: readonly ApprovedModel[] = [
   ...APPROVED_IMAGE_MODELS,
@@ -25,6 +25,9 @@ const BY_ID = new Map(APPROVED_MODELS.map((m) => [m.id.toLowerCase(), m]));
 
 const MODEL_ALIASES: Record<string, string> = {
   h3: 'MiniMax-H3',
+  'doubao-seedance-2-5-260628': 'doubao-seedance-2.5',
+  'veo-3.1-generate-001': 'veo3.1',
+  'veo-3.1-fast-generate-001': 'veo3.1-fast',
   'nano-banana-2.1': 'gemini-nano-banana-2.1',
   'nano-banana-2': 'gemini-3.1-flash-image',
   'nano-banana-2-lite': 'gemini-3.1-flash-lite-image',

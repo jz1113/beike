@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Camera, Download, Lock, Pencil, RefreshCw, Sparkles, Wallet } from 'lucide-react';
-import { DEFAULT_CREATOR_PROFILE, useCreatorProfile } from '../../hooks/useCreatorProfile';
+import { DEFAULT_CREATOR_PROFILE, useCreatorProfile } from '../../hooks/useApiProviders';
 
 async function readAvatar(file: File) {
   const bitmap = await createImageBitmap(file);

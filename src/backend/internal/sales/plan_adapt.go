@@ -72,14 +72,13 @@ func (exclusion *planSourceExclusion) UnmarshalJSON(raw []byte) error {
 			return errors.New("原片剥离词超过 200 字")
 		}
 		return nil
-	} else {
-		type typedExclusion planSourceExclusion
-		var typed typedExclusion
-		if err := json.Unmarshal(raw, &typed); err != nil {
-			return err
-		}
-		*exclusion = planSourceExclusion(typed)
 	}
+	type typedExclusion planSourceExclusion
+	var typed typedExclusion
+	if err := json.Unmarshal(raw, &typed); err != nil {
+		return err
+	}
+	*exclusion = planSourceExclusion(typed)
 	exclusion.Term, exclusion.Type = strings.TrimSpace(exclusion.Term), strings.TrimSpace(exclusion.Type)
 	if exclusion.Term == "" || len([]rune(exclusion.Term)) > 200 || exclusion.Type == "" || len([]rune(exclusion.Type)) > 80 {
 		return errors.New("原片剥离词的内容或类型无效")
@@ -223,27 +222,12 @@ func planAdaptHandler(cfg config.Config, complete summaryCompleter) http.Handler
 			imitationMode = "script_only"
 		}
 		facts := map[string]any{
-			"incompatibleSourceBeats":       changes,
-			"unresolved":                    body.Unresolved,
-			"productName":                   body.ProductName,
-			"brand":                         body.Brand,
-			"category":                      body.Category,
-			"summary":                       body.Summary,
-			"facts":                         body.Facts,
-			"buyingPoints":                  body.BuyingPoints,
-			"cautions":                      body.Cautions,
-			"scriptTitle":                   body.ScriptTitle,
-			"oneTake":                       body.OneTake,
-			"visualSpec":                    body.VisualSpec,
-			"voiceMode":                     body.VoiceMode,
-			"presentationMode":              presentationMode,
-			"imitationMode":                 imitationMode,
-			"personaSummary":                body.PersonaSummary,
-			"personaPresence":               body.PersonaPresence,
-			"personaReferenceImageSupplied": body.PersonaReferenceImageURL != "",
-			"sceneSummary":                  body.SceneSummary,
-			"sourceExclusions":              body.SourceExclusions,
-			"beats":                         body.Beats,
+			"incompatibleSourceBeats": changes, "unresolved": body.Unresolved, "productName": body.ProductName, "brand": body.Brand,
+			"category": body.Category, "summary": body.Summary, "facts": body.Facts, "buyingPoints": body.BuyingPoints, "cautions": body.Cautions,
+			"scriptTitle": body.ScriptTitle, "oneTake": body.OneTake, "visualSpec": body.VisualSpec, "voiceMode": body.VoiceMode,
+			"presentationMode": presentationMode, "imitationMode": imitationMode, "personaSummary": body.PersonaSummary,
+			"personaPresence": body.PersonaPresence, "personaReferenceImageSupplied": body.PersonaReferenceImageURL != "",
+			"sceneSummary": body.SceneSummary, "sourceExclusions": body.SourceExclusions, "beats": body.Beats,
 		}
 		systemPrompt := prompt.Prompt
 		spokenVersion := ""
@@ -316,8 +300,7 @@ func planAdaptHandler(cfg config.Config, complete summaryCompleter) http.Handler
 }
 
 func scrubAdaptedTerms(text string, exclusions []planSourceExclusion, productName string) string {
-	out := strings.TrimSpace(text)
-	fallback := strings.TrimSpace(productName)
+	out, fallback := strings.TrimSpace(text), strings.TrimSpace(productName)
 	if fallback == "" {
 		fallback = "当前商品"
 	}

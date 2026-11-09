@@ -1,13 +1,65 @@
 import { loadSystemConfiguredModels } from '@client/shared/models/configuredModels';
-import { assetCreationDimensions, readSalesAssetCreation } from '../model/salesAssetCreation';
+import { assetCreationDimensions, readSalesAssetCreation, type AssetViewRequest } from '../model/salesAssetDraft';
 import { apiRequest } from '@client/shared/api/apiRequest';
 import { readClientStorageConfig, storageConfigHeaders } from '@client/shared/api/apiClient';
 import { getGatewayClientHeaders, getGatewayClientOverrides, getModelCredentials, getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
+import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
+import { recordChatTokens, recordMediaTaskUsage, readReportedUsage } from '@client/shared/utils/modelUsage';
+import { operationUsageScope, usageDigest } from '@client/shared/utils/usageScope';
 import { salesAssetViewJobResponseSchema, salesAssetViewJobsResponseSchema, type SalesAssetViewJob } from '@shared/contracts/salesAssetViews';
+import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
 import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
-import { selectedTextModel } from '@shared/domain/models/textModelRoute';
-import type { AssetViewRequest } from '../model/salesAssetViews';
-import { gridImageSettings } from './salesAssetViews';
+import { resolveGptImageSizeForModel } from '@shared/domain/models/model-adapters/image/gptImageSafeSizes';
+import { selectedTextModel } from '@shared/domain/models/workflowModelStorage';
+
+export function gridImageSettings(kind: 'persona' | 'scene', selection: string) {
+  const model = upstreamModalityModelId('image', selection);
+  const credentials = getModelCredentials(selection);
+  const capabilities = imageCapabilities(model, credentials.protocol, credentials.baseUrl);
+  const resolution = ['4K', '2K', '1K'].find((size) => capabilities.resolutions.some((item) => item === size));
+  const quality = resolution === '1K' ? 'low' : resolution === '2K' ? 'medium' : 'high';
+  const aspectRatio = kind === 'persona' ? '16:9' : '4:3';
+  return {
+    aspectRatio,
+    size: resolveGptImageSizeForModel(aspectRatio, model, quality),
+    quality,
+    maxReferenceImages: capabilities.maxReferenceImages,
+  };
+}
+
+/** Capture attribution before dispatch; the backend freezes it with the original job. */
+export function prepareSalesAssetUsage(key: string, model: string, analysisModel?: string): NonNullable<SalesAssetViewJob['usageScopes']> {
+  const headers = getGatewayClientHeaders(model);
+  const capture = (id: string, type: 'image' | 'vision', selection: string, supplied?: Record<string, string>) => {
+    const scope = operationUsageScope(id, type, selection, supplied);
+    return { ...scope, mediaType: type, epoch: scope.epoch || 'initial' };
+  };
+  const scopes: NonNullable<SalesAssetViewJob['usageScopes']> = { views: capture(key, 'image', model, headers) };
+  if (analysisModel) {
+    scopes.analysis = capture(`${key}:analysis`, 'vision', analysisModel);
+    scopes.main = capture(`${key}:main`, 'image', model, headers);
+  }
+  return scopes;
+}
+
+/** Polling and refresh replay cumulative receipts; cropped views are one paid image. */
+export function recordSalesAssetUsage(job: SalesAssetViewJob): void {
+  const workspaceId = usageDigest(getWorkspaceSecret() || 'local');
+  for (const receipt of job.usageReceipts || []) {
+    const scope = job.usageScopes?.[receipt.stage];
+    const type = receipt.stage === 'analysis' ? 'vision' : 'image';
+    if (!scope || scope.workspaceId !== workspaceId || scope.mediaType !== type) continue;
+    const operationId = receipt.stage === 'views' ? job.key : `${job.key}:${receipt.stage}`;
+    if (type === 'vision') {
+      recordChatTokens({ modelId: receipt.modelId, type, operationId, scope, usage: receipt.usage, success: receipt.success });
+    } else if (receipt.success || readReportedUsage(receipt.usage)) {
+      recordMediaTaskUsage({ modelId: receipt.modelId, type, scope,
+        localTaskId: operationId, recordId: receipt.recordId, taskId: receipt.taskId,
+        success: receipt.success, mediaCount: receipt.success ? 1 : 0, billableCount: 1, usage: receipt.usage,
+      });
+    }
+  }
+}
 
 async function readResult(response: Response) {
   const data: unknown = await response.json().catch(() => null);
@@ -42,13 +94,14 @@ export async function submitSalesAssetJob(kind: 'persona' | 'scene', request: As
   const response = await apiRequest('POST', '/api/sales/asset-view-jobs', {
     signal, headers: { 'Content-Type': 'application/json', ...getGatewayClientHeaders(request.model), ...storageConfigHeaders() },
     body: JSON.stringify({ key: request.key, kind, assetId: request.assetId || assetId, data,
-      checkpoint: { taskId: request.taskId, resultUrl: request.resultUrl },
+      checkpoint: { taskId: request.taskId, recordId: request.recordId, resultUrl: request.resultUrl },
       generation: {
         model: upstreamModalityModelId('image', request.model), modelSelection: request.model, layout: request.layout, ...settings, useReferenceImage: true,
         referenceImageUrl: references[0], referenceImages: references,
         customBaseUrl: credentials.baseUrl || overrides.customBaseUrl,
         customApiKey: credentials.apiKey || overrides.customApiKey,
         customProtocol: credentials.protocol, requestTemplate: credentials.requestTemplate,
+        usageScopes: prepareSalesAssetUsage(request.key, request.model, creation ? request.analysisModel : undefined),
         storageConfig: readClientStorageConfig(), source: `sales_${kind}_view`,
         ...(creation ? { assetCreation: creation } : {}),
       },
@@ -59,6 +112,7 @@ export async function submitSalesAssetJob(kind: 'persona' | 'scene', request: As
   request.jobId = parsed.data.job.id;
   request.assetId = parsed.data.job.assetId;
   if (parsed.data.job.creation) request.creation = parsed.data.job.creation;
+  recordSalesAssetUsage(parsed.data.job);
   return parsed.data.job;
 }
 
@@ -66,6 +120,7 @@ export async function readSalesAssetJob(id: string, signal?: AbortSignal): Promi
   const response = await apiRequest('GET', '/api/sales/asset-view-jobs', { search: `jobId=${encodeURIComponent(id)}`, signal, cache: 'no-store' });
   const parsed = salesAssetViewJobResponseSchema.safeParse(await readResult(response));
   if (!parsed.success) throw new Error('生成结果不完整，请重试读取');
+  recordSalesAssetUsage(parsed.data.job);
   return parsed.data.job;
 }
 
@@ -89,5 +144,6 @@ export async function listSalesAssetJobs(signal?: AbortSignal): Promise<SalesAss
   const response = await apiRequest('GET', '/api/sales/asset-view-jobs', { signal, cache: 'no-store' });
   const parsed = salesAssetViewJobsResponseSchema.safeParse(await readResult(response));
   if (!parsed.success) throw new Error('后台任务列表不完整，请刷新重试');
+  parsed.data.jobs.forEach(recordSalesAssetUsage);
   return parsed.data.jobs;
 }

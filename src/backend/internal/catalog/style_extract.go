@@ -13,6 +13,7 @@ import (
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/network"
+	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
 var styleHTTP = func() *http.Client { return network.SafeClient() }
@@ -43,9 +44,21 @@ func extractStyle(cfg config.Config, w http.ResponseWriter, r *http.Request, pay
 		prompt += "\n已有技能（作为待修订素材）：" + string(previous) + "\n请保留仍成立的规则，根据新样本修订；有冲突时写明适用条件，不能将新图的固定场景推广到全类目。返回完整的新版本规则。"
 	}
 	content := []any{map[string]any{"type": "text", "text": prompt}}
+	workspace := httpx.WorkspaceFrom(r)
 	for _, image := range images {
 		if text, ok := image.(string); ok && strings.TrimSpace(text) != "" {
-			content = append(content, map[string]any{"type": "image_url", "image_url": map[string]any{"url": text}})
+			resolved := strings.TrimSpace(text)
+			if strings.HasPrefix(resolved, "/storage/") {
+				rel := strings.TrimPrefix(resolved, "/storage/")
+				rel = strings.SplitN(rel, "?", 2)[0]
+				rel = strings.SplitN(rel, "#", 2)[0]
+				if storage.WorkspaceRel(rel, workspace, !cfg.Production()) {
+					if inline, err := categoryImage(cfg, "/storage/"+rel); err == nil && inline != "" {
+						resolved = inline
+					}
+				}
+			}
+			content = append(content, map[string]any{"type": "image_url", "image_url": map[string]any{"url": resolved}})
 		}
 	}
 	text, status, usage, err := styleChat(r.Context(), base, key, model, content)
@@ -68,7 +81,7 @@ func extractStyle(cfg config.Config, w http.ResponseWriter, r *http.Request, pay
 func styleCredentials(cfg config.Config, r *http.Request, payload map[string]any) (string, string, string) {
 	model := strings.TrimSpace(styleString(payload, "model"))
 	if model == "" {
-		model = "gpt-5.6-luna"
+		model = "gpt-6-luna"
 	}
 	if strings.HasPrefix(model, "deepseek-official:") {
 		return "https://api.deepseek.com", strings.TrimSpace(styleString(payload, "customApiKey")), strings.TrimPrefix(model, "deepseek-official:")

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ModalityModelItem } from './modalityModelTypes';
-import { planModalityChannelSync } from './modalityModelStorage';
+import { planModalityChannelSync, type ModalityModelItem } from './modalityModelStorage';
 
 function model(partial: Partial<ModalityModelItem> & Pick<ModalityModelItem, 'id' | 'modelId'>): ModalityModelItem {
   return {

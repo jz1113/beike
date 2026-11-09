@@ -2,7 +2,7 @@ import React from 'react';
 import { Search, Plus, Globe } from 'lucide-react';
 import { type ApiProvider } from '../../model/apiProviderTypes';
 import { ModelIcon } from '@client/shared/ui/ModelIcons';
-import { ComflyLogo, LianchiLogo, OpenAILogo, DeepSeekLogo, OneBoundLogo } from '@client/shared/icons';
+import { ComflyLogo, OpenAILogo, DeepSeekLogo, OneBoundLogo } from '@client/shared/icons/brands/BrandIcons';
 
 interface Props {
   providers: ApiProvider[];
@@ -41,9 +41,6 @@ export function ApiProvidersNavList({
     }
     if (provider.id === 'comfly_gateway' || provider.iconType === 'comfly') {
       return <ComflyLogo className={iconCls} />;
-    }
-    if (provider.id === 'lianchi_images' || provider.iconType === 'lianchi') {
-      return <LianchiLogo className={iconCls} />;
     }
     if (provider.id === 'mita' || provider.iconType === 'mita') {
       return (

@@ -1,26 +1,25 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { RefreshCw } from 'lucide-react';
 import { useAppStore } from '@client/store';
 import '@client/store/persist/generation';
 import '@shared/domain/media/drawing';
 import { pageRoot } from '@client/shared/ui/layoutClasses';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
 import type { AssetHistoryTask } from '@client/shared/api/mapDbTask';
+import { agentHistoryTasks, type AssetTaskBatch } from '../model/agentAssetFilter';
 import { mergeAssetTasks } from '../model/mergeAssetTasks';
 import { useAssetHistoryQuery } from '../hooks/useAssetHistoryQuery';
 import { buildCanvasAssets, type AssetCanvasProject } from '../model/canvasAssets';
 import { useAssetActions } from '../hooks/useAssetActions';
-import { useI18n } from '@client/shared/i18n';
 import MaterialLibraryView from './material/MaterialLibraryView';
 
-export type { AssetTaskBatch } from '../model/assetBatch';
+export type { AssetTaskBatch };
 
 const EMPTY_ASSET_ITEMS: never[] = [];
 
 export type AssetCenterProps = {
   canvasProjects: AssetCanvasProject[];
-  onDeleteCanvasProject: (projectId: string) => void;
+  onDeleteCanvasProject: (projectId: string) => Promise<void>;
   onDeleteCanvasNode: (projectId: string, nodeId: string) => void;
   onSelectCanvasProject: (projectId: string) => void;
 };
@@ -29,20 +28,16 @@ export default function AssetCenter({
   canvasProjects,
   onDeleteCanvasProject,
   onDeleteCanvasNode,
-  onSelectCanvasProject,
 }: AssetCenterProps) {
-  const { t } = useI18n();
-  const { currentView, generationTasks, sessions, setPreviewTask, deleteSession } = useAppStore(
+  const { currentView, generationTasks, sessions, setPreviewTask } = useAppStore(
     useShallow((s) => ({
       currentView: s.currentView,
       generationTasks: s.generationTasks,
       sessions: s.sessions,
       setPreviewTask: s.setPreviewTask,
-      deleteSession: s.deleteSession,
     }))
   );
 
-  const [sourceType, setSourceType] = useState<'ai' | 'uploaded'>('ai');
 
   // 动画帧缓冲确保页面平滑渲染
   const [isGalleryReady, setIsGalleryReady] = useState(false);
@@ -109,7 +104,7 @@ export default function AssetCenter({
   // 合并生成任务与数据库任务
   const mergedTasks = useMemo(
     () =>
-      mergeAssetTasks({
+      agentHistoryTasks(mergeAssetTasks({
         serverHistoryComplete,
         dbTasks: activeDbTasks,
         generationTasks: activeGenerationTasks,
@@ -119,7 +114,7 @@ export default function AssetCenter({
         sessions: activeSessions,
         canvasTasks,
         now,
-      }),
+      }), activeSessions),
     [
       serverHistoryComplete,
       activeDbTasks,
@@ -137,16 +132,12 @@ export default function AssetCenter({
   );
 
   const {
-    isBusy,
     isDeleting,
     isDownloadingZip,
     handleBatchDeleteTasks,
     handleBatchDownloadTasks,
-    handleBatchDeleteProjects,
   } = useAssetActions({
     mergedTasks,
-    serverHistoryComplete,
-    deleteSession,
     selectedTaskIds,
     failedTasks,
     setSelectedTaskIds,
@@ -160,49 +151,6 @@ export default function AssetCenter({
 
   return (
     <div className={`${pageRoot} bg-transparent select-none`}>
-      <header className="shrink-0 cursor-default bg-transparent px-4 sm:px-6 lg:px-8 pt-4 pb-2">
-        <div className="flex flex-wrap items-center gap-4">
-          <h1 className="text-lg font-semibold">{t('sidebar.generationHistory')}</h1>
-          <div className="flex items-center gap-1.5 p-1 rounded-full bg-slate-100/90 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 shadow-2xs">
-            <button
-              type="button"
-              aria-pressed={sourceType === 'ai'}
-              onClick={() => setSourceType('ai')}
-              className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                sourceType === 'ai'
-                  ? 'bg-white dark:bg-[#20252F] text-slate-900 dark:text-white shadow-2xs'
-                  : 'text-slate-500 dark:text-[#8E8E93] hover:text-slate-800 dark:hover:text-white'
-              }`}
-            >
-              {t('assets.aiGenerated')}
-            </button>
-            <button
-              type="button"
-              aria-pressed={sourceType === 'uploaded'}
-              onClick={() => setSourceType('uploaded')}
-              className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                sourceType === 'uploaded'
-                  ? 'bg-white dark:bg-[#20252F] text-slate-900 dark:text-white shadow-2xs'
-                  : 'text-slate-500 dark:text-[#8E8E93] hover:text-slate-800 dark:hover:text-white'
-              }`}
-            >
-              {t('assets.myUploads')}
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => void refetchAssetTasks()}
-            disabled={isBusy || historyQuery.isFetching}
-            aria-label={t('common.refresh')}
-            title={t('common.refresh')}
-            className="ml-auto rounded-full p-2 text-slate-400 dark:text-[#8E8E93] hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-700 dark:hover:text-white transition-colors disabled:opacity-50"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${historyQuery.isFetching ? 'animate-spin' : ''}`}
-            />
-          </button>
-        </div>
-      </header>
 
       {/* 🌟 主视图内容区 */}
       <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -213,16 +161,10 @@ export default function AssetCenter({
           </div>
         )}
         <MaterialLibraryView
-          sessions={activeSessions}
-          canvasProjects={canvasProjects}
           mergedTasks={mergedTasks}
-          sourceType={sourceType}
           setPreviewTask={(task, queue) => setPreviewTask(task as unknown as Parameters<typeof setPreviewTask>[0], queue as unknown as Parameters<typeof setPreviewTask>[1])}
           onBatchDelete={handleBatchDeleteTasks}
           onBatchDownload={handleBatchDownloadTasks}
-          onOpenCanvasProject={onSelectCanvasProject}
-          onBatchDeleteProjects={handleBatchDeleteProjects}
-          projectHistoryReady={serverHistoryComplete}
           isDownloadingZip={isDownloadingZip}
           isDeleting={isDeleting}
         />

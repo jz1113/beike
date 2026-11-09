@@ -30,7 +30,14 @@ func detectSocialIntent(text string) socialIntent {
 			continue
 		}
 		host := strings.ToLower(parsed.Hostname())
-		if host != "xiaohongshu.com" && host != "xhslink.com" && !strings.HasSuffix(host, ".xiaohongshu.com") && !strings.HasSuffix(host, ".xhslink.com") {
+		supported := false
+		for _, domain := range []string{"xiaohongshu.com", "xhslink.com", "douyin.com", "kuaishou.com", "bilibili.com", "b23.tv", "channels.weixin.qq.com"} {
+			if host == domain || strings.HasSuffix(host, "."+domain) {
+				supported = true
+				break
+			}
+		}
+		if !supported {
 			continue
 		}
 		if seen[raw] {
@@ -75,7 +82,18 @@ func collectSocialImages(r *http.Request, cfg config.Config, urls []string) (ima
 		title, _ := body["title"].(string)
 		list := stringImages(body["images"])
 		if body["success"] == true {
-			summaries = append(summaries, "链接 "+strconv.Itoa(index+1)+"："+fallbackText(title, "小红书图集")+"，获取 "+strconv.Itoa(len(list))+" 张图片")
+			summary := "链接 " + strconv.Itoa(index+1) + "：" + fallbackText(title, "社媒素材") + "，获取 " + strconv.Itoa(len(list)) + " 张图片"
+			if body["fromCache"] == true {
+				summary += "（复用已采集结果，未调用采集服务）"
+			} else {
+				summary += "（本次调用了采集服务）"
+			}
+			if video, _ := body["video"].(string); video != "" {
+				if parsed, err := url.Parse(video); err == nil && (parsed.Scheme == "https" || parsed.Scheme == "http") && parsed.Host != "" {
+					summary += "\n\n[打开采集到的视频](" + strings.ReplaceAll(parsed.String(), ")", "%29") + ")。已获取视频地址，尚未下载或分析视频；源站链接可能失效。"
+				}
+			}
+			summaries = append(summaries, summary)
 		} else {
 			message, _ := body["error"].(string)
 			if message == "" {
@@ -101,7 +119,7 @@ func collectSocialImages(r *http.Request, cfg config.Config, urls []string) (ima
 	for i, image := range images {
 		all[i] = image.URL
 	}
-	title := "小红书采集图集"
+	title := "社媒采集图集"
 	widget = map[string]any{
 		"title": title, "imageSources": images, "allImages": all, "mainImages": all,
 		"props": map[string]any{"链接数量": strconv.Itoa(len(urls)), "图集数量": strconv.Itoa(len(images))},

@@ -2,44 +2,9 @@ import { isGenerationDeleted } from '@client/store/persist/generation';
 import { getAspectRatioFromSize } from '@shared/domain/media/drawing';
 import { getAssetTime, matchesAssetTime, resolveAssetMediaType, type AssetMediaCategory, type AssetTimeFilter } from '@client/shared/utils/assetTaskData';
 import type { useAppStore } from '@client/store';
-import { isPureAgentDialogue } from './agentAssetFilter';
+import { isPureAgentDialogue, type MergedAssetTask } from './agentAssetFilter';
 
 type AppState = ReturnType<typeof useAppStore.getState>;
-
-export interface MergedAssetTask {
-  id: string;
-  dbId?: string;
-  taskId?: string;
-  resultUrl?: string;
-  status?: string;
-  title?: string;
-  prompt?: string;
-  batchId?: string;
-  sessionId?: string;
-  sessionTitle?: string;
-  progress?: string;
-  failReason?: string;
-  size?: string;
-  quality?: string;
-  createdAt?: unknown;
-  model?: string;
-  mediaType?: string;
-  aspectRatio?: string;
-  referenceImages?: string[];
-  referenceImageUrl?: string;
-  images?: string[];
-  sourceImageUrl?: string;
-  useReferenceImage?: boolean;
-  rawTask?: { id?: string; status?: string; resultUrl?: string; referenceImages?: string[] };
-  batchTitle?: string;
-  canvasProjectTitle?: string;
-  canvasProjectId?: string;
-  nodeId?: string;
-  isCanvasPlaceholder?: boolean;
-  duration?: number | string;
-  coverUrl?: string;
-  isUploaded?: boolean;
-}
 
 interface MergeAssetTaskInput {
   dbTasks: MergedAssetTask[];

@@ -1,4 +1,3 @@
-import { migrateTravelCopySkill } from './migrateTravelCopySkill';
 import { StateCreator } from 'zustand';
 import { announceSkillLibraryChange, loadSkillLibrary, saveSkillDocument, deleteSkillDocument } from '@client/shared/api/skillLibrary';
 import { loadSkillFavorites } from '@client/shared/skills/model/skillTypes';
@@ -104,8 +103,8 @@ function loadStoredSkills(): AssistantSkill[] {
       if (!skill || typeof skill.id !== 'string' || skill.isBuiltin
         || typeof skill.name !== 'string' || typeof skill.prompt !== 'string') continue;
       try {
-        const migrated = migrateTravelCopySkill(normalizeCustomSkill({ ...skill, isFavorite: skill.isFavorite || favorites.has(skill.id) }));
-        valid.push({ ...migrated, createdAt: skill.createdAt || 1, updatedAt: skill.updatedAt || skill.createdAt || 1 });
+        const normalized = normalizeCustomSkill({ ...skill, isFavorite: skill.isFavorite || favorites.has(skill.id) });
+        valid.push({ ...normalized, createdAt: skill.createdAt || 1, updatedAt: skill.updatedAt || skill.createdAt || 1 });
       } catch {}
     }
     return valid;
@@ -133,7 +132,8 @@ export const createAssistantSkillSlice: StateCreator<AppState, [], [], Assistant
           const skills = library.skills.flatMap(entry => entry.kind === 'assistant' ? [entry.content] : []);
           const activeId = get().activeAssistantSkillId;
           set({ assistantCustomSkills: skills, assistantSkillsError: null,
-            activeAssistantSkillId: activeId && !skills.some(skill => skill.id === activeId) && !builtinIds.has(activeId) ? null : activeId });
+            activeAssistantSkillId: activeId && !skills.some(skill => skill.id === activeId) && !builtinIds.has(activeId) ? null : activeId,
+            activeAssistantSkillSnapshot: activeId && !skills.some(skill => skill.id === activeId) && !builtinIds.has(activeId) ? null : get().activeAssistantSkillSnapshot });
         }
         return library;
       } catch (error) {
@@ -190,7 +190,8 @@ export const createAssistantSkillSlice: StateCreator<AppState, [], [], Assistant
     getActiveAssistantSkill: () => {
       const activeId = get().activeAssistantSkillId;
       if (!activeId) return null;
-      if (get().activeAssistantSkillSnapshot?.id === activeId) return get().activeAssistantSkillSnapshot;
+      const snapshot=get().activeAssistantSkillSnapshot;
+      if(snapshot?.id===activeId) return snapshot.isBuiltin && !builtinIds.has(activeId) ? null : snapshot;
       return get().getAllAssistantSkills().find((s) => s.id === activeId) || null;
     },
 

@@ -1,6 +1,15 @@
-import { resolveSkillKind } from './skillPurpose';
-import type { AssistantSkill, AssistantSkillRuntime, SkillResourceFile } from './types';
-import { resolveSkillReferenceContent } from './references';
+import { REVERSE_ENGINE_CORE_SPEC } from '../../assets/asset-deconstruct/reverseEngineCoreSpec';
+import { resolveSkillKind, type AssistantSkill, type AssistantSkillRuntime, type SkillResourceFile } from './types';
+
+const BUILTIN_REFERENCE_CONTENT: Record<string, string> = {
+  'assetDeconstruct/REVERSE_ENGINE_CORE_SPEC': REVERSE_ENGINE_CORE_SPEC,
+};
+
+export function resolveSkillReferenceContent(path: string): string | null {
+  const key = path.trim();
+  if (!key) return null;
+  return BUILTIN_REFERENCE_CONTENT[key] ?? null;
+}
 
 /** 注入模型的技能正文上限。附属文件不在这里展开。 */
 const MAX_SKILL_RUNTIME_CHARS = 12_000;
@@ -43,11 +52,11 @@ export function skillRuntimeInstructions(skill: AssistantSkill): string {
     : skill.prompt.trim();
 }
 
-function resourceIndex(skill: AssistantSkill, resources: SkillResourceFile[]): string {
+function resourceIndex(skill: AssistantSkill, resources: SkillResourceFile[], includeLabels = true): string {
   if (!resources.length) return '';
   const labels = new Map((skill.references || []).map((ref) => [ref.path.trim(), ref.label?.trim() || '']));
   const lines = resources.map((resource) => {
-    const label = labels.get(resource.path)?.slice(0, 80);
+    const label = includeLabels ? labels.get(resource.path)?.slice(0, 80) : undefined;
     return label ? `- ${resource.path}（${label}）` : `- ${resource.path}`;
   });
   return [
@@ -68,6 +77,9 @@ export function withSkillFileTool(tools: string[] | undefined, resources?: Array
 
 export function composeSkillRuntime(skill: AssistantSkill | null | undefined): AssistantSkillRuntime | null {
   if (!skill?.id || !skill.prompt?.trim()) return null;
+  const adapter = skill.runtimeInstructions;
+  if (adapter !== undefined && (typeof adapter !== 'string' || !adapter.trim() || adapter.length > 4000)) throw new Error('宿主执行适配必须为 1–4000 字符');
+  const hostInstructions = adapter ? `【宿主执行适配】\n${adapter.trim()}` : '';
 
   const resources = collectSkillResources(skill);
   const parts = [
@@ -75,6 +87,7 @@ export function composeSkillRuntime(skill: AssistantSkill | null | undefined): A
     resolveSkillKind(skill) === 'creation' ? '将以下内容作为当前创作的脚本与风格约束，根据用户要求替换主体和细节（若用户在提示词中给出了【强指令】修改姓名、角色、朝代服饰或提供了参考垫图，必须最高优先级严格覆盖模板中的默认设定）；它不属于全局执行规范。' : '',
     skill.description?.trim() ? `用途：${skill.description.trim()}` : '',
     skillRuntimeInstructions(skill),
+    hostInstructions,
     resourceIndex(skill, resources),
   ].filter(Boolean);
 
@@ -84,11 +97,12 @@ export function composeSkillRuntime(skill: AssistantSkill | null | undefined): A
       if (resources.length >= MAX_RESOURCES) resources.pop();
       pushResource(resources, 'SKILL.md', skill.prompt);
     }
-    systemPrompt = [`【本次技能：${skill.displayName || skill.name}】`,
-      '完整主指令在 SKILL.md。执行前用 read_skill_file 读完，按 nextOffset 续读。', resourceIndex(skill, resources)].join('\n\n');
+    systemPrompt = [`【本次技能：${(skill.displayName || skill.name).slice(0, 200)}】`,
+      '完整主指令在 SKILL.md。执行前用 read_skill_file 读完，按 nextOffset 续读。', hostInstructions, resourceIndex(skill, resources, false)].filter(Boolean).join('\n\n');
   }
 
-  const allowedTools = skill.tools ? [...skill.tools] : undefined;
+  const declaredTools = skill.runtimeTools ?? skill.tools;
+  const allowedTools = declaredTools ? [...declaredTools] : undefined;
   if (resources.length && allowedTools && !allowedTools.includes('read_skill_file')) {
     allowedTools.push('read_skill_file');
   }

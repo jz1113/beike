@@ -3,10 +3,12 @@ package workshop
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -214,19 +216,19 @@ func ClearWorkshopHistory(ctx context.Context, db *sql.DB, workspace, activeID s
 		return 0, ErrBatchConflict
 	}
 	for _, statement := range []string{
-		`DELETE FROM "WorkshopOutputReview" WHERE "workspaceId" = ? AND "batchId" <> ?`,
-		`DELETE FROM "WorkshopPipelineRun" WHERE "workspaceId" = ? AND "batchId" <> ?`,
-		`DELETE FROM "PromptAssetUsageEvent" WHERE "workspaceId" = ? AND "batchId" IN (SELECT "id" FROM "WorkshopBatch" WHERE "workspaceId" = ? AND "id" <> ?)`,
+		`DELETE FROM "WorkshopOutputReview" WHERE "workspaceId" = ? AND "batchId" <> ? AND substr("batchId", 1, 7) <> 'canvas_'`,
+		`DELETE FROM "WorkshopPipelineRun" WHERE "workspaceId" = ? AND "batchId" <> ? AND substr("batchId", 1, 7) <> 'canvas_'`,
+		`DELETE FROM "PromptAssetUsageEvent" WHERE "workspaceId" = ? AND "batchId" IN (SELECT "id" FROM "WorkshopBatch" WHERE "workspaceId" = ? AND "id" <> ? AND substr("id", 1, 7) <> 'canvas_')`,
 	} {
 		args := []any{workspace, activeID}
-		if statement == `DELETE FROM "PromptAssetUsageEvent" WHERE "workspaceId" = ? AND "batchId" IN (SELECT "id" FROM "WorkshopBatch" WHERE "workspaceId" = ? AND "id" <> ?)` {
+		if statement == `DELETE FROM "PromptAssetUsageEvent" WHERE "workspaceId" = ? AND "batchId" IN (SELECT "id" FROM "WorkshopBatch" WHERE "workspaceId" = ? AND "id" <> ? AND substr("id", 1, 7) <> 'canvas_')` {
 			args = []any{workspace, workspace, activeID}
 		}
 		if _, err := tx.ExecContext(ctx, statement, args...); err != nil {
 			return 0, err
 		}
 	}
-	result, err := tx.ExecContext(ctx, `DELETE FROM "WorkshopBatch" WHERE "workspaceId" = ? AND "id" <> ?`, workspace, activeID)
+	result, err := tx.ExecContext(ctx, `DELETE FROM "WorkshopBatch" WHERE "workspaceId" = ? AND "id" <> ? AND substr("id", 1, 7) <> 'canvas_'`, workspace, activeID)
 	if err != nil {
 		return 0, err
 	}
@@ -239,7 +241,7 @@ func WriteWorkshopBatch(ctx context.Context, db *sql.DB, workspace, id string, r
 	if err != nil {
 		return 0, "", err
 	}
-	if active.ID != id {
+	if active.ID != id && !IsCanvasWorkshopBatch(id) {
 		return 0, "", errors.New("只能保存当前活跃批次，历史批次请复制为新批次后再编辑")
 	}
 	current, err := GetWorkshopBatch(ctx, db, workspace, id)
@@ -254,8 +256,8 @@ func WriteWorkshopBatch(ctx context.Context, db *sql.DB, workspace, id string, r
 		UPDATE "WorkshopBatch"
 		SET "revision" = "revision" + 1, "status" = ?, "snapshotJson" = ?, "updatedAt" = ?
 		WHERE "workspaceId" = ? AND "id" = ? AND "revision" = ? AND "status" <> 'archived'
-		  AND "id" = (SELECT "activeBatchId" FROM "WorkshopBatchState" WHERE "workspaceId" = ?)`,
-		status, snapshot, now, workspace, id, revision, workspace)
+		  AND (? OR "id" = (SELECT "activeBatchId" FROM "WorkshopBatchState" WHERE "workspaceId" = ?))`,
+		status, snapshot, now, workspace, id, revision, IsCanvasWorkshopBatch(id), workspace)
 	if err != nil {
 		return 0, "", err
 	}
@@ -364,4 +366,336 @@ func newBatchID() string {
 		return "batch_local"
 	}
 	return "batch_" + hex.EncodeToString(buf[:])
+}
+
+func workshopBatchName(id, name, createdAt string) string {
+	if name != "" && name != "未命名新批次" && name != "未命名批次" {
+		return name
+	}
+	date, err := time.Parse(time.RFC3339Nano, createdAt)
+	dateLabel := "未知日期"
+	if err == nil {
+		dateLabel = date.In(time.FixedZone("CST", 8*60*60)).Format("20060102")
+	}
+	shortID := id
+	if len(shortID) > 6 {
+		shortID = shortID[len(shortID)-6:]
+	}
+	return "电商图片 · " + dateLabel + " · " + strings.ToUpper(shortID)
+}
+
+func workshopBatchCopyName(source WorkshopBatchRow) string {
+	name := strings.TrimSuffix(workshopBatchName(source.ID, source.Name, source.CreatedAt), "（副本）")
+	characters := []rune(name)
+	if len(characters) > 116 {
+		name = string(characters[:116])
+	}
+	return name + "（副本）"
+}
+
+func DuplicateWorkshopBatch(ctx context.Context, db *sql.DB, workspace, id string) (WorkshopBatchRow, error) {
+	source, err := GetWorkshopBatch(ctx, db, workspace, id)
+	if err != nil || source.ID == "" {
+		return WorkshopBatchRow{}, ErrBatchMissing
+	}
+	active, err := EnsureActiveWorkshopBatch(ctx, db, workspace)
+	if err != nil {
+		return WorkshopBatchRow{}, err
+	}
+	if source.ID == active.ID {
+		source = active
+	}
+	return replaceActiveBatch(ctx, db, workspace, active, workshopBatchCopyName(source), duplicateSnapshot(source.Snapshot), false)
+}
+
+func ArchiveActiveWorkshopBatch(ctx context.Context, db *sql.DB, workspace string, force bool) (WorkshopBatchRow, error) {
+	active, err := EnsureActiveWorkshopBatch(ctx, db, workspace)
+	if err != nil {
+		return WorkshopBatchRow{}, err
+	}
+	if active.Status != "completed" && active.Status != "cancelled" && !force {
+		return WorkshopBatchRow{}, errors.New("请先完成本批次，或确认放弃后再归档")
+	}
+	return replaceActiveBatch(ctx, db, workspace, active, "未命名新批次", emptyBatchSnapshot(), true)
+}
+
+func replaceActiveBatch(ctx context.Context, db *sql.DB, workspace string, active WorkshopBatchRow, name, snapshot string, force bool) (WorkshopBatchRow, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return WorkshopBatchRow{}, err
+	}
+	defer tx.Rollback()
+	if err := retireActiveBatch(ctx, tx, workspace, active, force); err != nil {
+		return WorkshopBatchRow{}, err
+	}
+	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	id := newBatchID()
+	if err := insertBatchTx(ctx, tx, workspace, id, name, "draft", snapshot, now, false); err != nil {
+		return WorkshopBatchRow{}, err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE "WorkshopBatchState" SET "activeBatchId" = ? WHERE "workspaceId" = ? AND "activeBatchId" = ?`, id, workspace, active.ID)
+	if err != nil {
+		return WorkshopBatchRow{}, err
+	}
+	changed, _ := result.RowsAffected()
+	if changed != 1 {
+		return WorkshopBatchRow{}, errors.New("当前批次已在其他窗口切换，请重新加载后继续")
+	}
+	row, err := getBatchTx(ctx, tx, workspace, id)
+	if err != nil {
+		return WorkshopBatchRow{}, err
+	}
+	return row, tx.Commit()
+}
+
+func duplicateSnapshot(raw string) string {
+	var snapshot map[string]any
+	if json.Unmarshal([]byte(raw), &snapshot) != nil {
+		snapshot = map[string]any{}
+	}
+	snapshot["currentStage"] = stageForBatchContent(snapshot)
+	if items, _ := snapshot["items"].([]any); len(items) > 0 {
+		snapshot["batchInputText"] = ""
+	}
+	snapshot["pipeline"] = map[string]any{
+		"status": "draft", "planRevision": 0, "storyboardRevision": 0,
+		"diversityContext": map[string]any{"groupSignatures": []any{}, "actionIds": []any{}, "sceneIds": []any{}},
+		"runs":             []any{},
+	}
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		return emptyBatchSnapshot()
+	}
+	return string(encoded)
+}
+
+func stageForBatchContent(snapshot map[string]any) int {
+	items, _ := snapshot["items"].([]any)
+	hasImages := false
+	hasPrompts := false
+	hasSuccess := false
+	for _, item := range items {
+		product, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if product["status"] == "success" {
+			hasSuccess = true
+		}
+		if prompts, ok := product["prompts"].([]any); ok && len(prompts) > 0 {
+			hasPrompts = true
+		}
+		tasks, _ := product["tasks"].([]any)
+		for _, rawTask := range tasks {
+			task, ok := rawTask.(map[string]any)
+			if !ok {
+				continue
+			}
+			url, _ := task["resultUrl"].(string)
+			if task["status"] == "SUCCESS" && url != "" && len(url) >= 5 && url[:5] != "blob:" {
+				hasImages = true
+			}
+		}
+	}
+	if hasImages {
+		return 4
+	}
+	if hasPrompts {
+		return 3
+	}
+	if hasSuccess {
+		return 2
+	}
+	return 1
+}
+
+func IsCanvasWorkshopBatch(id string) bool { return strings.HasPrefix(id, "canvas_") }
+
+// A canvas owns a stable, independent batch. Creating or copying it never retires
+// the legacy active draft, and retrying the same project never copies twice.
+func CreateCanvasWorkshopBatch(ctx context.Context, db *sql.DB, workspace, projectID, sourceID, name string) (WorkshopBatchRow, error) {
+	digest := sha256.Sum256([]byte(workspace + "\x00" + projectID))
+	id := "canvas_" + hex.EncodeToString(digest[:16])
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return WorkshopBatchRow{}, err
+	}
+	defer tx.Rollback()
+	existing, err := getBatchTx(ctx, tx, workspace, id)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return WorkshopBatchRow{}, err
+	}
+	if existing.ID != "" {
+		return existing, tx.Commit()
+	}
+	snapshot := emptyBatchSnapshot()
+	if sourceID != "" {
+		source, err := getBatchTx(ctx, tx, workspace, sourceID)
+		if err != nil || source.ID == "" {
+			return WorkshopBatchRow{}, ErrBatchMissing
+		}
+		snapshot = duplicateSnapshot(source.Snapshot)
+		if name == "" {
+			name = workshopBatchCopyName(source)
+		}
+	}
+	if name == "" {
+		name = "电商图文画布"
+	}
+	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	if err := insertBatchTx(ctx, tx, workspace, id, name, "draft", snapshot, now, false); err != nil {
+		return WorkshopBatchRow{}, err
+	}
+	row, err := getBatchTx(ctx, tx, workspace, id)
+	if err != nil {
+		return WorkshopBatchRow{}, err
+	}
+	return row, tx.Commit()
+}
+
+// Keep model and image preferences; each new batch starts with four-shot grid output.
+func emptyBatchWithPreferences(previous string) string {
+	var old, next map[string]any
+	if json.Unmarshal([]byte(previous), &old) != nil {
+		return emptyBatchSnapshot()
+	}
+	if json.Unmarshal([]byte(emptyBatchSnapshot()), &next) != nil {
+		return emptyBatchSnapshot()
+	}
+	saved, _ := old["settings"].(map[string]any)
+	settings := next["settings"].(map[string]any)
+	for _, name := range []string{"selectedVisionModel", "selectedImageGenModel", "selectedQuality", "selectedAspect", "gridOutputSize"} {
+		if value, exists := saved[name]; exists {
+			settings[name] = value
+		}
+	}
+	raw, _ := json.Marshal(next)
+	return string(raw)
+}
+
+type ActiveWorkshopBatch struct {
+	ID       string
+	Snapshot string
+	Status   string
+}
+
+func ReadActiveWorkshopBatch(ctx context.Context, db *sql.DB, workspace string) (ActiveWorkshopBatch, error) {
+	var batch ActiveWorkshopBatch
+	err := db.QueryRowContext(ctx, `
+		SELECT b."id", b."snapshotJson", b."status"
+		FROM "WorkshopBatchState" s
+		JOIN "WorkshopBatch" b ON b."id" = s."activeBatchId" AND b."workspaceId" = s."workspaceId"
+		WHERE s."workspaceId" = ?`, workspace).Scan(&batch.ID, &batch.Snapshot, &batch.Status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ActiveWorkshopBatch{}, nil
+	}
+	return batch, err
+}
+
+type OutputReview struct {
+	BatchID     string
+	ProductID   string
+	TaskID      string
+	Decision    string
+	Fidelity    *int
+	Composition *int
+	Aesthetic   *int
+	Consistency *int
+	ReasonCodes []string
+	Note        string
+	AssetIDs    []string
+}
+
+type reviewExec interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func InsertOutputReview(ctx context.Context, db reviewExec, workspace string, review OutputReview) error {
+	reasons, err := json.Marshal(review.ReasonCodes)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO "WorkshopOutputReview"
+		("id", "workspaceId", "batchId", "productId", "taskId", "decision", "productFidelityScore", "compositionScore", "aestheticScore", "consistencyScore", "reasonCodesJson", "note", "createdAt")
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"wor_"+randomID(), workspace, review.BatchID, review.ProductID, review.TaskID, review.Decision,
+		review.Fidelity, review.Composition, review.Aesthetic, review.Consistency, string(reasons), review.Note, now)
+	if err != nil {
+		return err
+	}
+	event := map[string]string{
+		"accepted": "output_accepted", "retry_requested": "retry_requested", "rejected": "output_rejected",
+	}[review.Decision]
+	for _, assetID := range review.AssetIDs {
+		if assetID == "" {
+			continue
+		}
+		if _, err := db.ExecContext(ctx, `
+			INSERT INTO "PromptAssetUsageEvent"
+			("id", "workspaceId", "assetId", "batchId", "productId", "taskId", "eventType", "createdAt", "metadata")
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}')`,
+			"uev_"+randomID(), workspace, assetID, review.BatchID, review.ProductID, review.TaskID, event, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func randomID() string {
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "review"
+	}
+	return hex.EncodeToString(buf[:])
+}
+
+var ErrWorkspaceConflict = errors.New("工作区已被其他窗口更新，请保留当前内容后重新加载")
+
+type WorkshopWorkspace struct {
+	Revision  int
+	Snapshot  string
+	UpdatedAt string
+	Empty     bool
+}
+
+func ReadWorkshopWorkspace(ctx context.Context, db *sql.DB, workspace, id string) (WorkshopWorkspace, error) {
+	var row WorkshopWorkspace
+	err := db.QueryRowContext(ctx, `
+		SELECT revision, snapshotJson, updatedAt FROM WorkshopWorkspace
+		WHERE id = ? AND workspaceId = ?`, id, workspace).Scan(&row.Revision, &row.Snapshot, &row.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return WorkshopWorkspace{Empty: true}, nil
+	}
+	return row, err
+}
+
+func WriteWorkshopWorkspace(ctx context.Context, db *sql.DB, workspace, id string, revision int, snapshot, updatedAt string) (int, error) {
+	var changed int64
+	var err error
+	if revision == 0 {
+		result, execErr := db.ExecContext(ctx, `
+			INSERT OR IGNORE INTO WorkshopWorkspace (id, workspaceId, revision, snapshotJson, updatedAt)
+			VALUES (?, ?, 1, ?, ?)`, id, workspace, snapshot, updatedAt)
+		err = execErr
+		if err == nil {
+			changed, err = result.RowsAffected()
+		}
+	} else {
+		result, execErr := db.ExecContext(ctx, `
+			UPDATE WorkshopWorkspace SET revision = revision + 1, snapshotJson = ?, updatedAt = ?
+			WHERE id = ? AND workspaceId = ? AND revision = ?`, snapshot, updatedAt, id, workspace, revision)
+		err = execErr
+		if err == nil {
+			changed, err = result.RowsAffected()
+		}
+	}
+	if err != nil {
+		return 0, err
+	}
+	if changed != 1 {
+		return 0, ErrWorkspaceConflict
+	}
+	return revision + 1, nil
 }

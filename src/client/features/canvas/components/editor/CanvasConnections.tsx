@@ -1,100 +1,157 @@
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { ImagePlus, Video, Unplug, Plus, Sparkles } from 'lucide-react';
+import { Scissors, Plus } from 'lucide-react';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import {
-  canConnect, connectionError, nodeBounds, referenceReady, isTextSource,
+  canConnect, connectionError, nodeBounds, isTextSource,
   getNodeOutputPorts, getNodeInputPorts, type CanvasPortDefinition,
 } from '../../model/canvasGraph';
-import type { CanvasNode, CanvasPortType } from '../../model/types';
+import { buildQuickCanvasNode } from '../../model/canvasNodeFactory';
+import { CanvasNodeMenu } from './CanvasNodeMenu';
+import type { CanvasNode, CanvasPortType, CanvasQuickNodeType } from '../../model/types';
 
 type Point = { x: number; y: number };
 
-const portPoint = (node: CanvasNode, port: CanvasPortDefinition, isInput: boolean): Point => {
+const portPoint = (node: CanvasNode, _port: CanvasPortDefinition, isInput: boolean): Point => {
   const b = nodeBounds(node);
-  return { x: isInput ? b.x : b.x + b.width, y: port.offsetY ? b.y + port.offsetY : b.y + b.height / 2 };
+  return { x: isInput ? b.x : b.x + b.width, y: b.y + b.height / 2 };
 };
 
 const curve = (a: Point, b: Point) => {
-  const bend = Math.max(50, Math.abs(b.x - a.x) / 2);
+  const bend = Math.max(32, Math.abs(b.x - a.x) * 0.5);
   return `M ${a.x} ${a.y} C ${a.x + bend} ${a.y}, ${b.x - bend} ${b.y}, ${b.x} ${b.y}`;
 };
 
-interface TargetHit { node: CanvasNode; port: CanvasPortDefinition; point: Point; }
+interface TargetHit {
+  node: CanvasNode;
+  port: CanvasPortDefinition;
+  point: Point;
+  blocked?: boolean;
+}
 
-export function findPortTarget(nodes: CanvasNode[], sourceId: string, sourceType: CanvasPortType, point: Point, zoom: number): TargetHit | null {
-  const tolerance = 28 / Math.max(zoom, 0.2);
+export function findPortTarget(
+  nodes: CanvasNode[],
+  sourceId: string,
+  sourceType: CanvasPortType,
+  point: Point,
+  zoom: number,
+): TargetHit | null {
+  const tolerance = 32 / Math.max(zoom, 0.2);
   for (let i = nodes.length - 1; i >= 0; i--) {
     const node = nodes[i];
     if (node.id === sourceId || node.layerHidden || node.layerLocked) continue;
     const inPorts = getNodeInputPorts(node);
     if (inPorts.length === 0) continue;
-    for (const port of inPorts) {
-      if (sourceType === 'prompt' && port.type !== 'prompt') continue;
-      if (sourceType === 'video' && port.type !== 'video' && port.type !== 'any') continue;
-      if (sourceType === 'audio' && port.type !== 'audio' && port.type !== 'any') continue;
-      const p = portPoint(node, port, true);
-      if (Math.hypot(point.x - p.x, point.y - p.y) <= tolerance) return { node, port, point: p };
-    }
     const b = nodeBounds(node);
-    if (point.x >= b.x - tolerance && point.x <= b.x + b.width + tolerance && point.y >= b.y - tolerance && point.y <= b.y + b.height + tolerance) {
-      const bestPort = inPorts.find(p => p.type === sourceType) || inPorts[0];
-      if (bestPort) return { node, port: bestPort, point: portPoint(node, bestPort, true) };
+    if (
+      point.x < b.x - tolerance || point.x > b.x + b.width + tolerance ||
+      point.y < b.y - tolerance || point.y > b.y + b.height + tolerance
+    ) continue;
+    const bestPort = inPorts.find((p) => p.type === sourceType || p.type === 'any') || inPorts[0];
+    if (bestPort) {
+      return {
+        node,
+        port: bestPort,
+        point: portPoint(node, bestPort, true),
+        blocked: Boolean(node.referenceNodeIds?.includes(sourceId)),
+      };
     }
   }
   return null;
 }
 
-export function CanvasConnections({ nodes, projectId, zoom }: { nodes: CanvasNode[]; projectId: string; zoom: number }) {
+export function CanvasConnections({
+  nodes, projectId, zoom, selectedNodeIds, visibleBounds, onSelectCreatedNode,
+}: {
+  nodes: CanvasNode[];
+  projectId: string;
+  zoom: number;
+  selectedNodeIds: string[];
+  visibleBounds: { left: number; top: number; right: number; bottom: number };
+  onSelectCreatedNode?: (nodeId: string, isDrawing: boolean) => void;
+}) {
   const root = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [direction, setDirection] = useState<'input' | 'output'>('output');
+  const [batchIds, setBatchIds] = useState<string[]>([]);
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [sourcePort, setSourcePort] = useState<CanvasPortDefinition | null>(null);
   const [cursor, setCursor] = useState<Point | null>(null);
   const [hoverTarget, setHoverTarget] = useState<TargetHit | null>(null);
   const [selected, setSelected] = useState<{ from: string; to: string } | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<{ from: string; to: string } | null>(null);
   const [menu, setMenu] = useState<(Point & { world: Point }) | null>(null);
   const [message, setMessage] = useState('');
+  const [highlightedRefNodeId, setHighlightedRefNodeId] = useState<string | null>(null);
 
-  const source = nodes.find(n => n.id === sourceId);
+  const nodeById = useMemo(() => new Map(nodes.map(node => [node.id, node])), [nodes]);
+  const source = sourceId ? nodeById.get(sourceId) : undefined;
+  const batch = useMemo(() => selectedNodeIds.flatMap(id => {
+    const node = nodeById.get(id);
+    return node && !node.layerLocked && canConnect(node) ? [node] : [];
+  }), [nodeById, selectedNodeIds]);
 
-  const dismiss = useCallback(() => {
-    setSourceId(null); setSourcePort(null); setCursor(null); setMenu(null); setHoverTarget(null);
+  useEffect(() => {
+    const onHighlight = (event: Event) => {
+      const detail = (event as CustomEvent<{ nodeId?: string | null }>).detail;
+      setHighlightedRefNodeId(detail?.nodeId || null);
+    };
+    window.addEventListener('canvas:highlight-ref-node', onHighlight);
+    return () => window.removeEventListener('canvas:highlight-ref-node', onHighlight);
   }, []);
 
-  const connect = useCallback((target: CanvasNode, _targetPort?: CanvasPortDefinition) => {
-    if (!sourceId) return;
-    const edges = useCanvasStore.getState().projects.find(p => p.id === projectId)?.edges;
-    const error = connectionError(nodes, sourceId, target.id, edges);
-    if (error) { setMessage(error); dismiss(); return; }
-    const currentRefs = target.referenceNodeIds || [];
-    if (!currentRefs.includes(sourceId)) {
-      useCanvasStore.getState().updateNode(projectId, target.id, { referenceNodeIds: [...currentRefs, sourceId] });
-      useCanvasStore.getState().addEdge(projectId, {
-        sourceNodeId: sourceId, sourceHandle: sourcePort?.id || 'output',
-        targetNodeId: target.id, targetHandle: _targetPort?.id || 'input',
-      });
-    }
-    dismiss();
-  }, [sourceId, sourcePort, nodes, projectId, dismiss]);
+  const dismiss = useCallback(() => {
+    setSourceId(null); setBatchIds([]); setSourcePort(null); setCursor(null); setMenu(null); setHoverTarget(null);
+  }, []);
 
-  const disconnect = useCallback(() => {
-    if (!selected) return;
-    const node = nodes.find(n => n.id === selected.to);
+  const connect = useCallback((target: CanvasNode, targetPort?: CanvasPortDefinition) => {
+    if (!sourceId) return;
+    const store = useCanvasStore.getState();
+    const project = store.projects.find(item => item.id === projectId);
+    if (!project) { dismiss(); return; }
+    const pairs = direction === 'input' ? [{ from: target.id, to: sourceId }] :
+      (batchIds.length ? batchIds : [sourceId]).map(from => ({ from, to: target.id }));
+    let firstError = '';
+    const additions = pairs.flatMap(({ from, to }) => {
+      const error = connectionError(project.nodes, from, to, project.edges);
+      if (error) { firstError ||= error; return []; }
+      const output = direction === 'input' ? getNodeOutputPorts(target)[0] : getNodeOutputPorts(nodeById.get(from) ?? target)[0];
+      const destination = nodeById.get(to) ?? target;
+      const input = direction === 'input' ? sourcePort : destination.studioSubType === 'motion-control'
+        ? getNodeInputPorts(destination).find(port => port.type === output?.type) : targetPort;
+      if (destination.studioSubType === 'motion-control' && input?.type !== output?.type) {
+        firstError ||= '请连接与角色图、动作视频或描述端口匹配的素材';
+        return [];
+      }
+      return [{ sourceNodeId: from, sourceHandle: output?.id || 'output', targetNodeId: to, targetHandle: input?.id || 'input' }];
+    });
+    if (additions.length) store.addEdges(projectId, additions);
+    if (firstError) setMessage(additions.length ? `已连接 ${additions.length} 个节点，其余跳过：${firstError}` : firstError);
+    dismiss();
+  }, [sourceId, sourcePort, nodeById, direction, batchIds, projectId, dismiss]);
+
+  const disconnectEdge = useCallback((edgePair: { from: string; to: string } | null) => {
+    if (!edgePair) return;
+    const node = nodes.find((n) => n.id === edgePair.to);
     if (node?.layerLocked) { setMessage('请先解锁节点'); return; }
-    const project = useCanvasStore.getState().projects.find(p => p.id === projectId);
-    const edges = (project?.edges || []).filter(edge => edge.sourceNodeId === selected.from && edge.targetNodeId === selected.to);
+    const project = useCanvasStore.getState().projects.find((p) => p.id === projectId);
+    const edges = (project?.edges || []).filter((e) => e.sourceNodeId === edgePair.from && e.targetNodeId === edgePair.to);
     if (edges.length > 0) {
-      edges.forEach(edge => useCanvasStore.getState().deleteEdge(projectId, edge.id));
+      edges.forEach((edge) => useCanvasStore.getState().deleteEdge(projectId, edge.id));
     } else if (node) {
       useCanvasStore.getState().updateNode(projectId, node.id, {
-        referenceNodeIds: node.referenceNodeIds?.filter(id => id !== selected.from),
+        referenceNodeIds: node.referenceNodeIds?.filter((id) => id !== edgePair.from),
       });
     }
     setSelected(null);
-  }, [selected, nodes, projectId]);
+    setHoveredEdge(null);
+  }, [nodes, projectId]);
 
-  useEffect(() => { dismiss(); setSelected(null); setMessage(''); }, [projectId, dismiss]);
+  const disconnect = useCallback(() => {
+    disconnectEdge(selected || hoveredEdge);
+  }, [disconnectEdge, selected, hoveredEdge]);
+
+  useEffect(() => { dismiss(); setSelected(null); setHoveredEdge(null); setMessage(''); }, [projectId, dismiss]);
   useEffect(() => {
     if (!message) return;
     const timer = setTimeout(() => setMessage(''), 3500);
@@ -120,22 +177,54 @@ export function CanvasConnections({ nodes, projectId, zoom }: { nodes: CanvasNod
   useEffect(() => {
     if (!sourceId || !sourcePort) return;
     const getPoint = (e: MouseEvent) => {
-      const rect = root.current?.getBoundingClientRect();
-      return rect ? { x: (e.clientX - rect.left) / zoom, y: (e.clientY - rect.top) / zoom } : null;
+      const element = root.current;
+      const rect = element?.getBoundingClientRect();
+      const liveZoom = rect && element?.offsetWidth ? rect.width / element.offsetWidth : zoom;
+      return rect ? { x: (e.clientX - rect.left) / liveZoom, y: (e.clientY - rect.top) / liveZoom } : null;
+    };
+    const findTarget = (point: Point) => {
+      if (direction === 'output') return findPortTarget(nodes, sourceId, sourcePort.type, point, zoom);
+      const tolerance = 32 / zoom;
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const node = nodes[i];
+        if (node.id === sourceId || node.layerLocked || !canConnect(node)) continue;
+        const bounds = nodeBounds(node);
+        if (point.x < bounds.x - tolerance || point.x > bounds.x + bounds.width + tolerance ||
+          point.y < bounds.y - tolerance || point.y > bounds.y + bounds.height + tolerance) continue;
+        const port = getNodeOutputPorts(node)[0];
+        if (port) return { node, port, point: portPoint(node, port, false) };
+      }
+      return null;
     };
     const move = (e: MouseEvent) => {
       if (menu) return;
       const p = getPoint(e);
       if (!p) return;
-      const hit = findPortTarget(nodes, sourceId, sourcePort.type, p, zoom);
-      setHoverTarget(hit); setCursor(hit ? hit.point : p);
+      const hit = findTarget(p);
+      setHoverTarget(hit);
+      setCursor(hit ? hit.point : p);
     };
     const up = (e: MouseEvent) => {
-      if (menu || (e.target as Element)?.closest?.('[data-connection-port]')) return;
+      if (menu) return;
       const element = e.target as Element;
       const p = getPoint(e);
+      if (element.closest?.('[data-connection-port]')?.getAttribute('data-port-node') === sourceId) {
+        if (source && e.button === 0) {
+          const anchor = portPoint(source, sourcePort, direction === 'input');
+          const world = { x: anchor.x + (direction === 'output' ? 110 : -110), y: anchor.y };
+          setCursor(world);
+          setMenu({
+            x: e.clientX + (direction === 'output' ? 72 : -252),
+            y: Math.max(16, e.clientY - 24),
+            world,
+          });
+        } else {
+          dismiss();
+        }
+        return;
+      }
       if (!p || e.button !== 0) return;
-      const hit = findPortTarget(nodes, sourceId, sourcePort.type, p, zoom);
+      const hit = findTarget(p);
       if (hit) { connect(hit.node, hit.port); return; }
       if (element.closest?.('[data-testid="canvas-viewport"]') && !element.closest('.canvas-node-card,.canvas-fixed-ui,button,input,textarea')) {
         setMenu({ x: e.clientX, y: e.clientY, world: p });
@@ -145,212 +234,287 @@ export function CanvasConnections({ nodes, projectId, zoom }: { nodes: CanvasNod
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up, true);
     window.addEventListener('keydown', key);
-    return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up, true); window.removeEventListener('keydown', key); };
-  }, [sourceId, sourcePort, zoom, nodes, menu, connect, dismiss]);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up, true);
+      window.removeEventListener('keydown', key);
+    };
+  }, [sourceId, source, sourcePort, zoom, nodes, menu, direction, connect, dismiss]);
 
-  useEffect(() => {
-    if (!menu) return;
-    menuRef.current?.querySelector('button')?.focus();
-    const outside = (e: PointerEvent) => { if (!menuRef.current?.contains(e.target as Node)) dismiss(); };
-    document.addEventListener('pointerdown', outside);
-    return () => document.removeEventListener('pointerdown', outside);
-  }, [menu, dismiss]);
-
-  const createNext = (kind: 'image' | 'video' | 'extend') => {
+  const handleSelectDownstreamNode = useCallback((kind: CanvasQuickNodeType) => {
     if (!source || !menu) return;
-    const isVideo = kind === 'video' || kind === 'extend';
-    const title = kind === 'extend' ? '视频智能续写' : isVideo ? '视频生成' : '图片生成';
-    useCanvasStore.getState().addNode(projectId, {
-      type: 'drawing', generationKind: isVideo ? 'video' : 'image', title,
-      x: menu.world.x - 140, y: menu.world.y - 100, width: 560, height: 500, referenceNodeIds: [source.id],
-    });
+    const baseNode = buildQuickCanvasNode(kind, menu.world, direction === 'output'
+      ? { sourceImageUrl: source.imageUrl, sourceVideoUrl: source.videoUrl } : undefined);
+    const alignedX = direction === 'output'
+      ? Math.max(source.x + source.width + 64, Math.round(menu.world.x))
+      : Math.min(source.x - baseNode.width - 64, Math.round(menu.world.x - baseNode.width));
+    const inheritTextConfig =
+      source.textModel && ['prompt', 'video-prompt-optimizer', 'script-parse', 'table-editor-node', 'video-analyze', 'director-3d'].includes(kind)
+        ? { textModel: source.textModel, ...(source.textReasoningEffort ? { textReasoningEffort: source.textReasoningEffort } : {}) }
+        : {};
+    const newNode = { ...baseNode, ...inheritTextConfig, x: alignedX };
+    const store = useCanvasStore.getState();
+    const project = store.projects.find(item => item.id === projectId);
+    if (!project) { dismiss(); return; }
+    const candidates = [...project.nodes, newNode];
+    const first = direction === 'input' ? newNode.id : source.id;
+    const second = direction === 'input' ? source.id : newNode.id;
+    const error = connectionError(candidates, first, second, project.edges);
+    if (error && batchIds.length === 0) { setMessage(error); dismiss(); return; }
+    store.addNode(projectId, newNode);
+    connect(newNode, getNodeInputPorts(newNode)[0]);
+    onSelectCreatedNode?.(newNode.id, newNode.type === 'drawing');
     dismiss();
-  };
+  }, [source, menu, projectId, direction, batchIds, connect, onSelectCreatedNode, dismiss]);
 
-  type NextKind = 'image' | 'video' | 'extend';
-  const activePortOptions = useMemo<Array<{ key: NextKind; label: string; icon: typeof ImagePlus; desc: string }>>(() => {
-    if (!source) return [];
-    if (isTextSource(source)) {
-      return [
-        { key: 'image', label: '文生图', icon: ImagePlus, desc: '以此提示词生成新图片' },
-        { key: 'video', label: '文生视频', icon: Video, desc: '以此提示词生成新视频' },
-      ];
-    }
-    if (source.type === 'video' || source.generationKind === 'video') {
-      return [
-        { key: 'extend', label: '智能续写', icon: Sparkles, desc: '从视频尾帧接续生成下个镜头' },
-        { key: 'video', label: '参考视频生成', icon: Video, desc: '提取画面/动作连贯生成' },
-      ];
-    }
-    return [
-      { key: 'video', label: '图生视频', icon: Video, desc: '以此图片作为首帧生成连贯动态' },
-      { key: 'image', label: '垫图绘图', icon: ImagePlus, desc: '保持主体一致性进行图生图' },
-    ];
-  }, [source]);
+  const openPortMenu = (event: ReactKeyboardEvent<HTMLButtonElement>, node: CanvasNode, port: CanvasPortDefinition, side: 'input' | 'output') => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const anchor = portPoint(node, port, side === 'input');
+    const world = { x: anchor.x + (side === 'output' ? 110 : -110), y: anchor.y };
+    setDirection(side);
+    setBatchIds(side === 'output' && batch.length > 1 && batch.some(item => item.id === node.id) ? batch.map(item => item.id) : []);
+    setSourceId(node.id);
+    setSourcePort(port);
+    setCursor(world);
+    setMenu({ x: rect.left + (side === 'output' ? 72 : -252), y: Math.max(16, rect.top - 24), world });
+  };
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0">
       {message && createPortal(
-        <div role="status" className="pointer-events-none fixed left-1/2 top-20 z-[200] -translate-x-1/2 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-white dark:bg-[#1B1B1E] px-4 py-3 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-xl">
+        <div role="status" className="pointer-events-none fixed left-1/2 top-20 z-[200] -translate-x-1/2 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-white dark:bg-[#202024] px-4 py-3 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-xl">
           {message}
         </div>,
         document.body,
       )}
 
-      {menu && source && createPortal(
-        <div
-          ref={menuRef} role="menu" aria-label="连接下一步"
-          className="fixed z-[200] w-64 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-[#1B1B1E]/95 backdrop-blur-md p-2 text-xs text-slate-700 dark:text-[#C7C7CC] shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] animate-in fade-in zoom-in-95"
-          style={{ left: Math.max(12, Math.min(menu.x, window.innerWidth - 270)), top: Math.max(12, Math.min(menu.y, window.innerHeight - 200)) }}
-          onMouseDown={e => e.stopPropagation()}
-        >
-          <div className="px-3 py-2 border-b border-slate-100 dark:border-white/10 mb-1">
-            <p className="font-semibold text-slate-800 dark:text-white">接续创作流</p>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">以 {source.title || '当前节点'} 自动作为输入引用</p>
-          </div>
-          {activePortOptions.map(opt => {
-            const Icon = opt.icon;
-            return (
-              <button
-                key={opt.key} role="menuitem" type="button"
-                className="flex w-full items-center gap-3 rounded-xl p-2.5 hover:bg-indigo-50/80 dark:hover:bg-white/[0.06] transition-colors text-left cursor-pointer group"
-                onClick={() => createNext(opt.key)}
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                  <Icon size={16} />
-                </div>
-                <div>
-                  <div className="font-medium text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-white">{opt.label}</div>
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500">{opt.desc}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>,
-        document.body,
+      {menu && source && (
+        <CanvasNodeMenu
+          x={menu.x} y={menu.y}
+          sourcePortType={sourcePort?.type || 'any'}
+          sourceNodeTitle={source.title}
+          sourceNode={source}
+          direction={direction}
+          onClose={dismiss}
+          onSelect={handleSelectDownstreamNode}
+        />
       )}
+
+      {hoverTarget && (() => {
+        const b = nodeBounds(hoverTarget.node);
+        return (
+          <div
+            className={`pointer-events-none absolute z-30 rounded-2xl transition-all duration-150 ${
+              hoverTarget.blocked ? 'ring-2 ring-amber-400/90 bg-amber-400/5' : 'ring-2 ring-white/80 shadow-[0_0_24px_rgba(255,255,255,0.28)] bg-white/[0.03]'
+            }`}
+            style={{ left: b.x - 3, top: b.y - 3, width: b.width + 6, height: b.height + 6 }}
+          />
+        );
+      })()}
+
+      {highlightedRefNodeId && (() => {
+        const refNode = nodes.find((n) => n.id === highlightedRefNodeId);
+        if (!refNode) return null;
+        const b = nodeBounds(refNode);
+        return (
+          <div
+            data-reference-pick-role="highlighted"
+            className="pointer-events-none absolute z-30 rounded-2xl ring-2 ring-sky-400 shadow-[0_0_28px_rgba(56,189,248,0.5)] bg-sky-400/5 transition-all duration-150"
+            style={{ left: b.x - 4, top: b.y - 4, width: b.width + 8, height: b.height + 8 }}
+          />
+        );
+      })()}
 
       <svg className="absolute left-0 top-0 h-px w-px overflow-visible" aria-label="画布参考连线">
         <defs>
           <linearGradient id="flow-line-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#6366f1" />
-            <stop offset="50%" stopColor="#a855f7" />
-            <stop offset="100%" stopColor="#ec4899" />
+            <stop offset="0%" stopColor="#a1a1aa" />
+            <stop offset="50%" stopColor="#f4f4f5" />
+            <stop offset="100%" stopColor="#a1a1aa" />
           </linearGradient>
+          <linearGradient id="canvas-edge-pulse-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.65" />
+            <stop offset="50%" stopColor="#e0f2fe" stopOpacity="1" />
+            <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.85" />
+          </linearGradient>
+          <filter id="canvas-edge-glow" x="-35%" y="-35%" width="170%" height="170%">
+            <feGaussianBlur stdDeviation="2.8" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
-        {nodes.flatMap(target => (target.referenceNodeIds || []).map(id => {
-          const from = nodes.find(n => n.id === id);
-          if (!from || from.layerHidden || target.layerHidden) return null;
-          const active = selected?.from === id && selected.to === target.id;
-          const isTargetGenerating = target.status === 'generating';
-          const outPorts = getNodeOutputPorts(from);
-          const inPorts = getNodeInputPorts(target);
-          const a = portPoint(from, outPorts[0], false);
-          const b = portPoint(target, inPorts[0] || { id: 'in', label: '入', type: 'any', position: 'left' }, true);
-          const path = curve(a, b);
-          const color = active ? '#6366f1' : isTargetGenerating ? 'url(#flow-line-grad)' : !referenceReady(from) ? '#d3a95c' : isTextSource(from) ? '#a5a0cd' : '#94a3b8';
-          return (
-            <g key={`${id}-${target.id}`}>
-              {active && <path d={path} fill="none" stroke="#6366f1" strokeOpacity={0.25} strokeWidth={8} vectorEffect="non-scaling-stroke" />}
-              <path
-                d={path} fill="none" stroke={color} strokeOpacity={active ? 1 : isTargetGenerating ? 0.95 : 0.6}
-                strokeWidth={active ? 2.5 : isTargetGenerating ? 2 : 1.5}
-                strokeDasharray={isTargetGenerating ? '6 4' : !referenceReady(from) ? '5 5' : undefined}
-                className={isTargetGenerating ? 'animate-pulse' : undefined} vectorEffect="non-scaling-stroke"
-              />
-              <path
-                data-connection-edge="true" role="button" tabIndex={0}
-                aria-label={`选择连线 ${from.title || '节点'} → ${target.title || '节点'}`}
-                className="pointer-events-auto cursor-pointer focus:stroke-indigo-300/30 focus:outline-none"
-                d={path} fill="none" stroke="transparent" strokeWidth={20} vectorEffect="non-scaling-stroke"
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); setSelected({ from: id, to: target.id }); }}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected({ from: id, to: target.id }); } }}
-              />
-            </g>
-          );
-        }))}
-        {source && sourcePort && cursor && (
-          <path d={curve(portPoint(source, sourcePort, false), cursor)} fill="none" stroke="#6366f1" strokeWidth={2.5} strokeDasharray="6 4" vectorEffect="non-scaling-stroke" />
+        {nodes.flatMap((target) =>
+          (target.referenceNodeIds || []).map((id) => {
+            const from = nodeById.get(id);
+            if (!from || from.layerHidden || target.layerHidden) return null;
+            const isHovered = hoveredEdge?.from === id && hoveredEdge.to === target.id;
+            const active = (selected?.from === id && selected.to === target.id) || isHovered || highlightedRefNodeId === id;
+            const isEndpointSelected = selectedNodeIds.includes(id) || selectedNodeIds.includes(target.id);
+            const isTargetGenerating = target.status === 'generating';
+            const showPulse = active || isEndpointSelected || isTargetGenerating;
+            const output = getNodeOutputPorts(from)[0] || { id: 'out', label: '出', type: 'any', position: 'right' } as const;
+            const inputs = getNodeInputPorts(target);
+            const input = target.studioSubType === 'motion-control' ? inputs.find(port => port.type === output.type) ?? inputs[0] : inputs[0];
+            const a = portPoint(from, output, false);
+            const b = portPoint(target, input || { id: 'in', label: '入', type: 'any', position: 'left' }, true);
+            const margin = Math.max(32, Math.abs(b.x - a.x) * 0.5);
+            if (!active && (Math.max(a.x, b.x) + margin < visibleBounds.left ||
+              Math.min(a.x, b.x) - margin > visibleBounds.right || Math.max(a.y, b.y) < visibleBounds.top ||
+              Math.min(a.y, b.y) > visibleBounds.bottom)) return null;
+            const path = curve(a, b);
+            const color = active ? '#e4e4e7' : isTargetGenerating ? 'url(#flow-line-grad)' : isTextSource(from) ? '#b4b4bb' : '#a1a1aa';
+            return (
+              <g
+                key={`${id}-${target.id}`}
+                onMouseEnter={() => setHoveredEdge({ from: id, to: target.id })}
+                onMouseLeave={() => setHoveredEdge((prev) => (prev?.from === id && prev.to === target.id ? null : prev))}
+              >
+                <path
+                  d={path} fill="none" stroke={color}
+                  strokeOpacity={active ? 0.92 : isTargetGenerating ? 0.95 : isEndpointSelected ? 0.72 : 0.48}
+                  strokeWidth={active ? 2 : isTargetGenerating ? 2 : 1.5}
+                  strokeDasharray={isTargetGenerating ? '6 4' : undefined}
+                  className={isTargetGenerating ? 'animate-pulse' : undefined}
+                  vectorEffect="non-scaling-stroke"
+                />
+                {showPulse && (
+                  <>
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke="#38bdf8"
+                      strokeOpacity={0.55}
+                      strokeWidth={5.5}
+                      strokeLinecap="round"
+                      filter="url(#canvas-edge-glow)"
+                      className="canvas-edge-flow-pulse pointer-events-none"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                    <path
+                      data-connection-edge-pulse="true"
+                      d={path}
+                      fill="none"
+                      stroke="url(#canvas-edge-pulse-grad)"
+                      strokeWidth={2.4}
+                      strokeLinecap="round"
+                      className="canvas-edge-flow-pulse pointer-events-none"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </>
+                )}
+                <path
+                  data-connection-edge="true" role="button" tabIndex={0}
+                  aria-label={`选择连线 ${from.title || '节点'} → ${target.title || '节点'}`}
+                  className="pointer-events-auto cursor-pointer focus:stroke-white/30 focus:outline-none"
+                  d={path} fill="none" stroke="transparent" strokeWidth={14} vectorEffect="non-scaling-stroke"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); setSelected({ from: id, to: target.id }); }}
+                  onDoubleClick={(e) => { e.stopPropagation(); e.preventDefault(); disconnectEdge({ from: id, to: target.id }); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected({ from: id, to: target.id }); } }}
+                />
+              </g>
+            );
+          }),
         )}
+        {source && sourcePort && cursor && (batchIds.length ? batchIds : [source.id]).map(id => {
+          const node = nodeById.get(id);
+          if (!node) return null;
+          const anchor = portPoint(node, sourcePort, direction === 'input');
+          return <path key={id} d={direction === 'input' ? curve(cursor, anchor) : curve(anchor, cursor)} fill="none"
+            stroke={hoverTarget?.blocked ? '#f59e0b' : '#d4d4d8'} strokeOpacity={hoverTarget?.blocked ? 0.95 : 0.82} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />;
+        })}
       </svg>
 
-      {selected && (() => {
-        const from = nodes.find(n => n.id === selected.from);
-        const to = nodes.find(n => n.id === selected.to);
+      {(() => {
+        const activeEdge = selected || hoveredEdge;
+        if (!activeEdge) return null;
+        const from = nodes.find((n) => n.id === activeEdge.from);
+        const to = nodes.find((n) => n.id === activeEdge.to);
         if (!from || !to || !to.referenceNodeIds?.includes(from.id)) return null;
-        const outPorts = getNodeOutputPorts(from);
-        const a = portPoint(from, outPorts[0], false);
+        const a = portPoint(from, getNodeOutputPorts(from)[0] || { id: 'out', label: '出', type: 'any', position: 'right' }, false);
         const b = portPoint(to, { id: 'in', label: '入', type: 'any', position: 'left' }, true);
         return (
           <button
+            type="button"
             data-connection-edge="true"
-            className="pointer-events-auto absolute z-40 flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-[#1B1B1E]/95 px-3 py-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 shadow-xl dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)] backdrop-blur-sm hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-200 dark:hover:border-rose-900/50 transition-all cursor-pointer"
+            aria-label="断开连线"
+            onMouseEnter={() => setHoveredEdge(activeEdge)}
+            onMouseLeave={() => setHoveredEdge((prev) => (prev?.from === activeEdge.from && prev.to === activeEdge.to ? null : prev))}
+            className="pointer-events-auto absolute z-40 flex h-9 w-9 items-center justify-center rounded-full border border-slate-300/80 dark:border-white/15 bg-white/90 dark:bg-[#1e1e22]/80 text-zinc-700 dark:text-zinc-200 shadow-[0_4px_16px_rgba(0,0,0,0.45)] backdrop-blur-md hover:scale-105 hover:border-zinc-400 dark:hover:border-white/30 hover:bg-white dark:hover:bg-[#2a2a30]/95 hover:text-zinc-950 dark:hover:text-white transition-all cursor-pointer"
             style={{ left: (a.x + b.x) / 2, top: (a.y + b.y) / 2, transform: `translate(-50%,-50%) scale(${1 / zoom})` }}
-            onMouseDown={e => e.stopPropagation()}
-            onClick={disconnect}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); disconnectEdge(activeEdge); }}
           >
-            <Unplug size={13} />
-            <span>断开连线</span>
+            <Scissors size={16} strokeWidth={1.85} className="-rotate-[60deg]" />
+            <span className="sr-only">断开连线</span>
           </button>
         );
       })()}
 
-      {nodes.filter(n => !n.layerLocked && !n.layerHidden).flatMap(node => {
-        const outPorts = getNodeOutputPorts(node);
-        const inPorts = getNodeInputPorts(node);
+      {nodes.filter((node) => {
+        if (node.layerLocked || node.layerHidden) return false;
+        const bounds = nodeBounds(node);
+        return bounds.x + bounds.width >= visibleBounds.left && bounds.x <= visibleBounds.right &&
+          bounds.y + bounds.height >= visibleBounds.top && bounds.y <= visibleBounds.bottom;
+      }).flatMap((node) => {
+        const primaryOut = getNodeOutputPorts(node)[0];
+        const inputs = getNodeInputPorts(node);
+        const isNodeSelected = selectedNodeIds.includes(node.id);
+        const handleOffset = 28 / Math.max(0.65, zoom);
         const handles: React.ReactNode[] = [];
-        if (canConnect(node)) {
-          outPorts.forEach(port => {
-            const p = portPoint(node, port, false);
-            const isDraggingThis = sourceId === node.id && sourcePort?.id === port.id;
-            handles.push(
-              <button
-                key={`out-${node.id}-${port.id}`} type="button" data-connection-port="true"
-                aria-label={`从 ${node.title || node.id} 的 ${port.label} 连线`}
-                title={`拖出连线：${port.label}；在空白处松开可快速创建下一步`}
-                className={`pointer-events-auto absolute z-30 flex items-center justify-center rounded-full border-0 bg-transparent p-0 transition-opacity duration-150 focus:outline-none focus-visible:opacity-100 hover:opacity-100 ${
-                  isDraggingThis ? 'opacity-100 text-indigo-600 dark:text-indigo-400' : 'opacity-0 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400'
-                }`}
-                style={{ left: p.x + 18 / zoom, top: p.y, width: 48, height: 48, transform: `translate(-50%, -50%) scale(${1 / zoom})` }}
-                onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setSelected(null); setSourceId(node.id); setSourcePort(port); setCursor(p); }}
-              >
-                <span className={`flex h-6 w-6 items-center justify-center rounded-full border-[1.5px] bg-white dark:bg-[#1B1B1E] shadow-sm transition-transform hover:scale-125 ${
-                  isDraggingThis ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-950/60' : 'border-indigo-400 dark:border-indigo-500/80'
-                }`}>
-                  <Plus size={14} strokeWidth={2} className="text-indigo-600 dark:text-indigo-400" />
-                </span>
-              </button>,
-            );
-          });
+        if (canConnect(node) && primaryOut) {
+          const p = portPoint(node, primaryOut, false);
+          const isDraggingOut = sourceId === node.id && direction === 'output';
+          handles.push(
+            <button
+              key={`out-${node.id}`} type="button" data-connection-port="true" data-port-node={node.id}
+              aria-label={`从 ${node.title || node.id} 的 ${primaryOut.label} 连线`}
+              title="拖拽连线到目标节点，或在空白处松开创建下游节点"
+              className={`connector connector-right pointer-events-auto absolute z-30 flex items-center justify-center rounded-full border-0 bg-transparent p-0 transition-opacity duration-150 focus:outline-none focus-visible:opacity-100 ${isDraggingOut ? 'opacity-0 pointer-events-none' : isNodeSelected ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+              style={{ left: p.x + handleOffset, top: p.y, width: 36, height: 36, transform: `translate(-50%, -50%) scale(${1 / Math.max(0.65, zoom)})` }}
+              onKeyDown={event => openPortMenu(event, node, primaryOut, 'output')}
+              onMouseDown={(e) => {
+                if(e.button !== 0) return;
+                e.preventDefault(); e.stopPropagation(); setSelected(null);
+                setDirection('output'); setBatchIds(batch.some(item => item.id === node.id) && batch.length > 1 ? batch.map(item => item.id) : []);
+                setSourceId(node.id); setSourcePort(primaryOut); setCursor(p);
+              }}
+            >
+              <span className="flex size-8 items-center justify-center rounded-full border-2 border-[#8c8c8c] dark:border-[#a8a8ae] bg-white/95 dark:bg-[#141416]/90 text-[#7a7a7a] dark:text-[#d4d4d8] transition-all hover:scale-110 hover:border-zinc-900 dark:hover:border-white hover:text-zinc-900 dark:hover:text-white">
+                <Plus size={18} strokeWidth={2} />
+              </span>
+            </button>,
+          );
         }
-        if (inPorts.length > 0) {
-          inPorts.forEach(port => {
-            const p = portPoint(node, port, true);
-            const isTarget = hoverTarget?.node.id === node.id && hoverTarget?.port.id === port.id;
-            const isCompatible = sourcePort && (
-              sourcePort.type === port.type || port.type === 'any' || (sourcePort.type === 'image' && port.id.includes('frame'))
-            );
-            const showPort = sourceId !== null ? isCompatible : false;
-            handles.push(
-              <button
-                key={`in-${node.id}-${port.id}`} type="button" data-connection-port="true"
-                aria-label={`连接至 ${node.title || node.id} 的 ${port.label}`} title={`接收：${port.label}`}
-                className={`pointer-events-auto absolute z-30 flex items-center justify-center rounded-full border-0 bg-transparent p-0 transition-all duration-150 focus:outline-none focus-visible:opacity-100 hover:opacity-100 ${
-                  showPort ? 'opacity-100' : 'opacity-0 hover:opacity-100'
-                }`}
-                style={{ left: p.x - 18 / zoom, top: p.y, width: 48, height: 48, transform: `translate(-50%, -50%) scale(${1 / zoom})` }}
-                onMouseUp={e => { e.stopPropagation(); if (sourceId) connect(node, port); }}
-                onClick={e => { e.stopPropagation(); if (sourceId) connect(node, port); }}
-              >
-                <span className={`flex h-6 w-6 items-center justify-center rounded-full border-[1.5px] bg-white dark:bg-[#1B1B1E] shadow-sm transition-transform ${
-                  isTarget ? 'border-emerald-500 scale-125 ring-4 ring-emerald-100 dark:ring-emerald-950/60' : showPort ? 'border-indigo-500 ring-2 ring-indigo-50 dark:ring-indigo-950/40' : 'border-slate-400 dark:border-white/30'
-                }`}>
-                  <span className={`h-2 w-2 rounded-full ${isTarget ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
-                </span>
-              </button>,
-            );
-          });
+        for (const primaryIn of node.studioSubType === 'motion-control' ? inputs : inputs.slice(0, 1)) {
+          const p = portPoint(node, primaryIn, true);
+          const isTarget = hoverTarget?.node.id === node.id && hoverTarget.port.id === primaryIn.id;
+          const isDraggingIn = sourceId === node.id && direction === 'input';
+          const showPort = (sourceId !== null && sourceId !== node.id) || isNodeSelected;
+          handles.push(
+            <button
+              key={`in-${node.id}-${primaryIn.id}`} type="button" data-connection-port="true" data-port-node={node.id}
+              aria-label={`连接至 ${node.title || node.id} 的 ${primaryIn.label}`}
+              title={`接收上游连接：${primaryIn.label}`}
+              className={`connector connector-left pointer-events-auto absolute z-30 flex items-center justify-center rounded-full border-0 bg-transparent p-0 transition-all duration-150 focus:outline-none focus-visible:opacity-100 ${isDraggingIn ? 'opacity-0 pointer-events-none' : showPort ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+              style={{ left: p.x - handleOffset, top: p.y, width: 36, height: 36, transform: `translate(-50%, -50%) scale(${1 / Math.max(0.65, zoom)})` }}
+              onKeyDown={event => openPortMenu(event, node, primaryIn, 'input')}
+              onMouseDown={(e) => {
+                if(e.button !== 0) return;
+                e.preventDefault(); e.stopPropagation(); setSelected(null);
+                setDirection('input'); setBatchIds([]); setSourceId(node.id); setSourcePort(primaryIn); setCursor(p);
+              }}
+            >
+              <span className={`flex size-8 items-center justify-center rounded-full border-2 bg-white/95 dark:bg-[#141416]/90 transition-all hover:scale-110 ${isTarget ? 'border-white scale-125 ring-4 ring-white/25 text-white' : showPort && sourceId !== null && sourceId !== node.id ? 'border-zinc-300 dark:border-zinc-400 ring-2 ring-white/10 text-zinc-700 dark:text-zinc-200' : 'border-[#8c8c8c] dark:border-[#a8a8ae] text-[#7a7a7a] dark:text-[#d4d4d8] hover:border-zinc-900 dark:hover:border-white hover:text-zinc-900 dark:hover:text-white'}`}>
+                <Plus size={18} strokeWidth={2} />
+              </span>
+            </button>,
+          );
         }
         return handles;
       })}

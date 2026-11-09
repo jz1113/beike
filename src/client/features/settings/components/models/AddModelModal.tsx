@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { X, Layers } from 'lucide-react';
 import { loadStoredProviders, type ApiProvider } from '../../model/apiProviderTypes';
-import type { WorkflowModel } from '../../model/workflowModel';
-import { useSettingsDialogFocus } from '../../hooks/useSettingsDialogFocus';
+import type { WorkflowModel } from '../../model/modelManagement';
+import { useSettingsDialogFocus } from '../../hooks/useApiProviders';
 
 interface Props {
   initialChannel?: string;

@@ -1,8 +1,7 @@
 import React from 'react';
-import { AlertCircle, Check, FileText, Loader2 } from 'lucide-react';
-import type { AssetTaskBatch } from '../../model/assetBatch';
+import { Check, FileText, Loader2 } from 'lucide-react';
+import { getAssetMediaKind, type AssetTaskBatch } from '../../model/agentAssetFilter';
 import AssetMediaPreview from '../dialogs/AssetMediaPreview';
-import { getAssetMediaKind } from '../../model/assetMedia';
 
 type Task = AssetTaskBatch['tasks'][number];
 
@@ -12,9 +11,10 @@ interface Props {
   isBatchMode?: boolean;
   onToggleSelect: (id: string, e: React.MouseEvent) => void;
   onClick: (task: Task) => void;
+  onImageUnavailable?: (url: string) => void;
 }
 
-export function DocumentAssetCardCover({
+function DocumentAssetCardCover({
   task,
   className = '',
 }: {
@@ -84,6 +84,7 @@ export function MaterialAssetCard({
   isBatchMode = false,
   onToggleSelect,
   onClick,
+  onImageUnavailable,
 }: Props) {
   const kind = getAssetMediaKind(task);
   const isDoc = kind === 'document';
@@ -141,12 +142,8 @@ export function MaterialAssetCard({
             title={title}
             posterUrl={task.coverUrl}
             videoAutoPlay={false}
+            onUnavailable={kind === 'image' ? () => onImageUnavailable?.(task.resultUrl!) : undefined}
           />
-        ) : task.status === 'FAILURE' ? (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-3 text-slate-400 bg-rose-50/30">
-            <AlertCircle className="h-5 w-5 text-rose-400" />
-            <span className="text-[10px] text-rose-400">生成未完成</span>
-          </div>
         ) : task.status === 'IN_PROGRESS' || task.status === 'PENDING' ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-3 text-slate-400 bg-slate-50 dark:bg-white/5">
             <Loader2 className="h-5 w-5 text-purple-500 animate-spin" />

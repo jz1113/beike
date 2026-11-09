@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -20,19 +21,51 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 		httpx.WriteJSON(w, status, body)
 		return
 	}
+	pinnedQuery, allowed := authorizeVideoRoute(cfg, w, r, taskID)
+	if !allowed {
+		return
+	}
 	base, apiKey := pollCredentials(cfg, r)
+	if (veoModel(r.URL.Query().Get("model")) || strings.HasPrefix(taskID, "veo-op.")) && veoNativeBase(base) {
+		model := r.URL.Query().Get("model")
+		if model == "" {
+			model = "veo3.1"
+			raw, _ := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(taskID, "veo-op."))
+			if strings.Contains(string(raw), "/veo-3.1-fast-generate-001/") {
+				model = "veo3.1-fast"
+			}
+		}
+		pollVeoNative(cfg, w, r, base, apiKey, model, taskID)
+		return
+	}
 	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
 	urls := videoPollURLs(root, taskID, r.URL.Query().Get("model"), r.Header.Get("x-custom-protocol"))
+	if pinnedQuery != "" {
+		urls = []string{strings.ReplaceAll(pinnedQuery, "{taskId}", url.QueryEscape(taskID))}
+	}
 	for _, endpoint := range urls {
-		status, raw, err := gateway.PostModel(r.Context(), http.MethodGet, endpoint, apiKey, nil, 5*time.Second)
+		headers := map[string]string{}
+		if nativeVideoProvider(base) == "vidu" {
+			headers["Authorization"] = "Token " + apiKey
+		}
+		status, raw, err := gateway.PostModelHeaders(r.Context(), http.MethodGet, endpoint, apiKey, nil, 5*time.Second, headers)
 		if err != nil || status < 200 || status >= 300 {
 			continue
 		}
 		var data map[string]any
-		if json.Unmarshal(raw, &data) != nil || !videoPollReady(data) {
+		if json.Unmarshal(raw, &data) != nil {
+			continue
+		}
+		if nativeVideoProvider(base) == "kling" {
+			data = selectKlingTask(data, taskID)
+		}
+		if !videoPollReady(data) {
 			continue
 		}
 		parsed := readVideoPoll(data)
+		if veoModel(r.URL.Query().Get("model")) {
+			parsed = finalizeVeoExtension(cfg, r, taskID, parsed)
+		}
 		settleUnknownVideoTerminal(cfg, r, taskID, parsed, gateway.EncodeUsage(gateway.NormalizeUsage(data)))
 		httpx.WriteJSON(w, http.StatusOK, polledTaskBody(r.Context(), cfg, scopeOf(r, "video"), taskID, parsed, data))
 		return
@@ -42,6 +75,29 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 
 func videoPollURLs(base, taskID, model, protocol string) []string {
 	var urls []string
+	if provider := nativeVideoProvider(base); provider != "" && provider == videoFamily(model) {
+		var queries []string
+		if provider == "kling" {
+			parsed, _ := url.Parse(base)
+			root := parsed.Scheme + "://" + parsed.Host + "/v1/videos/"
+			queries = append(queries, parsed.Scheme+"://"+parsed.Host+"/tasks?task_ids={taskId}")
+			paths := []string{"text2video", "image2video"}
+			if strings.Contains(strings.ToLower(model), "omni") {
+				paths = []string{"omni-video"}
+			}
+			for _, path := range paths {
+				queries = append(queries, root+path+"/{taskId}")
+			}
+		} else {
+			a := videoAdapted{family: provider, modelID: model}
+			applyNativeVideoRoute(base, "text", "", &a)
+			queries = a.queries
+		}
+		if template := videoQueryTemplate(base, taskID); template != "" {
+			urls = append(urls, strings.ReplaceAll(template, "{taskId}", url.QueryEscape(taskID)))
+		}
+		return uniqueStrings(append(urls, expandVideoURLs(base, queries, url.QueryEscape(taskID))...))
+	}
 	if template := videoQueryTemplate(base, taskID); template != "" && !(minimaxH3(model) && minimaxMetasoHost(base)) {
 		urls = append(urls, strings.ReplaceAll(template, "{taskId}", url.QueryEscape(taskID)))
 	}
@@ -54,6 +110,9 @@ func videoPollURLs(base, taskID, model, protocol string) []string {
 		_, queries = routeGrokEndpoints(base, "")
 	} else {
 		_, queries, _ = videoEndpointSet(videoFamily(model), model, "", nil)
+	}
+	if videoFamily(model) == "kling" && minimaxComflyHost(base) && (model == "kling-video-v3" || model == "kling-video-v2-6") {
+		queries = append([]string{"{base}/kling/v1/videos/motion-control/{taskId}"}, queries...)
 	}
 	urls = append(urls, expandVideoURLs(base, queries, url.QueryEscape(taskID))...)
 	if (model == "wan3.0-video" || model == "wan3.0-video-prime") && minimaxComflyHost(base) {
@@ -152,6 +211,15 @@ func extractVideoResult(roots ...map[string]any) string {
 		}
 		if url := firstString(root, "video_url", "url"); url != "" {
 			return url
+		}
+		if outputs, ok := root["outputs"].([]any); ok {
+			for _, item := range outputs {
+				if output, ok := item.(map[string]any); ok && output["type"] == "video" {
+					if value := firstString(output, "url"); value != "" {
+						return value
+					}
+				}
+			}
 		}
 		if video, ok := root["video"].(map[string]any); ok {
 			if url := firstString(video, "url", "video_url"); url != "" {

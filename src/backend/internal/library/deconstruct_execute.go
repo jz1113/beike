@@ -60,7 +60,7 @@ func executeDeconstruct(cfg config.Config, r *http.Request, payload map[string]a
 	}
 	model := strings.TrimSpace(stringValue(payload["model"]))
 	if model == "" {
-		model = "gpt-5.6-luna"
+		model = "gpt-6-luna"
 	}
 	if !deconstructVisionReady(map[string]any{"model": model, "apiFormat": payload["apiFormat"]}) {
 		report("failed", "反推未完成，请查看任务错误信息")

@@ -1,0 +1,35 @@
+{
+  "id": "scenario-veo",
+  "name": "scenario-veo",
+  "displayName": "Veo 3.1 提示词 · 社区",
+  "description": "Use when generating or extending video with Google Veo models on Scenario via MCP: text-to-video, image-to-video from a first frame, first and last frame transitions, reference-to-video (R2V) with asset or style reference images, native audio with dialogue, sound effects, and ambience, negative prompts, seeded reruns, extending a 16:9 clip, or choosing a quality, fast, or lite tier. Keywords: Veo 3.1, Veo 3.1 Fast, Veo 3.1 Lite, Extend Video, Google, T2V, I2V, V2V, 720p, 1080p.",
+  "displayDescription": "为 Veo 3.1 与 Fast 整理连续镜头、主体动作、场景、风格和对白音效。",
+  "usageGuide": "### 适合什么任务\n为 Veo 3.1 与 Fast 整理连续镜头、主体动作、场景、风格和对白音效。\n\n### 会怎样优化\n优先描述连续镜头及一个主要动作；把对白、音效和环境声分别写清。素材职责与时间安排以当前节点输入为准。\n\n### 在画布中\n选择对应视频模型并开启“生成前优化提示词”。优化稿会先展示，可修改后再确认生成；取消不提交。实际模式、素材数量、时长和分辨率以当前节点渠道为准。",
+  "category": "社区视频提示词",
+  "author": "Scenario",
+  "version": "e24bc7d40be97b428e7b9fd467c415366e1dd974",
+  "icon": "video",
+  "colorTheme": "amber",
+  "isBuiltin": true,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "tools": [],
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": [
+      "GitHub 社区原版"
+    ]
+  },
+  "source": {
+    "kind": "community",
+    "url": "https://github.com/scenario-labs/skills/tree/e24bc7d40be97b428e7b9fd467c415366e1dd974/skills/scenario-veo",
+    "revision": "e24bc7d40be97b428e7b9fd467c415366e1dd974",
+    "license": "MIT",
+    "files": {
+      "LICENSE": "26f54ae8c2f3d1fb0e3f810a599e6fb51852d1f176b97578961826be3bb98cef",
+      "SKILL.md": "55c7a6478982669f8c11540b6135e2a926c933cd78fb5ca01653e311b58937d8"
+    }
+  },
+  "modelIcon": "veo3.1"
+}

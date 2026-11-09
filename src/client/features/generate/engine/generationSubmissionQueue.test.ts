@@ -16,6 +16,17 @@ async function flushQueue() {
 }
 
 describe('GenerationSubmissionQueue', () => {
+  it('cancels one preparing and one queued task while other nodes continue in their original slots',async()=>{
+    const queue=new GenerationSubmissionQueue();queue.setMediaConcurrency(2);
+    const jobs=['cancel-preparing','keep','cancel-queued','next'].map(id=>controlledJob(id));
+    queue.enqueue(jobs);await flushQueue();
+    queue.cancelTask('cancel-preparing');queue.cancelTask('cancel-queued');
+    expect(jobs[0].run.mock.calls[0][0].aborted).toBe(true);
+    expect(jobs[1].run.mock.calls[0][0].aborted).toBe(false);
+    expect(jobs[3].run).not.toHaveBeenCalled();jobs[0].resolve();await flushQueue();
+    expect(jobs[2].run).not.toHaveBeenCalled();expect(jobs[3].run).toHaveBeenCalledOnce();
+    jobs.forEach(job=>job.resolve());await flushQueue();
+  });
   it('dispatches all media tasks in a batch concurrently by default and deduplicates pending/active IDs', async () => {
     const queue = new GenerationSubmissionQueue();
     const jobs = Array.from({ length: 5 }, (_, i) => controlledJob(`media-${i}`));

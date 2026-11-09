@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"beike.local/cloud/src/backend/internal/platform/database"
 )
@@ -214,5 +215,188 @@ func TestLearningFailedRevisionUndoesAdoption(t *testing.T) {
 	var status string
 	if err := db.QueryRow(`SELECT "status" FROM "CoverMemoryEntry" WHERE "id"='old'`).Scan(&status); err != nil || status != "pending" {
 		t.Fatalf("partial adoption %s %v", status, err)
+	}
+}
+
+func TestFeedbackUpdatesChoiceAndCreatesExplicitCorrection(t *testing.T) {
+	cfg := coverMemoryConfig(t)
+	db, ok := openCoverDB(cfg)
+	if !ok {
+		t.Fatal("db")
+	}
+	defer db.Close()
+	ctx := t.Context()
+	for _, id := range []string{"watch", "lamp"} {
+		title := "手表表盘"
+		if id == "lamp" {
+			title = "台灯书桌"
+		}
+		if err := insertCoverSample(ctx, db, "local", id, title, "model", nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := insertCoverEntries(ctx, db, "local", []coverEntry{learningEntry(id, id, title)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	learningExec(t, db, `UPDATE "CoverMemoryEntry" SET "createdAt"='2020-01-01T00:00:00Z' WHERE "id"='watch'`)
+	_, _, selected, err := adoptedCoverSelection(ctx, db, "local", "auto", "手表测评")
+	if err != nil || selected != "watch" {
+		t.Fatalf("relevance %s %v", selected, err)
+	}
+	if err := recordCoverUsage(ctx, db, "local", "batch", "item", "手表", []string{"watch"}, map[string]string{"memorySampleId": "watch"}); err != nil {
+		t.Fatal(err)
+	}
+	usages, err := listCoverUsages(ctx, db, "local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := HeadlineMemoryFeedback(cfg)
+	post := func(body, id string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+		req.SetPathValue("id", id)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+	for i := 0; i < 2; i++ {
+		rec := post(`{"rating":"good","note":"边缘清晰","correction":"不要遮挡品牌"}`, usages[0].ID)
+		if rec.Code != 200 {
+			t.Fatalf("feedback %d %s", rec.Code, rec.Body.String())
+		}
+	}
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM "CoverMemoryEntry" WHERE "source"='correction'`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("duplicate correction %d %v", count, err)
+	}
+	_, _, selected, err = adoptedCoverSelection(ctx, db, "local", "auto", "未知商品")
+	if err != nil || selected != "watch" {
+		t.Fatalf("feedback tie break %s %v", selected, err)
+	}
+	_, _, selected, err = adoptedCoverSelection(ctx, db, "local", "lamp", "手表")
+	if err != nil || selected != "lamp" {
+		t.Fatalf("explicit selection %s %v", selected, err)
+	}
+	if rec := post(`{"rating":"bad","note":"test"}`, "missing"); rec.Code != 404 {
+		t.Fatalf("missing feedback %d", rec.Code)
+	}
+	if rec := post(`{"rating":"anything"}`, usages[0].ID); rec.Code != 400 {
+		t.Fatalf("bad rating %d", rec.Code)
+	}
+}
+
+// Reproduce the old failure without depending on the clock's fractional precision.
+func seedRevisionOrder(t *testing.T, db *sql.DB) []string {
+	t.Helper()
+	stamps := []string{"2026-11-04T17:01:10Z", "2026-11-04T17:01:10.6039Z", "2026-11-04T17:01:10.603975Z", "2026-11-04T17:01:10.603975001Z"}
+	ids := []string{}
+	for i, stamp := range stamps {
+		id := fmt.Sprintf("revision_%d", i)
+		learningExec(t, db, `INSERT INTO "CoverMemoryRevision" ("id","workspaceId","reason","fingerprint","snapshot","markdown","entryCount","sampleCount","createdAt") VALUES (?,'local','test',?,'[]','',0,0,?)`, id, id, stamp)
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func TestRevisionOrderMixedUTCPrecisionAndWorkspace(t *testing.T) {
+	db := learningDB(t)
+	ids := seedRevisionOrder(t, db)
+	learningExec(t, db, `INSERT INTO "CoverMemoryRevision" SELECT 'other','other',"reason","fingerprint","snapshot","markdown","entryCount","sampleCount",'2099-01-01T00:00:00Z' FROM "CoverMemoryRevision" LIMIT 1`)
+	revisions, err := listCoverRevisions(t.Context(), db, "local", 0)
+	if err != nil || len(revisions) != len(ids) {
+		t.Fatalf("list %v %v", revisions, err)
+	}
+	for i, revision := range revisions {
+		if revision.ID != ids[len(ids)-1-i] {
+			t.Fatalf("time order at %d: %v", i, revisions)
+		}
+	}
+	memory, err := readDesignMemory(t.Context(), db, "local", "auto", "", "", "batch", "item")
+	if err != nil || memory.RevisionID != ids[len(ids)-1] {
+		t.Fatalf("design references stale revision: %v %v", memory, err)
+	}
+}
+
+func TestRevisionOrderNoChangeUsesActualLatestFingerprint(t *testing.T) {
+	db := learningDB(t)
+	ids := seedRevisionOrder(t, db)
+	// [] is the snapshot of the empty adopted rules. Only the actual latest matches it.
+	learningExec(t, db, `UPDATE "CoverMemoryRevision" SET "fingerprint"='4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945' WHERE "id"=?`, ids[len(ids)-1])
+	if err := mutateCoverExperience(t.Context(), db, "local", "no change", func(*sql.Tx) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM "CoverMemoryRevision"`).Scan(&count); err != nil || count != len(ids) {
+		t.Fatalf("no-op created revisions: count=%d err=%v", count, err)
+	}
+}
+
+func TestRevisionOrderEqualInstantsUseInsertionOrder(t *testing.T) {
+	db := learningDB(t)
+	for _, id := range []string{"revision_9", "revision_10"} {
+		learningExec(t, db, `INSERT INTO "CoverMemoryRevision" VALUES (?,'local','test','same','[]','',0,0,'2026-11-04T17:01:10.6039Z')`, id)
+	}
+	revisions, err := listCoverRevisions(t.Context(), db, "local", 0)
+	if err != nil || len(revisions) != 2 || revisions[0].ID != "revision_10" {
+		t.Fatalf("equal timestamp order %v %v", revisions, err)
+	}
+}
+
+func TestRevisionOrderAPIPaginationAndRestore(t *testing.T) {
+	cfg := coverMemoryConfig(t)
+	db, err := database.OpenWrite(cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	base := time.Date(2026, 11, 4, 17, 1, 10, 603900000, time.UTC)
+	for i := 0; i < 105; i++ {
+		stamp := base.Add(time.Duration(i) * time.Nanosecond).Format(time.RFC3339Nano)
+		learningExec(t, db, `INSERT INTO "CoverMemoryRevision" VALUES (?,'local',?,'unused','[]','',0,0,?)`, fmt.Sprintf("r_%d", i), fmt.Sprintf("reason %d", i), stamp)
+	}
+	// Read through the API used by the version panel, including the page boundary.
+	for _, offset := range []int{0, 100} {
+		w := httptest.NewRecorder()
+		HeadlineMemory(cfg).ServeHTTP(w, httptest.NewRequest("GET", fmt.Sprintf("/?offset=%d", offset), nil))
+		var page struct {
+			Revisions  []coverRevision
+			NextOffset *int
+		}
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &page) != nil {
+			t.Fatalf("page %d: %d %s", offset, w.Code, w.Body.String())
+		}
+		want := min(100, 105-offset)
+		if len(page.Revisions) != want || (offset == 0 && (page.NextOffset == nil || *page.NextOffset != 100)) || (offset == 100 && page.NextOffset != nil) {
+			t.Fatalf("pagination %d: %+v", offset, page)
+		}
+		for i, revision := range page.Revisions {
+			if revision.ID != fmt.Sprintf("r_%d", 104-offset-i) {
+				t.Fatalf("page %d index %d: %v", offset, i, revision)
+			}
+		}
+	}
+	// Restore a historical snapshot through the public handler; then no-op must
+	// compare against that newly created revision, without creating another one.
+	r := httptest.NewRequest("POST", "/revisions/r_0", nil)
+	r.SetPathValue("id", "r_0")
+	w := httptest.NewRecorder()
+	HeadlineMemoryRevision(cfg).ServeHTTP(w, r)
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	before, err := listCoverRevisions(t.Context(), db, "local", 0)
+	if err != nil || len(before) == 0 || before[0].Reason != "原有经验" {
+		// Restoring the identical empty snapshot is a no-op after preserving the
+		// initial fingerprint; it must not add a second "回退经验" revision.
+		t.Fatalf("restore empty snapshot %v %v", before, err)
+	}
+	var countBefore, countAfter int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM "CoverMemoryRevision"`).Scan(&countBefore); err != nil {
+		t.Fatal(err)
+	}
+	if err := mutateCoverExperience(t.Context(), db, "local", "no change", func(*sql.Tx) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM "CoverMemoryRevision"`).Scan(&countAfter); err != nil || countBefore != countAfter {
+		t.Fatalf("post-restore no-op %d -> %d: %v", countBefore, countAfter, err)
 	}
 }

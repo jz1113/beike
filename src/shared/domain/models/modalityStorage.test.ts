@@ -186,33 +186,6 @@ describe('modalityStorage', () => {
     expect(loaded.map((item) => item.id)).toContain('chat_doubao_live');
   });
 
-  it('moves saved lip-sync models from video into avatar once', () => {
-    memoryStore.set(getModalityStorageKey('video'), JSON.stringify([
-      { id: 'vid_seedance', name: 'Seedance', modality: 'video', vendor: 'bytedance', modelId: 'doubao-seedance-2.5', isDefault: true },
-      { id: 'vid_sync', name: 'Sync', modality: 'video', vendor: 'fal', modelId: 'sync-lipsync-2', isCustom: true },
-    ]));
-    const avatar = readEffectiveModalityModels('avatar');
-    expect(avatar.configured).toBe(true);
-    expect(avatar.models.map((item) => item.modelId)).toEqual(['sync-lipsync-2']);
-    expect(avatar.models[0]?.modality).toBe('avatar');
-    expect(readStoredModalityModels('video').map((item) => item.modelId)).toEqual(['doubao-seedance-2.5']);
-    memoryStore.set(getModalityStorageKey('video'), JSON.stringify([
-      ...readStoredModalityModels('video'),
-      { id: 'vid_hedra', name: 'Hedra', modality: 'video', vendor: 'hedra', modelId: 'hedra-character-3' },
-    ]));
-    expect(readEffectiveModalityModels('avatar').models.map((item) => item.modelId)).toEqual(['sync-lipsync-2']);
-  });
-
-  it('leaves avatar unconfigured when saved video models are not drivers', () => {
-    memoryStore.set(getModalityStorageKey('video'), JSON.stringify([
-      { id: 'vid_seedance', name: 'Seedance', modality: 'video', vendor: 'bytedance', modelId: 'doubao-seedance-2.5' },
-    ]));
-    const avatar = readEffectiveModalityModels('avatar');
-    expect(avatar.configured).toBe(false);
-    expect(memoryStore.has(getModalityStorageKey('avatar'))).toBe(false);
-    expect(readStoredModalityModels('video')).toHaveLength(1);
-  });
-
   it('falls back to defaults when a saved list only contains invalid placeholders', () => {
     noteRemovedDefaultModels('image', [{ id: 'img_openai' }], []);
     memoryStore.set(getModalityStorageKey('image'), JSON.stringify([

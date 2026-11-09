@@ -1,9 +1,10 @@
-import { selectedTextModel, selectedTextProtocol } from '@shared/domain/models/textModelRoute';
-import type { TextProtocol } from '@shared/domain/models/textProtocol';
+import { selectedTextModel, selectedTextProtocol } from '@shared/domain/models/workflowModelStorage';
+import type { TextProtocol } from '@shared/domain/models/deepseek';
 import { DEEPSEEK_BASE_URL, isDeepSeekRoute, deepSeekModel } from '@shared/domain/models/deepseek';
 import { API_PROVIDERS_STORAGE_KEY, credentialsForModalityItem, findConfiguredModalityModel, readEffectiveModalityModels, resolveModalityModelRoute, type StoredModalityModelItem } from '@shared/domain/models/modalityStorage';
 import { isOpenAIModelRouteId } from '@shared/domain/models/workflowModels';
 import { isDashScopeBase, isNativeDashscopeImageModel } from '@shared/domain/media/imageCapabilities';
+import { normalizeGatewayBaseUrl } from '@shared/domain/models/gatewayCreds';
 
 // 三态缓存：undefined=未显式设置（允许初始兼容加载），null=显式清空（严格禁止回退 localStorage），string=有效密钥
 let cachedApiKey: string | null | undefined = undefined;
@@ -100,23 +101,23 @@ function configuredModalityCredentials(item: StoredModalityModelItem): ModelCred
   const provider = readStoredProvider(item.channelId || '');
   return {
     baseUrl: creds.baseUrl || provider?.baseUrl,
-    apiKey: creds.apiKey || provider?.apiKey,
+    apiKey: creds.apiKey || (sameGatewayOrInherited(creds.baseUrl, provider?.baseUrl) ? provider?.apiKey : undefined),
     protocol: provider?.protocol,
     requestTemplate: provider?.requestTemplate,
   };
 }
 
+function sameGatewayOrInherited(selected?: string, fallback?: string): boolean {
+  return !selected?.trim() || normalizeGatewayBaseUrl(selected) === normalizeGatewayBaseUrl(fallback);
+}
+
 /** 根据模型 ID 获取其绑定的专属服务商凭证 */
 export function getModelCredentials(modelId?: string): ModelCredentials {
   if (!modelId) return {};
-  if (typeof window === 'undefined') {
-    const modality = findConfiguredModalityModel(modelId);
-    return modality ? configuredModalityCredentials(modality) : {};
-  }
-  const chat = configuredChatModel(modelId);
-  // A synced global-channel choice also wins over stale legacy credentials;
-  // its actual global credentials still come from the runtime-aware overrides.
-  if (chat) return configuredModalityCredentials(chat);
+  const modality = findConfiguredModalityModel(modelId);
+  // A synced selection (including the global channel) is authoritative.
+  if (modality) return configuredModalityCredentials(modality);
+  if (typeof window === 'undefined') return {};
   try {
     const rawModels = localStorage.getItem('custom_models');
     if (rawModels) {
@@ -129,7 +130,7 @@ export function getModelCredentials(modelId?: string): ModelCredentials {
           if (target.customBaseUrl || target.customApiKey || provider) {
             return {
               baseUrl: target.customBaseUrl || provider?.baseUrl,
-              apiKey: target.customApiKey || provider?.apiKey,
+              apiKey: target.customApiKey || (sameGatewayOrInherited(target.customBaseUrl, provider?.baseUrl) ? provider?.apiKey : undefined),
               protocol: provider?.protocol,
               requestTemplate: provider?.requestTemplate,
             };
@@ -139,12 +140,6 @@ export function getModelCredentials(modelId?: string): ModelCredentials {
     }
   } catch {
     // 忽略存储读取异常
-  }
-  const modality = findConfiguredModalityModel(modelId);
-  if (modality) {
-    const creds = credentialsForModalityItem(modality);
-    const provider = readStoredProvider(modality.channelId || '');
-    if (creds.baseUrl || creds.apiKey || provider) return configuredModalityCredentials(modality);
   }
   return dashscopeCredentialsForUnboundModel(modelId) || {};
 }
@@ -236,7 +231,8 @@ export function getGatewayClientHeaders(modelId?: string): Record<string, string
   const modelCreds = getModelCredentials(modelId);
   const { customBaseUrl, customApiKey, customWanbangKey, customWanbangSecret } = getGatewayClientOverrides();
   const effectiveBaseUrl = modelCreds.baseUrl || customBaseUrl;
-  const effectiveApiKey = modelCreds.apiKey || customApiKey;
+  const mayUseGlobalKey = sameGatewayOrInherited(modelCreds.baseUrl, customBaseUrl);
+  const effectiveApiKey = modelCreds.apiKey || (mayUseGlobalKey ? customApiKey : undefined);
 
   const headers: Record<string, string> = {};
   if (effectiveBaseUrl) headers['x-custom-base-url'] = effectiveBaseUrl;
@@ -252,8 +248,6 @@ export function getGatewayClientHeaders(modelId?: string): Record<string, string
       // 模板无法序列化时不附带，提交体会另行校验。
     }
   }
-  const lianchiKey = typeof localStorage !== 'undefined' ? localStorage.getItem('lianchi_api_key')?.trim() : '';
-  if (lianchiKey) headers['x-lianchi-api-key'] = lianchiKey;
   if (customWanbangKey) headers['x-wanbang-key'] = customWanbangKey;
   if (customWanbangSecret) headers['x-wanbang-secret'] = customWanbangSecret;
   return headers;

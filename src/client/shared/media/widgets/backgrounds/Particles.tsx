@@ -3,10 +3,9 @@
 import { useEffect, useRef } from 'react';
 import './Particles.css';
 
-import { SHAPES, EFFECTS, DRIFTS, MAX_COUNT, MAX_LINES, MAX_BURSTS, INTRO_SECONDS, BURST_SECONDS, PARTICLE_VERTEX, PARTICLE_FRAGMENT, LINE_VERTEX, LINE_FRAGMENT, clamp, link } from './particlesRenderer';
-import type { ParticlesProps, Settings, Burst } from './particlesRenderer';
-export type { ParticlesShape, ParticlesHoverEffect, ParticlesDrift, ParticlesProps } from './particlesRenderer';
+import { ParticlesProps, Settings, Burst, SHAPES, EFFECTS, DRIFTS, MAX_COUNT, MAX_LINES, MAX_BURSTS, INTRO_SECONDS, BURST_SECONDS, PARTICLE_VERTEX, PARTICLE_FRAGMENT, LINE_VERTEX, LINE_FRAGMENT, clamp, link } from './particlesRenderer';
 import { createParticleSimulation } from './particleSimulation';
+export type { ParticlesShape, ParticlesHoverEffect, ParticlesDrift, ParticlesProps } from './particlesRenderer';
 
 const Particles = ({
   particleCount = 200,
@@ -189,7 +188,7 @@ const Particles = ({
     let visible = true;
 
     const { rebuild, rotationOf, offsetOf, buildLines } = createParticleSimulation({
-      gl, positionBuffer, randomBuffer, colorBuffer, parse, ink, view, pointer, state, bursts, cloud, screen, lineData,
+      gl, positionBuffer, randomBuffer, colorBuffer, parse, ink, view, pointer, state, bursts, cloud, screen, lineData
     });
 
     const render = () => {

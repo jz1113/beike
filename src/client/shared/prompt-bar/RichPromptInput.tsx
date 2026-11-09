@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
-import { densityComposerInputMaxH, densityComposerText } from '@client/shared/ui/layoutClasses';
+import { densityComposerInputMaxH } from '@client/shared/ui/layoutClasses';
 import type { SubjectItem } from './promptBarConstants';
 import { resolveSubjectByMention } from './promptMentions';
 import {
@@ -11,11 +11,35 @@ import {
   renderTextToDOM,
   resolveEditorInsertionRange,
 } from './promptMentionDom';
-import type { RichPromptInputProps, RichPromptInputRef } from './richPromptInputTypes';
 import { extractPromptMentions } from '@shared/domain/prompts/prompt-engine/mentions';
 
-export type { SubjectItem, RichPromptInputProps, RichPromptInputRef } from './richPromptInputTypes';
+export type { SubjectItem };
 export { resolveSubjectByMention } from './promptMentions';
+
+export interface RichPromptInputProps {
+  ariaLabel?: string;
+  value: string;
+  onChange: (value: string) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  onPasteFiles?: (files: File[]) => void;
+  placeholder?: string;
+  allSubjects: SubjectItem[];
+  quickRefImages: string[];
+  onTriggerAtMenu?: (pos: number, query?: string) => void;
+  onCloseAtMenu?: () => void;
+  variant?: 'default' | 'composer' | 'compact';
+  expanded?: boolean;
+  singleLine?: boolean;
+}
+
+export interface RichPromptInputRef {
+  focus: () => void;
+  getSelectionStart: () => number;
+  insertMention: (subject: SubjectItem) => void;
+  insertSkill: (skillName: string) => void;
+  insertAtSymbol: () => void;
+  setCursorToEnd: () => void;
+}
 
 export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputProps>(({
   ariaLabel = '提示词',
@@ -312,18 +336,21 @@ export const RichPromptInput = forwardRef<RichPromptInputRef, RichPromptInputPro
   };
 
   const isComposer = variant === 'composer';
+  const isCompact = variant === 'compact';
   const wrapperMinH = singleLine
     ? 'min-h-[24px] sm:min-h-[26px]'
-    : isComposer
-      ? (expanded ? 'min-h-[72px] sm:min-h-[80px]' : 'min-h-[52px] sm:min-h-[60px]')
+    : isCompact
+      ? 'min-h-[32px]'
+      : isComposer
+      ? (expanded ? 'min-h-[96px] sm:min-h-[108px]' : 'min-h-[74px] sm:min-h-[78px]')
       : 'min-h-[44px] sm:min-h-[50px] md:min-h-[58px] xl:min-h-[68px]';
   const editorMaxH = singleLine
     ? 'max-h-[26px]'
     : isComposer
       ? densityComposerInputMaxH
       : 'max-h-48 xl:max-h-64';
-  const editorText = singleLine ? 'text-xs sm:text-[13.5px]' : isComposer ? densityComposerText : 'text-[14px] sm:text-[15px] md:text-[16px] xl:text-[17px]';
-  const placeholderText = singleLine ? 'empty:before:text-xs sm:empty:before:text-[13.5px]' : 'empty:before:text-[14px] sm:empty:before:text-[14px] md:empty:before:text-[14.5px]';
+  const editorText = singleLine ? 'text-xs sm:text-[13.5px]' : isCompact ? 'text-[14px]' : isComposer ? 'text-[14.5px] sm:text-[15px]' : 'text-[14px] sm:text-[15px] md:text-[16px] xl:text-[17px]';
+  const placeholderText = singleLine ? 'empty:before:text-xs sm:empty:before:text-[13.5px]' : 'empty:before:text-[14.5px] sm:empty:before:text-[15px]';
 
   return (
     <div

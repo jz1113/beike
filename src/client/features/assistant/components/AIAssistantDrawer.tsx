@@ -1,33 +1,264 @@
-import { buildAssistantWorkspaceSnapshot } from '../model/assistantWorkspaceContext';
-import { useAssistantDialog } from '../hooks/useAssistantDialog';
-import { useAssistantNarrowViewport } from '../hooks/useAssistantViewport';
-import { useAssistantOutputLanguage } from '../hooks/useAssistantOutputLanguage';
-import { getAssistantSuggestions } from '../model/assistantSuggestions';
-import { useAssistantReasoning } from '../hooks/useAssistantReasoning';
+import { useAssistantReasoning } from '@client/shared/hooks/useAssistantReasoning';
 import '../assistantWorkspace.css';
 import { normalizeReasoningEffort } from '@shared/domain/assistant/reasoning';
-import AssistantMemoryPanel from './panels/AssistantMemoryPanel';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore, type MediaAttachment } from '@client/store';
-import { useToast } from '@client/shared/hooks/useToast';
-import { COPY_FEEDBACK_DURATION_MS } from '@client/shared/constants/timing';
-import { proxyMediaUrl } from '@client/shared/api/apiClient';
+import { COPY_FEEDBACK_DURATION_MS, useToast } from '@client/shared/hooks/useToast';
+import { apiFetch, proxyMediaUrl } from '@client/shared/api/apiClient';
 import AssistantMessageList from '@client/features/assistant/components/message/AssistantMessageList';
 import AssistantInputArea from '@client/features/assistant/components/AssistantInputArea';
 import AssistantDrawerHeader from '@client/features/assistant/components/AssistantDrawerHeader';
-import AssistantMediaLightbox, { ChatPreviewState } from '@client/features/assistant/components/message/AssistantMediaLightbox';
 import BrandKitModal from '@client/features/assistant/components/brand-kit/BrandKitModal';
-import { DEFAULT_ASSISTANT_MODELS } from '@client/features/assistant/model/assistantConstants';
+import {
+  DEFAULT_ASSISTANT_MODELS,
+  getAssistantSuggestions,
+  useAssistantDialog,
+} from '@client/features/assistant/model/assistantConstants';
 import { useAssistantModels } from '@client/features/assistant/hooks/useAssistantModels';
 import { useAssistantMediaUpload } from '@client/features/assistant/hooks/useAssistantMediaUpload';
 import { useAssistantChatStream } from '@client/features/assistant/hooks/useAssistantChatStream';
 import {
   getCanvasWorkspaceAttachments,
+  getCanvasWorkspaceSnapshot,
   useCanvasWorkspaceSelection,
 } from '@client/shared/workspace/canvasWorkspace';
 import { visibleMarkdownText } from '@client/shared/ui/markdown/visibleMarkdownText';
-import { Sparkles, UploadCloud } from 'lucide-react';
+import { Sparkles, UploadCloud, X } from 'lucide-react';
+
+export interface ChatPreviewState {
+  url: string;
+  type: 'image' | 'video';
+  poster?: string;
+}
+
+interface MemoryView {
+  enabled: boolean;
+  summary: string;
+  updatedAt: number;
+  coveredCount: number;
+  pendingCount: number;
+}
+
+function AssistantMemoryPanel({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
+  const dialogRef = useAssistantDialog(true, onClose);
+  const [memory, setMemory] = useState<MemoryView | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const url = `/api/assistant/threads/${encodeURIComponent(sessionId)}/memory`;
+  useEffect(() => {
+    const controller = new AbortController();
+    setMemory(null);
+    setError('');
+    apiFetch(url, { signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || '读取失败');
+        if (!controller.signal.aborted) setMemory(data.memory);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) setError(err.message);
+      });
+    return () => controller.abort();
+  }, [url]);
+  const update = async (body: { enabled?: boolean; clear?: boolean }) => {
+    setBusy(true);
+    setError('');
+    try {
+      const response = await apiFetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || '保存失败');
+      setMemory(data.memory);
+      setConfirmClear(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 p-4" onClick={onClose}>
+      <section
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="会话记忆"
+        className="flex max-h-[80%] w-full max-w-lg flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-[#18191c]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold">会话记忆</h2>
+          <button aria-label="关闭会话记忆" onClick={onClose} className="rounded p-1 hover:bg-slate-100 dark:hover:bg-white/10">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <p className="mb-3 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          仅用于当前会话，重启后保留。超过 30 条待处理消息时，将较早消息增量摘要，保留最近 20 条；较长历史会提前触发。采集时只保存文本，后续对话再整理。摘要会额外调用当前模型。
+        </p>
+        {error && <p role="alert" className="mb-3 text-sm text-orange-700">{error}</p>}
+        {!memory && !error && <p className="text-sm">正在读取记忆…</p>}
+        {memory && (
+          <>
+            <label className="mb-3 flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={memory.enabled} disabled={busy} onChange={(e) => void update({ enabled: e.target.checked })} />
+              自动整理并使用本会话记忆
+            </label>
+            <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+              已摘要 {memory.coveredCount} 条 · 待处理及近期原文 {memory.pendingCount} 条
+              {memory.updatedAt ? ` · 更新于 ${new Date(memory.updatedAt).toLocaleString()}` : ''}
+            </p>
+            <div className="min-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 text-sm leading-6 select-text dark:bg-white/5">
+              {memory.summary || '尚未形成摘要。对话积累后会自动整理，不需要手动复制历史消息。'}
+            </div>
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              摘要可能遗漏细节，可在对话中纠正。关闭后不再积累或使用记忆，已有摘要保留。
+            </p>
+            {confirmClear ? (
+              <div className="mt-3 text-sm">
+                <p>清除摘要和待处理文本，保留聊天记录。清除前的消息不会再次自动记入摘要。</p>
+                <div className="mt-2 flex gap-3">
+                  <button disabled={busy} onClick={() => void update({ clear: true })} className="text-red-600">
+                    确认清除
+                  </button>
+                  <button disabled={busy} onClick={() => setConfirmClear(false)}>
+                    取消
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button disabled={busy} onClick={() => setConfirmClear(true)} className="mt-3 self-start text-sm text-slate-500 hover:text-red-600 dark:text-slate-400">
+                清除本会话记忆
+              </button>
+            )}
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function AssistantMediaLightbox({
+  preview,
+  onClose,
+  resolveAssistantMediaSrc,
+}: {
+  preview: ChatPreviewState | null;
+  onClose: () => void;
+  resolveAssistantMediaSrc: (rawUrl?: string | null, asVideo?: boolean) => string;
+}) {
+  const dialogRef = useAssistantDialog(Boolean(preview), onClose);
+  if (!preview) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in pointer-events-auto"
+      onClick={onClose}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={preview.type === 'video' ? '视频预览' : '图片预览'}
+        tabIndex={-1}
+        className="relative max-w-4xl max-h-[90vh] w-full bg-transparent flex flex-col items-center justify-center cursor-default"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {preview.type === 'video' ? (
+          <video
+            key={preview.url}
+            src={resolveAssistantMediaSrc(preview.url, true)}
+            poster={preview.poster ? resolveAssistantMediaSrc(preview.poster, false) : undefined}
+            controls
+            autoPlay
+            playsInline
+            preload="auto"
+            controlsList="nodownload"
+            className="max-w-full max-h-[85vh] w-auto rounded-2xl shadow-2xl border border-white/20 bg-black"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <img
+            key={preview.url}
+            src={resolveAssistantMediaSrc(preview.url, false)}
+            alt="图片大图预览"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.dataset.hasRetried && preview.url && !/^(data:|blob:)/.test(preview.url)) {
+                target.dataset.hasRetried = 'true';
+                target.src = proxyMediaUrl(preview.url);
+              }
+            }}
+            className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/20 cursor-zoom-out"
+          />
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-3 px-5 py-2 rounded-full bg-slate-900/90 text-white text-xs font-bold border border-white/10 hover:bg-slate-800 transition-colors shadow-lg cursor-pointer dark:hover:bg-slate-200"
+        >
+          关闭预览
+        </button>
+      </div>
+    </div>
+  );
+}
+
+type OutputLanguage = '中文' | 'English' | '双语';
+const isOutputLanguage = (value: unknown): value is OutputLanguage => value === '中文' || value === 'English' || value === '双语';
+
+function useAssistantOutputLanguage() {
+  const [language, setLanguage] = useState<OutputLanguage>(() => {
+    try {
+      const saved = localStorage.getItem('beike_assistant_output_lang');
+      if (isOutputLanguage(saved)) return saved;
+    } catch { /* Storage can be unavailable in restricted browser sessions. */ }
+    return '中文';
+  });
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      const value = (event as CustomEvent<{ lang?: unknown }>).detail?.lang;
+      if (isOutputLanguage(value)) setLanguage(value);
+    };
+    window.addEventListener('assistant_lang_changed', onChange);
+    return () => window.removeEventListener('assistant_lang_changed', onChange);
+  }, []);
+  return language;
+}
+
+function useAssistantNarrowViewport() {
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches);
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 639px)');
+    const update = () => setNarrow(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return narrow;
+}
+
+/** Build the small active-workspace context sent with a new assistant turn. */
+function buildAssistantWorkspaceSnapshot(currentView: string, productTitle?: string): Record<string, unknown> {
+  if (currentView === 'canvas') return getCanvasWorkspaceSnapshot();
+  if (currentView === 'workshop') {
+    return {
+      workspaceType: 'workshop',
+      title: productTitle || '电商图文',
+      summary: productTitle ? `当前已加载商品「${productTitle}」。` : '当前尚未加载商品。',
+    };
+  }
+  return { workspaceType: ['generate', 'assets', 'home'].includes(currentView) ? currentView : 'other' };
+}
 
 interface Props {
   onOpenSettings?: () => void;
@@ -57,13 +288,9 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     currentView,
     setCurrentView,
     setProductData,
-    setStep,
     getActiveBrandKit,
-    currentStep,
     product,
     selectedArchId,
-    workshopMode,
-    activeWorkshopTab,
     getActiveAssistantSkill,
   } = useAppStore(
     useShallow((s) => ({
@@ -86,13 +313,9 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
       currentView: s.currentView,
       setCurrentView: s.setCurrentView,
       setProductData: s.setProductData,
-      setStep: s.setStep,
       getActiveBrandKit: s.getActiveBrandKit,
-      currentStep: s.currentStep,
       product: s.product,
       selectedArchId: s.selectedArchId,
-      workshopMode: s.workshopMode,
-      activeWorkshopTab: s.activeWorkshopTab,
       getActiveAssistantSkill: s.getActiveAssistantSkill,
     }))
   );
@@ -165,7 +388,7 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     }
   }, [assistantInputDraft]);
 
-  const [selectedLang] = useAssistantOutputLanguage();
+  const selectedLang = useAssistantOutputLanguage();
 
   // 1. 模型列表与当前模型管理 Hook
   const {
@@ -198,8 +421,8 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
   const activeBrandKit = getActiveBrandKit();
   // 只在发送时读取精简画布摘要：让助手知道当前项目状态，同时避免把图片 URL、
   // 完整提示词或画布坐标塞入上下文。
-  const getWorkspaceSnapshot = useCallback(() => buildAssistantWorkspaceSnapshot(currentView, currentStep, product?.title),
-    [currentStep, currentView, product?.title]);
+  const getWorkspaceSnapshot = useCallback(() => buildAssistantWorkspaceSnapshot(currentView, product?.title),
+    [currentView, product?.title]);
 
   // 仅将“当前选中”的可视节点作为本轮参考附件带入模型；画布里其他素材仍以摘要传递。
   // 这样既能让视觉模型真正看见用户正在讨论的图，也不会把整张画布重复上传。
@@ -242,11 +465,8 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     addAssistantMessage,
     updateAssistantMessage,
     currentView,
-    currentStep,
     product,
     selectedArchId,
-    workshopMode,
-    activeWorkshopTab,
     activeBrandKit,
     getWorkspaceSnapshot,
     getWorkspaceAttachments,
@@ -375,7 +595,6 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
           setChatPreview={setChatPreview}
           addAssistantAttachment={addAssistantAttachment}
           setProductData={setProductData}
-          setStep={setStep}
           setCurrentView={setCurrentView}
           setIsAssistantOpen={setIsAssistantOpen}
         />}

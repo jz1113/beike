@@ -28,6 +28,13 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('server skill library state', () => {
+  it('does not reactivate a retired builtin snapshot while keeping imported user skills available', () => {
+    const state=store();
+    state.setState({activeAssistantSkillId:'retired',activeAssistantSkillSnapshot:{...oldSkill,id:'retired',isBuiltin:true}});
+    expect(state.getState().getActiveAssistantSkill()).toBeNull();
+    state.setState({activeAssistantSkillId:'old',activeAssistantSkillSnapshot:oldSkill});
+    expect(state.getState().getActiveAssistantSkill()).toEqual(oldSkill);
+  });
   it('imports the legacy source deterministically without changing its original or activating a skill', async () => {
     const state = store();
     const original = storage.get(vaultKey);

@@ -1,8 +1,18 @@
+import { apiRequest } from '@client/shared/api/apiRequest';
+import { salesStudioAssetsResponseSchema } from '@shared/contracts/salesProduction';
+import { isPlaceholderIdentity } from '@shared/domain/workshop/workshop-pipeline/states';
+import type { SalesMaterialCatalog } from '@shared/domain/sales';
 import { apiFetch } from '@client/shared/api/apiClient';
-import type { AssetLibrarySlim } from '@shared/domain/assets/assetLibraryTypes';
-import { categoryIds, type AssetProductCategory } from '@shared/domain/assets/assetOrganization';
-import { builtinSubcategoryFolderId, isPromptGroupSubcategory, PROMPT_GROUP_SUBCATEGORY_LABELS } from '@shared/domain/assets/promptGroupSubcategory';
-import type { PromptAssetType as AssetSubTab } from '@shared/domain/prompts/prompt-asset/states';
+import {
+  builtinSubcategoryFolderId,
+  categoryIds,
+  isPromptGroupSubcategory,
+  PROMPT_GROUP_SUBCATEGORY_LABELS,
+  type AssetLibraryItem,
+  type AssetLibrarySlim,
+  type AssetProductCategory,
+  type PromptAssetType as AssetSubTab,
+} from '@shared/domain/assets/assetLibraryTypes';
 
 export interface GlobalAssetStore {
   personas: AssetLibrarySlim[];
@@ -25,9 +35,6 @@ const store: GlobalAssetStore = {
   lastUpdated: 0,
   isLoaded: false,
 };
-
-// The production preload is slim; browsing needs complete preview fields.
-const categoryStore = new Map<AssetSubTab, AssetLibrarySlim[]>();
 
 let inFlightPromise: Promise<GlobalAssetStore> | null = null;
 /** 每次 invalidate 递增；进行中的请求落库前须比对，防止过期响应覆盖新状态 */
@@ -102,32 +109,10 @@ export async function getGlobalAssetLibrary(force = false): Promise<GlobalAssetS
 }
 
 /**
- * 同步快速获取当前内存中的资产，0ms 无等待
- */
-export function getCachedAssetsSync(tab: 'full_prompt' | 'persona' | 'outfit' | 'scene' | 'action'): AssetLibrarySlim[] {
-  const category = categoryStore.get(tab);
-  if (category) return category;
-  if (tab === 'full_prompt') return store.fullPrompts;
-  if (tab === 'persona') return store.personas;
-  if (tab === 'outfit') return store.outfits;
-  if (tab === 'scene') return store.scenes;
-  if (tab === 'action') return store.actions;
-  return [];
-}
-
-/**
- * 是否已经预加载完毕
- */
-export function isAssetLibraryLoaded(): boolean {
-  return store.isLoaded;
-}
-
-/**
  * 资产增删改后使全局缓存失效
  */
 export function invalidateGlobalAssetCache() {
   cacheGeneration += 1;
-  categoryLoadedAt.clear();
   store.isLoaded = false;
   store.lastUpdated = 0;
   for (const listener of invalidationListeners) listener();
@@ -137,43 +122,34 @@ export function invalidateGlobalAssetCache() {
 export async function fetchAssetDetail(
   activeSubTab: AssetSubTab,
   id: string,
-): Promise<Record<string, unknown> | null> {
+): Promise<AssetLibraryItem | null> {
   const assetType = activeSubTab;
   try {
     const res = await apiFetch(`/api/catalog/assets/library?type=${encodeURIComponent(assetType)}&id=${encodeURIComponent(id)}`);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.success || !data.item) return null;
-    return data.item as Record<string, unknown>;
+    return typeof data.item.id === 'string' ? data.item as AssetLibraryItem : null;
   } catch (err) {
     console.warn('[assetLibraryCache] 获取资产详情失败:', err);
     return null;
   }
 }
 
-const categoryLoadedAt = new Map<AssetSubTab, number>();
-const categoryRequests = new Map<AssetSubTab, Promise<void>>();
-/** The library view loads its current category; workshop preload may still request all. */
-export async function getCategoryAssetLibrary(tab: AssetSubTab, force = false): Promise<void> {
-  const generation = cacheGeneration;
-  const existing = categoryRequests.get(tab);
-  if (existing) { await existing; return getCategoryAssetLibrary(tab, force && !categoryLoadedAt.has(tab)); }
-  if (!force && Date.now() - (categoryLoadedAt.get(tab) || 0) < 120_000) return;
-  const request = (async () => {
-    const collected = new Map<string, AssetLibrarySlim>();
-    for (let page = 1; ; page++) {
-      const res = await apiFetch(`/api/catalog/assets/library?type=${tab}&pageSize=100&page=${page}`);
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || '资产加载失败');
-      for (const item of data.items || []) collected.set(item.id, item);
-      if ((data.items || []).length < 100 || page * 100 >= data.total) break;
-    }
-    if (cacheGeneration === generation) {
-      categoryStore.set(tab, [...collected.values()]);
-      categoryLoadedAt.set(tab, Date.now());
-    }
-  })();
-  categoryRequests.set(tab, request);
-  try { await request; } finally { categoryRequests.delete(tab); }
-  if (generation !== cacheGeneration) await getCategoryAssetLibrary(tab);
+type Json = Record<string, unknown>;
+const record = (v: unknown): Json => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Json) : {});
+const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+async function readJSON(response: Response, fallback: string): Promise<Json> {
+  const data = record(await response.json().catch(() => null));
+  if (response.status === 404 && !data.error) throw new Error('当前服务尚未启用电商视频资产与合成接口，请重启贝壳服务后重试。');
+  if (!response.ok || data.success !== true) throw new Error(text(data.error) || `${fallback}（HTTP ${response.status}）`);
+  return data;
+}
+
+export async function fetchSalesStudioAssets(signal?: AbortSignal): Promise<SalesMaterialCatalog> {
+  const response = await apiRequest('GET', '/api/sales/studio-assets', { signal });
+  const parsed = salesStudioAssetsResponseSchema.safeParse(await readJSON(response, '读取资产库失败'));
+  if (!parsed.success) throw new Error('资产库数据格式不完整');
+  return { ...parsed.data, personas: parsed.data.personas.filter((item) => !isPlaceholderIdentity(item, 'persona')) };
 }

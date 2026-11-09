@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
-import type { ModalityChannelOption } from '../../model/modalityModelTypes';
+import type { ModalityChannelOption } from '../../model/modalityModelStorage';
 
 interface Props {
   channels: ModalityChannelOption[];

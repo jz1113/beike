@@ -1,6 +1,143 @@
-import { isSalesProductImageView } from './imageCatalog';
-import { inferScriptProductCategory, inferScriptStyleCategory, type SalesScriptTaxonomy } from './scriptTaxonomy';
-import { SALES_IMAGE_VIEW_LABELS, type SalesProductImageView } from './types';
+/** Product collection and reference script domain types for the ecommerce video workspace. */
+export type VideoSalesCategory = 'beauty' | 'food' | 'home' | 'fashion' | 'tech' | 'other';
+
+export type SalesProductImageView = 'front' | 'back' | 'detail' | 'worn' | 'flat';
+
+export interface SalesReferenceSlot {
+  slotIndex: number;
+  mixedToken: string;
+  apiToken: string;
+  kind: 'persona_identity' | 'persona_body' | 'persona_face' | 'product' | 'scene' | 'action';
+  roles?: Array<SalesReferenceSlot['kind']>;
+  mediaType?: 'image' | 'video';
+  label: string;
+  url: string;
+  view?: SalesProductImageView;
+}
+
+export const SALES_PRODUCT_IMAGE_VIEWS: readonly SalesProductImageView[] = ['front', 'back', 'detail', 'worn', 'flat'];
+
+export function isSalesProductImageView(value: unknown): value is SalesProductImageView {
+  return typeof value === 'string' && (SALES_PRODUCT_IMAGE_VIEWS as readonly string[]).includes(value);
+}
+
+export const SALES_IMAGE_VIEW_LABELS: Record<SalesProductImageView, string> = {
+  front: '正面',
+  back: '背面',
+  detail: '细节',
+  worn: '上身/场景',
+  flat: '平铺/白底',
+};
+
+export interface SalesColorSelection {
+  variantId?: string;
+  colorLabel: string;
+  confirmedImageUrls: string[];
+  excludedImageUrls: string[];
+}
+
+/** Whether to prepare narration and separate subtitle drafts, or produce a clean visual showcase. */
+export type SalesPresentationMode = 'subtitled_intro' | 'clean_visual';
+
+export const SALES_PRESENTATION_MODE_LABELS: Record<SalesPresentationMode, { title: string; subtitle: string }> = {
+  subtitled_intro: {
+    title: '卖点介绍',
+    subtitle: '用口播或旁白讲解商品，提供字幕草稿。',
+  },
+  clean_visual: {
+    title: '纯画面展示',
+    subtitle: '专注商品、人物与运镜，不生成口播和字幕。',
+  },
+};
+
+/** Step 4 in product video workflow: whether motion is driven by storyboard text or depth video imitation. */
+export type SalesImitationMode = 'script_only' | 'depth_imitation';
+
+export const SALES_IMITATION_MODE_LABELS: Record<SalesImitationMode, { title: string; subtitle: string }> = {
+  script_only: {
+    title: '仅按脚本',
+    subtitle: '按脚本的镜头切换与动作描述生成，使用所选商品、人物与场景图片。',
+  },
+  depth_imitation: {
+    title: '脚本＋深度视频',
+    subtitle: '深度视频仅参考动作与节奏；运镜、景别和表情按分镜，人物、商品与场景按所选图片。',
+  },
+};
+
+export type SalesScriptStyleCategory =
+  | 'street_onetake'
+  | 'lifestyle_vlog'
+  | 'talking_head'
+  | 'detail_proof'
+  | 'studio_lookbook'
+  | 'home_cozy';
+
+export interface SalesScriptTaxonomy {
+  categoryId?: string;
+  styleId?: string;
+  productCategory: VideoSalesCategory;
+  subCategory: string;
+  styleCategory: SalesScriptStyleCategory;
+}
+
+const VALID_PRODUCT_CATEGORIES = new Set<string>(['fashion', 'beauty', 'food', 'home', 'tech', 'other']);
+const VALID_STYLE_CATEGORIES = new Set<string>([
+  'street_onetake', 'lifestyle_vlog', 'talking_head', 'detail_proof', 'studio_lookbook', 'home_cozy',
+]);
+
+export function isSalesScriptStyleCategory(v: unknown): v is SalesScriptStyleCategory {
+  return typeof v === 'string' && VALID_STYLE_CATEGORIES.has(v);
+}
+
+export function inferScriptProductCategory(
+  explicit: unknown,
+  reusableCategories: readonly string[],
+  corpus: string,
+): VideoSalesCategory {
+  if (typeof explicit === 'string' && VALID_PRODUCT_CATEGORIES.has(explicit)) {
+    return explicit as VideoSalesCategory;
+  }
+  for (const cat of reusableCategories) {
+    if (VALID_PRODUCT_CATEGORIES.has(cat)) return cat as VideoSalesCategory;
+  }
+  if (/冲锋衣|开衫|连衣裙|针织|外套|衬衫|裤|裙|穿搭|衣|鞋|包|模特上身/.test(corpus)) return 'fashion';
+  if (/护肤|精华|面霜|口红|粉底|面膜|洗发|美妆|彩妆/.test(corpus)) return 'beauty';
+  if (/零食|茶|咖啡|饮|奶|食品|冲泡|试吃|口感/.test(corpus)) return 'food';
+  if (/数码|手机|耳机|充电|家电|科技|电脑|音箱/.test(corpus)) return 'tech';
+  if (/家居|客厅|桌面|收纳|床品|厨房|纸巾|清洁/.test(corpus)) return 'home';
+  return 'other';
+}
+
+export function inferScriptStyleCategory(input: {
+  explicit?: unknown;
+  oneTake: boolean;
+  format: string;
+  voiceMode: string;
+  spatialType: string;
+  corpus: string;
+}): SalesScriptStyleCategory {
+  if (isSalesScriptStyleCategory(input.explicit)) return input.explicit;
+  const text = input.corpus.toLowerCase();
+  if (input.format === 'hands' || input.format === 'product' || /微距|细节测评|手部演示|材质实测/.test(text)) {
+    return 'detail_proof';
+  }
+  if (input.spatialType === 'studio' || /影棚|纯底|大片|lookbook/.test(text)) {
+    return 'studio_lookbook';
+  }
+  if ((input.oneTake && input.spatialType === 'outdoor') || /街拍|一镜到底/.test(text)) {
+    return 'street_onetake';
+  }
+  if (/vlog|法式|松弛|度假|回眸/.test(text) || (input.voiceMode === 'none' && input.format === 'presenter')) {
+    return 'lifestyle_vlog';
+  }
+  if (/治愈|居家|温暖|清晨|原木/.test(text) && input.voiceMode !== 'speech') {
+    return 'home_cozy';
+  }
+  if (input.voiceMode === 'speech') {
+    return 'talking_head';
+  }
+  return 'lifestyle_vlog';
+}
 
 export type SalesScriptFormat = 'presenter' | 'hands' | 'product' | 'mixed';
 export type SalesScriptVoiceMode = 'speech' | 'voiceover' | 'mixed' | 'none';
@@ -391,4 +528,10 @@ export function tryParsePastedScriptJson(raw: string): SalesScriptDomain | null 
   } catch {
     return null;
   }
+}
+
+export function selectSalesTemplateVoice(template: string, mode: SalesBeatVoiceMode): string {
+  const label = { speech: '有口播', none: '无口播', voiceover: '后期旁白' }[mode];
+  return template.replace(/^【仅(有口播|无口播|后期旁白)】([^\r\n]*)(\r?\n|$)/gm,
+    (_, voice: string, line: string, newline: string) => voice === label ? line + newline : '');
 }

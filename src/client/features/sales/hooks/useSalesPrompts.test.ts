@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { SalesPrompt } from '@shared/contracts/salesPrompts';
-import { listSalesPrompts, SalesPromptRequestError, saveSalesPrompt } from '../api/salesPrompts';
+import type { SalesPrompt } from '@shared/contracts/salesAssetViews';
+import { listSalesPrompts, SalesPromptRequestError, saveSalesPrompt } from '../api/salesMaterials';
 import { useSalesPrompts } from './useSalesPrompts';
 
 const hooks = vi.hoisted(() => ({ index: 0, slots: [] as unknown[], effects: [] as (() => void)[], cleanups: new Map<number, () => void>() }));
@@ -37,7 +37,7 @@ vi.mock('react', () => ({
     }];
   },
 }));
-vi.mock('../api/salesPrompts', async (original) => ({ ...await original<typeof import('../api/salesPrompts')>(), listSalesPrompts: vi.fn(), saveSalesPrompt: vi.fn() }));
+vi.mock('../api/salesMaterials', async (original) => ({ ...await original<typeof import('../api/salesMaterials')>(), listSalesPrompts: vi.fn(), saveSalesPrompt: vi.fn() }));
 const summary: SalesPrompt = { id: 'summary', title: '卖点提炼', description: '', prompt: '自定义旧稿', defaultPrompt: '默认稿', version: 'v1', customized: true, configured: true };
 const script: SalesPrompt = { ...summary, id: 'script-analysis', title: '脚本拆解', prompt: '拆解要求' };
 const grid: SalesPrompt = { ...summary, id: 'persona-grid', title: '人物补图 · 九宫格', prompt: '人物 3×3 等分九宫格', version: 'grid-v1' };

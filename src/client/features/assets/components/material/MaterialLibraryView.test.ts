@@ -1,9 +1,9 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MaterialLibraryView from './MaterialLibraryView';
-import MaterialProjectDetailView from './MaterialProjectDetailView';
+import type { MergedAssetTask } from '../../model/agentAssetFilter';
 import MaterialLibraryToolbar from './MaterialLibraryToolbar';
-import MaterialProjectView from './MaterialProjectView';
+import MaterialAssetCard from './MaterialAssetCard';
 import MaterialFloatingDock from './MaterialFloatingDock';
 
 const hooks = vi.hoisted(() => ({ index: 0, values: [] as unknown[], effects: [] as (() => void)[] }));
@@ -21,9 +21,8 @@ vi.mock('react', async (original) => ({
   },
 }));
 vi.mock('@client/shared/i18n', async (original) => ({ ...await original<typeof import('@client/shared/i18n')>(), useI18n: () => ({ t: (key: string) => key, locale: 'zh-CN' }) }));
-vi.mock('@client/shared/media/widgets/Folder', () => ({ Folder: () => null }));
 vi.mock('../dialogs/AssetMediaPreview', () => ({ default: () => null }));
-vi.mock('@client/shared/ui/agentDocumentBus', () => ({ openAgentDocument: vi.fn() }));
+vi.mock('@client/shared/ui/AppErrorBoundary', () => ({ openAgentDocument: vi.fn() }));
 
 function nodes(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   return Children.toArray(node).flatMap((child) => isValidElement<Record<string, unknown>>(child) ? [child, ...nodes(child.props.children as ReactNode)] : []);
@@ -42,10 +41,9 @@ function Render<T>(component: () => T) {
 }
 function props() {
   return {
-    sessions: [{ id: 's', title: '项目', createdAt: 1, tasks: [] }], canvasProjects: [],
-    mergedTasks: [{ id: 'generated', sessionId: 's', resultUrl: '/generated.png', referenceImageUrl: '/reference.png' }, { id: 'upload', sessionId: 's', isUploaded: true, resultUrl: '/upload.png' }],
-    sourceType: 'ai' as 'ai' | 'uploaded', onSourceTypeChange: vi.fn(), setPreviewTask: vi.fn(),
-    onBatchDelete: vi.fn().mockResolvedValue(true), onBatchDownload: vi.fn(), onBatchDeleteProjects: vi.fn().mockResolvedValue(true),
+    mergedTasks: [{ id: 'generated', sessionId: 's', resultUrl: '/generated.png', referenceImageUrl: '/reference.png' }, { id: 'upload', sessionId: 's', isUploaded: true, resultUrl: '/upload.png' }] as MergedAssetTask[],
+    sourceType: 'ai' as 'ai' | 'uploaded', setPreviewTask: vi.fn(),
+    onBatchDelete: vi.fn().mockResolvedValue(true), onBatchDownload: vi.fn(),
   };
 }
 
@@ -56,19 +54,37 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('material library interactions', () => {
-  it('shares one project list between cards, counts, selection and batch deletion', async () => {
+  it('hides unavailable images and empty groups, clears selection, and allows replacement URLs', async () => {
     const input = props();
     let view = Render(() => MaterialLibraryView(input));
-    child(view, MaterialLibraryToolbar).props.onViewModeChange('project');
-    view = Render(() => MaterialLibraryView(input));
-    const projects = child(view, MaterialProjectView).props.projects;
-    expect(projects[0]).toMatchObject({ id: 's', assetCount: 1 });
-    expect(child(view, MaterialLibraryToolbar).props.totalCount).toBe(projects.length);
     child(view, MaterialLibraryToolbar).props.onToggleSelectAll();
     view = Render(() => MaterialLibraryView(input));
+    child(view, MaterialAssetCard).props.onImageUnavailable?.('/generated.png');
+    view = Render(() => MaterialLibraryView(input));
+    expect(nodes(view).filter(node => node.type === MaterialAssetCard)).toHaveLength(0);
+    expect(nodes(view).filter(node => node.type === 'section')).toHaveLength(0);
+    expect(child(view, MaterialLibraryToolbar).props.totalCount).toBe(0);
+    expect(child(view, MaterialFloatingDock).props.selectedCount).toBe(0);
     await child(view, MaterialFloatingDock).props.onBatchDelete();
-    expect(input.onBatchDeleteProjects).toHaveBeenCalledWith(projects);
-    expect(child(Render(() => MaterialLibraryView(input)), MaterialFloatingDock).props.selectedCount).toBe(0);
+    expect(input.onBatchDelete).toHaveBeenCalledWith([]);
+    input.mergedTasks[0] = { ...input.mergedTasks[0], resultUrl: '/replacement.png' };
+    view = Render(() => MaterialLibraryView(input));
+    expect(child(view, MaterialLibraryToolbar).props.totalCount).toBe(1);
+    expect(child(view, MaterialAssetCard).props.task.resultUrl).toBe('/replacement.png');
+  });
+
+  it('excludes failures from cards, counts, selection, downloads and previews', () => {
+    const input = props();
+    input.mergedTasks.push({ id: 'failed', sessionId: 's', resultUrl: '/failed.png', status: 'FAILURE' });
+    let view = Render(() => MaterialLibraryView(input));
+    expect(nodes(view).filter(node => node.type === MaterialAssetCard)).toHaveLength(1);
+    expect(child(view, MaterialLibraryToolbar).props.totalCount).toBe(1);
+    child(view, MaterialAssetCard).props.onClick(input.mergedTasks[0]);
+    expect(input.setPreviewTask).toHaveBeenCalledWith(input.mergedTasks[0], [input.mergedTasks[0]]);
+    child(view, MaterialLibraryToolbar).props.onToggleSelectAll();
+    view = Render(() => MaterialLibraryView(input));
+    child(view, MaterialFloatingDock).props.onBatchDownload?.();
+    expect(input.onBatchDownload).toHaveBeenCalledWith(['generated']);
   });
 
   it('does not delete hidden selected media after source changes', async () => {
@@ -96,28 +112,22 @@ describe('material library interactions', () => {
     expect(child(Render(() => MaterialLibraryView(input)), MaterialFloatingDock).props.selectedCount).toBe(0);
   });
 
-  it('passes the controlled source and source changes through to project details', () => {
+  it('renders a flat grid without a view selector', () => {
+    const view = Render(() => MaterialLibraryView(props()));
+    expect(nodes(view).some(node => node.type === 'select')).toBe(false);
+    expect(nodes(view).filter(node => node.type === MaterialAssetCard)).toHaveLength(1);
+  });
+
+  it('removes a selected task from actions as soon as it fails', async () => {
     const input = props();
     let view = Render(() => MaterialLibraryView(input));
-    child(view, MaterialLibraryToolbar).props.onViewModeChange('project');
+    child(view, MaterialLibraryToolbar).props.onToggleSelectAll();
+    input.mergedTasks[0] = { ...input.mergedTasks[0], status: 'FAILURE' };
     view = Render(() => MaterialLibraryView(input));
-    const projectView = child(view, MaterialProjectView);
-    projectView.props.onSelectProject(projectView.props.projects[0]);
-    input.sourceType = 'uploaded';
-    view = Render(() => MaterialLibraryView(input));
-    expect(view.type).toBe(MaterialProjectDetailView);
-    const detail = child(view, MaterialProjectDetailView);
-    expect(detail.props.sourceType).toBe('uploaded');
-    expect(detail.props.project.assetCount).toBe(1);
-  });
-});
-
-describe('project detail interactions', () => {
-  it('uses the page source and does not repeat the source switch', () => {
-    const input = props();
-    const view = Render(() => MaterialProjectDetailView({ ...input, sourceType: 'uploaded', project: { id: 's', type: 'session', title: '项目', photos: [], assetCount: 1 }, onBack: vi.fn() }));
-    expect(nodes(view).some((node) => node.props.src === '/generated.png')).toBe(false);
-    expect(nodes(view).some((node) => node.props.src === '/upload.png')).toBe(true);
-    expect(nodes(view).some((node) => node.type === 'button' && node.props.children === 'AI 生成')).toBe(false);
+    expect(child(view, MaterialLibraryToolbar).props.totalCount).toBe(0);
+    expect(child(view, MaterialFloatingDock).props.selectedCount).toBe(0);
+    expect(nodes(view).some(node => node.type === MaterialAssetCard)).toBe(false);
+    await child(view, MaterialFloatingDock).props.onBatchDelete();
+    expect(input.onBatchDelete).toHaveBeenCalledWith([]);
   });
 });

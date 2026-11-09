@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiFetch, storageConfigHeaders } from '@client/shared/api/apiClient';
+import { operationUsageScope } from '@client/shared/utils/usageScope';
 import { recordModelUsage } from '@client/shared/utils/usageTracker';
 import { DEPTH_MODEL_SETUP_COMMAND, type DepthQuality, type DepthVideoStyle } from '@shared/domain/media/depthVideo';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
@@ -7,14 +8,15 @@ import { getDerived, putDerived } from '@client/shared/media/idbMediaCache';
 import { resolveRefMediaFile } from '@client/shared/media/refMediaRegistry';
 import { throwIfGenerationAborted } from '@client/shared/api/generation/generationAbort';
 import { generationRecoveryError, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generation/generationRecovery';
-import {
-  type DepthSubmitPayload,
-  depthSubmitMap,
-} from '@client/shared/api/generation/depthSubmitRegistry';
 
-export type { DepthSubmitPayload };
+export interface DepthSubmitPayload {
+  file: File;
+  style: DepthVideoStyle;
+  quality: DepthQuality;
+  mode: 'depth-image' | 'depth-video';
+}
 
-const depthSubmitRegistry = depthSubmitMap();
+const depthSubmitRegistry = new Map<string, DepthSubmitPayload>();
 
 export function registerDepthSubmit(taskId: string, payload: DepthSubmitPayload): void {
   depthSubmitRegistry.set(taskId, payload);
@@ -244,9 +246,11 @@ export async function submitDepthImage(
   form.append('image', file);
   form.append('style', style);
   form.append('quality', quality);
+  const scope = operationUsageScope(operationId, 'depth-image', 'depth-image');
   const data = await postDepthFile('/api/generate/depth-image', form, signal, operationId);
   if (!data.resultUrl) throw generationRecoveryError(SUBMISSION_RECOVERY_HINT);
   recordModelUsage({
+    localTaskId: operationId, scope,
     modelId: 'depth-image',
     modelName: `深度图生成 (${style})`,
     provider: '本地算力 / 视觉生成',
@@ -264,16 +268,19 @@ export async function submitDepthVideo(
   quality: DepthQuality,
   signal?: AbortSignal,
   operationId?: string,
+  resolution?: '480p' | '720p',
 ): Promise<{ taskId: string; recordId?: string }> {
   throwIfGenerationAborted(() => Boolean(signal?.aborted));
-  const form = typeof file === 'string' ? JSON.stringify({videoUrl: file, style, quality}) : new FormData();
+  const form = typeof file === 'string' ? JSON.stringify({videoUrl: file, style, quality, resolution}) : new FormData();
   if (form instanceof FormData && typeof file !== 'string') {
     form.append('video', file); form.append('style', style); form.append('quality', quality);
+    if (resolution) form.append('resolution', resolution);
   }
+  const scope = operationUsageScope(operationId, 'depth-video', 'depth-video');
   const data = await postDepthFile('/api/generate/depth-video', form, signal, operationId);
   if (!data.taskId) throw generationRecoveryError(SUBMISSION_RECOVERY_HINT);
   recordModelUsage({
-    localTaskId: operationId,
+    localTaskId: operationId, scope, recordId: data.recordId,
     taskId: data.taskId,
     modelId: 'depth-video',
     modelName: `深度动作捕捉 (${style})`,

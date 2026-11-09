@@ -2,13 +2,16 @@ package catalog
 
 import (
 	"beike.local/cloud/src/backend/internal/platform/database"
+	"beike.local/cloud/src/backend/internal/platform/media"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
-
-	"beike.local/cloud/src/backend/internal/platform/media"
 )
 
 var ErrProductMissing = errors.New("记录不存在")
@@ -169,4 +172,295 @@ func loadProduct(ctx context.Context, db *sql.DB, workspace, id string) (map[str
 		"itemId": database.NullText(itemID), "title": database.NullText(title), "picUrl": database.NullText(picURL),
 		"detailUrls": database.NullText(detailURLs), "createdAt": database.FormatSQLiteTime(createdAt),
 	}, nil
+}
+
+func DeleteProduct(ctx context.Context, db *sql.DB, workspace, id, storageRoot string) error {
+	var pic, details sql.NullString
+	err := db.QueryRowContext(ctx, `
+		SELECT "picUrl", "detailUrls" FROM "Product" WHERE "id" = ? AND "workspaceId" = ?`, id, workspace).Scan(&pic, &details)
+	if err == sql.ErrNoRows {
+		return ErrProductMissing
+	}
+	if err != nil {
+		return err
+	}
+	removeLocalProductMedia(storageRoot, productMediaURLs(database.NullText(pic), database.NullText(details)))
+	result, err := db.ExecContext(ctx, `DELETE FROM "Product" WHERE "id" = ? AND "workspaceId" = ?`, id, workspace)
+	if err != nil {
+		return err
+	}
+	deleted, _ := result.RowsAffected()
+	if deleted != 1 {
+		return ErrProductMissing
+	}
+	return nil
+}
+
+func productMediaURLs(pic, details any) []string {
+	urls := []string{}
+	if text, ok := pic.(string); ok && text != "" {
+		urls = append(urls, text)
+	}
+	raw, ok := details.(string)
+	if !ok || raw == "" {
+		return urls
+	}
+	var parsed []any
+	if json.Unmarshal([]byte(raw), &parsed) != nil {
+		return urls
+	}
+	for _, item := range parsed {
+		if text, ok := item.(string); ok && text != "" {
+			urls = append(urls, text)
+		}
+	}
+	return urls
+}
+
+func removeLocalProductMedia(root string, urls []string) {
+	for _, raw := range urls {
+		target := deletableStorageFile(root, raw)
+		if target == "" {
+			continue
+		}
+		if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+			continue
+		}
+	}
+}
+
+func deletableStorageFile(root, raw string) string {
+	if strings.TrimSpace(root) == "" || !strings.HasPrefix(raw, "/storage/azhuo/") {
+		return ""
+	}
+	pathOnly := raw
+	if index := strings.IndexAny(pathOnly, "?#"); index >= 0 {
+		pathOnly = pathOnly[:index]
+	}
+	if strings.Contains(pathOnly, "%") {
+		return ""
+	}
+	relative, err := url.PathUnescape(strings.TrimPrefix(pathOnly, "/storage/"))
+	if err != nil || strings.Contains(relative, "\\") || strings.Contains(relative, "\x00") {
+		return ""
+	}
+	segments := strings.Split(relative, "/")
+	for _, segment := range segments {
+		if segment == "" || segment == ".." || segment == "." {
+			return ""
+		}
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return ""
+	}
+	current := realRoot
+	for _, segment := range segments {
+		current = filepath.Join(current, segment)
+		info, err := os.Lstat(current)
+		if err != nil || info.Mode()&os.ModeSymlink != 0 {
+			return ""
+		}
+	}
+	info, err := os.Lstat(current)
+	if err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	within, err := filepath.Rel(realRoot, current)
+	if err != nil || within == "." || strings.HasPrefix(within, "..") || filepath.IsAbs(within) {
+		return ""
+	}
+	return current
+}
+
+func productDetailObject(raw string) map[string]any {
+	var value any
+	if json.Unmarshal([]byte(raw), &value) != nil {
+		return nil
+	}
+	if object, ok := value.(map[string]any); ok {
+		return object
+	}
+	if list, ok := value.([]any); ok {
+		return map[string]any{"main": list}
+	}
+	return nil
+}
+
+func detailImageList(value any) []string {
+	result := []string{}
+	switch list := value.(type) {
+	case []string:
+		return list
+	case []any:
+		for _, item := range list {
+			if source, ok := item.(string); ok {
+				result = append(result, source)
+			}
+		}
+	}
+	return result
+}
+
+func detailImageKey(source string) string {
+	if image, ok := media.ParseProductImage(source); ok {
+		return image.Key
+	}
+	return source
+}
+
+// Generic product saves often send a flattened main array. Preserve known group
+// ownership and all omitted metadata instead of replacing the collected detail.
+func mergeProductDetail(previous, incoming string) string {
+	old, next := productDetailObject(previous), productDetailObject(incoming)
+	if next == nil {
+		if old != nil {
+			return previous
+		}
+		return incoming
+	}
+	if old == nil {
+		old = map[string]any{}
+	}
+	groups := []string{"main", "skus", "details"}
+	ownership := map[string]string{}
+	for _, group := range groups {
+		for _, source := range detailImageList(old[group]) {
+			key := detailImageKey(source)
+			if ownership[key] == "" {
+				ownership[key] = group
+			}
+		}
+	}
+	for key, value := range next {
+		if key != "main" && key != "skus" && key != "details" {
+			if value == nil {
+				continue
+			}
+			if key == "variantMetadata" && ReadProductVariantMetadata(value) == nil {
+				continue
+			}
+			old[key] = value
+		}
+	}
+	for _, group := range groups {
+		for _, source := range detailImageList(next[group]) {
+			key := detailImageKey(source)
+			owner := ownership[key]
+			if owner == "" {
+				owner = group
+				ownership[key] = group
+			}
+			old[owner] = append(detailImageList(old[owner]), source)
+		}
+	}
+	body, err := json.Marshal(old)
+	if err != nil {
+		return previous
+	}
+	cleaned, _ := cleanDetailURLs(string(body))
+	result, _ := cleaned.(string)
+	return result
+}
+
+// Keep the list cover on the same best-quality URL selected for its resource.
+func cleanProductCover(source string, detailURLs any) string {
+	cover, _, _ := media.ProductImageGroups([]string{source}, nil, nil)
+	text, _ := detailURLs.(string)
+	var groups struct {
+		Main, Skus, Details []string
+	}
+	_ = json.Unmarshal([]byte(text), &groups)
+	requested, valid := media.ParseProductImage(source)
+	first := ""
+	for _, addresses := range [][]string{groups.Main, groups.Skus, groups.Details} {
+		for _, address := range addresses {
+			if first == "" {
+				first = address
+			}
+			image, ok := media.ParseProductImage(address)
+			if (valid && ok && image.Key == requested.Key) || address == source {
+				return address
+			}
+		}
+	}
+	if len(cover) > 0 {
+		return cover[0]
+	}
+	return first
+}
+
+type ProductColorVariant struct {
+	ID        string   `json:"id"`
+	Label     string   `json:"label"`
+	Color     string   `json:"color,omitempty"`
+	SKUIDs    []string `json:"skuIds"`
+	ImageURLs []string `json:"imageUrls"`
+}
+
+type ProductVariantMetadata struct {
+	Version           int                   `json:"version"`
+	Variants          []ProductColorVariant `json:"variants"`
+	RequestedSKUID    string                `json:"requestedSkuId,omitempty"`
+	SelectedVariantID string                `json:"selectedVariantId,omitempty"`
+}
+
+// ReadProductVariantMetadata rejects malformed historical data without inventing evidence.
+func ReadProductVariantMetadata(value any) *ProductVariantMetadata {
+	body, err := json.Marshal(value)
+	if err != nil {
+		return nil
+	}
+	var result ProductVariantMetadata
+	if json.Unmarshal(body, &result) != nil || result.Version != 1 || result.Variants == nil {
+		return nil
+	}
+	ids := map[string]bool{}
+	for index := range result.Variants {
+		variant := &result.Variants[index]
+		variant.ID, variant.Label = strings.TrimSpace(variant.ID), strings.TrimSpace(variant.Label)
+		if variant.ID == "" || variant.Label == "" || ids[variant.ID] || variant.SKUIDs == nil || variant.ImageURLs == nil {
+			return nil
+		}
+		ids[variant.ID] = true
+	}
+	if result.SelectedVariantID != "" && !ids[result.SelectedVariantID] {
+		return nil
+	}
+	return &result
+}
+
+// AlignProductVariantImages keeps references on the actual complete catalog URL,
+// including a higher-quality copy owned by a different image group.
+func AlignProductVariantImages(metadata *ProductVariantMetadata, images []string) *ProductVariantMetadata {
+	if metadata == nil {
+		return nil
+	}
+	catalog := map[string]string{}
+	for _, source := range images {
+		if image, ok := media.ParseProductImage(source); ok {
+			catalog[image.Key] = source
+		} else {
+			catalog[source] = source
+		}
+	}
+	result := *metadata
+	result.Variants = make([]ProductColorVariant, 0, len(metadata.Variants))
+	for _, variant := range metadata.Variants {
+		urls := []string{}
+		seen := map[string]bool{}
+		for _, source := range variant.ImageURLs {
+			key := source
+			if image, ok := media.ParseProductImage(source); ok {
+				key = image.Key
+			}
+			if actual := catalog[key]; actual != "" && !seen[actual] {
+				urls = append(urls, actual)
+				seen[actual] = true
+			}
+		}
+		variant.ImageURLs = urls
+		result.Variants = append(result.Variants, variant)
+	}
+	return &result
 }

@@ -2,15 +2,14 @@ import './settingsWorkspace.css';
 import { CANVAS_SETTINGS_PAGES, clearQueuedSettingsSection, initialCanvasSettingsPage, peekQueuedSettingsSection, settingsSectionLabel, SETTINGS_NAV_ITEMS, type CanvasSettingsPage, type SettingsNavSection } from './model/settingsNavigation';
 import { CanvasPreview } from './components/SettingsPreview';
 import { PetSettingsPanel } from './components/pet/PetSettingsPanel';
-import { LanguageSettingsPanel } from './components/appearance/LanguageSettingsPanel';
-import { LibraryPreferencesPanel } from './components/LibraryPreferencesPanel';
 import { AppearanceSettingsPanel } from './components/appearance/AppearanceSettingsPanel';
-import { useI18n } from '@client/shared/i18n';
+import { useI18n, type SupportedLocale } from '@client/shared/i18n';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@client/shared/hooks/useToast';
-import { SettingsSidebar } from './components/SettingsSidebar';
-import { X } from 'lucide-react';
-import { useSettingsLeaveGuard } from './hooks/useSettingsLeaveGuard';
+import {
+  Activity, AudioLines, Bot, Check, FolderOpen, HardDrive, Languages, LayoutGrid, MessageSquare,
+  Palette, Plug, SunMedium, Video, X,
+} from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
 import { getUsageSummary, USAGE_LOG_EVENT, type UsageRange, type UsageSummary } from '@client/shared/utils/usageTracker';
@@ -21,17 +20,210 @@ import { ModelManagementPanel } from './components/models/ModelManagementPanel';
 import { MODEL_CHANNELS, type ModelChannel } from './model/modelManagement';
 import UsageTab from './tabs/UsageTab';
 import AddModelModal from './components/models/AddModelModal';
-import { useSystemConfigQuery } from './hooks/useSystemConfigQuery';
 import { useSettingsConfig } from './hooks/useSettingsConfig';
 import { useCustomModels } from './hooks/useCustomModels';
 import { useGatewayUser } from './hooks/useGatewayUser';
 import { ModalityHubView } from './components/modality/ModalityHubView';
 import { API_PROVIDERS_STORAGE_KEY, API_REMOVED_PROVIDERS_KEY, MODALITY_STORAGE_KEY_PREFIX, readEffectiveModalityModels, readStoredApiProviders, selectableModalityModels } from '@shared/domain/models/modalityStorage';
-import type { ModalityKind } from './model/modalityModelTypes';
+import type { ModalityKind } from './model/modalityModelStorage';
+import { useLibraryPreferences, useUpdateLibraryPreferences } from '@client/shared/api/credentialClient';
+import { SettingsToggle } from './components/SettingsControls';
+import { confirmAction } from '@client/shared/utils/confirmAction';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@client/shared/api/apiClient';
+import { SystemConfigResponseSchema } from '@shared/contracts/generate';
+
+const SECTION_ICONS = {
+  profile: Activity,
+  library: FolderOpen,
+  appearance: SunMedium,
+  api: Plug,
+  chat: MessageSquare,
+  image: Palette,
+  video: Video,
+  voice: AudioLines,
+  canvas: LayoutGrid,
+  pet: Bot,
+  language: Languages,
+  storage: HardDrive,
+} satisfies Record<SettingsNavSection, typeof LayoutGrid>;
+
+export function SettingsSidebar({
+  navSection,
+  setNavSection,
+  gatewayBalanceFormatted,
+  modalityCounts,
+}: {
+  navSection: SettingsNavSection;
+  setNavSection: (section: SettingsNavSection) => void;
+  gatewayBalanceFormatted?: number;
+  modalityCounts?: Partial<Record<SettingsNavSection, number>>;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <aside data-settings-sidebar className="settings-sidebar hidden md:flex w-52 xl:w-56 shrink-0 h-full flex-col overflow-hidden">
+      <div className="px-4 pt-5 pb-2">
+        <div className="px-2">{t('settings.globalSettings')}</div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
+        {SETTINGS_NAV_ITEMS.map(item => {
+          const Icon = SECTION_ICONS[item.id];
+          const active = navSection === item.id;
+          const profileBadge = item.id === 'profile' && gatewayBalanceFormatted !== undefined;
+          const countBadge = modalityCounts?.[item.id];
+          const displayLabel = t(`settings.nav.${item.id}`) || item.label;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={active ? 'page' : undefined}
+              onClick={() => setNavSection(item.id)}
+              className="w-full px-2.5 py-2 flex items-center justify-between gap-2"
+            >
+              <span className="flex items-center gap-2.5 min-w-0">
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="truncate">{displayLabel}</span>
+              </span>
+              {profileBadge ? (
+                <span className="settings-sidebar-badge text-emerald-700">{gatewayBalanceFormatted > 999 ? `${(gatewayBalanceFormatted / 1000).toFixed(1)}k` : gatewayBalanceFormatted.toFixed(1)}</span>
+              ) : countBadge !== undefined ? (
+                <span title="当前模型目录中启用渠道的线路数" className="settings-sidebar-badge text-slate-500 dark:text-slate-400">{countBadge}</span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+export function LanguageSettingsPanel() {
+  const { locale, setLocale, t, locales } = useI18n();
+
+  const handleSelectLocale = (targetLocale: SupportedLocale) => {
+    setLocale(targetLocale);
+  };
+
+  return (
+    <div className="w-full max-w-3xl animate-fade-in">
+      <div className="mb-6">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+          {t('settings.interfaceLanguage')}
+        </h2>
+        <p className="mt-1 text-xs text-slate-500 leading-relaxed dark:text-[#8E8E93]">
+          {t('settings.interfaceLanguageDesc')}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        {locales.map((item) => {
+          const isSelected = locale === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleSelectLocale(item.id)}
+              className={`group flex items-center justify-between h-13 px-4 rounded-xl text-sm transition-all duration-150 text-left select-none border ${
+                isSelected
+                  ? 'bg-[#eef1eb] border-slate-300 text-slate-900 font-medium shadow-xs dark:bg-[#26262B] dark:border-white/20 dark:text-white'
+                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/70 dark:bg-[#1B1B1E] dark:border-white/[0.08] dark:text-[#EDEDED] dark:hover:border-white/20 dark:hover:bg-[#222226]'
+              }`}
+            >
+              <span className="text-[13.5px] tracking-wide">{item.nativeLabel}</span>
+              {isSelected ? (
+                <Check className="h-4 w-4 text-slate-800 stroke-[2.2] shrink-0 dark:text-white" />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="mt-6 text-xs text-slate-400 leading-relaxed dark:text-[#636366]">
+        {t('settings.unmodifiedNotice')}
+      </p>
+    </div>
+  );
+}
+
+const systemConfigQueryKey = ['system', 'config'] as const;
+
+function useSystemConfigQuery(enabled = true) {
+  return useQuery({
+    queryKey: systemConfigQueryKey,
+    queryFn: async () => {
+      const res = await apiFetch('/api/system/config');
+      if (!res.ok) throw new Error(`配置加载失败 (${res.status})`);
+      const json = await res.json();
+      const parsed = SystemConfigResponseSchema.safeParse(json);
+      return parsed.success ? parsed.data : json;
+    },
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+function useSettingsLeaveGuard(dirty: boolean, leave: () => void, busy: boolean, showToast: (message: string) => void) {
+  const requestLeave = useCallback((navigate: () => void) => {
+    if (busy) { showToast('配置保存或存储迁移正在进行，请等待当前操作完成后再离开'); return; }
+    if (!dirty) { navigate(); return; }
+    void confirmAction('服务配置有未保存的更改。确定放弃更改并离开设置吗？').then((confirmed) => {
+      if (confirmed) navigate();
+    });
+  }, [dirty, busy, showToast]);
+  useEffect(() => {
+    if (!dirty && !busy) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    const handleNavigation = (event: Event) => {
+      event.preventDefault();
+      requestLeave((event as CustomEvent<{ navigate: () => void }>).detail.navigate);
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('app:before-navigate', handleNavigation);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('app:before-navigate', handleNavigation);
+    };
+  }, [dirty, busy, requestLeave]);
+  return useCallback(() => requestLeave(leave), [requestLeave, leave]);
+}
+
+const controls = [
+  { key: 'showEntry', label: '首页侧栏入口', hint: '关闭后，首页侧栏会隐藏资产库入口。你可以随时在这里恢复。', note: null },
+  { key: 'sharingEnabled', label: '跨工作区共享', hint: '双方都开启后，可以互相查看并复制对方的可共享素材和已确认脚本。', note: '关闭后停止新的共享，已复制到各工作区的内容仍可使用。' },
+] as const;
+
+function LibraryPreferencesPanel() {
+  const prefs = useLibraryPreferences();
+  const update = useUpdateLibraryPreferences();
+  return <section className="max-w-2xl" aria-label="工作区资产库设置">
+    <p className="mb-3 text-[13px] font-normal leading-5 text-[var(--settings-muted)]">以下设置仅应用于当前工作区。</p>
+    {prefs.isPending && <p role="status">正在读取设置…</p>}
+    {prefs.error && <p role="alert">{prefs.error.message} <button onClick={() => void prefs.refetch()}>重试</button></p>}
+    {prefs.data && <div className="divide-y divide-[var(--settings-border)] rounded-xl border border-[var(--settings-border)]">
+      {controls.map(({ key, label, hint, note }) => (
+        <div key={key} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 px-4 py-4">
+          <div>
+            <h2 className="text-sm font-medium leading-6 text-[var(--settings-text)]">{label}</h2>
+            <p className="mt-1 text-[13px] font-normal leading-5 text-[var(--settings-muted)]">{hint}</p>
+            {note && <p className="mt-1 text-[13px] font-normal leading-5 text-[var(--settings-muted)]">{note}</p>}
+          </div>
+          <SettingsToggle label={label} checked={prefs.data[key]} disabled={update.isPending || prefs.isError}
+            onChange={(value) => update.mutate({ [key]: value })} />
+        </div>
+      ))}
+    </div>}
+    {update.error && <p role="alert" className="mt-3 text-sm text-rose-600">{update.error.message}</p>}
+    {(update.isPending || update.isSuccess) && <p role="status" className="mt-3 text-xs text-slate-500">{update.isPending ? '正在保存…' : '工作区设置已保存'}</p>}
+  </section>;
+}
 
 function readModalityCounts(): Partial<Record<SettingsNavSection, number>> {
   const providers = readStoredApiProviders();
-  const kinds: ModalityKind[] = ['chat', 'image', 'video', 'three_d', 'music', 'voice', 'avatar'];
+  const kinds: ModalityKind[] = ['chat', 'image', 'video', 'voice'];
   return Object.fromEntries(kinds.map(kind => {
     const {models} = readEffectiveModalityModels(kind);
     return [kind, selectableModalityModels(models, providers).length];
@@ -145,7 +337,6 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
   const discoverModels = (channel: ModelChannel) => {
     if (channel === 'deepseek') { configureChannel(channel); return; }
     if (channel === 'openai') void models.handleOpenOpenAIDiscovery(config.openAIBaseUrl, config.openAIApiKey, config.openAIAllowInsecureHttp, true);
-    else if (channel === 'lianchi') void models.handleOpenLianchiDiscovery(config.lianchiApiKey, true);
     else void models.handleOpenGatewayDiscovery();
   };
 
@@ -257,7 +448,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
             <div className="flex-1 overflow-y-auto min-h-0 settings-page-scroll p-4 sm:p-6">
               <button type="button" onClick={() => setShowModelBoard(false)} className="mb-4 text-xs text-slate-500 hover:text-slate-900 dark:text-[#8E8E93] dark:hover:text-white">返回 API 接入</button>
               <ModelManagementPanel models={models} onAdd={openAddModel} onConfigure={configureChannel} onDiscover={discoverModels}
-                isDiscovering={models.isFetchingGateway || models.isFetchingOpenAI || models.isFetchingLianchi}
+                isDiscovering={models.isFetchingGateway || models.isFetchingOpenAI}
                 defaultRouteIds={[activeVisionModel, activeImageGenModel, activeVideoGenModel]} />
             </div>
           ) : navSection === 'api' || storageOpen ? (
@@ -279,7 +470,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
             <div className="flex-1 overflow-y-auto min-h-0 settings-page-scroll p-4 sm:p-6 lg:p-8">
               <div className="settings-page-content w-full min-w-0">
                 {navSection === 'canvas' && (canvasPage === 'pet' ? <PetSettingsPanel /> : <CanvasPreview page={canvasPage} />)}
-                {['chat', 'image', 'video', 'three_d', 'music', 'voice', 'avatar'].includes(navSection) && (
+                {['chat', 'image', 'video', 'voice'].includes(navSection) && (
                   <ModalityHubView
                     kind={navSection as ModalityKind}
                     showToast={showToast}
@@ -318,17 +509,17 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
         <GatewayModelModal
           isOpen={models.isGatewayModalOpen}
           onClose={() => models.setIsGatewayModalOpen(false)}
-          allGatewayModels={models.gatewaySource === 'lianchi' ? models.lianchiModels : models.gatewaySource === 'openai' ? models.openAIModels : models.allGatewayModels}
-          gatewayName={models.gatewaySource === 'lianchi' ? '联池' : models.gatewaySource === 'openai' ? (models.openAIModelSource === 'codex' ? 'Codex' : 'OpenAI') : 'Comfly'}
+          allGatewayModels={models.gatewaySource === 'openai' ? models.openAIModels : models.allGatewayModels}
+          gatewayName={models.gatewaySource === 'openai' ? (models.openAIModelSource === 'codex' ? 'Codex' : 'OpenAI') : 'Comfly'}
           channel={models.gatewaySource}
-          error={models.gatewaySource === 'lianchi' ? models.lianchiModelError : models.gatewaySource === 'openai' ? models.openAIModelError : models.gatewayModelError}
+          error={models.gatewaySource === 'openai' ? models.openAIModelError : models.gatewayModelError}
           onRefresh={() => discoverModels(models.gatewaySource)}
           activeModelIds={new Set(models.customModels.map(workflowModelRouteId))}
-          isLoading={models.gatewaySource === 'lianchi' ? models.isFetchingLianchi : models.gatewaySource === 'openai' ? models.isFetchingOpenAI : models.isFetchingGateway}
+          isLoading={models.gatewaySource === 'openai' ? models.isFetchingOpenAI : models.isFetchingGateway}
           onToggleAddModel={models.handleToggleGatewayModel}
           onAddModels={models.handleAddAllUsefulGatewayModels}
           onAddAllUsefulModels={() => {
-            models.handleAddAllUsefulGatewayModels(models.gatewaySource === 'lianchi' ? models.lianchiModels : models.gatewaySource === 'openai' ? models.openAIModels : models.allGatewayModels);
+            models.handleAddAllUsefulGatewayModels(models.gatewaySource === 'openai' ? models.openAIModels : models.allGatewayModels);
             models.setIsGatewayModalOpen(false);
           }}
         />

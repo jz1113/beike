@@ -21,8 +21,7 @@
   inset: 0 auto 0 0;
   width: calc(var(--effort-progress) * 100%);
   border-radius: 999px;
-  background: #7c3aed;
-  box-shadow: 0 0 12px rgba(124, 58, 237, 0.38);
+  background: #cbd0d8;
   transition: width .24s cubic-bezier(.2, .85, .25, 1.06);
 }
 .prompt-effort-ticks {
@@ -48,13 +47,13 @@
   border: 0;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(124, 58, 237, 0.08);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.08);
   transform: translate(-50%, -50%);
   transition: left .24s cubic-bezier(.2, .85, .25, 1.06), transform .18s, box-shadow .18s;
 }
 .prompt-effort-slider:active .prompt-effort-thumb {
   transform: translate(-50%, -50%) scale(1.06);
-  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.42);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.22);
 }
 .prompt-effort-range {
   position: absolute;
@@ -78,8 +77,7 @@ html.dark .prompt-effort-rail {
 }
 .dark .prompt-effort-fill,
 html.dark .prompt-effort-fill {
-  background: #a855f7;
-  box-shadow: 0 0 14px rgba(168, 85, 247, 0.5);
+  background: rgba(255, 255, 255, 0.2);
 }
 .dark .prompt-effort-ticks i,
 html.dark .prompt-effort-ticks i { background: rgba(255, 255, 255, 0.28); }
@@ -92,5 +90,5 @@ html.dark .prompt-effort-thumb {
 }
 .dark .prompt-effort-slider:active .prompt-effort-thumb,
 html.dark .prompt-effort-slider:active .prompt-effort-thumb {
-  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.55);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }

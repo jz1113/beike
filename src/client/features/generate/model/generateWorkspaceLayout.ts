@@ -1,7 +1,6 @@
 import type { GenerationTask } from '@client/store/appStoreTypes';
 import { groupTasksIntoBatches as groupTasksCore } from '@client/shared/utils/taskBatchGrouping';
-import { isDepthImageTask, isDepthVideoTask } from '@client/shared/media/generationTaskMedia';
-import { isGenerationVideoTask } from '@client/shared/media/generationTaskMedia';
+import { isDepthImageTask, isDepthVideoTask, isGenerationVideoTask } from '@client/shared/media/generationAttempt';
 
 export type TimeFilter = 'all' | 'today' | '7days' | '30days' | '90days' | 'custom';
 export type ModeFilter = 'all' | 'image' | 'video' | 'depth-image' | 'depth-video';

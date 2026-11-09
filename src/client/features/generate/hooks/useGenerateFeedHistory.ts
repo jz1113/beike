@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
+import { useViewVisibility } from '@client/shared/hooks/useSafeTimeout';
 import type { FlatBatchItem } from '../model/generateWorkspaceLayout';
 
 const NEAR_BOTTOM = 64;

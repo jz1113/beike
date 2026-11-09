@@ -123,6 +123,7 @@ func (loop *agentLoop) spawnSubagent(skillID, prompt string) string {
 	child.mu = &sync.Mutex{}
 	child.plan = &taskPlan{}
 	child.send = func(map[string]any) {}
+	child.items = nil
 	child.messages = []map[string]any{{"role": "user", "content": strings.TrimSpace(skillID + "\n" + prompt)}}
 	names := filterChildTools(loop.names, loop.box.mcp)
 	allowedName := map[string]bool{}

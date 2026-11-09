@@ -35,11 +35,16 @@ function isFrameMostlyBlank(canvas: HTMLCanvasElement): boolean {
 
 function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
   return new Promise((resolve) => {
-    const rvfc = (video as HTMLVideoElement & {
-      requestVideoFrameCallback?: (cb: () => void) => number;
-    }).requestVideoFrameCallback;
-    if (typeof rvfc === 'function') {
-      rvfc.call(video, () => resolve());
+    if (typeof video.requestVideoFrameCallback === 'function') {
+      // A detached, paused video can finish seeking without presenting another frame.
+      const callback = video.requestVideoFrameCallback(() => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      const timeout = setTimeout(() => {
+        video.cancelVideoFrameCallback(callback);
+        resolve();
+      }, 100);
       return;
     }
     requestAnimationFrame(() => {

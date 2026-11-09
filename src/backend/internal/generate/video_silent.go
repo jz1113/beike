@@ -54,7 +54,7 @@ func VideoSilent(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		rel := storage.WorkspaceKey("azhuo/generated/videos/w3-silent/"+videoDiagnosticDigest([]byte(recordID+"\x00"+source+"\x00v1"))+".mp4", workspaceOf(r))
-		output := storage.SafeWithin(storage.ResolveRoot(), rel)
+		output := storage.SafeWithin(veoStorageRoot(cfg), rel)
 		if output == "" {
 			fail(500, "成片保存位置无效")
 			return
@@ -102,7 +102,7 @@ func VideoSilent(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		data, err = os.ReadFile(temporary)
-		if err != nil || writeSilentDelivery(output, data) != nil {
+		if err != nil || writeVeoFile(output, data) != nil {
 			fail(500, "无声成片保存失败，模型原片已保留")
 			return
 		}
@@ -116,20 +116,7 @@ func validSilentDelivery(probe system.VideoProbe) bool {
 
 func readSilentSource(ctx context.Context, cfg config.Config, source, workspace string) ([]byte, error) {
 	if strings.HasPrefix(source, "/storage/") {
-		rel := strings.TrimPrefix(source, "/storage/")
-		if !storage.WorkspaceRel(rel, workspace, !cfg.Production()) {
-			return nil, errors.New("invalid storage scope")
-		}
-		file := storage.SafeWithin(storage.ResolveRoot(), rel)
-		if file == "" {
-			return nil, errors.New("invalid storage path")
-		}
-		input, err := os.Open(file)
-		if err != nil {
-			return nil, err
-		}
-		defer input.Close()
-		return readSilentBytes(input)
+		return readVeoMedia(ctx, cfg, source, workspace, veoVideoLimit)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)
 	if err != nil {
@@ -144,34 +131,9 @@ func readSilentSource(ctx context.Context, cfg config.Config, source, workspace 
 	if res.StatusCode != 200 || res.Header.Get("Content-Range") != "" {
 		return nil, errors.New("incomplete video")
 	}
-	return readSilentBytes(res.Body)
-}
-
-func readSilentBytes(r io.Reader) ([]byte, error) {
-	const maxVideo = 200 << 20
-	data, err := io.ReadAll(io.LimitReader(r, maxVideo+1))
-	if err != nil || len(data) == 0 || len(data) > maxVideo {
+	data, err := io.ReadAll(io.LimitReader(res.Body, veoVideoLimit+1))
+	if err != nil || len(data) == 0 || len(data) > veoVideoLimit {
 		return nil, errors.New("invalid video size")
 	}
 	return data, nil
-}
-
-func writeSilentDelivery(output string, data []byte) error {
-	dir := filepath.Dir(output)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
-	}
-	file, err := os.CreateTemp(dir, ".w3-delivery-*.mp4")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(file.Name())
-	_, err = file.Write(data)
-	if closeErr := file.Close(); err == nil {
-		err = closeErr
-	}
-	if err != nil {
-		return err
-	}
-	return os.Rename(file.Name(), output)
 }

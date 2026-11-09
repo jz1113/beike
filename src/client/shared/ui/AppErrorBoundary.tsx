@@ -2,6 +2,26 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 
+export interface AgentDocumentPayload {
+  filename: string;
+  content: string;
+  createdAt?: number;
+}
+
+type AgentDocumentListener = (document: AgentDocumentPayload | null) => void;
+const agentDocumentListeners = new Set<AgentDocumentListener>();
+
+export function openAgentDocument(document: AgentDocumentPayload) {
+  agentDocumentListeners.forEach((listener) => listener(document));
+}
+
+export function subscribeAgentDocument(listener: AgentDocumentListener) {
+  agentDocumentListeners.add(listener);
+  return () => {
+    agentDocumentListeners.delete(listener);
+  };
+}
+
 interface Props {
   children: ReactNode;
   title?: string;

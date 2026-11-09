@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import './LightRays.css';
 
-import { PIXEL_BUDGET, MAX_PULSES, ORIGINS, clamp, parseColor, link, smoother } from './lightRaysRenderer';
-import type { LightRaysProps, Settings } from './lightRaysRenderer';
+import { LightRaysProps, Settings, PIXEL_BUDGET, MAX_PULSES, ORIGINS, clamp, parseColor, link, smoother } from './lightRaysRenderer';
 export type { RaysOrigin, LightRaysProps } from './lightRaysRenderer';
 
 const LightRays = ({

@@ -1,8 +1,16 @@
 package system
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"image"
+	_ "image/gif"
+	"image/jpeg"
+	_ "image/png"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,6 +19,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
@@ -27,6 +36,12 @@ var audioURLPattern = regexp.MustCompile(`(?i)\.(mp3|wav|m4a|aac|ogg|oga|flac|op
 var videoHostPattern = regexp.MustCompile(`(?i)video|snssdk\.com|bytecdn\.cn|yximgs|kwaicdn|kwimgs|kwai\.|kuaishou|douyinvod`)
 
 var proxyCache = media.NewProxyCache(128<<20, 256, 15*time.Minute, 8)
+
+var proxySuffixes struct {
+	sync.Mutex
+	root   string
+	values []string
+}
 
 // PurgeExpiredProxyCache releases idle content from the API maintenance loop.
 func PurgeExpiredProxyCache() { proxyCache.PurgeExpired() }
@@ -103,9 +118,9 @@ func ProxyImage(cfg config.Config) http.Handler {
 		if serveCachedProxy(w, r, cacheKey) {
 			return
 		}
-		body, contentType, ok := cachedOrFetch(r, imageURL)
-		if !ok {
-			writeProxySVG(w, http.StatusBadGateway, "优质电商素材")
+		body, contentType, err := cachedOrFetch(r, imageURL)
+		if err != nil {
+			writeProxyImageError(w, err)
 			return
 		}
 		if width > 0 {
@@ -130,31 +145,57 @@ func proxyAuthorized(r *http.Request, cfg config.Config) bool {
 	return mediasign.Verify(raw, exp, sig, cfg.AccessToken) || mediasign.Verify("proxy-media-session", exp, sig, cfg.AccessToken)
 }
 
-func fetchProxy(r *http.Request, rawURL string, video bool) ([]byte, string, bool) {
+func fetchProxy(r *http.Request, rawURL string, video bool) ([]byte, string, error) {
 	request, err := http.NewRequestWithContext(r.Context(), http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, "", false
+		return nil, "", err
 	}
 	for key, value := range upstreamHeaders(rawURL, video, "") {
 		request.Header.Set(key, value)
 	}
 	response, err := network.SafeClient().Do(request)
-	if err != nil || response.StatusCode >= 400 {
-		if response != nil {
-			response.Body.Close()
-		}
-		return nil, "", false
+	if err != nil {
+		return nil, "", err
 	}
+	return readProxyImageResponse(response)
+}
+
+func readProxyImageResponse(response *http.Response) ([]byte, string, error) {
 	defer response.Body.Close()
+	if response.StatusCode >= 400 {
+		return nil, "", proxyImageStatusError(response.StatusCode)
+	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxProxyBytes+1))
-	if err != nil || len(body) > maxProxyBytes || len(body) == 0 {
-		return nil, "", false
+	if err != nil {
+		return nil, "", err
+	}
+	if len(body) > maxProxyBytes || len(body) == 0 {
+		return nil, "", errors.New("invalid remote image size")
 	}
 	contentType := response.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "image/jpeg"
+	if contentType == "" || strings.EqualFold(strings.TrimSpace(strings.SplitN(contentType, ";", 2)[0]), "application/octet-stream") {
+		contentType = http.DetectContentType(body)
 	}
-	return body, contentType, true
+	if !strings.HasPrefix(strings.ToLower(contentType), "image/") {
+		return nil, "", errors.New("remote response is not an image")
+	}
+	return body, contentType, nil
+}
+
+type proxyImageStatusError int
+
+func (status proxyImageStatusError) Error() string {
+	return fmt.Sprintf("remote image HTTP %d", status)
+}
+
+func writeProxyImageError(w http.ResponseWriter, err error) {
+	status, message := http.StatusBadGateway, "远程图片暂时无法加载，请稍后重试"
+	var upstream proxyImageStatusError
+	if errors.As(err, &upstream) && (upstream == http.StatusNotFound || upstream == http.StatusGone) {
+		status, message = int(upstream), "远程图片已不存在，请重新上传或生成"
+	}
+	// Error responses must not decode as images: img.onerror owns preview fallbacks.
+	writeProxyText(w, status, message)
 }
 
 func writeProxyBytes(w http.ResponseWriter, contentType, etag string, body []byte) {
@@ -243,4 +284,158 @@ func normalizeProxyURL(raw string) string {
 		return "https://img10.360buyimg.com/pcpubliccms/s1440x1440_" + trimmed
 	}
 	return trimmed
+}
+
+func RemoteHostAllowed(cfg config.Config, host string) bool {
+	return proxyHostAllowed(cfg, host)
+}
+
+func proxyHostAllowed(cfg config.Config, host string) bool {
+	host = strings.ToLower(strings.Trim(strings.TrimSuffix(host, "."), "[]"))
+	if host == "" {
+		return false
+	}
+	if !cfg.Production() {
+		if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0" || strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "172.") {
+			return true
+		}
+	}
+	if network.PrivateIP(host) {
+		return false
+	}
+	// Permit the exact result hosts published for Metaso H3 and Omni Flash.
+	if host == "files.metaso.cn" || host == "oss-us.file-download.life" {
+		return true
+	}
+	for _, suffix := range configuredProxyHosts() {
+		if host == suffix || strings.HasSuffix(host, "."+suffix) {
+			return true
+		}
+	}
+	for _, suffix := range loadProxySuffixes(cfg.Root) {
+		if host == suffix || strings.HasSuffix(host, "."+suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func configuredProxyHosts() []string {
+	hosts := []string{}
+	for _, key := range []string{
+		"S3_PUBLIC_DOMAIN", "S3_ENDPOINT", "R2_PUBLIC_DOMAIN",
+		"AI_DRAWING_BASE_URL", "AI_DRAWING_API_BASE_URL", "AI_API_BASE", "AI_BASE_URL", "AI_GATEWAY_URL",
+		"OPENAI_BASE_URL", "OPENAI_API_BASE",
+		"ANTHROPIC_BASE_URL", "GEMINI_BASE_URL", "DEEPSEEK_BASE_URL",
+		"MIDJOURNEY_BASE_URL", "COMFYUI_BASE_URL",
+		"ONEAPI_BASE_URL", "NEWAPI_BASE_URL",
+	} {
+		raw := strings.TrimSpace(os.Getenv(key))
+		if raw == "" {
+			continue
+		}
+		raw = strings.TrimPrefix(strings.TrimPrefix(raw, "https://"), "http://")
+		raw = strings.Split(raw, "/")[0]
+		raw = strings.Split(raw, ":")[0]
+		if raw != "" {
+			hosts = append(hosts, strings.ToLower(raw))
+		}
+	}
+	return hosts
+}
+
+func loadProxySuffixes(root string) []string {
+	proxySuffixes.Lock()
+	defer proxySuffixes.Unlock()
+	if proxySuffixes.root == root && proxySuffixes.values != nil {
+		return proxySuffixes.values
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "src/shared/data/remote-host-suffixes.json"))
+	payload := struct {
+		Suffixes []string `json:"suffixes"`
+	}{}
+	if err == nil {
+		_ = json.Unmarshal(raw, &payload)
+	}
+	proxySuffixes.root = root
+	proxySuffixes.values = payload.Suffixes
+	return payload.Suffixes
+}
+
+func proxyThumbWidth(r *http.Request) int {
+	thumb := r.URL.Query().Get("thumb") == "1" || r.URL.Query().Get("thumb") == "true"
+	raw := r.URL.Query().Get("w")
+	if raw == "" {
+		if thumb {
+			return 640
+		}
+		return 0
+	}
+	width, err := strconv.Atoi(raw)
+	if err != nil {
+		width = 640
+	}
+	if width < 80 {
+		return 80
+	}
+	if width > 1920 {
+		return 1920
+	}
+	return width
+}
+
+func serveCachedProxy(w http.ResponseWriter, r *http.Request, key string) bool {
+	cached, ok := proxyCache.Load(key)
+	if !ok {
+		return false
+	}
+	entry := cached
+	if r.Header.Get("If-None-Match") == entry.ETag {
+		w.Header().Set("ETag", entry.ETag)
+		w.Header().Set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800")
+		w.WriteHeader(http.StatusNotModified)
+		return true
+	}
+	writeProxyBytes(w, entry.ContentType, entry.ETag, entry.Body)
+	return true
+}
+
+func cachedOrFetch(r *http.Request, imageURL string) ([]byte, string, error) {
+	return proxyCache.FetchWithError(r.Context(), imageURL, func() ([]byte, string, error) {
+		return fetchProxy(r, imageURL, false)
+	})
+}
+
+func resizeProxyThumb(body []byte, width int) ([]byte, string, bool) {
+	img, _, err := image.Decode(bytes.NewReader(body))
+	if err != nil {
+		return nil, "", false
+	}
+	bounds := img.Bounds()
+	if bounds.Dx() <= width {
+		return nil, "", false
+	}
+	height := bounds.Dy() * width / bounds.Dx()
+	if height < 1 {
+		height = 1
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, width, height))
+	scaleNearest(dst, img)
+	var encoded bytes.Buffer
+	if err := jpeg.Encode(&encoded, dst, &jpeg.Options{Quality: 82}); err != nil {
+		return nil, "", false
+	}
+	return encoded.Bytes(), "image/jpeg", true
+}
+
+func scaleNearest(dst *image.RGBA, src image.Image) {
+	bounds := dst.Bounds()
+	source := src.Bounds()
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		sy := source.Min.Y + (y-bounds.Min.Y)*source.Dy()/bounds.Dy()
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			sx := source.Min.X + (x-bounds.Min.X)*source.Dx()/bounds.Dx()
+			dst.Set(x, y, src.At(sx, sy))
+		}
+	}
 }

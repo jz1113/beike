@@ -1,7 +1,7 @@
-import { listApprovedModels } from './modelCatalog';
-import type { TextProtocol } from './textProtocol';
+import { DEFAULT_MULTIMODAL_MODEL_ID, listApprovedModels } from './modelCatalog';
+import type { TextProtocol } from './deepseek';
 
-export type ModalityStorageKind = 'chat' | 'image' | 'video' | 'three_d' | 'music' | 'voice' | 'avatar';
+export type ModalityStorageKind = 'chat' | 'image' | 'video' | 'voice';
 
 export interface StoredModalityModelItem {
   id: string;
@@ -48,8 +48,8 @@ function catalogSeeds(kind: 'chat' | 'image' | 'video', ids: readonly string[]):
 /** 设置页与前台共用的模态默认模型。空列表和占位项会补回这些模型；用户解除过的种子不会再自动补回。 */
 export const DEFAULT_MODALITY_MODELS: Record<ModalityStorageKind, DefaultModalityModel[]> = {
   chat: [
-    seed('chat_openai_gpt', 'GPT', 'chat', 'openai', 'gpt-5.6-luna'),
-    seed('chat_google_gemini', 'Gemini', 'chat', 'google', 'gemini-3-flash-preview-thinking-128', { isDefault: true }),
+    seed('chat_openai_gpt', 'GPT', 'chat', 'openai', DEFAULT_MULTIMODAL_MODEL_ID, { isDefault: true }),
+    seed('chat_google_gemini', 'Gemini', 'chat', 'google', 'gemini-3-flash-preview-thinking-128'),
     seed('chat_anthropic_claude', 'Claude', 'chat', 'anthropic', 'claude-3-7-sonnet-20250219'),
     seed('chat_xai_grok', 'Grok', 'chat', 'xai', 'grok-4.6'),
     seed('chat_deepseek', 'DeepSeek', 'chat', 'deepseek', 'deepseek-chat'),
@@ -103,14 +103,6 @@ export const DEFAULT_MODALITY_MODELS: Record<ModalityStorageKind, DefaultModalit
       'viduq3-turbo',
     ]),
   ],
-  three_d: [
-    seed('3d_hunyuan_fal', 'Hunyuan 3D', 'three_d', 'hunyuan', 'fal-ai/hunyuan-3d/v3.1/pro', { isDefault: true }),
-  ],
-  music: [
-    seed('music_suno', 'Suno', 'music', 'suno', 'suno', { isDefault: true }),
-    seed('music_elevenlabs', 'ElevenLabs', 'music', 'elevenlabs', 'elevenlabs-music'),
-    seed('music_minimax', 'MiniMax Music', 'music', 'minimax', 'minimax-music'),
-  ],
   voice: [
     seed('voice_minimax', 'MiniMax Speech', 'voice', 'minimax', 'speech-2.8-hd', { isDefault: true }),
     seed('voice_xai', 'xAI Voice', 'voice', 'xai', 'grok-voice'),
@@ -118,5 +110,4 @@ export const DEFAULT_MODALITY_MODELS: Record<ModalityStorageKind, DefaultModalit
     seed('voice_google', 'Google Voice', 'voice', 'google', 'gemini-tts'),
     seed('voice_bytedance', '字节语音', 'voice', 'bytedance', 'doubao-tts'),
   ],
-  avatar: [],
 };

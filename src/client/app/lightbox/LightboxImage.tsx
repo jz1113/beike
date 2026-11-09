@@ -1,6 +1,51 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { resolveLightboxImageSources } from './lightboxImageSources';
+import { proxyMediaUrl } from '@client/shared/api/apiClient';
+
+function imageIdentity(source: string, base: string): string {
+  try {
+    const url = new URL(source, base);
+    if (url.pathname === '/api/system/proxy-image') {
+      const original = url.searchParams.get('url');
+      if (original) return new URL(original, base).href;
+    }
+    return url.href;
+  } catch {
+    return source;
+  }
+}
+
+/** Reuse decoded images, including an earlier proxy signature or direct fallback. */
+export function findLoadedImagePreview(source: string) {
+  if (typeof document === 'undefined' || !document.images) return null;
+  const identity = imageIdentity(source, document.baseURI);
+  const loaded = Array.from(document.images)
+    .filter((image) => image.complete && image.naturalWidth > 0 &&
+      imageIdentity(image.currentSrc || image.src, document.baseURI) === identity)
+    .sort((a, b) => b.naturalWidth - a.naturalWidth)[0];
+  if (!loaded) return null;
+
+  const src = loaded.currentSrc || loaded.src;
+  const url = new URL(src, document.baseURI);
+  const isThumbnail = url.pathname === '/api/system/proxy-image' &&
+    (url.searchParams.has('thumb') || url.searchParams.has('w'));
+  return { src, width: loaded.naturalWidth, height: loaded.naturalHeight, isThumbnail };
+}
+
+/** Reuse the actual decoded feed image, including its direct/proxy fallback URL. */
+export function resolveLightboxImageSources(resultUrl: string) {
+  const fullSource = proxyMediaUrl(resultUrl, { width: 1920 });
+  const fallbackSources = [...new Set([fullSource, resultUrl])];
+  const loaded = findLoadedImagePreview(proxyMediaUrl(resultUrl));
+  if (!loaded) return { sources: fallbackSources, preview: null };
+
+  const { src, isThumbnail, width, height } = loaded;
+  return {
+    // Direct originals are already in the browser cache; avoid fetching them again via the server.
+    sources: isThumbnail ? fallbackSources : [src, ...fallbackSources.filter((source) => source !== src)],
+    preview: { src, width, height },
+  };
+}
 
 /** Mounted with a URL key so task metadata updates cannot hide an already loaded image. */
 export function LightboxImage({ resultUrl, alt }: { resultUrl: string; alt: string }) {

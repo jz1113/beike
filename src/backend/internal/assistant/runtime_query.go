@@ -90,6 +90,9 @@ func readTurnSnapshot(ctx context.Context, cfg config.Config, workspace, turnID 
 	if task != nil {
 		snapshot["task"] = task
 	}
+	if widget, ok := stored["productWidget"].(map[string]any); ok {
+		snapshot["productWidget"] = widget
+	}
 	return snapshot, nil
 }
 

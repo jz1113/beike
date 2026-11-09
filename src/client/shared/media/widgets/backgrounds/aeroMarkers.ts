@@ -1,6 +1,5 @@
-import type { AeroState } from './aeroState';
+import type { AeroResources, AeroState } from './aeroResources';
 import type { AeroPaths } from './aeroPaths';
-import type { AeroResources } from './aeroResources';
 import { SAMPLES, CAMERA, DEPTHS, FADE, LEVELS, INTRO_SECONDS, MARKER_FLOATS, MARKER_PHASES, clamp, smoother, latticeHash, AeroSettings } from './aeroShardModel';
 export function updateAeroMarkers(context: {
   state: AeroState;

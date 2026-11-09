@@ -160,7 +160,7 @@ export default function PromptBarUploadMenu({
         }}
         className="w-full px-3 py-2 rounded-xl text-[13px] font-normal text-slate-800 dark:text-slate-100 hover:text-slate-950 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10 flex items-center transition-colors cursor-pointer"
       >
-        <span>资产库</span>
+        <span>历史或素材</span>
       </button>
 
       <button

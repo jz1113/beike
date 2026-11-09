@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"beike.local/cloud/src/backend/internal/gateway"
 	"bytes"
 	"context"
 	"fmt"
@@ -13,8 +14,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"beike.local/cloud/src/backend/internal/gateway"
 )
 
 func omniFlash(model string) bool {
@@ -130,4 +129,38 @@ func omniVideoBytes(ctx context.Context, ref, workspace string, production bool)
 		return nil, imageEditPrepareError{"参考视频为空、无法读取或超过当前 32MB 上传上限"}
 	}
 	return data, nil
+}
+
+// Gemini Omni binds image/video roles through documented source/reference tags.
+func omniFlashRolePrompt(prompt, mode string, imageCount, videoCount int) string {
+	var sources, references, parts []string
+	for index := 0; index < imageCount; index++ {
+		if mode == "first_frame" || mode == "first_last_frame" {
+			role := "FIRST_FRAME"
+			if index > 0 {
+				role = "LAST_FRAME"
+			}
+			sources = append(sources, fmt.Sprintf("<%s>@Image%d", role, index+1))
+		} else {
+			references = append(references, fmt.Sprintf("<IMAGE_REF_%d>@Image%d", index, index+1))
+		}
+	}
+	for index := 0; index < videoCount; index++ {
+		if index == 0 && (mode == "edit" || mode == "extend") {
+			role := "VIDEO_0"
+			if mode == "extend" {
+				role = "PREVIOUS_VIDEO"
+			}
+			sources = append(sources, "<"+role+">@Video1")
+		} else {
+			references = append(references, fmt.Sprintf("<VIDEO_REF_%d>@Video%d", index, index+1))
+		}
+	}
+	if len(sources) > 0 {
+		parts = append(parts, "[# Sources "+strings.Join(sources, " ")+"]")
+	}
+	if len(references) > 0 {
+		parts = append(parts, "[# References "+strings.Join(references, " ")+"]")
+	}
+	return strings.Join(append(parts, prompt), "\n")
 }

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { ModalityKind, ModalityModelItem } from '../../model/modalityModelTypes';
+import type { ModalityKind, ModalityModelItem } from '../../model/modalityModelStorage';
 import {
   MODALITY_TITLES,
   MODALITY_VENDORS_BY_KIND,

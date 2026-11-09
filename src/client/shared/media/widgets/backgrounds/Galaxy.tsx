@@ -3,8 +3,7 @@
 import { useEffect, useRef } from 'react';
 import './Galaxy.css';
 
-import { MAX_LAYERS, MAX_COLORS, INTRO_SECONDS, clamp, keyOf, start, finish } from './galaxyRenderer';
-import type { GalaxyProps, Settings, Variant } from './galaxyRenderer';
+import { GalaxyProps, Settings, Variant, MAX_LAYERS, MAX_COLORS, INTRO_SECONDS, clamp, keyOf, start, finish } from './galaxyRenderer';
 export type { GalaxyDirection, GalaxyProps } from './galaxyRenderer';
 
 const Galaxy = ({

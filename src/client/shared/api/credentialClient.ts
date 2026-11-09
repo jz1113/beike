@@ -1,10 +1,70 @@
-import { writeLocalConfig } from './localConfigStorage';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { libraryPreferencesSchema, type LibraryPreferences } from '@shared/contracts/assistant';
+import { apiRequest } from './apiRequest';
+
+/** Save one related group, restoring its previous values if any write fails. */
+export function writeLocalConfig(values: Readonly<Record<string, string | null>>): void {
+  const previous = new Map<string, string | null>();
+  const written: string[] = [];
+  try {
+    for (const key of Object.keys(values)) previous.set(key, localStorage.getItem(key));
+    for (const [key, value] of Object.entries(values)) {
+      written.push(key);
+      if (value === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, value);
+    }
+  } catch {
+    let restored = true;
+    for (const key of written.reverse()) {
+      try {
+        const value = previous.get(key);
+        if (value === null || value === undefined) localStorage.removeItem(key);
+        else localStorage.setItem(key, value);
+      } catch { restored = false; }
+    }
+    throw new Error(restored
+      ? '本地配置保存失败，请检查存储权限或可用空间后重试'
+      : '本地配置保存失败，部分更改未能还原，请恢复存储权限后重新保存');
+  }
+}
+
+const libraryPreferencesKey = ['library-preferences'] as const;
+const libraryPreferencesEndpoint = '/api/library/preferences';
+
+async function preferencesResponse(response: Response) {
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || '无法读取工作区资产库设置');
+  return libraryPreferencesSchema.parse(data);
+}
+
+export function useLibraryPreferences() {
+  return useQuery({
+    queryKey: libraryPreferencesKey,
+    queryFn: async ({ signal }) => preferencesResponse(await apiRequest('GET', libraryPreferencesEndpoint, { signal })),
+  });
+}
+
+export function useUpdateLibraryPreferences() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: Partial<LibraryPreferences>) => preferencesResponse(await apiRequest('PATCH', libraryPreferencesEndpoint, {
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+    })),
+    onSuccess: async (preferences, patch) => {
+      await client.cancelQueries({ queryKey: libraryPreferencesKey });
+      client.setQueryData(libraryPreferencesKey, preferences);
+      if (patch.sharingEnabled !== undefined) {
+        await client.cancelQueries({ queryKey: ['shared-materials'] });
+        await client.invalidateQueries({ queryKey: ['shared-materials'] });
+      }
+    },
+  });
+}
 
 export type CredentialKey =
   | 'ai_api_key'
   | 'deepseek_api_key'
   | 'openai_api_key'
-  | 'lianchi_api_key'
   | 'image_api_key'
   | 'wanbang_api_key'
   | 'wanbang_api_secret'
@@ -20,7 +80,6 @@ const LEGACY_LOCAL_KEYS: Record<CredentialKey, string> = {
   ai_api_key: 'ai_api_key',
   deepseek_api_key: 'deepseek_api_key',
   openai_api_key: 'openai_api_key',
-  lianchi_api_key: 'lianchi_api_key',
   image_api_key: 'image_api_key',
   wanbang_api_key: 'wanbang_api_key',
   wanbang_api_secret: 'wanbang_api_secret',

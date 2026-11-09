@@ -1,8 +1,14 @@
-import React, { createContext, useMemo, useRef } from 'react';
-import { getGenerationProgress } from '@client/shared/utils/generationProgress';
+import React, { createContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useDocumentHidden, useViewVisibility } from '@client/shared/hooks/useSafeTimeout';
+import './aiGeneratingCard.css';
+
+/** Textual stages and counters must not masquerade as a percentage. */
+function getGenerationProgress(raw: unknown): number | undefined {
+  const value = typeof raw === 'number' ? raw : typeof raw === 'string' && /^\s*\d+(?:\.\d+)?\s*%?\s*$/.test(raw) ? Number(raw.replace('%', '').trim()) : NaN;
+  return Number.isFinite(value) ? Math.min(99, Math.max(0, Math.round(value))) : undefined;
+}
 
 interface AIGeneratingCardProps {
-  statusText?: string;
   task?: {
     id?: string;
     model?: string;
@@ -24,6 +30,7 @@ interface AIGeneratingCardProps {
   isVideo?: boolean;
   className?: string;
   embedded?: boolean;
+  statusText?: string;
   /** lite=轻量 CSS 动效；premium=高级动效 */
   variant?: 'lite' | 'premium';
 }
@@ -59,80 +66,93 @@ export function GeneratingEffectsProvider({ children }: { children: React.ReactN
   return <PremiumSlotContext.Provider value={value}>{children}</PremiumSlotContext.Provider>;
 }
 
-/**
- * 🌟 即梦原版浅天蓝水漾柔光生成中卡片（像素级还原即梦原版）
- * 包含：柔和天蓝渐变、呼吸光晕、表面流动扫光、微细进度光条、左上角进度胶囊
- */
-function SoftSkyGeneratingCard({
+/** 画布同款黑底粒子扫光；离开可见区域或切到后台时暂停。 */
+function CanvasGeneratingCard({
   className = '',
   formattedProgress,
   showProgressBadge = false,
   badgePosition = 'left',
   statusHint,
+  embedded,
+  statusText,
 }: {
   className?: string;
   formattedProgress: string;
   showProgressBadge?: boolean;
   badgePosition?: 'left' | 'right';
   statusHint?: string;
+  embedded?: boolean;
+  statusText?: string;
 }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(true);
+  const hidden = useDocumentHidden();
+  const visible = useViewVisibility();
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting));
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
   return (
     <div
-      className={`relative w-full h-full overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#E6F1FE] via-[#D8E8FD] to-[#EDF4FE] dark:from-[#0F172A] dark:via-[#161B26] dark:to-[#0B0F19] select-none border border-sky-200/60 dark:border-indigo-500/20 shadow-2xs ${className}`.trim()}
+      ref={rootRef}
+      className={`ai-generating-card${embedded ? ' ai-generating-card--embedded' : ''} ${className}`.trim()}
+      data-active={inView && visible && !hidden}
+      role="status"
+      aria-busy="true"
+      aria-label={statusText || '正在生成'}
     >
-      {/* 1. 柔和呼吸微光光晕 */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-1/4 -left-1/4 w-4/5 h-4/5 rounded-full bg-sky-200/50 dark:bg-indigo-600/20 blur-2xl animate-pulse" />
-        <div className="absolute -bottom-1/4 -right-1/4 w-4/5 h-4/5 rounded-full bg-indigo-200/40 dark:bg-purple-600/20 blur-2xl animate-pulse [animation-delay:1.2s]" />
+      <div className="ai-generating-decoration" aria-hidden="true">
+        <div className="ai-generating-empty" />
+        <div className="ai-generating-shadow-layer-empty" />
+        <div className="ai-generating-motion">
+          <div className="ai-generating-grid-stars" />
+          <div className="ai-generating-grid-sweep" />
+          <div className="ai-generating-sweep-glow" />
+          <div className="ai-generating-burst" />
+          <div className="ai-generating-dither" />
+        </div>
       </div>
-
-      {/* 2. 表面白光流动扫光 (Shimmer) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="w-full h-full bg-gradient-to-r from-transparent via-white/35 dark:via-white/10 to-transparent -translate-x-full animate-[shimmerMove_3s_ease-in-out_infinite]" />
-      </div>
-
-      {/* 3. 底部极细动态进度光条 */}
-      <div className="absolute inset-x-0 bottom-0 h-1 bg-sky-200/40 dark:bg-indigo-950/60 overflow-hidden">
-        <div className="h-full w-1/3 bg-gradient-to-r from-sky-400 to-indigo-500 rounded-full animate-[shimmerMove_2s_ease-in-out_infinite]" />
-      </div>
-
-      {/* 4. 根据真实进度展示百分比 */}
       {showProgressBadge && (
-        <div className={`absolute top-2.5 ${badgePosition === 'right' ? 'right-2.5' : 'left-2.5'} z-20 px-2 py-0.5 rounded-lg bg-white/80 dark:bg-black/60 backdrop-blur-md border border-white/80 dark:border-white/10 shadow-2xs select-none pointer-events-none animate-in fade-in zoom-in-95 duration-150`}>
-          <span className="text-slate-800 dark:text-slate-100 font-semibold text-[11px] leading-tight font-mono-nums tabular-nums tracking-tight">
+        <div className={`ai-generating-progress ai-generating-progress--${badgePosition}`}>
+          <span>
             {formattedProgress}
           </span>
         </div>
       )}
-      {statusHint && (
-        <div className="absolute inset-x-3 bottom-3 z-10 rounded-lg bg-white/85 dark:bg-slate-900/85 px-2 py-1.5 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300" role="status">
-          {statusHint}
+      {(statusText || statusHint) && (
+        <div className="ai-generating-caption">
+          {statusText && <span>{statusText}</span>}
+          {statusHint && <span>{statusHint}</span>}
         </div>
       )}
     </div>
   );
 }
 
-/**
- * 🌟 AI 生成中卡片入口组件
- */
+/** 跨功能共用的生成预览。 */
 function AIGeneratingCard({
-  statusText,
   task,
   progressNumber,
   showProgressBadge = false,
   badgePosition = 'left',
   className = '',
+  embedded,
+  statusText,
 }: AIGeneratingCardProps) {
   const progress = getGenerationProgress(progressNumber ?? task?.progress);
 
   return (
-    <SoftSkyGeneratingCard
+    <CanvasGeneratingCard
       className={className}
+      embedded={embedded}
+      statusText={statusText}
       formattedProgress={progress === undefined ? '' : `${progress}%`}
       showProgressBadge={showProgressBadge && progress !== undefined}
       badgePosition={badgePosition}
-      statusHint={task?.submissionRecoveryRequired ? '正在核对原任务，请勿重复提交' : task?.failReason || statusText}
+      statusHint={task?.submissionRecoveryRequired ? '正在核对原任务，请勿重复提交' : task?.failReason}
     />
   );
 }

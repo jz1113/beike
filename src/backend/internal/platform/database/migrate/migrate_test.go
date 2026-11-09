@@ -10,6 +10,10 @@ import (
 
 func TestChecksumsMatchNodeLedger(t *testing.T) {
 	want := map[string]string{
+		"20261109_01_collection_cache":                         "075a20d403a4283bc66d8a80d43936c1dcb75596b74b17b6e500012ed3adab45",
+		"20261106_01_canvas_drafts":                            "7bf64d99a09af2b82c5d34ff7f1111d109fc0069d1f711640e375d518ac7c199",
+		"20261105_01_generation_submissions":                   "9b700ddd9bc3ba80c3e5cdc60a7ce8006d684b7cac00205a427981239e086afd",
+		"20261104_01_image_task_route":                         "536671fc3240544f8581cdb8b25c30a604ca48f9e9d5e948572221a557e011a9",
 		"20261103_03_library_preferences":                      "3ae477a30011696caa2e67383d612bffa8bb2f85fb7bb12760186675740e6f96",
 		"20261103_02_sales_prompt_template_version":            "a986f484fd3d7455a55bb0119de20215aaa0c6c3413d863b2457a69872256d5d",
 		"20261103_01_sales_media_jobs":                         "3b2499942888b499b4bb895d9ffd28b5c99fc831dff4daf8fd8712c61b293faf",

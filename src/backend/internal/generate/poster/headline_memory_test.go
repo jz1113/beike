@@ -148,7 +148,7 @@ func TestHeadlineDesignInjectsAdoptedMemory(t *testing.T) {
 
 	response := httptest.NewRecorder()
 	request := `{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"originalTitle":"台灯","coverTitle":"台灯","batchId":"batch_1","itemId":"item_1","itemTitle":"台灯很好用","previousDesign":"上一张是深底黄字","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
-	HeadlineDesign(config.Config{NodeEnv: "development", DatabaseURL: cfg.DatabaseURL}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(request)))
+	headlineDesignTestHandler(t, config.Config{NodeEnv: "development", DatabaseURL: cfg.DatabaseURL}).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(request)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("design %d %s", response.Code, response.Body.String())
 	}
@@ -277,7 +277,7 @@ func TestDesignUsesOnlyRequestedSample(t *testing.T) {
 	previous := gateway.ModelHTTP
 	gateway.ModelHTTP = func() *http.Client { return server.Client() }
 	t.Cleanup(func() { gateway.ModelHTTP = previous })
-	handler := HeadlineDesign(config.Config{NodeEnv: "development", DatabaseURL: cfg.DatabaseURL})
+	handler := headlineDesignTestHandler(t, config.Config{NodeEnv: "development", DatabaseURL: cfg.DatabaseURL})
 	request := `{"imageUrls":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="],"originalTitle":"台灯","coverTitle":"台灯","memorySampleId":"sample_old","textProtocol":"openai","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/headline-design", strings.NewReader(request)))

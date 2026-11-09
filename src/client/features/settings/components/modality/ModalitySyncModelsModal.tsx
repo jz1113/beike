@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { ModalityChannelOption, ModalityKind, ModalityModelItem } from '../../model/modalityModelTypes';
-import { MODALITY_TITLES, isModelMatchModality, compareModelVersionsDesc } from '../../model/modalityMeta';
+import type { ModalityChannelOption, ModalityKind, ModalityModelItem } from '../../model/modalityModelStorage';
+import { MODALITY_TITLES, isModelMatchModality, isModalitySyncCandidate, modalitySyncCandidateKey, compareModelVersionsDesc } from '../../model/modalityMeta';
 import { groupModelsByGeneration } from '@shared/domain/models/modelGrouping';
 import { describeSyncModels, ModalitySyncModelPicker } from './ModalitySyncModelPicker';
 import { ModalitySyncChannelPicker } from './ModalitySyncChannelPicker';
-import { useSettingsDialogFocus } from '../../hooks/useSettingsDialogFocus';
+import { useSettingsDialogFocus } from '../../hooks/useApiProviders';
 import { CheckCheck, Eye, EyeOff, RotateCcw, RotateCw, Search, Sparkles, X } from 'lucide-react';
 
 interface Props {
@@ -55,30 +55,35 @@ export function ModalitySyncModelsModal({
     [currentModels, channelId],
   );
 
-  // 本次全量目录，加上本渠道已接入但远端没有的模型。确认同步按这份名单解除，不受当前标签和搜索影响。
+  // 合格的远端与本渠道模型共同组成同步范围，旧配置不会因候选筛选被解除。
   const catalogIds = useMemo(() => {
     const seen = new Set<string>();
     const ids: string[] = [];
-    for (const modelId of remoteModels) {
+    const savedIds = scopedModels.map(({ modelId }) => modelId);
+    const orderedRemoteIds = kind === 'video'
+      ? remoteModels.toSorted((a, b) => {
+        const isAlias = (id: string) => id.trim().toLowerCase() !== modalitySyncCandidateKey(id, kind);
+        return Number(isAlias(a)) - Number(isAlias(b));
+      })
+      : remoteModels;
+    const sourceIds = kind === 'video' || kind === 'voice'
+      ? [...savedIds, ...orderedRemoteIds]
+      : [...orderedRemoteIds, ...savedIds];
+    for (const modelId of sourceIds) {
       const trimmed = modelId.trim();
-      if (!trimmed || seen.has(trimmed)) continue;
-      seen.add(trimmed);
-      ids.push(trimmed);
-    }
-    for (const model of scopedModels) {
-      const trimmed = model.modelId.trim();
-      if (!trimmed || seen.has(trimmed)) continue;
-      seen.add(trimmed);
+      const key = modalitySyncCandidateKey(trimmed, kind);
+      if (!trimmed || seen.has(key) || !isModalitySyncCandidate(trimmed, kind)) continue;
+      seen.add(key);
       ids.push(trimmed);
     }
     return ids;
-  }, [remoteModels, scopedModels]);
+  }, [remoteModels, scopedModels, kind]);
 
   // 1. 模态推荐模型 vs 全站所有模型（预先从新到老排序）
   const matchedModels = useMemo(
     () =>
       catalogIds
-        .filter((modelId) => isModelMatchModality(modelId, kind))
+        .filter((modelId) => kind !== 'chat' || isModelMatchModality(modelId, kind))
         .sort(compareModelVersionsDesc),
     [catalogIds, kind],
   );
@@ -89,16 +94,18 @@ export function ModalitySyncModelsModal({
     setSearch('');
     setIsConfirmingReset(false);
     setShowArchived(false);
-    // 回显：将当前已有模型（内置与已同步）全部预选，保持状态真实连贯
+    // 预选当前渠道内仍符合候选条件的已接入模型。
     const initialPicked = new Set<string>();
-    for (const model of currentModels) {
-      if (model.modelId && (model.channelId || '') === channelId) initialPicked.add(model.modelId);
-    }
-    if (activeModel?.modelId && (activeModel.channelId || '') === channelId) {
-      initialPicked.add(activeModel.modelId);
+    const seen = new Set<string>();
+    for (const model of [...scopedModels, activeModel]) {
+      if (!model?.modelId || (model.channelId || '') !== channelId) continue;
+      const key = modalitySyncCandidateKey(model.modelId, kind);
+      if (seen.has(key) || !isModalitySyncCandidate(model.modelId, kind)) continue;
+      seen.add(key);
+      initialPicked.add(model.modelId);
     }
     setPicked(initialPicked);
-  }, [isOpen, channelId, activeModel?.modelId, activeModel?.channelId, currentModels]);
+  }, [isOpen, channelId, kind, activeModel, scopedModels]);
 
   // 2. 当前标签页下的备选池
   const activeCandidates = tab === 'recommended' ? matchedModels : catalogIds;
@@ -290,7 +297,7 @@ export function ModalitySyncModelsModal({
               <span className="ml-1 text-[11px] tabular-nums opacity-60">{matchedModels.length}</span>
             </button>
             <button type="button" onClick={() => setTab('all')} className={tabClass(tab === 'all')}>
-              全站候选
+              全部候选
               <span className="ml-1 text-[11px] tabular-nums opacity-60">{catalogIds.length}</span>
             </button>
           </div>

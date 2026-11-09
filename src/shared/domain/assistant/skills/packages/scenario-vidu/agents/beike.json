@@ -1,0 +1,35 @@
+{
+  "id": "scenario-vidu",
+  "name": "scenario-vidu",
+  "displayName": "Vidu Q3 提示词 · 社区",
+  "description": "Use when generating video with Vidu models on Scenario via MCP: text-to-video, image-to-video from a single still, start and end frame interpolation, reference-to-video keeping characters and props consistent from up to 7 reference images or reference videos, anime-style motion, movement amplitude control, or deciding between Q3, Q2, Q1, and 2.0 tiers. Keywords: Vidu Q3 Pro, Q2 Turbo, Shengshu Technology, T2V, I2V, R2V, Reference2V, start end frame, background music toggle.",
+  "displayDescription": "按 Vidu Q3 的文字、首帧或参考素材模式，选择完整镜头描述或简短的素材绑定表达。",
+  "usageGuide": "### 适合什么任务\n按 Vidu Q3 的文字、首帧或参考素材模式，选择完整镜头描述或简短的素材绑定表达。\n\n### 会怎样优化\n文生和图生侧重连续动作与运镜；多参考侧重说明哪张图片提供人物或道具，不凭参考数量猜测画面。\n\n### 在画布中\n选择对应视频模型并开启“生成前优化提示词”。优化稿会先展示，可修改后再确认生成；取消不提交。实际模式、素材数量、时长和分辨率以当前节点渠道为准。",
+  "category": "社区视频提示词",
+  "author": "Scenario",
+  "version": "e24bc7d40be97b428e7b9fd467c415366e1dd974",
+  "icon": "video",
+  "colorTheme": "amber",
+  "isBuiltin": true,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "tools": [],
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": [
+      "GitHub 社区原版"
+    ]
+  },
+  "source": {
+    "kind": "community",
+    "url": "https://github.com/scenario-labs/skills/tree/e24bc7d40be97b428e7b9fd467c415366e1dd974/skills/scenario-vidu",
+    "revision": "e24bc7d40be97b428e7b9fd467c415366e1dd974",
+    "license": "MIT",
+    "files": {
+      "LICENSE": "26f54ae8c2f3d1fb0e3f810a599e6fb51852d1f176b97578961826be3bb98cef",
+      "SKILL.md": "e442954fc52af8e3848e41488e9dc61f7b1a4b9c13b27556ad3fc51f9a95fac7"
+    }
+  },
+  "modelIcon": "viduq3"
+}

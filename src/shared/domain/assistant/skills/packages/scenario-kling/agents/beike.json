@@ -1,0 +1,35 @@
+{
+  "id": "scenario-kling",
+  "name": "scenario-kling",
+  "displayName": "可灵 2.6 提示词 · 社区",
+  "description": "Use when generating or editing video with Kling models on Scenario via MCP: text-to-video, image-to-video with first and last frames, multi-shot sequences with per-shot prompts, consistent characters via elements and reference images, prompt-based video editing, motion transfer from a driving video (motion control, mocap), lipsync to audio or text, talking avatars, native audio and dialogue, or picking 720p, 1080p, or 4K tiers. Keywords: Kling V3, O1, 2.6, Omni, Kuaishou, T2V, I2V, V2V.",
+  "displayDescription": "梳理可灵 2.6 的镜头、参考素材和声音要求，区分文生与图生的输入职责。",
+  "usageGuide": "### 适合什么任务\n梳理可灵 2.6 的镜头、参考素材和声音要求，区分文生与图生的输入职责。\n\n### 会怎样优化\n从原版 Skill 的示例和常见错误中提取镜头与参考素材写法；不套用可灵 3.0 独有的多镜头参数。\n\n### 在画布中\n选择对应视频模型并开启“生成前优化提示词”。优化稿会先展示，可修改后再确认生成；取消不提交。实际模式、素材数量、时长和分辨率以当前节点渠道为准。",
+  "category": "社区视频提示词",
+  "author": "Scenario",
+  "version": "e24bc7d40be97b428e7b9fd467c415366e1dd974",
+  "icon": "video",
+  "colorTheme": "amber",
+  "isBuiltin": true,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "tools": [],
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": [
+      "GitHub 社区原版"
+    ]
+  },
+  "source": {
+    "kind": "community",
+    "url": "https://github.com/scenario-labs/skills/tree/e24bc7d40be97b428e7b9fd467c415366e1dd974/skills/scenario-kling",
+    "revision": "e24bc7d40be97b428e7b9fd467c415366e1dd974",
+    "license": "MIT",
+    "files": {
+      "LICENSE": "26f54ae8c2f3d1fb0e3f810a599e6fb51852d1f176b97578961826be3bb98cef",
+      "SKILL.md": "8fdbde55ac3e4b0669121b4ac04849fc6be430587c63123511cde4c3ba37b29a"
+    }
+  },
+  "modelIcon": "kling-video-v2-6"
+}

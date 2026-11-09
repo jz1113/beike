@@ -1,0 +1,39 @@
+{
+  "id": "gemini-omni-flash-api",
+  "name": "gemini-omni-flash-api",
+  "displayName": "Gemini Omni Flash 官方提示词规范",
+  "description": "Use this skill for generative video editing, text-to-video, image-referenced video generation, first-frame-to-video, first-and-last-frame transitions, and video extensions using Gemini Omni 1.1 Flash (gemini-omni-1.1-flash) via the official google-genai SDK. Includes workflows for pre-processing/optimizing high-resolution or long source videos with ffmpeg, stripping audio for full sound regeneration, and handling turn-by-turn video editing and parallel execution.",
+  "displayDescription": "采用 Google 官方 Omni Flash Skill 的提示词章节，整理动作、时间、声音与参考素材角色。",
+  "usageGuide": "### 适合什么任务\n采用 Google 官方 Omni Flash Skill 的提示词章节，整理动作、时间、声音与参考素材角色。\n\n### 会怎样优化\n仅使用官方 Prompting 章节：单场景、编辑范围、时间点、音频和图片视频角色。原版 SDK 脚本保留供阅读，视频节点不会执行脚本或切换到官方接口。\n\n### 在画布中\n选择对应视频模型并开启“生成前优化提示词”。优化稿会先展示，可修改后再确认生成；取消不提交。实际模式、素材数量、时长和分辨率以当前节点渠道为准。",
+  "category": "官方视频提示词",
+  "author": "Google Gemini",
+  "version": "e1f29deb4d81af6d3e4bf6d22112e640d94015a9",
+  "icon": "video",
+  "colorTheme": "amber",
+  "isBuiltin": true,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "tools": [],
+  "meta": {
+    "kind": "agent",
+    "genres": [],
+    "tags": [
+      "官方原版"
+    ]
+  },
+  "source": {
+    "kind": "official",
+    "url": "https://github.com/google-gemini/gemini-skills/tree/e1f29deb4d81af6d3e4bf6d22112e640d94015a9/skills/gemini-omni-flash-api",
+    "revision": "e1f29deb4d81af6d3e4bf6d22112e640d94015a9",
+    "license": "Apache-2.0",
+    "files": {
+      "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "SKILL.md": "2f490fcc3e547d1a377d56304ad7bf9d6013061a337980256b81d8974009ff13",
+      "scripts/upload_file.py": "9cf738db76e3849c813b2968655d41e6b245f4cdba9e9c8de8444f36135e0a72",
+      "scripts/video/inspect_video.py": "bc5352b51cd051c24965b3bca1e74d833cb6f28731323d525baf0fec600939e3",
+      "scripts/video/prep_video.py": "80e77de075fc997b51d2b1a17dcb329d7e36253ead8e265ad5262c61905085a5",
+      "scripts/video/generate_video.py": "a9ae6c57c3fed2c5de0a8752f5e7ec34f0fd3c3e596e98a2d6bf7278498e918b"
+    }
+  },
+  "modelIcon": "omni_flash-10s"
+}

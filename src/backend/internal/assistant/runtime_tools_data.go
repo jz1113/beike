@@ -49,6 +49,9 @@ func listProducts(ctx context.Context, db *sql.DB, workspace string, args map[st
 			break
 		}
 	}
+	if rows.Err() != nil {
+		return toolJSON(false, "读取商品库失败")
+	}
 	body, _ := json.Marshal(map[string]any{"success": true, "count": len(products), "products": products})
 	return string(body)
 }
@@ -93,6 +96,9 @@ func queryAssets(ctx context.Context, db *sql.DB, workspace string, args map[str
 		if len(assets) >= limit {
 			break
 		}
+	}
+	if rows.Err() != nil {
+		return toolJSON(false, "资产库查询失败")
 	}
 	body, _ := json.Marshal(map[string]any{"success": true, "count": len(assets), "assets": assets})
 	return string(body)

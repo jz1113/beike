@@ -1,20 +1,195 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
+import { credentialGet } from '@client/shared/api/credentialClient';
+import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
 import { compressImageToDataUrl } from '@client/shared/media/image-utils';
+import { recordChatTokens } from '@client/shared/utils/modelUsage';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { DEFAULT_CATEGORIES, getMergedCategories, CategoryItem } from '@shared/domain/prompts/vision';
-import { getEnabledMultimodalModelsFromSettings } from '@shared/domain/models/workflowModels';
+import { getEnabledMultimodalModelsFromSettings, pickOrderedMultimodalFallbacks } from '@shared/domain/models/workflowModels';
 import { normalizeImageSource } from '@shared/domain/media/drawing';
 import { useFileDropZone } from '@client/shared/hooks/useFileDropZone';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
-import type { BaseStyleSkill, ExtractedRecipeData } from './types';
-import { useStyleExtractSession } from './useStyleExtractSession';
-import { extractStyleRecipe, parseStyleReferences } from './styleExtractRequests';
+import type { BaseStyleSkill, ExtractedRecipeData } from './RecipeEditorPanel';
+
+export type PreferredScraper = 'auto' | 'qiyun' | 'apia' | 'wanbang';
+
+const PREFERRED_SCRAPERS = new Set<PreferredScraper>(['auto', 'qiyun', 'apia', 'wanbang']);
+
+export type ExternalScraperCredentials = {
+  scraperId?: string;
+  scraperSecret?: string;
+  qiyunAppId?: string;
+  qiyunAppKey?: string;
+  preferredScraper?: PreferredScraper;
+};
+
+const CREDENTIAL_KEYS = ['external_scraper_id', 'external_scraper_secret', 'qiyun_app_id', 'qiyun_app_key'] as const;
+const PREFERRED_SCRAPER_STORAGE_KEY = 'preferred_scraper';
+
+export function getPreferredScraperSync(): PreferredScraper {
+  if (typeof window === 'undefined') return 'auto';
+  try {
+    const val = localStorage.getItem(PREFERRED_SCRAPER_STORAGE_KEY);
+    if (val && PREFERRED_SCRAPERS.has(val as PreferredScraper)) return val as PreferredScraper;
+  } catch {
+    // 忽略 localStorage 读取异常
+  }
+  return 'auto';
+}
+
+export function setPreferredScraper(engine: PreferredScraper): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(PREFERRED_SCRAPER_STORAGE_KEY, engine);
+  } catch {
+    // 忽略 localStorage 写入异常
+  }
+}
+
+export async function getExternalScraperCredentials(): Promise<ExternalScraperCredentials> {
+  if (typeof window === 'undefined') {
+    return { preferredScraper: 'auto' };
+  }
+
+  const [scraperId, scraperSecret, qiyunAppId, qiyunAppKey] = await Promise.all(
+    CREDENTIAL_KEYS.map((key) => credentialGet(key).then((value) => value.trim())),
+  );
+
+  return {
+    scraperId: scraperId || undefined,
+    scraperSecret: scraperSecret || undefined,
+    qiyunAppId: qiyunAppId || undefined,
+    qiyunAppKey: qiyunAppKey || undefined,
+    preferredScraper: getPreferredScraperSync(),
+  };
+}
+
+function currentSessionGuard(signal: AbortSignal, isCurrent: () => boolean) {
+  return () => {
+    signal.throwIfAborted();
+    if (!isCurrent()) throw new DOMException('素材会话已结束', 'AbortError');
+  };
+}
+
+/** Bound parsing concurrency and honor cancellation before credential loading and every request. */
+export async function parseStyleReferences(lines: string[], signal: AbortSignal, isCurrent: () => boolean) {
+  const assertCurrent = currentSessionGuard(signal, isCurrent);
+  assertCurrent();
+  const { scraperId, scraperSecret, qiyunAppId, qiyunAppKey } = await getExternalScraperCredentials();
+  assertCurrent();
+  const results: PromiseSettledResult<Record<string, unknown>>[] = new Array(lines.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < lines.length) {
+      assertCurrent();
+      const index = next++;
+      try {
+        const response = await apiFetch('/api/catalog/styles/parse-link', {
+          method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: lines[index], text: lines[index], scraperId, customScraperId: scraperId,
+            scraperSecret, customApiKey: scraperSecret, qiyunAppId, qiyunAppKey }),
+        });
+        const value = await response.json();
+        assertCurrent();
+        results[index] = { status: 'fulfilled', value: response.ok ? value : { ...value, success: false } };
+      } catch (reason) {
+        assertCurrent();
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(3, lines.length) }, worker));
+  assertCurrent();
+  const images: string[] = [], titles: string[] = [];
+  let failCount = 0, lastError = '';
+  for (const result of results) {
+    if (result.status === 'fulfilled' && result.value?.success === true) {
+      const values = Array.isArray(result.value.images) && result.value.images.length
+        ? result.value.images : [result.value.cover];
+      images.push(...values.filter((value): value is string => typeof value === 'string').map(normalizeImageSource).filter(Boolean));
+      if (typeof result.value.title === 'string') titles.push(result.value.title);
+    } else {
+      failCount++;
+      if (result.status === 'fulfilled' && result.value?.error) lastError = String(result.value.error);
+      else if (result.status === 'rejected' && result.reason instanceof Error) lastError = result.reason.message;
+    }
+  }
+  return { images: [...new Set(images)], titles, failCount, lastError };
+}
+
+export async function extractStyleRecipe(input: {
+  images: string[]; userHint: string; model: string; modelIds: string[];
+  baseSkill?: BaseStyleSkill;
+}, signal: AbortSignal, isCurrent: () => boolean): Promise<ExtractedRecipeData> {
+  const assertCurrent = currentSessionGuard(signal, isCurrent);
+  assertCurrent();
+  const { customBaseUrl } = getGatewayClientOverrides();
+  const response = await apiFetch('/api/catalog/styles/extract', {
+    method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageUrls: input.images, userHint: input.userHint.trim(), baseSkill: input.baseSkill, model: input.model,
+      fallbackModels: pickOrderedMultimodalFallbacks(input.model, input.modelIds), customBaseUrl }),
+  });
+  const data = await response.json();
+  assertCurrent();
+  if (!response.ok || !data.success) throw new Error(data.error || '风格提炼失败');
+  try {
+    recordChatTokens({ modelId: data.model || input.model, type: 'vision', usage: data.usage, mediaCount: input.images.length });
+  } catch {}
+  return data.recipe;
+}
+
+type OperationKind = 'parse' | 'extract';
+type Operation = { kind: OperationKind; session: symbol; controller: AbortController };
+
+/** Locks take effect synchronously; a result must still belong to the currently open material session. */
+function useStyleExtractSession(key: string, isOpen: boolean) {
+  const current = useRef({ key, token: Symbol(), isOpen });
+  const running = useRef<Partial<Record<OperationKind, Operation>>>({});
+  if (current.current.key !== key) current.current = { key, token: Symbol(), isOpen };
+  current.current.isOpen = isOpen;
+
+  const active = useCallback((token: symbol | null) => Boolean(token && current.current.isOpen && current.current.token === token), []);
+  const capture = useCallback(() => current.current.isOpen ? current.current.token : null, []);
+  const isCurrent = useCallback((operation: Operation) => active(operation.session) &&
+    running.current[operation.kind] === operation && !operation.controller.signal.aborted, [active]);
+  const begin = useCallback((kind: OperationKind): Operation | null => {
+    if (!current.current.isOpen) return null;
+    const previous = running.current[kind];
+    if (previous && isCurrent(previous)) return null;
+    previous?.controller.abort();
+    const operation = { kind, session: current.current.token, controller: new AbortController() };
+    running.current[kind] = operation;
+    return operation;
+  }, [isCurrent]);
+  const finish = useCallback((operation: Operation) => {
+    const visible = isCurrent(operation);
+    if (running.current[operation.kind] === operation) delete running.current[operation.kind];
+    return visible;
+  }, [isCurrent]);
+
+  useEffect(() => {
+    const token = current.current.token;
+    const operations = running.current;
+    current.current.isOpen = isOpen;
+    for (const operation of Object.values(operations)) {
+      if (operation.session !== token) operation.controller.abort();
+    }
+    return () => {
+      if (current.current.token === token) current.current.isOpen = false;
+      for (const operation of Object.values(operations)) {
+        if (operation.session === token) operation.controller.abort();
+      }
+    };
+  }, [isOpen, key]);
+
+  return { active, capture, isCurrent, begin, finish };
+}
 
 export interface UseStyleExtractWorkflowOptions {
   isOpen: boolean;
   onClose: () => void;
-  onRecipeCreated?: (recipe: any) => void;
+  onRecipeCreated?: (recipe: unknown) => void;
   initialImages?: string[];
   initialTitle?: string;
   baseSkill?: BaseStyleSkill;

@@ -4,8 +4,7 @@ import { useEffect, useRef } from 'react';
 
 import './DotGrid.css';
 
-import { VERTEX, FRAGMENT, toRgb, smootherstep, backOut, compile } from './dotGridRenderer';
-import type { DotGridProps, Shock } from './dotGridRenderer';
+import { VERTEX, FRAGMENT, DotGridProps, Shock, toRgb, smootherstep, backOut, compile } from './dotGridRenderer';
 import { stepDotGridPhysics } from './dotGridPhysics';
 
 const DotGrid = ({
@@ -175,7 +174,7 @@ const DotGrid = ({
     };
 
     const step = (dt: number, now: number) => stepDotGridPhysics({
-      s: settingsRef.current, reduced, grid, pointer, shocks, rest, offset, velocity, force, next, wave, energy,
+      s: settingsRef.current, reduced, grid, pointer, shocks, rest, offset, velocity, force, next, wave, energy
     }, dt, now);
 
     const render = (now: number) => {

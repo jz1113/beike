@@ -9,8 +9,8 @@ import {
   normalizeStudios,
   snapStudioNumber,
   STUDIO_STYLES,
+  STUDIO_FIELD_GROUPS,
 } from './index';
-import { STUDIO_FIELD_GROUPS } from './types';
 
 describe('background studio schema', () => {
   it('gives every field a default and keeps presets inside the schema', () => {

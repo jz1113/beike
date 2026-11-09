@@ -1,6 +1,9 @@
 package generate
 
 import (
+	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
+	"beike.local/cloud/src/backend/internal/platform/database"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -9,11 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
-
-	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/gateway"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func TestViduAndGrokPayloadsFollowOfficialAPIs(t *testing.T) {
@@ -265,6 +266,7 @@ func TestVideoSubmitAndPollUseGateway(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err = db.Exec(`CREATE TABLE "ImageTask" (
+        "routeFingerprint" TEXT NOT NULL DEFAULT '',
 		"id" TEXT, "workspaceId" TEXT, "productId" TEXT, "prompt" TEXT, "taskId" TEXT, "status" TEXT,
 		"resultUrl" TEXT, "failReason" TEXT, "model" TEXT, "mediaType" TEXT, "size" TEXT, "quality" TEXT,
 		"idempotencyKey" TEXT, "createdAt" TEXT, "updatedAt" TEXT
@@ -300,5 +302,104 @@ func TestComflyWanRouteUsesDocumentedQwenEndpoint(t *testing.T) {
 	}
 	if len(query) != 1 || query[0] != "https://ai.comfly.org/qwen/api/v1/tasks/{taskId}" {
 		t.Fatalf("query: %v", query)
+	}
+}
+
+func TestVideoBindOnlyAttachesUnknownReceipts(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "videos.db")
+	db, err := database.OpenWrite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace := workspaceOf(httptest.NewRequest(http.MethodPost, "/", nil))
+	if _, err = db.Exec(`CREATE TABLE "ImageTask" (
+        "routeFingerprint" TEXT NOT NULL DEFAULT '',
+		"id" TEXT, "workspaceId" TEXT, "productId" TEXT, "prompt" TEXT, "taskId" TEXT, "status" TEXT,
+		"resultUrl" TEXT, "failReason" TEXT, "model" TEXT, "mediaType" TEXT, "size" TEXT, "quality" TEXT,
+		"idempotencyKey" TEXT, "createdAt" TEXT, "updatedAt" TEXT
+	)`); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range [][]any{
+		{"video_a_x", "pending_a", "SUBMISSION_UNKNOWN", "unknown-key"},
+		{"video_b_x", "vid-ok", "IN_PROGRESS", "accepted-key"},
+	} {
+		if _, err = db.Exec(`INSERT INTO "ImageTask" ("id","workspaceId","prompt","taskId","status","failReason","mediaType","idempotencyKey","createdAt","updatedAt")
+			VALUES (?, ?, 'p', ?, ?, '视频提交响应未确认', 'video', ?, '2026-01-01', '2026-01-01')`, row[0], workspace, row[1], row[2], row[3]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = db.Close()
+	handler := VideoBind(config.Config{DatabaseURL: "file:" + dbPath, NodeEnv: "development"})
+	bind := func(body string) *httptest.ResponseRecorder {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/generate/video/bind", strings.NewReader(body)))
+		return response
+	}
+	if response := bind(`{"taskKey":"unknown-key","taskId":"pending_x"}`); response.Code != http.StatusBadRequest {
+		t.Fatalf("pending id accepted %d %s", response.Code, response.Body.String())
+	}
+	if response := bind(`{"taskKey":"unknown-key","taskId":"vid-found"}`); response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"taskId":"vid-found"`) || !strings.Contains(response.Body.String(), `"status":"IN_PROGRESS"`) {
+		t.Fatalf("bind %d %s", response.Code, response.Body.String())
+	}
+	if response := bind(`{"taskKey":"unknown-key","taskId":"vid-other"}`); response.Code != http.StatusConflict {
+		t.Fatalf("rebind %d %s", response.Code, response.Body.String())
+	}
+	if response := bind(`{"taskKey":"accepted-key","taskId":"vid-other"}`); response.Code != http.StatusConflict {
+		t.Fatalf("accepted bind %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestP1VideoRouteSurvivesRestartAndRejectsChangedChannel(t *testing.T) {
+	var posts, polls, other atomic.Int32
+	a := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			posts.Add(1)
+			w.Write([]byte(`{"task_id":"shared"}`))
+		} else {
+			polls.Add(1)
+			w.Write([]byte(`{"status":"SUCCESS","video_url":"https://original.example/video.mp4"}`))
+		}
+	}))
+	defer a.Close()
+	b := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		other.Add(1)
+		w.Write([]byte(`{"status":"SUCCESS","video_url":"https://wrong.example/video.mp4"}`))
+	}))
+	defer b.Close()
+	cfg := videoSubmissionTestConfig(t, a)
+	cfg.Root = t.TempDir()
+	initial := videoSubmissionTestPost(Video(cfg), a.URL, "route", "prompt", "local")
+	if initial.Code != 200 {
+		t.Fatal(initial.Code, initial.Body.String())
+	}
+	videoQueries = sync.Map{}
+	for _, tc := range []struct{ base, key, model, protocol string }{{b.URL, "secret", "veo3.1", ""}, {a.URL, "changed", "veo3.1", ""}, {a.URL, "secret", "veo3.1", "other"}, {a.URL, "secret", "wan3.0-video", ""}} {
+		r := httptest.NewRequest("GET", "/?taskId=shared&model="+tc.model, nil)
+		r.Header.Set("x-custom-base-url", tc.base)
+		r.Header.Set("x-custom-api-key", tc.key)
+		r.Header.Set("x-custom-protocol", tc.protocol)
+		w := httptest.NewRecorder()
+		Video(cfg).ServeHTTP(w, r)
+		if w.Code != 409 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	if polls.Load() != 0 || other.Load() != 0 {
+		t.Fatal("changed route contacted upstream")
+	}
+	r := httptest.NewRequest("GET", "/?taskId=shared&model=veo3.1", nil)
+	r.Header.Set("x-custom-base-url", a.URL)
+	r.Header.Set("x-custom-api-key", "secret")
+	w := httptest.NewRecorder()
+	Video(cfg).ServeHTTP(w, r)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "original.example") || polls.Load() != 1 || posts.Load() != 1 {
+		t.Fatal(w.Code, w.Body.String(), polls.Load(), posts.Load())
+	}
+	// A finished, owned result remains readable without credentials or a live provider.
+	w = httptest.NewRecorder()
+	Video(cfg).ServeHTTP(w, httptest.NewRequest("GET", "/?taskId=shared&model=veo3.1", nil))
+	if w.Code != 200 || polls.Load() != 1 {
+		t.Fatal("lost completed receipt")
 	}
 }

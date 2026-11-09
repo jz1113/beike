@@ -10,10 +10,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-01.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-01.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "16:9",
     "model": "gpt-image-2",
@@ -28,10 +25,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-02.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-02.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "2:3",
     "model": "gpt-image-2",
@@ -46,10 +40,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-03.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-03.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "3:4",
     "model": "gpt-image-2",
@@ -64,10 +55,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-04.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-04.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "9:16",
     "model": "gpt-image-2",
@@ -82,10 +70,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-05.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-05.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "9:16",
     "model": "gpt-image-2",
@@ -100,10 +85,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-06.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-06.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "4:3",
     "model": "gpt-image-2",
@@ -118,10 +100,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-07.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-07.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "9:16",
     "model": "gpt-image-2",
@@ -136,10 +115,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-08.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-08.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "3:4",
     "model": "gpt-image-2",
@@ -154,10 +130,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-09.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-09.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "9:16",
     "model": "gpt-image-2",
@@ -172,10 +145,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-10.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-10.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "9:16",
     "model": "gpt-image-2",
@@ -190,10 +160,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-11.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-11.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "9:16",
     "model": "gpt-image-2",
@@ -208,10 +175,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-12.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-12.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "9:16",
     "model": "gpt-image-2",
@@ -226,10 +190,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-13.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-13.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "2:3",
     "model": "gpt-image-2",
@@ -244,10 +205,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-14.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-14.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "2:3",
     "model": "gpt-image-2",
@@ -262,10 +220,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-15.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-15.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "9:16",
     "model": "gpt-image-2",
@@ -280,10 +235,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-16.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-16.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "3:4",
     "model": "gpt-image-2",
@@ -298,10 +250,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-17.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-17.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "2:3",
     "model": "gpt-image-2",
@@ -316,10 +265,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-18.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-18.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "9:16",
     "model": "gpt-image-2",
@@ -334,10 +280,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-19.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-19.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "3:4",
     "model": "gpt-image-2",
@@ -352,10 +295,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-20.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-20.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "9:16",
     "model": "gpt-image-2",
@@ -370,10 +310,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-21.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-21.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "9:16",
     "model": "gpt-image-2",
@@ -388,10 +325,7 @@ export const WORKBOOK_GENERATED_ITEMS: InspirationItem[] = [
     "image": "/generated/workbook/workbook-22.png",
     "thumbnail": "/generated/workbook/thumbs/workbook-22.jpg",
     "mediaType": "image",
-    "author": {
-      "name": "贝壳云图 · 工作簿生成",
-      "badge": "GPT Image 2"
-    },
+    "author": { "name": "贝壳云图 · 工作簿生成", "badge": "GPT Image 2" },
     "date": "2026-10-27 | 工作簿生成",
     "aspectRatio": "3:4",
     "model": "gpt-image-2",

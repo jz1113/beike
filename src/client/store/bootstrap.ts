@@ -1,15 +1,10 @@
 import type { StoreApi } from 'zustand';
 import type { AppState } from './types';
-import { finishDrawingHydration } from './persist/generationHydration';
 import {
-  loadGenerationTombstones, migrateLegacyWorkshopDraftKeys, STUDIO_DRAFT_KEY,
-  getStoredWorkshopModeDraft, persistWorkshopModeDraftToStorage, restoreDrawingArchive,
+  loadGenerationTombstones, restoreDrawingArchive,
 } from './persist/index';
-import { attachDrawingPageLifecycle } from './persist/generation';
-import {
-  applyWorkshopModeSession, areWorkshopSessionsEqual, extractWorkshopModeSession,
-  hydrateWorkshopSessionFromDraft,
-} from './workshopSession';
+import { revokeSnapshotBlobUrls } from './persist/generationArchive';
+import { attachDrawingPageLifecycle, finishDrawingHydration } from './persist/generation';
 import { mergeAndSortTasks, mergeRestoredSessions } from './generateSliceHelpers';
 
 function scheduleAssistant(callback: () => void): () => void {
@@ -24,11 +19,7 @@ function scheduleAssistant(callback: () => void): () => void {
 const browserServices = {
   prepare: () => {
     loadGenerationTombstones();
-    migrateLegacyWorkshopDraftKeys();
-    try { sessionStorage.removeItem(STUDIO_DRAFT_KEY); } catch { /* Storage may be unavailable. */ }
   },
-  readDraft: () => getStoredWorkshopModeDraft('storyboard_generate'),
-  persistDraft: persistWorkshopModeDraftToStorage,
   restoreArchive: restoreDrawingArchive,
   finishHydration: finishDrawingHydration,
   attachPageLifecycle: attachDrawingPageLifecycle,
@@ -45,6 +36,20 @@ type BootstrapServices = typeof browserServices;
 const active = new WeakMap<StoreApi<AppState>, AppStoreBootstrap>();
 const initialized = new WeakSet<StoreApi<AppState>>();
 
+const CONVERSATION_LIFETIME_MS = 24 * 60 * 60 * 1000;
+
+/** Expire chat history, leaving canvas sessions and generated assets intact. */
+export function expireConversations(store: StoreApi<AppState>, now = Date.now()) {
+  const state = store.getState();
+  const expired = (createdAt: number) => Number.isFinite(createdAt) && createdAt > 0 && now - createdAt >= CONVERSATION_LIFETIME_MS;
+  for (const session of state.sessions || []) {
+    if (!session.canvasProjectId && expired(session.createdAt)) state.deleteSession(session.id);
+  }
+  for (const session of state.assistantSessions || []) {
+    if (expired(session.createdAt)) void state.deleteAssistantSession(session.id);
+  }
+}
+
 /** Called by the application entry before rendering, outside React effects.
  * Repeated starts share one subscription; dispose invalidates late results. */
 export function bootstrapAppStore(store: StoreApi<AppState>, services: BootstrapServices = browserServices): AppStoreBootstrap {
@@ -54,46 +59,46 @@ export function bootstrapAppStore(store: StoreApi<AppState>, services: Bootstrap
   const controller = new AbortController();
   if (!initialized.has(store)) {
     services.prepare();
-    const draft = services.readDraft();
-    const social = hydrateWorkshopSessionFromDraft('storyboard_generate', draft);
-    const original = hydrateWorkshopSessionFromDraft('storyboard_generate', draft);
-    store.setState({ socialSessionCache: social, originalSessionCache: original, ...applyWorkshopModeSession(social), workshopMode: 'storyboard_generate' });
     initialized.add(store);
   }
-  const unsubscribe = store.subscribe((state, prev) => {
-    const fields = extractWorkshopModeSession(state);
-    if (state.workshopMode === prev.workshopMode && areWorkshopSessionsEqual(fields, extractWorkshopModeSession(prev))) return;
-    services.persistDraft(state.workshopMode, fields);
-    if (!areWorkshopSessionsEqual(state.originalSessionCache, fields)) store.setState({ originalSessionCache: fields });
-  });
   const detachPage = services.attachPageLifecycle();
   const cancelAssistant = services.scheduleAssistant(() => {
-    if (!controller.signal.aborted) void store.getState().hydrateAssistantSessions(controller.signal).catch(services.reportError);
+    if (!controller.signal.aborted) void store.getState().hydrateAssistantSessions(controller.signal).then(() => {
+      if (!controller.signal.aborted && store.getState().generationHistoryReady) expireConversations(store);
+    }).catch(services.reportError);
   });
   const ready = Promise.resolve().then(() => services.restoreArchive()).then(restored => {
-    if (controller.signal.aborted) return;
+    if (controller.signal.aborted) {
+      revokeSnapshotBlobUrls(restored);
+      return;
+    }
     const state = store.getState();
     store.setState({
       ...(restored ? {
         sessions: mergeRestoredSessions(state.sessions, restored.sessions),
-        currentSessionId: restored.currentId,
+        currentSessionId: restored.sessions.some(session => session.id === restored.currentId && !session.canvasProjectId)
+          ? restored.currentId : restored.sessions.find(session => !session.canvasProjectId)?.id || 'session-default',
         generationTasks: mergeAndSortTasks(state.generationTasks, restored.tasks),
       } : {}),
       generationHistoryReady: true,
     });
     services.finishHydration();
+    expireConversations(store);
   }).catch(error => {
     if (controller.signal.aborted) return;
     services.reportError(error);
     store.setState({ generationHistoryReady: true });
     services.finishHydration();
   });
+  const expiryTimer = setInterval(() => {
+    if (store.getState().generationHistoryReady) expireConversations(store);
+  }, 60_000);
   const handle: AppStoreBootstrap = { ready, dispose: () => {
     if (controller.signal.aborted) return;
     controller.abort();
-    unsubscribe();
     detachPage();
     cancelAssistant();
+    clearInterval(expiryTimer);
     active.delete(store);
   } };
   active.set(store, handle);

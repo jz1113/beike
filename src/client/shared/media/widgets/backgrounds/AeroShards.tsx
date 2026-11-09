@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, type CSSProperties } from 'react';
 import { mountAeroShards } from './aeroLifecycle';
-import { ROOT, PLACEMENTS, MATERIALS, MARKER_STYLES, clamp, parseColor, type AeroSettings } from './aeroShardModel';
 import './AeroShards.css';
+import { ROOT, PLACEMENTS, MATERIALS, MARKER_STYLES, clamp, parseColor, AeroSettings } from './aeroShardModel';
 
 export interface AeroShardsProps {
   shardColor?: string;
@@ -105,8 +105,7 @@ export default function AeroShards({
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return undefined;
-    return mountAeroShards(container, settingsRef, onErrorRef);
+    if (container) return mountAeroShards(container, settingsRef, onErrorRef);
   }, []);
 
   return <div ref={containerRef} className={[ROOT, className].filter(Boolean).join(' ')} style={style} />;

@@ -1,13 +1,16 @@
 package assistant
 
 import (
+	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/httpx"
+	"context"
 	"encoding/json"
+	"errors"
+	"github.com/dop251/goja"
 	"io"
 	"net/http"
 	"strings"
-
-	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/httpx"
+	"time"
 )
 
 func Chat(cfg config.Config) http.Handler {
@@ -208,4 +211,228 @@ func turnKind(raw json.RawMessage) string {
 	default:
 		return "number"
 	}
+}
+
+const DeletedThreadMessages = `{"version":1,"deleted":true}`
+
+func ThreadTime(raw string) int64 {
+	if parsed, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		return parsed.UnixMilli()
+	}
+	if parsed, err := time.Parse("2006-01-02 15:04:05", raw); err == nil {
+		return parsed.UnixMilli()
+	}
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed.UnixMilli()
+	}
+	return 0
+}
+
+func ThreadTurns(cfg config.Config) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		threadID := r.PathValue("threadId")
+		if threadID == "" || len(threadID) >= 256 {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "缺少 threadId"})
+			return
+		}
+		deleted, err := threadDeleted(cfg, r, threadID)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "对话记录读取失败，请稍后重试"})
+			return
+		}
+		if deleted {
+			httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "error": "对话已删除"})
+			return
+		}
+		turns, err := listThreadTurnRows(r.Context(), cfg, httpx.WorkspaceFrom(r), threadID, r.URL.Query().Get("status"))
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "对话记录读取失败，请稍后重试"})
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "turns": turns})
+	})
+}
+
+func TurnRecover(cfg config.Config) http.Handler { return TurnSnapshot(cfg) }
+
+func AllRuns(cfg config.Config) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		markRunsDeprecated(w)
+		writeRuns(cfg, w, r, "")
+	})
+}
+
+func ThreadRuns(cfg config.Config) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		markRunsDeprecated(w)
+		threadID := r.PathValue("threadId")
+		if threadID == "" {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "缺少 threadId"})
+			return
+		}
+		deleted, err := threadDeleted(cfg, r, threadID)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "任务列表读取失败，请稍后重试"})
+			return
+		}
+		if deleted {
+			httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "error": "对话已删除"})
+			return
+		}
+		writeRuns(cfg, w, r, threadID)
+	})
+}
+
+func writeRuns(cfg config.Config, w http.ResponseWriter, r *http.Request, threadID string) {
+	includeCompleted := false
+	limit := 20
+	if threadID == "" {
+		includeCompleted = r.URL.Query().Get("includeCompleted") == "1"
+		limit = httpx.QueryInt(r, "limit", 20)
+		if limit < 1 {
+			limit = 1
+		}
+		if limit > 50 {
+			limit = 50
+		}
+	}
+	runs, err := listRunRows(r.Context(), cfg, httpx.WorkspaceFrom(r), threadID, includeCompleted, limit)
+	if err != nil {
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "任务列表读取失败，请稍后重试"})
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "runs": runs})
+}
+
+func markRunsDeprecated(w http.ResponseWriter) {
+	w.Header().Set("Deprecation", "true")
+	w.Header().Set("Link", `</api/assistant/threads/:threadId/turns>; rel="successor-version"`)
+}
+
+func TurnSnapshot(cfg config.Config) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		turnID := r.PathValue("turnId")
+		if turnID == "" || len(turnID) >= 256 {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "error": "缺少 turnId"})
+			return
+		}
+		snapshot, err := readTurnSnapshot(r.Context(), cfg, httpx.WorkspaceFrom(r), turnID)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "对话记录读取失败，请稍后重试"})
+			return
+		}
+		if snapshot == nil {
+			httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "error": "Turn 不存在或对话已删除"})
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "snapshot": snapshot})
+	})
+}
+
+const (
+	sandboxMaxCode      = 32_000
+	sandboxMaxInput     = 1_000_000
+	sandboxMaxOutput    = 32_000
+	sandboxMaxLines     = 100
+	sandboxMaxToolCalls = 64
+)
+
+func RunSandbox(code string, input any, timeout time.Duration) ([]string, error) {
+	return runSandbox(context.Background(), code, input, timeout, nil)
+}
+
+func runSandbox(ctx context.Context, code string, input any, timeout time.Duration, tools map[string]func(map[string]any) string) ([]string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if len(code) > sandboxMaxCode {
+		return nil, errors.New("代码超过 32000 字符限制")
+	}
+	if timeout <= 0 || timeout > 120*time.Second {
+		timeout = 120 * time.Second
+	}
+	payload, err := json.Marshal(input)
+	if err != nil || len(payload) > sandboxMaxInput {
+		return nil, errors.New("沙箱输入过大")
+	}
+	vm := goja.New()
+	vm.SetMaxCallStackSize(512 * 1024)
+	output := []string{}
+	outputSize := 0
+	vm.Set("__print", func(call goja.FunctionCall) goja.Value {
+		text := call.Argument(0).String()
+		outputSize += len(text)
+		if outputSize > sandboxMaxOutput || len(output) >= sandboxMaxLines {
+			panic(vm.ToValue("沙箱输出超过限制，请先筛选或汇总数据"))
+		}
+		output = append(output, text)
+		return goja.Undefined()
+	})
+	if err := vm.Set("__input", string(payload)); err != nil {
+		return nil, err
+	}
+	toolObject := vm.NewObject()
+	toolCalls := 0
+	for name, call := range tools {
+		toolName := name
+		toolCall := call
+		_ = toolObject.Set(toolName, func(call goja.FunctionCall) goja.Value {
+			toolCalls++
+			if toolCalls > sandboxMaxToolCalls {
+				panic(vm.ToValue("沙箱工具调用次数超过限制，请先使用筛选参数缩小查询范围"))
+			}
+			args := map[string]any{}
+			if len(call.Arguments) > 0 && !goja.IsUndefined(call.Arguments[0]) && !goja.IsNull(call.Arguments[0]) {
+				switch exported := call.Arguments[0].Export().(type) {
+				case map[string]any:
+					args = exported
+				case string:
+					_ = json.Unmarshal([]byte(exported), &args)
+				default:
+					if raw, err := json.Marshal(exported); err == nil {
+						_ = json.Unmarshal(raw, &args)
+					}
+				}
+			}
+			return vm.ToValue(toolCall(args))
+		})
+	}
+	_ = vm.Set("tools", toolObject)
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-runCtx.Done():
+			vm.Interrupt("沙箱执行超时")
+		case <-done:
+		}
+	}()
+	if _, err := vm.RunString(`
+		globalThis.input = JSON.parse(__input);
+		delete globalThis.__input;
+		globalThis.text = function(value) { __print(typeof value === "string" ? value : JSON.stringify(value)); };
+		globalThis.console = { log: function() {
+			var values = Array.prototype.slice.call(arguments);
+			text(values.length === 1 ? values[0] : values);
+		} };
+	`); err != nil {
+		return nil, errors.New("沙箱执行失败")
+	}
+	_, err = vm.RunString("(function(){\n" + code + "\n})()")
+	if err != nil {
+		var interrupted *goja.InterruptedError
+		if errors.As(err, &interrupted) {
+			if errors.Is(ctx.Err(), context.Canceled) {
+				return nil, ctx.Err()
+			}
+			return nil, errors.New("沙箱执行超时")
+		}
+		return nil, err
+	}
+	return output, nil
 }

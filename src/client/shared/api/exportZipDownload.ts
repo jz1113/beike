@@ -1,6 +1,6 @@
 import { apiFetch } from './apiClient';
 import { saveToDownloadDir } from '../media/saveDownload';
-import { EXPORT_ZIP_LIMITS } from '@shared/domain/media/exportZipLimits';
+import { EXPORT_ZIP_LIMITS } from '@shared/domain/media/mediaDownload';
 
 export interface ExportZipStatistics { total: number; succeeded: number; failed: number; partial: boolean }
 export interface ExportZipResult extends ExportZipStatistics { savedVia: 'browser' }

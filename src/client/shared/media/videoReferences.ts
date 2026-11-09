@@ -2,11 +2,13 @@ import { isVideoMediaUrl } from './mediaHelper';
 import { isGenericSubjectMention, mentionTokenToName, parseSubjectMention, PROMPT_MENTION_REGEX } from '@shared/domain/prompts/prompt-engine/mentions';
 import { resolveRefMediaIdentity } from './refMediaRegistry';
 
-/** Number each modality independently, in upload order, matching the request content. */
-export function mediaReferenceSlots(urls: string[]) {
+/** Use modality-local numbers unless the request numbers mixed media together. */
+export function mediaReferenceSlots(urls: string[], videoFlags?: readonly boolean[], mixedOrder = false) {
   let images = 0;
   let videos = 0;
-  return urls.map(url => ({ url, name: isVideoMediaUrl(url) ? `视频${++videos}` : `图片${++images}` }));
+  return urls.map((url, index) => ({ url, name: (videoFlags?.[index] ?? isVideoMediaUrl(url))
+    ? `视频${mixedOrder ? index + 1 : ++videos}`
+    : `图片${mixedOrder ? index + 1 : ++images}` }));
 }
 
 export function normalizeVideoReferenceMentions(prompt: string, urls: string[], subjects: { name: string; url: string }[]) {

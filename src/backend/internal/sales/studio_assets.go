@@ -317,6 +317,10 @@ func Presets(cfg config.Config) http.HandlerFunc {
 					items = append(items, item)
 				}
 			}
+			if rows.Err() != nil {
+				httpx.WriteJSON(w, 500, map[string]any{"success": false, "error": "读取生产预设失败"})
+				return
+			}
 			httpx.WriteJSON(w, 200, map[string]any{"success": true, "items": items})
 			return
 		}
@@ -385,4 +389,177 @@ func PresetByID(cfg config.Config) http.HandlerFunc {
 		}
 		httpx.WriteJSON(w, 200, map[string]any{"success": true})
 	}
+}
+
+type studioAction struct {
+	ID                 string   `json:"id"`
+	Title              string   `json:"title"`
+	Action             string   `json:"action"`
+	ShotType           string   `json:"shotType"`
+	Camera             string   `json:"camera"`
+	Tags               string   `json:"tags"`
+	CoverURL           string   `json:"coverUrl"`
+	MediaType          string   `json:"mediaType"`
+	MediaURL           string   `json:"mediaUrl"`
+	SourceURL          string   `json:"sourceUrl"`
+	SourceImages       []string `json:"sourceImages"`
+	Dimensions         string   `json:"dimensions"`
+	ProductCategoryIDs []string `json:"productCategoryIds"`
+	CategoryID         string   `json:"categoryId"`
+}
+
+func parseActionCategoryIDs(raw string) ([]string, string) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || trimmed == "[]" {
+		return []string{}, ""
+	}
+	var list []string
+	if err := json.Unmarshal([]byte(trimmed), &list); err == nil {
+		out := make([]string, 0, len(list))
+		for _, item := range list {
+			id := strings.TrimSpace(item)
+			if id != "" {
+				out = append(out, id)
+			}
+		}
+		if len(out) > 0 {
+			return out, out[0]
+		}
+		return []string{}, ""
+	}
+	return []string{trimmed}, trimmed
+}
+
+func parseActionSourceImages(raw string) []string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || trimmed == "[]" {
+		return []string{}
+	}
+	var list []string
+	if err := json.Unmarshal([]byte(trimmed), &list); err == nil {
+		out := make([]string, 0, len(list))
+		for _, item := range list {
+			clean := strings.TrimSpace(item)
+			if clean != "" {
+				out = append(out, clean)
+			}
+		}
+		return out
+	}
+	return []string{}
+}
+
+func queryStudioActions(ctx context.Context, db *sql.DB, workspace string) ([]studioAction, error) {
+	out := []studioAction{}
+	withExtras := true
+	rows, err := db.QueryContext(ctx, `SELECT "id","title","action","shotType",COALESCE("camera",''),COALESCE("tags",''),COALESCE("coverUrl",''),COALESCE("mediaType",'image'),COALESCE("mediaUrl",''),COALESCE("sourceUrl",''),COALESCE("sourceImages",'[]'),COALESCE("dimensions",''),COALESCE("productCategoryIds",'[]') FROM "ActionAsset" WHERE "workspaceId" = ? ORDER BY "isFavorite" DESC,"usageCount" DESC,"createdAt" DESC`, workspace)
+	if err != nil && strings.Contains(err.Error(), "no such column") {
+		withExtras = false
+		rows, err = db.QueryContext(ctx, `SELECT "id","title","action","shotType",COALESCE("camera",''),COALESCE("tags",''),COALESCE("coverUrl",''),COALESCE("mediaType",'image'),COALESCE("mediaUrl",''),COALESCE("sourceUrl",''),COALESCE("productCategoryIds",'[]') FROM "ActionAsset" WHERE "workspaceId" = ? ORDER BY "isFavorite" DESC,"usageCount" DESC,"createdAt" DESC`, workspace)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item studioAction
+		var rawSources, rawCats string
+		var scanErr error
+		if withExtras {
+			scanErr = rows.Scan(&item.ID, &item.Title, &item.Action, &item.ShotType, &item.Camera, &item.Tags, &item.CoverURL, &item.MediaType, &item.MediaURL, &item.SourceURL, &rawSources, &item.Dimensions, &rawCats)
+		} else {
+			scanErr = rows.Scan(&item.ID, &item.Title, &item.Action, &item.ShotType, &item.Camera, &item.Tags, &item.CoverURL, &item.MediaType, &item.MediaURL, &item.SourceURL, &rawCats)
+		}
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		item.SourceImages = parseActionSourceImages(rawSources)
+		item.ProductCategoryIDs, item.CategoryID = parseActionCategoryIDs(rawCats)
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+// Return the complete catalog or an error. A partial catalog would make the
+// client mistake temporarily unreadable assets for deleted selections.
+func readStudioAssets(ctx context.Context, db *sql.DB, workspace string) (map[string]any, error) {
+	personas, err := queryStudioPersonas(ctx, db, workspace)
+	if err != nil {
+		return nil, err
+	}
+	scenes, err := queryStudioScenes(ctx, db, workspace)
+	if err != nil {
+		return nil, err
+	}
+	actions, err := queryStudioActions(ctx, db, workspace)
+	if err != nil {
+		return nil, err
+	}
+	voices, err := queryStudioVoices(ctx, db, workspace)
+	if err != nil {
+		return nil, err
+	}
+	bgms, err := queryStudioBgms(ctx, db, workspace)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"success": true, "personas": personas, "scenes": scenes, "actions": actions, "voices": voices, "bgms": bgms}, nil
+}
+
+// Keep the original identity source separate from generated face/front views.
+// A stale explicit main must not silently become a derived image or images[0].
+func studioPersonaIdentityURL(dimensions string, images []string, avatar string) string {
+	var metadata map[string]json.RawMessage
+	if json.Unmarshal([]byte(dimensions), &metadata) != nil {
+		return strings.TrimSpace(avatar)
+	}
+	rawViews, marked := metadata["personaViews"]
+	if !marked {
+		return strings.TrimSpace(avatar)
+	}
+	var views map[string]string
+	if json.Unmarshal(rawViews, &views) != nil {
+		return ""
+	}
+	main := strings.TrimSpace(views["main"])
+	for _, image := range images {
+		if main != "" && main == image {
+			return main
+		}
+	}
+	return ""
+}
+
+// Explicit view labels take precedence over the legacy source-image ordering.
+// Only use anchors that still belong to this asset's saved reference images.
+func studioPersonaAnchors(dimensions string, images []string, face, body string) (string, string, string) {
+	var metadata struct {
+		Views map[string]string `json:"personaViews"`
+		Voice string            `json:"defaultVoiceId"`
+	}
+	if json.Unmarshal([]byte(dimensions), &metadata) != nil {
+		return face, body, ""
+	}
+	valid := func(url string) bool {
+		if url == "" {
+			return false
+		}
+		for _, image := range images {
+			if url == image {
+				return true
+			}
+		}
+		return false
+	}
+	if valid(metadata.Views["face"]) {
+		face = metadata.Views["face"]
+	} else if valid(metadata.Views["main"]) {
+		face = metadata.Views["main"]
+	}
+	if valid(metadata.Views["front"]) {
+		body = metadata.Views["front"]
+	} else if valid(metadata.Views["main"]) {
+		body = metadata.Views["main"]
+	}
+	return face, body, strings.TrimSpace(metadata.Voice)
 }

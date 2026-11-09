@@ -1,14 +1,15 @@
-import type { ModalityKind, ModalityModelItem } from './modalityModelTypes';
 import {
   loadStoredModalityGlobalConfig,
+  type ModalityKind,
+  type ModalityModelItem,
 } from './modalityModelStorage';
-import type { WorkflowModel } from './workflowModel';
-import { writeLocalConfig } from '@client/shared/api/localConfigStorage';
+import type { WorkflowModel } from './modelManagement';
+import { writeLocalConfig } from '@client/shared/api/credentialClient';
 
 export const PROVIDER_CREDENTIALS_CHANGED_EVENT = 'beike:provider-credentials-changed';
 export const SAVED_PROVIDER_CREDENTIALS_KEY = 'beike_api_provider_saved_credentials_v1';
 
-const MODALITY_KINDS: ModalityKind[] = ['chat', 'image', 'video', 'three_d', 'music', 'voice', 'avatar'];
+const MODALITY_KINDS: ModalityKind[] = ['chat', 'image', 'video', 'voice'];
 
 export interface ProviderCredentials {
   baseUrl: string;
@@ -19,7 +20,6 @@ const PROVIDER_ID_ALIASES: Record<string, string> = {
   comfly: 'comfly_gateway',
   openai: 'openai_official',
   deepseek: 'deepseek_official',
-  lianchi: 'lianchi_images',
 };
 
 export function canonicalProviderId(providerId: string): string {
@@ -76,9 +76,7 @@ function isCustomModelForProvider(model: { providerId?: string; channel?: string
       ? 'openai'
       : canonicalId === 'deepseek_official'
         ? 'deepseek'
-        : canonicalId === 'lianchi_images'
-          ? 'lianchi'
-          : '';
+        : '';
   return Boolean(legacyChannel && model.channel === legacyChannel);
 }
 

@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { credentialGet } from '@client/shared/api/credentialClient';
-import { persistLianchiConfig, persistOpenAIConfig, waitForCredentialSaves } from '@client/shared/api/persistCredentials';
+import { persistOpenAIConfig, waitForCredentialSaves } from '@client/shared/api/persistCredentials';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import { useConnectionChecks } from './useConnectionChecks';
-import { testModelConnection } from '../model/settingsConnectionChecks';
+import { useConnectionChecks, useConfigSaveState } from './useApiProviders';
+import { testModelConnection } from '../model/apiProviderTypes';
 import { isPublicHttpGatewayIpUrl } from '@shared/domain/models/gatewayCreds';
-import { useConfigSaveState } from './useConfigSaveState';
 
 type ProviderSnapshot = {
   openAIBaseUrl: string;
   openAIApiKey: string;
   openAIEnabled: boolean;
   openAIInsecureHttpConsentUrl: string;
-  lianchiApiKey: string;
 };
 
 function buildIndependentProviderSnapshot(
@@ -20,14 +18,12 @@ function buildIndependentProviderSnapshot(
   openAIApiKey: string,
   openAIEnabled: boolean,
   openAIInsecureHttpConsentUrl: string,
-  lianchiApiKey: string,
 ): ProviderSnapshot {
   return {
     openAIBaseUrl: openAIBaseUrl.trim().replace(/\/+$/, ''),
     openAIApiKey: openAIApiKey.trim(),
     openAIEnabled,
     openAIInsecureHttpConsentUrl: openAIInsecureHttpConsentUrl.trim(),
-    lianchiApiKey: lianchiApiKey.trim(),
   };
 }
 
@@ -56,14 +52,10 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     setOpenAIBaseUrl(normalized);
     setOpenAIInsecureHttpConsentUrl(normalized);
   };
-  const [lianchiApiKey, setLianchiApiKey] = useState('');
-  const [showLianchiKey, setShowLianchiKey] = useState(false);
   const connectionChecks = useConnectionChecks({
     openai_official: [openAIBaseUrl.trim(), openAIApiKey.trim(), openAIAllowInsecureHttp, openAIEnabled],
-    lianchi_images: [lianchiApiKey.trim()],
   }, showToast, isOpen && independentConfigLoaded);
   const isTestingOpenAI = Boolean(connectionChecks.testing.openai_official);
-  const isTestingLianchi = Boolean(connectionChecks.testing.lianchi_images);
 
   useEffect(() => {
     if (!isOpen || typeof window === 'undefined') return;
@@ -76,14 +68,13 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
       const baseUrl = (localStorage.getItem('openai_base_url') || 'https://api.openai.com').trim().replace(/\/+$/, '');
       const enabled = localStorage.getItem('openai_responses_enabled') === 'true';
       const consentUrl = (localStorage.getItem('openai_insecure_http_consent_url') || '').trim();
-      const [key, lianchiKey] = await Promise.all([credentialGet('openai_api_key', true), credentialGet('lianchi_api_key', true)]);
+      const key = await credentialGet('openai_api_key', true);
       if (!active) return;
       setOpenAIBaseUrl(baseUrl);
       setOpenAIEnabled(enabled);
       setOpenAIInsecureHttpConsentUrl(consentUrl);
       setOpenAIApiKey(key);
-      setLianchiApiKey(lianchiKey);
-      setSavedConfig(buildIndependentProviderSnapshot(baseUrl, key, enabled, consentUrl, lianchiKey));
+      setSavedConfig(buildIndependentProviderSnapshot(baseUrl, key, enabled, consentUrl));
       setConfigLoaded(true);
     })().catch(error => { if (active) setConfigLoadError(formatUserError(error, '独立渠道配置加载失败，请重试')); });
     return () => { active = false; };
@@ -114,7 +105,6 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
         effectiveApiKey,
         openAIEnabled,
         openAIAllowInsecureHttp ? normalizedOpenAIBaseUrl : '',
-        lianchiApiKey,
       );
       const saved = await saves.save('openai_official', snapshot, () => persistOpenAIConfig(snapshot.openAIBaseUrl, snapshot.openAIApiKey,
         {
@@ -133,29 +123,16 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     }
   };
 
-  const handleSaveLianchiConfig = async (notify = true, overrideApiKey?: string) => {
-    const snapshot = { lianchiApiKey: (overrideApiKey ?? lianchiApiKey).trim() };
-    const saved = await saves.save('lianchi_images', snapshot, () => persistLianchiConfig(snapshot.lianchiApiKey), '✅ 联池 API Key 已保存；选择「联池image2」即可调用', notify);
-    if (saved) setLianchiApiKey(snapshot.lianchiApiKey);
-    return saved;
-  };
-
-  const handleTestLianchi = () => connectionChecks.run('lianchi_images', () => testModelConnection('联池', {
-    provider: 'lianchi', apiKey: lianchiApiKey.trim(),
-  }));
-
   return {
     independentConfigLoaded, independentConfigLoadError,
     independentIsSavingConfig: saves.isSaving,
     isSavingOpenAI: saves.states.openai_official === 'saving',
-    isSavingLianchi: saves.states.lianchi_images === 'saving',
     independentHasUnsavedChanges: Boolean(independentConfigLoaded && savedConfig && (
       independentProviderFingerprint(buildIndependentProviderSnapshot(
         openAIBaseUrl,
         openAIApiKey,
         openAIEnabled,
         openAIInsecureHttpConsentUrl,
-        lianchiApiKey,
       )) !== independentProviderFingerprint(savedConfig)
     )),
     connectionResults: connectionChecks.results,
@@ -164,7 +141,5 @@ export function useIndependentModelProviders(isOpen: boolean, showToast: (messag
     switchOpenAIToHttpGateway,
     showOpenAIKey, setShowOpenAIKey, openAIEnabled, setOpenAIEnabled,
     isTestingOpenAI, handleTestOpenAI, handleSaveOpenAIConfig,
-    lianchiApiKey, setLianchiApiKey, showLianchiKey, setShowLianchiKey,
-    isTestingLianchi, handleTestLianchi, handleSaveLianchiConfig,
   };
 }

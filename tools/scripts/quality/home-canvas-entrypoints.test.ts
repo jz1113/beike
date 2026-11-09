@@ -8,9 +8,8 @@ describe('home canvas entry points', () => {
     expect(source('../../../src/client/features/home/HomePage.tsx')).not.toContain('canvasComposer');
     expect(source('../../../src/client/app/App.tsx')).not.toContain('CanvasHomeComposer');
   });
-  it('keeps creative tools without the retired recommendation carousel', () => {
-    const tools = source('../../../src/client/features/canvas/components/projects/CanvasCreativeTools.tsx');
-    expect(tools).not.toContain('CanvasToolSpotlight');
-    expect(tools).toContain('data-creative-tool');
+  it('does not render the retired creative tools', () => {
+    expect(source('../../../src/client/features/home/HomePage.tsx')).not.toContain('creativeTools');
+    expect(source('../../../src/client/app/App.tsx')).not.toContain('CanvasCreativeTools');
   });
 });

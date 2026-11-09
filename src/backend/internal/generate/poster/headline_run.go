@@ -2,8 +2,16 @@ package poster
 
 import (
 	"context"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -12,12 +20,14 @@ import (
 	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/generate"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/media"
+	"beike.local/cloud/src/backend/internal/platform/storage"
 )
 
 func runHeadlineTitle(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]any) {
 	model := strings.TrimSpace(generate.StringField(payload, "model"))
 	if model == "" {
-		model = "gemini-3.7-flash"
+		model = "gpt-6-luna"
 	}
 	base, key := headlineCredentials(cfg, r, payload, model)
 	images, message := headlineImages(cfg, r, generate.StringListField(payload, "imageUrls"))
@@ -31,7 +41,7 @@ func runHeadlineTitle(cfg config.Config, w http.ResponseWriter, r *http.Request,
 	}
 	text, usageData, status, err := gateway.ChatCompletionJSON(r.Context(), base, key, model, []any{map[string]any{"role": "user", "content": content}}, 0.35, 90*time.Second)
 	if err != nil || status >= 300 {
-		httpx.WriteJSON(w, headlineFailure(err, status), map[string]any{"success": false, "error": headlineErrorText(err, status, "标题改写模型 "+model+" 返回 HTTP "+generate.Itoa(status))})
+		writeHeadlineFailure(w, headlineFailure(err, status), headlineErrorText(err, status, "标题改写模型 "+model+" 返回 HTTP "+generate.Itoa(status)), usageData, err)
 		return
 	}
 	parsed := gateway.DecodeObject(text)
@@ -41,7 +51,7 @@ func runHeadlineTitle(cfg config.Config, w http.ResponseWriter, r *http.Request,
 	}
 	title = normalizeHeadline(title)
 	if !regexp.MustCompile(`^[\x{3400}-\x{9fff}]{4,18}$`).MatchString(title) {
-		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "标题改写模型未返回 4–18 字的有效主标题，未截断或提交后续任务"})
+		writeHeadlineFailure(w, http.StatusBadGateway, "标题改写模型未返回 4–18 字的有效主标题，未截断或提交后续任务", usageData, nil)
 		return
 	}
 	body := map[string]any{"success": true, "data": map[string]any{"title": title}, "model": model}
@@ -54,7 +64,7 @@ func runHeadlineTitle(cfg config.Config, w http.ResponseWriter, r *http.Request,
 func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]any) {
 	model := strings.TrimSpace(generate.StringField(payload, "model"))
 	if model == "" {
-		model = "gemini-3.7-flash"
+		model = "gpt-6-luna"
 	}
 	original := strings.TrimSpace(generate.StringField(payload, "originalTitle"))
 	if original == "" {
@@ -93,17 +103,17 @@ func runHeadlineDesign(cfg config.Config, w http.ResponseWriter, r *http.Request
 		if strings.TrimSpace(text) == "" && err == nil && status < 300 {
 			code = http.StatusBadGateway
 		}
-		httpx.WriteJSON(w, code, map[string]any{"success": false, "error": headlineErrorText(err, status, "设计模型 "+model+" 没有返回有效内容")})
+		writeHeadlineFailure(w, code, headlineErrorText(err, status, "设计模型 "+model+" 没有返回有效内容"), usageData, err)
 		return
 	}
 	parsed := gateway.DecodeObject(text)
 	if parsed == nil {
-		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": "设计模型没有返回合法 JSON"})
+		writeHeadlineFailure(w, http.StatusBadGateway, "设计模型没有返回合法 JSON", usageData, nil)
 		return
 	}
 	design, message := validateCoverDesign(parsed, cover, generate.StringField(payload, "productName"))
 	if message != "" {
-		httpx.WriteJSON(w, http.StatusBadGateway, map[string]any{"success": false, "error": message})
+		writeHeadlineFailure(w, http.StatusBadGateway, message, usageData, nil)
 		return
 	}
 	usageID, auditErr := recordDesignMemory(r, cfg, payload, memory, design)
@@ -189,4 +199,136 @@ func headlineErrorText(err error, status int, fallback string) string {
 		return fallback
 	}
 	return fallback
+}
+
+func writeHeadlineFailure(w http.ResponseWriter, status int, message string, data map[string]any, err error) {
+	var invalidJSON *gateway.TextJSONError
+	if data == nil && errors.As(err, &invalidJSON) {
+		data = invalidJSON.Response
+	}
+	body := map[string]any{"success": false, "error": message}
+	if usage := gateway.NormalizeUsage(data); usage != nil {
+		body["usage"] = usage
+	}
+	if data["submissionUnknown"] == true {
+		body["submissionUnknown"] = true
+	}
+	httpx.WriteJSON(w, status, body)
+}
+
+var errCoverRequestMismatch = errors.New("投喂标识已用于其他图片或模型，请重新添加样张")
+
+type coverFeedOperation struct {
+	ID     string
+	Model  string
+	Status string
+	Error  string
+}
+
+func beginCoverFeed(ctx context.Context, db *sql.DB, workspace, key, title, model, hash string, images []string) (coverFeedOperation, bool, error) {
+	id := coverID("sample")
+	raw, _ := json.Marshal(images)
+	now := coverNow()
+	result, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO "CoverMemorySample"
+  ("id","workspaceId","title","imageUrls","model","deconstruction","status","error","createdAt","updatedAt","requestKey","inputHash")
+  VALUES (?,?,?,?,?,'','running','',?,?,?,?)`, id, workspace, title, string(raw), model, now, now, key, hash)
+	if err != nil {
+		return coverFeedOperation{}, false, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return coverFeedOperation{}, false, err
+	}
+	if count == 1 {
+		return coverFeedOperation{ID: id, Model: model, Status: "running"}, true, nil
+	}
+	var operation coverFeedOperation
+	var storedHash string
+	err = db.QueryRowContext(ctx, `SELECT "id","model","status","error","inputHash" FROM "CoverMemorySample" WHERE "workspaceId"=? AND "requestKey"=?`, workspace, key).Scan(&operation.ID, &operation.Model, &operation.Status, &operation.Error, &storedHash)
+	if err == nil && hash != storedHash {
+		err = errCoverRequestMismatch
+	}
+	return operation, false, err
+}
+
+func replayCoverFeed(w http.ResponseWriter, operation coverFeedOperation) {
+	if operation.Status == "completed" {
+		httpx.WriteJSON(w, 200, map[string]any{"success": true, "sampleId": operation.ID, "model": operation.Model, "replayed": true})
+		return
+	}
+	message := "原样张仍在反推，请先刷新核对，不要重复投喂"
+	if operation.Status == "failed" {
+		message = operation.Error + "；请核对后使用重试"
+	}
+	httpx.WriteJSON(w, 409, map[string]any{"success": false, "sampleId": operation.ID, "error": message, "uncertain": operation.Status == "running"})
+}
+
+func coverFeedHash(images []string, model, title, effort, protocol, base string) string {
+	raw, _ := json.Marshal([]any{images, model, title, effort, protocol, base})
+	return fmt.Sprintf("%x", sha256.Sum256(raw))
+}
+
+// A process crash cannot leave a sample looking active forever. No model call is retried here.
+func recoverStaleCoverFeeds(ctx context.Context, db *sql.DB, workspace string) error {
+	cutoff := time.Now().UTC().Add(-5 * time.Minute).Format(time.RFC3339Nano)
+	_, err := db.ExecContext(ctx, `UPDATE "CoverMemorySample" SET "status"='failed',"error"='反推执行已中断，请核对后手动重试',"updatedAt"=? WHERE "workspaceId"=? AND "status"='running' AND "updatedAt"<?`, coverNow(), workspace, cutoff)
+	return err
+}
+
+func coverRequestKey(payload map[string]any) (string, bool) {
+	value, exists := payload["requestKey"]
+	if !exists {
+		return "", true
+	}
+	text, ok := value.(string)
+	text = strings.TrimSpace(text)
+	return text, ok && len(text) >= 8 && len(text) <= 128
+}
+
+func headlineImages(cfg config.Config, r *http.Request, urls []string) ([]string, string) {
+	root := storage.ResolveRoot()
+	if os.Getenv("AZHUO_CACHE_DIR") == "" && cfg.DataDir() != "" {
+		root = filepath.Join(cfg.DataDir(), "storage")
+	}
+	out := make([]string, 0, len(urls))
+	for _, item := range urls {
+		item = strings.TrimSpace(item)
+		if strings.HasPrefix(item, "data:image/") {
+			out = append(out, item)
+			continue
+		}
+		parsed, err := url.Parse(item)
+		if err != nil || parsed.User != nil {
+			return nil, "unread"
+		}
+		// The UI and API use different development ports. Only a relative
+		// storage path or this application's host can resolve a local file.
+		local := parsed.Host == "" && parsed.Scheme == "" && strings.HasPrefix(item, "/storage/")
+		if (parsed.Scheme == "http" || parsed.Scheme == "https") && strings.HasPrefix(parsed.Path, "/storage/") {
+			requestURL := &url.URL{Host: r.Host}
+			local = strings.EqualFold(parsed.Hostname(), requestURL.Hostname()) || loopbackHost(parsed.Hostname()) && loopbackHost(requestURL.Hostname())
+		}
+		if local {
+			rel := strings.TrimPrefix(parsed.Path, "/storage/")
+			if !storage.WorkspaceRel(rel, httpx.WorkspaceFrom(r), !cfg.Production()) {
+				return nil, "unread"
+			}
+			image, err := media.VisionImageURL(root, "/storage/"+rel)
+			if err != nil {
+				return nil, "unread"
+			}
+			out = append(out, image)
+			continue
+		}
+		status, raw, err := gateway.PostModelHeaders(r.Context(), http.MethodGet, item, "", nil, 20*time.Second, media.RemoteImageHeaders(item))
+		if err != nil || status < 200 || status >= 300 || len(raw) == 0 {
+			return nil, "unread"
+		}
+		out = append(out, item)
+	}
+	return out, ""
+}
+
+func loopbackHost(host string) bool {
+	return strings.EqualFold(host, "localhost") || net.ParseIP(host).IsLoopback()
 }

@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -148,5 +149,54 @@ func TestSessionsHideDeletedThreads(t *testing.T) {
 	body := response.Body.String()
 	if response.Code != http.StatusOK || !strings.Contains(body, `"id":"keep"`) || strings.Contains(body, `"id":"gone"`) {
 		t.Fatalf("status %d body %s", response.Code, body)
+	}
+}
+
+func TestExpireSessionsUsesCreationTime(t *testing.T) {
+	t.Setenv("AZHUO_USER_DATA_DIR", t.TempDir())
+	path := filepath.Join(t.TempDir(), "expiry.db")
+	db, err := database.OpenWrite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`CREATE TABLE AssistantThread (id TEXT, workspaceId TEXT, title TEXT, messagesJson TEXT, allowedToolsJson TEXT, createdAt TEXT, updatedAt TEXT)`,
+		`CREATE TABLE AssistantTurn (id TEXT, workspaceId TEXT, threadId TEXT)`,
+		`CREATE TABLE AssistantTurnItem (turnId TEXT, workspaceId TEXT)`,
+		`INSERT INTO AssistantThread VALUES ('old','local','old','[]','[]','2026-01-01T00:00:00Z','2026-01-02T12:00:00Z')`,
+		`INSERT INTO AssistantThread VALUES ('new','local','new','[]','[]','2026-01-01T12:00:01Z','2026-01-01T12:00:01Z')`,
+		`INSERT INTO AssistantTurn VALUES ('turn','local','old')`,
+		`INSERT INTO AssistantTurnItem VALUES ('turn','local')`,
+	} {
+		if _, err = db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+	count, err := ExpireSessions(context.Background(), config.Config{DatabaseURL: "file:" + path}, time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC))
+	if err != nil || count != 1 {
+		t.Fatalf("expired %d: %v", count, err)
+	}
+	db, err = database.OpenWrite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var old, recent string
+	var turns, items int
+	if err = db.QueryRow(`SELECT messagesJson FROM AssistantThread WHERE id='old'`).Scan(&old); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.QueryRow(`SELECT messagesJson FROM AssistantThread WHERE id='new'`).Scan(&recent); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.QueryRow(`SELECT count(*) FROM AssistantTurn`).Scan(&turns); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.QueryRow(`SELECT count(*) FROM AssistantTurnItem`).Scan(&items); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(old, `"deleted":true`) || recent != "[]" || turns != 0 || items != 0 {
+		t.Fatalf("old=%s new=%s turns=%d items=%d", old, recent, turns, items)
 	}
 }

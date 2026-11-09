@@ -4,8 +4,7 @@ import { useEffect, useRef } from 'react';
 
 import './Beams.css';
 
-import { FIELD, COMPOSITE, INTRO_SECONDS, MAX_FIELD_PIXELS, clamp, link } from './beamsRenderer';
-import type { BeamsProps, Settings } from './beamsRenderer';
+import { BeamsProps, Settings, FIELD, COMPOSITE, INTRO_SECONDS, MAX_FIELD_PIXELS, clamp, link } from './beamsRenderer';
 export type { BeamsProps } from './beamsRenderer';
 
 export const Beams = ({

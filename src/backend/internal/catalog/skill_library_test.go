@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
@@ -73,4 +74,19 @@ func TestSkillLibraryHTTPUnifiesSourcesWithoutChangingOfficialRows(t *testing.T)
 	call("b", http.MethodDelete, "/api/catalog/skills?id=my-skill&version="+created["libraryVersion"].(string), nil, 409)
 	doc["files"] = map[string]any{"bad": true}
 	call("a", http.MethodPost, "/api/catalog/skills", map[string]any{"skill": doc}, 400)
+}
+
+func TestProductDeleteRequiresIDAndProxiesRemoteStorage(t *testing.T) {
+	handler := productsDeleteHandler(config.Config{})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/api/catalog/products", nil))
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status %d body %s", response.Code, response.Body.String())
+	}
+	t.Setenv("STORAGE_ENABLED", "true")
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/api/catalog/products?id=1", nil))
+	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "操作失败") {
+		t.Fatalf("remote status %d body %s", response.Code, response.Body.String())
+	}
 }

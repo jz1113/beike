@@ -30,7 +30,7 @@ export interface MultiAngleModalProps {
     model: string;
     quality: string;
     aspectRatio?: string;
-  }) => void;
+  }) => void | boolean;
 }
 
 interface PresetAngle {
@@ -164,7 +164,7 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
     const normalizedQuality =
       selectedQuality === '1K' ? 'low' : selectedQuality === '4K' ? 'high' : 'medium';
 
-    onSubmitNovelView({
+    const submitted = onSubmitNovelView({
       azimuth,
       elevation,
       angleName,
@@ -172,7 +172,7 @@ export const MultiAngleModal: React.FC<MultiAngleModalProps> = ({
       quality: normalizedQuality,
       aspectRatio: selectedAspectId,
     });
-    onClose();
+    if (submitted !== false) onClose();
   }, [
     activePreset,
     azimuth,

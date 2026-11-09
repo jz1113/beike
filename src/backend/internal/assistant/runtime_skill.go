@@ -1,8 +1,10 @@
 package assistant
 
 import (
+	_ "embed"
 	"encoding/json"
 	"strings"
+	"sync"
 )
 
 var alwaysSkillTools = []string{"update_plan", "read_skill", "read_skill_file", "read_tool_result"}
@@ -12,12 +14,13 @@ func parseSkillCatalog(raw json.RawMessage) []skillPackage {
 		return nil
 	}
 	var rows []struct {
-		ID          string   `json:"id"`
-		Name        string   `json:"name"`
-		Description string   `json:"description"`
-		Prompt      string   `json:"prompt"`
-		Tools       []string `json:"tools"`
-		Resources   []struct {
+		ID              string   `json:"id"`
+		BuiltinRevision string   `json:"builtinRevision"`
+		Name            string   `json:"name"`
+		Description     string   `json:"description"`
+		Prompt          string   `json:"prompt"`
+		Tools           []string `json:"tools"`
+		Resources       []struct {
 			Path    string `json:"path"`
 			Content string `json:"content"`
 		} `json:"resources"`
@@ -42,6 +45,7 @@ func parseSkillCatalog(raw json.RawMessage) []skillPackage {
 			name = id
 		}
 		item := skillPackage{ID: id, Name: name, Description: trimRunes(strings.TrimSpace(row.Description), 400)}
+		item.BuiltinRevision = trimRunes(strings.TrimSpace(row.BuiltinRevision), 128)
 		prompt := trimRunes(strings.TrimSpace(row.Prompt), 12_000)
 		resources := []skillResource{}
 		for _, file := range row.Resources {
@@ -92,7 +96,7 @@ func skillCatalogNote(skills []skillPackage, pinned string) string {
 		if skill.Description != "" {
 			line += "：" + skill.Description
 		}
-		if skill.Prompt == "" {
+		if skill.Prompt == "" && skill.BuiltinRevision == "" {
 			line += "（正文未携带）"
 		}
 		b.WriteString(line + "\n")
@@ -115,7 +119,7 @@ func insertSkillCatalog(messages []map[string]any, note string) []map[string]any
 
 func catalogHasResources(skills []skillPackage) bool {
 	for _, skill := range skills {
-		if len(skill.Resources) > 0 {
+		if len(skill.Resources) > 0 || skill.BuiltinRevision != "" {
 			return true
 		}
 	}
@@ -159,6 +163,13 @@ func (box *toolBox) readSkill(args map[string]any) string {
 			hint += "可用 id：" + strings.Join(ids, "、") + "。"
 		}
 		return toolJSON(false, hint+"请改用目录中的 id，或直接说明并继续。")
+	}
+	if found.Prompt == "" && found.BuiltinRevision != "" {
+		if snapshot, ok := builtinSkillSnapshot(found.ID, found.BuiltinRevision); ok {
+			*found = snapshot
+		} else {
+			return toolJSON(false, "该内置技能的固定版本与服务器不一致，请更新应用并重新加载；不会用其他版本替换。")
+		}
 	}
 	if found.Prompt == "" {
 		return toolJSON(false, "「"+found.Name+"」本轮只携带了名称和用途，正文未随目录发送。请直接说明并改用最接近的做法。")
@@ -220,4 +231,128 @@ func (box *toolBox) noteSkillTools(extra []string) {
 	if box.applyTools != nil {
 		box.applyTools(next)
 	}
+}
+
+//go:embed builtinSkillPackages.json
+var builtinSkillPackagesJSON []byte
+
+// This seed is compiled and hash-verified at build time; lookup never touches user paths or a network.
+var builtinSkillSnapshots = sync.OnceValue(func() map[string]skillPackage {
+	var rows []struct {
+		ID                  string   `json:"id"`
+		Name                string   `json:"name"`
+		DisplayName         string   `json:"displayName"`
+		Description         string   `json:"description"`
+		Prompt              string   `json:"prompt"`
+		RuntimeInstructions string   `json:"runtimeInstructions"`
+		Tools               []string `json:"tools"`
+		RuntimeTools        []string `json:"runtimeTools"`
+		Files               []struct {
+			Path    string `json:"path"`
+			Content string `json:"content"`
+		} `json:"files"`
+		Source struct {
+			Revision string `json:"revision"`
+		} `json:"source"`
+	}
+	if json.Unmarshal(builtinSkillPackagesJSON, &rows) != nil {
+		return nil
+	}
+	out := map[string]skillPackage{}
+	for _, row := range rows {
+		name := row.DisplayName
+		if name == "" {
+			name = row.Name
+		}
+		prompt := strings.TrimSpace(row.Prompt)
+		item := skillPackage{ID: row.ID, Name: name, Description: row.Description, BuiltinRevision: row.Source.Revision, Prompt: prompt, Tools: builtinRuntimeTools(row.Tools, row.RuntimeTools)}
+		if len(prompt) > 9000 {
+			item.Resources = append(item.Resources, skillResource{Path: "SKILL.md", Content: prompt})
+			item.Prompt = "完整主指令在 SKILL.md。执行任务前必须用 read_skill_file 读取该文件，skill_id 使用当前技能 id；如有 hasMore，按 nextOffset 继续，直到读完主指令。"
+		}
+		if host := strings.TrimSpace(row.RuntimeInstructions); host != "" {
+			item.Prompt += "\n\n【贝壳宿主执行适配】\n" + host
+		}
+		for _, file := range row.Files {
+			item.Resources = append(item.Resources, skillResource{Path: file.Path, Content: strings.TrimSpace(file.Content)})
+		}
+		out[item.ID] = item
+	}
+	return out
+})
+
+// Host permissions never forward an upstream platform's tool identifiers.
+func builtinRuntimeTools(original, mapped []string) []string {
+	if mapped != nil {
+		return mapped
+	}
+	return original
+}
+
+func builtinSkillSnapshot(id, revision string) (skillPackage, bool) {
+	item, ok := builtinSkillSnapshots()[id]
+	return item, ok && revision != "" && item.BuiltinRevision == revision
+}
+
+// Catalog packages must not overwrite the resource snapshot of a pinned skill.
+func (box *toolBox) mergeSkillFiles(id string, files []skillResource) {
+	if id == box.pinnedSkillID {
+		return
+	}
+	if box.skillFilePackages == nil {
+		box.skillFilePackages = map[string][]skillResource{}
+	}
+	box.skillFilePackages[id] = files
+}
+
+func (box *toolBox) readSkillFile(args map[string]any) string {
+	path := textArg(args, "path")
+	id := textArg(args, "skill_id")
+	if path == "" {
+		return toolJSON(false, "缺少技能文件路径")
+	}
+	type match struct {
+		skillID string
+		file    skillResource
+	}
+	var matches []match
+	if id == "" || id == box.pinnedSkillID {
+		for _, file := range box.skillFiles {
+			if file.Path == path {
+				matches = append(matches, match{box.pinnedSkillID, file})
+			}
+		}
+	}
+	for skillID, files := range box.skillFilePackages {
+		if id != "" && id != skillID {
+			continue
+		}
+		for _, file := range files {
+			if file.Path == path {
+				matches = append(matches, match{skillID, file})
+			}
+		}
+	}
+	if len(matches) == 0 {
+		return toolJSON(false, "当前已读取的技能资料里没有这个文件，请先 read_skill 并核对 skill_id 与 path")
+	}
+	if len(matches) > 1 {
+		return toolJSON(false, "多个技能包含同名文件，请指定 skill_id 后读取")
+	}
+	runes := []rune(matches[0].file.Content)
+	offset, length := intArg(args, "offset"), intArgDefault(args, "length", 8000)
+	if offset < 0 || offset > len(runes) || length < 1 || length > 12000 {
+		return toolJSON(false, "文件读取范围无效；offset 不得超过总字符数，length 应为 1–12000")
+	}
+	end := offset + length
+	if end > len(runes) {
+		end = len(runes)
+	}
+	payload := map[string]any{"success": true, "path": path, "skillId": matches[0].skillID,
+		"content": string(runes[offset:end]), "offset": offset, "total": len(runes), "hasMore": end < len(runes)}
+	if end < len(runes) {
+		payload["nextOffset"] = end
+	}
+	body, _ := json.Marshal(payload)
+	return string(body)
 }

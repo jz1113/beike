@@ -1,12 +1,14 @@
 import type { AssistantTaskState, AssistantRunMode, ReferenceScope } from '@shared/domain/assistant/taskPolicy';
 /** Domain types used by the Zustand app store (and UI that consumes them). */
 
+import type { UsageScope } from '@client/shared/utils/usageScope';
 import type { DepthVideoStyle } from '@shared/domain/media/depthVideo';
 import type { AssistantItem } from '@shared/domain/assistant/types';
 import type { GenerationTask as ContractGenerationTask, GenerationMediaType } from '@shared/contracts/generate';
 
 export type { GenerationMediaType };
 export interface AgentTurnTaskData {
+  productWidget?: ProductWidgetData;
   threadId?: string;
   turnId?: string;
   modelUsed?: string;
@@ -48,8 +50,17 @@ export interface AgentTurnTaskData {
 }
 
 export type GenerationTask = ContractGenerationTask & {
+  firstFrameImage?: string;
+  lastFrameImage?: string;
+  /** Canvas tasks belong to their project, independently of the selected conversation. */
   canvasProjectId?: string;
-  usageScope?: import("@client/shared/utils/usageLog").UsageScope;
+  /** Legacy task metadata retained by restored generation history. */
+  outputUrl?: string;
+  source?: string;
+  workshopMode?: string;
+  aspectRatio?: string;
+  params?: { quality?: string; duration?: number | string };
+  options?: { quality?: string; duration?: number | string };
   /** Original assistant deliverable; kept across generation history restoration. */
   generationOrigin?: { sourceId: string; entryId: string };
   depthStyle?: DepthVideoStyle;
@@ -57,15 +68,18 @@ export type GenerationTask = ContractGenerationTask & {
   referenceMediaMissing?: boolean;
   /** The original submission may have been accepted; only query it until reconciled. */
   submissionRecoveryRequired?: boolean;
+  /** Latest query was blocked before reaching the original upstream channel. */
+  routeQueryBlock?: string;
   /** Real runtime data when mediaType === 'agent' */
   agentTurn?: AgentTurnTaskData;
   /** 模态条目 id。与 model 不同时，请求凭证按这个条目而不是上游 ID 的第一条匹配。 */
   modelRouteKey?: string;
+  usageScope?: UsageScope;
 };
 
 export interface ChatSession {
-  canvasProjectId?: string;
   id: string;
+  canvasProjectId?: string;
   title: string;
   createdAt: number;
   updatedAt?: number;
@@ -88,6 +102,12 @@ export interface MediaAttachment {
 }
 
 export interface ProductWidgetData {
+  shopName?: string;
+  currentSpecs?: Record<string, string>;
+  variantMetadata?: {
+    selectedVariantId?: string;
+    variants: Array<{ id: string; color?: string }>;
+  };
   imageSources?: Array<{ url: string; label: string; sourceUrl?: string }>;
   id?: string;
   itemId: string;

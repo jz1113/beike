@@ -99,14 +99,8 @@ func imageFamily(model string) string {
 }
 
 func imageSubmitURLs(base string, edits bool, family, model string) []string {
+	_ = model
 	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
-	if model == "openai/gpt-image-2" {
-		path := "/v1/images/generations"
-		if edits {
-			path = "/v1/images/edits"
-		}
-		return []string{root + path}
-	}
 	if family == "qwen-edit" {
 		return []string{root + "/v1/images/edits"}
 	}
@@ -120,9 +114,6 @@ func dispatchImage(r *http.Request, urls []string, apiKey string, payload map[st
 	var lastStatus int
 	var lastData map[string]any
 	timeout := 45 * time.Second
-	if payloadText(payload["model"]) == "openai/gpt-image-2" {
-		timeout = 180 * time.Second
-	}
 	for _, endpoint := range urls {
 		var status int
 		var raw []byte
@@ -282,9 +273,7 @@ func imageSubmitTransportError(err error) string {
 }
 
 func imageSubmitCredentials(cfg config.Config, r *http.Request, payload map[string]json.RawMessage, model string) (string, string) {
-	if model == "openai/gpt-image-2" {
-		return lianchiImageBase, strings.TrimSpace(r.Header.Get("x-lianchi-api-key"))
-	}
+	_ = model
 	clientBase := rawString(payload, "customBaseUrl")
 	if clientBase == "" {
 		clientBase = strings.TrimSpace(r.Header.Get("x-custom-base-url"))

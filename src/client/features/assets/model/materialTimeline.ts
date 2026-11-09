@@ -1,7 +1,5 @@
-import type { MergedAssetTask } from './mergeAssetTasks';
 import { getAssetTime, matchesAssetTime } from '@client/shared/utils/assetTaskData';
-import { getAssetMediaKind } from './assetMedia';
-import { isPureAgentDialogue } from './agentAssetFilter';
+import { getAssetMediaKind, isPureAgentDialogue, type MergedAssetTask } from './agentAssetFilter';
 import { useI18nStore, TRANSLATIONS, type SupportedLocale } from '@client/shared/i18n';
 
 type Task = MergedAssetTask;
@@ -16,25 +14,21 @@ export interface TimelineGroup {
 export interface MaterialFilterOptions {
   sourceType: 'ai' | 'uploaded';
   mediaCategory: 'all' | 'image' | 'video' | 'audio' | 'document';
-  statusFilter?: 'all' | 'completed' | 'failed';
+  statusFilter?: 'all' | 'completed';
   timeFilter?: 'all' | 'today' | 'yesterday' | '7days' | '30days';
   searchInput: string;
   sortOrder: 'newest' | 'oldest' | 'name';
 }
 
 export function filterMaterialTasks(tasks: Task[], opts: MaterialFilterOptions): Task[] {
-  let list = tasks.filter((t) => !isPureAgentDialogue(t));
+  let list = tasks.filter((t) => t.status !== 'FAILURE' && !isPureAgentDialogue(t));
   // A reference attached to a generation is not an independent uploaded asset.
   list = list.filter((task) => opts.sourceType === 'uploaded' ? task.isUploaded === true : !task.isUploaded);
   if (opts.mediaCategory !== 'all') {
     list = list.filter((t) => getAssetMediaKind(t) === opts.mediaCategory);
   }
-  if (opts.statusFilter && opts.statusFilter !== 'all') {
-    if (opts.statusFilter === 'completed') {
-      list = list.filter((t) => (t.resultUrl || getAssetMediaKind(t) === 'document') && t.status !== 'FAILURE');
-    } else if (opts.statusFilter === 'failed') {
-      list = list.filter((t) => t.status === 'FAILURE');
-    }
+  if (opts.statusFilter === 'completed') {
+    list = list.filter((t) => t.resultUrl || getAssetMediaKind(t) === 'document');
   }
   list = list.filter((task) => matchesAssetTime(task.createdAt, opts.timeFilter || 'all'));
   const kw = opts.searchInput.trim().toLowerCase();

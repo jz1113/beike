@@ -53,13 +53,10 @@ export default function GenerateWorkspace({
   const { dropZoneProps: pageMediaDropProps, toastMsg: dropToastMsg } = useQuickRefMediaDrop();
   const combinedToast = toastMsg || dropToastMsg;
 
-  // 底部吸底提示词控制栏折叠与展开状态（参考画布常态设计）
-  const [isDockExpanded, setIsDockExpanded] = useState(false);
-
   const promptDockRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // 动态测量底部 PromptActionBar 高度，避免滚动内容被遮挡
+  // 测量输入区高度，供“回到最新消息”浮动按钮定位使用。
   useEffect(() => {
     const dock = promptDockRef.current;
     const scroll = scrollContainerRef.current;
@@ -115,7 +112,7 @@ export default function GenerateWorkspace({
   );
 
   return (
-    <div className={`${pageRoot} bg-transparent select-none relative`}>
+    <div className={`${pageRoot} bg-white dark:bg-[#18181b] select-none relative`}>
       {/* 全局浮动操作提示 (Toast) */}
       {combinedToast && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-2xl bg-slate-900/90 backdrop-blur-md text-white text-xs font-semibold shadow-2xl border border-white/10 animate-fade-in flex items-center gap-2">
@@ -135,15 +132,12 @@ export default function GenerateWorkspace({
           onShowToast={showToast}
         />
 
-        {/* 🌟 3. 底部吸底提示词控制栏 (画布同款常态折叠与展开：常态 max-w-[560px]，展开 max-w-5xl 2xl:max-w-6xl) */}
-        <div ref={promptDockRef} className={`absolute bottom-4 inset-x-4 sm:inset-x-6 ${previewTask ? 'z-55' : 'z-30'} pointer-events-none min-w-0 transition-all duration-300 ease-out`}>
-          <div className={`w-full mx-auto pointer-events-auto min-w-0 overflow-visible transition-all duration-300 ease-out ${
-            isDockExpanded ? 'max-w-5xl 2xl:max-w-6xl' : 'max-w-[560px] 2xl:max-w-[620px]'
-          }`}>
+        {/* 输入区占据独立空间，消息与操作按钮不会滚入输入框背后。 */}
+        <div ref={promptDockRef} className={`relative shrink-0 px-4 pb-4 pt-2 sm:px-6 ${previewTask ? 'z-55' : 'z-30'} pointer-events-none min-w-0`}>
+          <div className="w-full max-w-3xl mx-auto pointer-events-auto min-w-0 overflow-visible">
             <PromptActionBar 
               dropdownPlacement="up"
               collapsible={true}
-              onExpandChange={setIsDockExpanded}
             />
           </div>
         </div>

@@ -196,20 +196,6 @@
       "description": "OpenAI 新一代生图，支持 low/medium/high/xhigh/max 与最多 16 张参考图编辑"
     },
     {
-      "id": "openai/gpt-image-2",
-      "name": "联池image2",
-      "shortName": "联池image2",
-      "provider": "OpenAI",
-      "supportedQualities": [
-        "high",
-        "medium",
-        "low"
-      ],
-      "defaultSize": "1024x1024",
-      "supportEdits": true,
-      "description": "联池 OpenAI 兼容图像接口，支持文生图与多参考图编辑"
-    },
-    {
       "id": "gpt-image-2.5-sunburst",
       "name": "GPT Image 2.5 Sunburst",
       "shortName": "GPT Image 2.5 Sunburst",

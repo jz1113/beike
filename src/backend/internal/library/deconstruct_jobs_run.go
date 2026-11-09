@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
@@ -19,27 +20,29 @@ import (
 )
 
 type liveDeconstructJob struct {
-	stopping bool
+	stopping atomic.Bool
 	done     chan struct{}
 }
 
 var (
 	deconstructJobsMu       sync.Mutex
 	deconstructJobsLive     = map[string]*liveDeconstructJob{}
-	deconstructJobsShutdown bool
+	deconstructJobsShutdown atomic.Bool
 )
 
 func submitDeconstructJobs(cfg config.Config, w http.ResponseWriter, r *http.Request, body []byte) {
-	deconstructJobsMu.Lock()
-	shutting := deconstructJobsShutdown
-	deconstructJobsMu.Unlock()
-	if shutting {
+	if deconstructJobsShutdown.Load() {
 		writeJobError(w, http.StatusServiceUnavailable, "服务正在关闭，请稍后重新提交并核对原任务", "server_shutting_down")
 		return
 	}
 	var payload map[string]any
 	if json.Unmarshal(body, &payload) != nil {
 		writeJobError(w, http.StatusBadRequest, "后台反推参数无效", "invalid_job_submission")
+		return
+	}
+	jobID := strings.TrimSpace(stringValue(payload["jobId"]))
+	if jobID == "" {
+		writeJobError(w, http.StatusBadRequest, "缺少后台反推任务 ID", "invalid_job_submission")
 		return
 	}
 	protocol, protocolErr := generate.RequestTextProtocol(r, payload)
@@ -74,7 +77,7 @@ func submitDeconstructJobs(cfg config.Config, w http.ResponseWriter, r *http.Req
 	}
 	defer db.Close()
 	created, err := dbworkshop.CreateDeconstructJob(r.Context(), db, httpx.WorkspaceFrom(r), jobStorageRoot(cfg), dbworkshop.DeconstructJobCreate{
-		JobID: stringValue(payload["jobId"]), InputHash: hash, ConfigJSON: string(rawConfig),
+		JobID: jobID, InputHash: hash, ConfigJSON: string(rawConfig),
 		Concurrency: concurrency, ReviewBeforeSave: reviewBefore, Items: jobRecords(items),
 	})
 	if err == dbworkshop.ErrJobConflict {
@@ -89,8 +92,8 @@ func submitDeconstructJobs(cfg config.Config, w http.ResponseWriter, r *http.Req
 		writeJobError(w, http.StatusInternalServerError, "后台反推提交失败", "internal_error")
 		return
 	}
-	if !created.Reused && !deconstructJobsShutdown {
-		startDeconstructJob(cfg, httpx.WorkspaceFrom(r), stringValue(payload["jobId"]), items, configBody, baseURL, apiKey)
+	if !created.Reused && !deconstructJobsShutdown.Load() {
+		startDeconstructJob(cfg, httpx.WorkspaceFrom(r), jobID, items, configBody, baseURL, apiKey)
 	}
 	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"success": true, "reused": created.Reused, "job": created.Job})
 }
@@ -103,7 +106,7 @@ func stopDeconstructJobs(cfg config.Config, w http.ResponseWriter, r *http.Reque
 	key := httpx.WorkspaceFrom(r) + ":" + payload.JobID
 	deconstructJobsMu.Lock()
 	if live := deconstructJobsLive[key]; live != nil {
-		live.stopping = true
+		live.stopping.Store(true)
 	}
 	deconstructJobsMu.Unlock()
 	db, err := database.OpenRequired(cfg.SQLiteFile())
@@ -131,7 +134,7 @@ func startDeconstructJob(cfg config.Config, workspace, jobID string, items []map
 	key := workspace + ":" + jobID
 	live := &liveDeconstructJob{done: make(chan struct{})}
 	deconstructJobsMu.Lock()
-	if deconstructJobsShutdown {
+	if deconstructJobsShutdown.Load() {
 		deconstructJobsMu.Unlock()
 		return
 	}
@@ -177,7 +180,7 @@ func deconstructWorker(cfg config.Config, workspace string, live *liveDeconstruc
 		return
 	}
 	defer db.Close()
-	for !live.stopping {
+	for !live.stopping.Load() {
 		claimed, err := dbworkshop.ClaimDeconstructJobItem(context.Background(), db, workspace, jobID)
 		if err != nil || claimed == nil {
 			return
@@ -198,7 +201,7 @@ func deconstructWorker(cfg config.Config, workspace string, live *liveDeconstruc
 		}
 		status, body := executeDeconstruct(cfg, request, payload, deconstructHooks{
 			beforeDispatch: func() (bool, error) {
-				if live.stopping {
+				if live.stopping.Load() {
 					return false, nil
 				}
 				return dbworkshop.CommitDeconstructDispatch(context.Background(), db, workspace, jobID, claimed.ItemID)
@@ -307,10 +310,10 @@ func RecoverDeconstructJobs(cfg config.Config) (int, error) {
 
 func DrainDeconstructJobs(timeout time.Duration) {
 	deconstructJobsMu.Lock()
-	deconstructJobsShutdown = true
+	deconstructJobsShutdown.Store(true)
 	pending := make([]chan struct{}, 0, len(deconstructJobsLive))
 	for _, live := range deconstructJobsLive {
-		live.stopping = true
+		live.stopping.Store(true)
 		pending = append(pending, live.done)
 	}
 	deconstructJobsMu.Unlock()

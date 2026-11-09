@@ -1,14 +1,14 @@
 package assets
 
 import (
+	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/platform/database"
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"beike.local/cloud/src/backend/internal/config"
-	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func TestAssetLifecycleRejectsUnknownType(t *testing.T) {
@@ -59,5 +59,31 @@ func TestAssetLifecycleDisableUsesReason(t *testing.T) {
 	assetLifecycleHandler(cfg, "disable").ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("invalid reason status %d", response.Code)
+	}
+}
+
+func TestAssetPerformanceRejectsUnknownType(t *testing.T) {
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/catalog/assets/video/asset-1/performance", nil)
+	request.SetPathValue("type", "video")
+	request.SetPathValue("id", "asset-1")
+	assetPerformanceHandler(config.Config{}).ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "资产类型不正确") {
+		t.Fatalf("status %d body %s", response.Code, response.Body.String())
+	}
+}
+
+func TestClearAllTasksRequiresAdminInProduction(t *testing.T) {
+	handler := assetTasksDeleteHandler(config.Config{NodeEnv: "production", AccessToken: "secret"})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodDelete, "/api/assets/tasks", bytes.NewBufferString(`{"clearAll":true}`))
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("status %d body %s", response.Code, response.Body.String())
+	}
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/api/assets/tasks", nil))
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("missing status %d body %s", response.Code, response.Body.String())
 	}
 }

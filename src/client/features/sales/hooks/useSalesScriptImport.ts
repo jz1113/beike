@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { StoredSalesScript } from '../api/salesScripts';
-import { addSalesScriptImportFiles, type SalesScriptImportItem } from '../model/salesScriptImport';
+import { addSalesScriptImportFiles, readSalesScriptImport, saveSalesScriptImport, type SalesScriptImportItem } from '../model/salesScriptImport';
 import { runSalesScriptImportBatch } from '../api/salesScriptImport';
-import { readSalesScriptImport, saveSalesScriptImport } from '../model/salesScriptImportStorage';
 
 const STORAGE_ERROR = '批量进度未能保存，请保留当前页面并释放浏览器存储空间后继续。';
 const ACTIVE = new Set<SalesScriptImportItem['status']>(['uploading', 'analyzing', 'saving', 'depth']);

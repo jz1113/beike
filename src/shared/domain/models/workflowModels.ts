@@ -5,42 +5,24 @@
 
 import { IMAGE_GEN_MODELS } from '@shared/domain/media/drawing';
 import { VIDEO_GEN_MODELS } from '@shared/domain/media/video';
-import {
-  DEFAULT_MULTIMODAL_MODEL_ID,
-  isApprovedModel,
-  getApprovedModel,
-} from '@shared/domain/models/modelCatalog';
-import { deepSeekModel, deepSeekRouteId, isDeepSeekRoute, deepSeekModelId } from './deepseek';
-import { channelBadge, channelDisplayName } from './modelChannels';
+import { DEFAULT_MULTIMODAL_MODEL_ID, isApprovedModel, getApprovedModel } from '@shared/domain/models/modelCatalog';
+import { channelBadge, channelDisplayName, deepSeekModel, deepSeekRouteId, isDeepSeekRoute, deepSeekModelId } from './deepseek';
 import { domainStorage } from '../core/runtime';
 import { inferWorkflowCapabilitiesFromId, isKnownImageOnlyModel, isKnownVideoOnlyModel } from './workflowCapabilities';
-import { parseWorkflowModelList, isValidWorkflowModelList } from './workflowModelStorage';
+import { parseWorkflowModelList, isValidWorkflowModelList, type WorkflowCapability } from './workflowModelStorage';
 export { inferWorkflowCapabilitiesFromId, isKnownImageOnlyModel, isKnownVideoOnlyModel } from './workflowCapabilities';
 export type { InferredWorkflowCapabilities } from './workflowCapabilities';
-
-import type { WorkflowCapability } from './workflowModelTypes';
-export type { WorkflowCapability } from './workflowModelTypes';
+export type { WorkflowCapability } from './workflowModelStorage';
 
 export const OPENAI_MODEL_ROUTE_PREFIX = 'openai-responses:';
-
-export function openAIModelRouteId(modelId: string): string {
-  return `${OPENAI_MODEL_ROUTE_PREFIX}${modelId}`;
-}
-
-export function isOpenAIModelRouteId(routeId: string): boolean {
-  return routeId.startsWith(OPENAI_MODEL_ROUTE_PREFIX);
-}
-
+export function openAIModelRouteId(modelId: string): string { return `${OPENAI_MODEL_ROUTE_PREFIX}${modelId}`; }
+export function isOpenAIModelRouteId(routeId: string): boolean { return routeId.startsWith(OPENAI_MODEL_ROUTE_PREFIX); }
 export function upstreamModelId(routeId: string): string {
   if (isDeepSeekRoute(routeId)) return deepSeekModelId(routeId);
   return isOpenAIModelRouteId(routeId) ? routeId.slice(OPENAI_MODEL_ROUTE_PREFIX.length) : routeId;
 }
-
 /** Keep official channel identity until the server's Chat Completions adapter. */
-export function requestModelId(routeId: string): string {
-  return isDeepSeekRoute(routeId) ? routeId : upstreamModelId(routeId);
-}
-
+export function requestModelId(routeId: string): string { return isDeepSeekRoute(routeId) ? routeId : upstreamModelId(routeId); }
 export function workflowModelRouteId(model: Pick<WorkflowCapability, 'id' | 'routeId' | 'channel'>): string {
   return model.routeId || (model.channel === 'deepseek' ? deepSeekRouteId(model.id) : model.channel === 'openai' ? openAIModelRouteId(model.id) : model.id);
 }
@@ -121,7 +103,7 @@ export function repairWorkflowModelList(value: unknown): WorkflowCapability[] {
         ...item,
         id: canonicalId,
         routeId: routeId === canonicalId ? undefined : routeId,
-        channel: routeId === canonicalId ? (item.channel || (canonicalId === 'openai/gpt-image-2' ? 'lianchi' : 'comfly')) : 'openai',
+        channel: routeId === canonicalId ? (item.channel || 'comfly') : 'openai',
         isAssistant: routeId === canonicalId ? item.isAssistant : false,
         name: item.name && item.name !== item.id ? item.name : builtin?.name || item.name || canonicalId,
         shortName: item.shortName && item.shortName !== item.id ? item.shortName : builtin?.shortName || item.shortName || canonicalId,
@@ -262,17 +244,10 @@ export function isMultimodalWorkflowModel(m: WorkflowCapability): boolean {
 }
 
 /** 读取全局默认多模态模型（设置 / 助手 / 提示词工作室共用） */
-export function getStoredMultimodalModelId(
-  fallback = DEFAULT_MULTIMODAL_MODEL_ID
-): string {
+export function getStoredMultimodalModelId(fallback = DEFAULT_MULTIMODAL_MODEL_ID): string {
   const storage = domainStorage();
   if (!storage) return fallback;
-  return (
-    storage.getItem('ai_multimodal_model') ||
-    storage.getItem('ai_vision_model') ||
-    storage.getItem('ai_assistant_model') ||
-    fallback
-  );
+  return storage.getItem('ai_multimodal_model') || storage.getItem('ai_vision_model') || storage.getItem('ai_assistant_model') || fallback;
 }
 
 /** 写入全局默认多模态模型，同步全部 legacy key */
@@ -289,39 +264,24 @@ export function setStoredMultimodalModelId(id: string): boolean {
       throw error;
     }
     return true;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
 /** 若当前存储的是生图/无效模型，自动回退到首个可用多模态模型 */
-export function resolveStoredMultimodalModelId(
-  enabledModels?: WorkflowCapability[],
-  fallback = DEFAULT_MULTIMODAL_MODEL_ID
-): string {
+export function resolveStoredMultimodalModelId(enabledModels?: WorkflowCapability[], fallback = DEFAULT_MULTIMODAL_MODEL_ID): string {
   const list = enabledModels ?? getEnabledMultimodalModelsFromSettings();
   const stored = getStoredMultimodalModelId(fallback);
   if (list.some((m) => m.id === stored)) return stored;
-  if (list.length > 0) {
-    setStoredMultimodalModelId(list[0].id);
-    return list[0].id;
-  }
+  if (list.length > 0) { setStoredMultimodalModelId(list[0].id); return list[0].id; }
   setStoredMultimodalModelId('');
   return '';
 }
 
 /** 网关模型条目 → 工作区 WorkflowModel */
-export function gatewayModelToWorkflowModel(model: {
-  id: string;
-  name?: string;
-  shortName?: string;
-  isVision?: boolean;
-  isImage?: boolean;
-  isVideo?: boolean;
-  isMultimodal?: boolean;
-  isThinking?: boolean;
-  category?: string;
-}, channel: WorkflowCapability['channel'] = 'comfly'): WorkflowCapability {
+export function gatewayModelToWorkflowModel(
+  model: { id: string; name?: string; shortName?: string; isVision?: boolean; isImage?: boolean; isVideo?: boolean; isMultimodal?: boolean; isThinking?: boolean; category?: string },
+  channel: WorkflowCapability['channel'] = 'comfly',
+): WorkflowCapability {
   const caps = getApprovedModel(model.id) ? inferWorkflowCapabilitiesFromId(model.id) : undefined;
   return normalizeWorkflowModel({
     id: model.id,

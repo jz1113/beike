@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureDomainRuntime } from '@shared/domain/core/runtime';
-import { selectedTextModel } from '@shared/domain/models/textModelRoute';
+import { selectedTextModel } from '@shared/domain/models/workflowModelStorage';
 import { resolveModalityModelRoute, type StoredModalityModelItem } from '@shared/domain/models/modalityStorage';
 import {
   getGatewayClientHeaders, getModelCredentials, getMultimodalClientOverrides,
@@ -159,5 +159,39 @@ describe('legacy and official text routes remain available', () => {
       customBaseUrl: 'http://responses.example', customApiKey: 'fixture-openai', textProtocol: 'openai',
       apiFormat: 'openai-responses', allowInsecureHttp: true,
     });
+  });
+});
+
+
+describe('qwen image credentials', () => {
+  it('uses the saved Qianwen provider when the model has no gateway of its own', () => {
+    memory.set('ai_base_url', 'https://ai.comfly.org');
+    memory.set('ai_api_key', 'global-key');
+    memory.set('beike_api_providers_v2', JSON.stringify([
+      { id: 'qianwen_platform', providerType: 'dashscope', baseUrl: 'https://maas.qianwenaiapi.com', apiKey: 'qwen-key' },
+    ]));
+    expect(getModelCredentials('qwen-image-3.0-pro')).toMatchObject({
+      baseUrl: 'https://maas.qianwenaiapi.com',
+      apiKey: 'qwen-key',
+      protocol: 'dashscope',
+    });
+    const headers = getGatewayClientHeaders('qwen-image-3.0-pro');
+    expect(headers['x-custom-base-url']).toBe('https://maas.qianwenaiapi.com');
+    expect(headers['x-custom-api-key']).toBe('qwen-key');
+    expect(headers['x-custom-protocol']).toBe('dashscope');
+  });
+
+  it('keeps an explicitly bound gateway and leaves qwen-image-max on the global gateway', () => {
+    memory.set('beike_api_providers_v2', JSON.stringify([
+      { id: 'qianwen_platform', providerType: 'dashscope', baseUrl: 'https://maas.qianwenaiapi.com', apiKey: 'qwen-key' },
+      { id: 'comfly', providerType: 'openai', baseUrl: 'https://ai.comfly.org', apiKey: 'comfly-key' },
+    ]));
+    memory.set('custom_models', JSON.stringify([
+      { id: 'qwen-image-3.0-pro', providerId: 'comfly' },
+    ]));
+    expect(getModelCredentials('qwen-image-3.0-pro').baseUrl).toBe('https://ai.comfly.org');
+    expect(getModelCredentials('qwen-image-max')).toEqual({});
+    expect(getModelCredentials('qwen-image')).toEqual({});
+    expect(getModelCredentials('qwen-image-edit')).toEqual({});
   });
 });

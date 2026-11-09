@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Trash2, Globe } from 'lucide-react';
 import { type ApiProvider } from '../../model/apiProviderTypes';
 import { ProviderBasicConfigCard } from './ProviderBasicConfigCard';
-import { ComflyLogo, LianchiLogo, OpenAILogo, DeepSeekLogo } from '@client/shared/icons';
+import { ComflyLogo, OpenAILogo, DeepSeekLogo } from '@client/shared/icons/brands/BrandIcons';
 
 interface Props {
   provider: ApiProvider;
@@ -38,9 +38,6 @@ export function ApiProviderDetailPanel({
     if (provider.id === 'comfly_gateway' || provider.iconType === 'comfly') {
       return <ComflyLogo className={cls} />;
     }
-    if (provider.id === 'lianchi_images' || provider.iconType === 'lianchi') {
-      return <LianchiLogo className={cls} />;
-    }
     return <Globe className="w-7 h-7 text-slate-500 dark:text-slate-400" />;
   };
 
@@ -50,7 +47,7 @@ export function ApiProviderDetailPanel({
   };
 
   return (
-    <div className="w-full space-y-4">
+    <fieldset disabled={isSaving} className="m-0 min-w-0 w-full space-y-4 border-0 p-0">
       {/* 顶部 Header：服务商基本信息 + 总开关 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-white/10">
         <div className="flex items-center gap-3">
@@ -133,6 +130,6 @@ export function ApiProviderDetailPanel({
           </button>
         )}
       </div>
-    </div>
+    </fieldset>
   );
 }

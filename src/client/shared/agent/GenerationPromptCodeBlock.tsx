@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import MarkdownCodeBlock from '@client/shared/ui/markdown/MarkdownCodeBlock';
 import type { GenerationPromptSource } from './generationBatchSources';
-import { dispatchGenerationBatch } from './dispatchGenerationBatch';
-import { readGenerationBatchReceipts } from './generationBatchReceipts';
+import { dispatchGenerationBatch, readGenerationBatchReceipts } from './dispatchGenerationBatch';
 
 export default function GenerationPromptCodeBlock({ code, lang, incomplete, source, disabled }: {
   code: string; lang: string; incomplete: boolean; source: GenerationPromptSource; disabled: boolean;

@@ -1,9 +1,62 @@
 import { executeGenerationBatchAction } from '@client/shared/agent/dispatchGenerationBatch';
 import { apiFetch } from '@client/shared/api/apiClient';
+import { apiRequest } from '@client/shared/api/apiRequest';
 import { useAppStore } from '@client/store';
+import type { AssistantTurn } from '@shared/domain/assistant/types';
+import { normalizeAssistantItems, normalizeAssistantTask } from '@shared/domain/assistant/normalizeAssistantItems';
 import type { ApprovalDecision } from '../model/assistantTurnTypes';
 import { isAppView } from '@client/store/appView';
-import { getReplyReferenceMedia, prepareAssistantImagePrompt } from '../model/assistantPromptReferences';
+import { getReplyReferenceMedia, prepareAssistantImagePrompt } from '../model/assistantConstants';
+
+export interface ActiveRun {
+  turnId: string;
+  threadId: string;
+  status: 'running' | 'awaiting_approval' | 'completed' | 'interrupted' | 'failed';
+  model?: string | null;
+  startedAt: number;
+  completedAt?: number | null;
+  usage?: { inputTokens: number; outputTokens: number };
+}
+
+export async function fetchAssistantRuns(): Promise<ActiveRun[]> {
+  const res = await apiRequest('GET', '/api/assistant/runs');
+  if (!res.ok) throw new Error(`读取助手任务失败 (HTTP ${res.status})`);
+  const data = await res.json();
+  if (data.success === false) throw new Error(data.error || '读取助手任务失败');
+  return Array.isArray(data.runs) ? data.runs : [];
+}
+
+async function readSnapshotResponse(res: Response, turnId: string, threadId?: string): Promise<AssistantTurn | null> {
+  if (!res.ok) return null;
+  const data = await res.json().catch(() => null);
+  const snapshot = data?.snapshot;
+  if (
+    data?.success !== true ||
+    !snapshot ||
+    snapshot.id !== turnId ||
+    typeof snapshot.threadId !== 'string' ||
+    (threadId && snapshot.threadId !== threadId) ||
+    !['running', 'awaiting_approval', 'completed', 'interrupted', 'failed'].includes(snapshot.status)
+  ) {
+    return null;
+  }
+  return {
+    ...snapshot,
+    items: normalizeAssistantItems(snapshot.items),
+    task: normalizeAssistantTask(snapshot.task),
+    modelUsed: typeof snapshot.modelUsed === 'string' ? snapshot.modelUsed : undefined,
+  };
+}
+
+export async function fetchAssistantTurnSnapshot(turnId: string, threadId?: string): Promise<AssistantTurn | null> {
+  const res = await apiRequest('GET', '/api/assistant/turns/{turnId}/snapshot', { pathParams: { turnId } });
+  return readSnapshotResponse(res, turnId, threadId);
+}
+
+export async function recoverAssistantTurn(turnId: string, threadId?: string): Promise<AssistantTurn | null> {
+  const res = await apiRequest('POST', '/api/assistant/turns/{turnId}/recover', { pathParams: { turnId } });
+  return readSnapshotResponse(res, turnId, threadId);
+}
 
 export async function approveAssistantTool(
   turnId: string,
@@ -63,13 +116,9 @@ export function executeClientToolAction(
         showToast('未找到可载入的商品图片，请先采集商品或从商品库选择');
         break;
       }
-      store.setWorkshopMode('storyboard_generate');
-      store.setActiveWorkshopTab('studio');
-      store.setCurrentView('workshop');
       store.setProductData({ itemId: String(product.itemId), title: String(product.title || product.itemId),
         platform: String(product.platform || 'local'), price: typeof product.price === 'number' ? product.price : String(product.price || ''),
         picUrl: typeof product.picUrl === 'string' ? product.picUrl : imageGroups.main[0] }, imageGroups, '🤖 AI 助手载入');
-      store.setStep(2);
       showToast(String(action.message || '已装载至电商图文'));
       break;
     }

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const baseURL = 'http://127.0.0.1:' + (process.env.BEIKE_BROWSER_PORT || '3199');
+const baseURL = 'http://127.0.0.1:3199';
 
 export default defineConfig({
   testDir: '../scripts/web',

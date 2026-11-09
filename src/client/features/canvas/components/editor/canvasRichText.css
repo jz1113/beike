@@ -1,11 +1,180 @@
-.canvas-rich-text { user-select: text; white-space: pre-wrap; }
-.canvas-rich-text p, .canvas-rich-text div { min-height: 1em; }
-.canvas-rich-text h1 { font-size: 1.7em; font-weight: 700; line-height: 1.4; margin: .3em 0; }
-.canvas-rich-text h2 { font-size: 1.4em; font-weight: 600; line-height: 1.5; margin: .3em 0; }
-.canvas-rich-text h3 { font-size: 1.15em; font-weight: 600; line-height: 1.5; margin: .3em 0; }
-.canvas-rich-text ul { list-style: disc; padding-left: 1.5em; }
-.canvas-rich-text ol { list-style: decimal; padding-left: 1.5em; }
-.canvas-rich-text hr { border: 0; border-top: 1px solid #cbd5e1; margin: 1em 0; }
-.dark .canvas-rich-text hr { border-top-color: rgba(255, 255, 255, 0.14); }
-.canvas-rich-text b, .canvas-rich-text strong { font-weight: 700; }
-.canvas-rich-text i, .canvas-rich-text em { font-style: italic; }
+.canvas-rich-text {
+  user-select: text;
+  white-space: pre-wrap;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+.canvas-rich-text > :first-child { margin-top: 0; }
+.canvas-rich-text > :last-child { margin-bottom: 0; }
+.canvas-rich-text p, .canvas-rich-text div { min-height: 1.2em; margin: 0.2em 0; }
+.canvas-rich-text h1 {
+  font-size: 2em;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0.45em 0 0.3em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+.dark .canvas-rich-text h1 {
+  color: #f5f5f5;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+.canvas-rich-text h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0.45em 0 0.3em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+.dark .canvas-rich-text h2 {
+  color: #cccccc;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+.canvas-rich-text h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0.45em 0 0.3em;
+}
+.dark .canvas-rich-text h3 {
+  color: #cccccc;
+}
+.canvas-rich-text h1:first-child,
+.canvas-rich-text h2:first-child,
+.canvas-rich-text h3:first-child {
+  margin-top: 0;
+}
+.canvas-rich-text ul {
+  list-style-type: disc;
+  list-style-position: outside;
+  margin: 0.3em 0;
+  padding-left: 1.25em;
+}
+.canvas-rich-text ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+  margin: 0.3em 0;
+  padding-left: 1.25em;
+}
+.canvas-rich-text li {
+  display: list-item;
+  margin: 0.15em 0;
+  padding-left: 0.2em;
+  line-height: 1.5;
+}
+.canvas-rich-text li::marker {
+  color: #71717a;
+  font-weight: 400;
+}
+.canvas-rich-text hr {
+  border: 0;
+  height: 2px;
+  margin: 1.25em 0;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+.dark .canvas-rich-text hr {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.canvas-rich-text b, .canvas-rich-text strong { font-weight: 700; color: inherit; }
+.canvas-rich-text i, .canvas-rich-text em { font-style: italic; color: inherit; }
+
+/* 桥豆麻衣 1:1 文本节点顶部工具栏样式 (.text-node-rich-toolbar) */
+.text-node-rich-toolbar {
+  box-sizing: border-box;
+  overflow: visible !important;
+  background: #f6f6f6;
+  border-color: #e4e4e7;
+  color: rgba(24, 24, 27, 0.82);
+}
+.dark .text-node-rich-toolbar {
+  background: rgba(38, 38, 38, 0.82);
+  border-color: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  color: rgba(255, 255, 255, 0.9);
+}
+.text-node-rich-toolbar .text-node-rich-toolbar-btn {
+  position: relative;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 9999px;
+  color: #52525b;
+  transition: color 0.12s ease;
+}
+.dark .text-node-rich-toolbar .text-node-rich-toolbar-btn {
+  color: #7a7a7a;
+}
+.text-node-rich-toolbar .text-node-rich-toolbar-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-sizing: border-box;
+  opacity: 0 !important;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.14s ease;
+}
+.text-node-rich-toolbar .text-node-rich-toolbar-btn > * {
+  position: relative;
+  z-index: 1;
+}
+.text-node-rich-toolbar .text-node-rich-toolbar-btn:hover,
+.text-node-rich-toolbar .text-node-rich-toolbar-btn--active,
+.text-node-rich-toolbar .text-node-rich-toolbar-btn--active:hover {
+  color: #09090b;
+}
+.text-node-rich-toolbar .text-node-rich-toolbar-btn:hover:not(:disabled)::before,
+.text-node-rich-toolbar .text-node-rich-toolbar-btn[data-popover-open="true"]::before {
+  opacity: 1 !important;
+  background-image: none;
+  background-color: #d4d4d4;
+}
+.dark .text-node-rich-toolbar .text-node-rich-toolbar-btn:hover,
+.dark .text-node-rich-toolbar .text-node-rich-toolbar-btn--active,
+.dark .text-node-rich-toolbar .text-node-rich-toolbar-btn--active:hover {
+  color: #f5f5f5;
+}
+.dark .text-node-rich-toolbar .text-node-rich-toolbar-btn:hover:not(:disabled)::before,
+.dark .text-node-rich-toolbar .text-node-rich-toolbar-btn:active:not(:disabled)::before,
+.dark .text-node-rich-toolbar .text-node-rich-toolbar-btn[data-popover-open="true"]::before {
+  opacity: 1 !important;
+  border: 1px solid transparent;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-repeat: no-repeat;
+  background-position: center, center;
+  background-size: 100% 100%, 330% 147%;
+  background-image:
+    radial-gradient(200% 140% at 50% 40.25%, #1a1a1a 16%, #656766 85%),
+    conic-gradient(from 0deg, #5d5d5d, #6a6a6a1a 70deg, #909090, #9090901a 290deg, #5d5d5d 360deg);
+}
+.text-node-rich-toolbar [data-popover-open="true"]::after {
+  opacity: 0 !important;
+}
+
+/* The floating node editor lives in a body portal above the canvas. */
+body:has([data-canvas-tools-menu]) [data-canvas-node-editor],
+body:has([data-text-node-fullscreen-overlay]) [data-canvas-node-editor] {
+  visibility: hidden !important;
+}
+
+@keyframes canvas-edge-flow {
+  from {
+    stroke-dashoffset: 180;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.canvas-edge-flow-pulse {
+  stroke-dasharray: 28 62;
+  animation: canvas-edge-flow 1.8s linear infinite;
+}

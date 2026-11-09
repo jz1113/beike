@@ -1,16 +1,57 @@
-import { InspirationToolbar } from './InspirationToolbar';
-import { matchesInspirationSearch } from '../../model/inspirationSearch';
-import { visibleJustifiedRows } from '../../model/justifiedRows';
 import { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react';
-import type { InspirationItem, InspirationUseOptions } from '../../model/inspirationItem';
+import {
+  INSPIRATION_EAGER_COUNT,
+  inspirationAspectRatio,
+  matchesInspirationSearch,
+  visibleJustifiedRows,
+  type InspirationItem,
+  type InspirationUseOptions,
+} from '../../model/inspirationItem';
 import { INSPIRATION_ITEMS } from '../../data/inspirationData';
-import { INSPIRATION_EAGER_COUNT, inspirationAspectRatio } from '../../model/inspirationMedia';
-import { LazyFeedVideo } from './LazyFeedVideo';
-import { FeedImage } from './FeedImage';
-import { isInspirationVideo, type InspirationMediaFilter } from './inspirationFilters';
+import { LazyFeedVideo, FeedImage } from './LazyFeedVideo';
+import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { HOME_PUBLISHED_EVENT, HOME_PUBLISHED_STORAGE_KEY, readPublishedHomeItems, type PublishedHomeItem } from '@client/shared/home-publish/homePublish';
 import { CanvasShowcase } from './CanvasShowcase';
-import { useViewVisibility } from '@client/shared/hooks/useViewVisibility';
+import { useViewVisibility } from '@client/shared/hooks/useSafeTimeout';
+import { Search, X } from 'lucide-react';
+
+export type InspirationMediaFilter = 'all' | 'image' | 'video';
+
+export const INSPIRATION_MEDIA_FILTERS: { id: InspirationMediaFilter; label: string }[] = [
+  { id: 'all', label: '全部' },
+  { id: 'image', label: '图片' },
+  { id: 'video', label: '视频' },
+];
+
+export function isInspirationVideo(item: { mediaType?: 'all' | 'image' | 'video'; video?: string; image: string }) {
+  return item.mediaType === 'video' || !!item.video || isVideoMediaUrl(item.image);
+}
+
+function InspirationToolbar({ query, onQueryChange, mediaFilter, onMediaChange }: {
+  query: string; onQueryChange: (value: string) => void;
+  mediaFilter: InspirationMediaFilter; onMediaChange: (value: InspirationMediaFilter) => void;
+}) {
+  const search = useRef<HTMLInputElement>(null);
+  return <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-3">
+    <div role="tablist" aria-label="素材类型" className="inline-flex shrink-0 rounded-full bg-slate-100 p-0.5 dark:bg-white/5"
+      onKeyDown={event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault(); const index = INSPIRATION_MEDIA_FILTERS.findIndex(item => item.id === mediaFilter);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + 3) % 3;
+        onMediaChange(INSPIRATION_MEDIA_FILTERS[next].id); event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+      }}>
+      {INSPIRATION_MEDIA_FILTERS.map(item => <button key={item.id} type="button" role="tab" aria-selected={mediaFilter === item.id} tabIndex={mediaFilter === item.id ? 0 : -1}
+        onClick={() => onMediaChange(item.id)} className={`rounded-full px-3 py-1.5 text-xs transition-colors ${mediaFilter === item.id ? 'bg-white text-slate-950 shadow-xs dark:bg-white/10 dark:text-white' : 'text-slate-500 dark:text-stone-400'}`}>{item.label}</button>)}
+    </div>
+    <form role="search" aria-label="搜索首页作品" onSubmit={event => event.preventDefault()} className="relative ml-auto w-full sm:w-[312px]">
+      <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+      <input ref={search} type="search" aria-label="搜索作品" value={query} onChange={event => onQueryChange(event.target.value)}
+        onKeyDown={event => { if (event.key === 'Escape' && !event.nativeEvent.isComposing) { event.preventDefault(); onQueryChange(''); } }}
+        placeholder="搜索作品、提示词或作者" className="h-9 w-full rounded-lg border border-slate-200 bg-transparent pl-9 pr-9 text-xs text-slate-800 outline-offset-2 placeholder:text-slate-400 dark:border-white/10 dark:text-stone-200 [&::-webkit-search-cancel-button]:appearance-none" />
+      {query && <button type="button" aria-label="清除作品搜索" onClick={() => { onQueryChange(''); search.current?.focus(); }} className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-black/5 dark:hover:bg-white/10"><X className="h-3.5 w-3.5" /></button>}
+    </form>
+  </div>;
+}
 
 // 限制首屏附近的图片并发下载与解码；用户开始浏览后再逐批补齐。
 const INITIAL_VISIBLE = 10;
@@ -25,8 +66,8 @@ const FEED_GAP = 8;
 
 export default function InspirationFeed({ onUsePrompt }: Props) {
   const isVisible = useViewVisibility();
-  const [mediaFilter, setMediaFilter] = useState<InspirationMediaFilter>('image');
   const [query, setQuery] = useState('');
+  const [mediaFilter, setMediaFilter] = useState<InspirationMediaFilter>('all');
   const [published, setPublished] = useState<PublishedHomeItem[]>(() => readPublishedHomeItems());
   const [selectedModalItem, setSelectedModalItem] = useState<InspirationItem | null>(null);
   const [selectedCanvasItem, setSelectedCanvasItem] = useState<PublishedHomeItem | null>(null);
@@ -45,8 +86,8 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
   }, [isVisible]);
 
   const filteredItems = useMemo(() => {
-    const mine = published.filter(item => isInspirationVideo(item) === (mediaFilter === 'video'));
-    const seeded = INSPIRATION_ITEMS.filter(item => isInspirationVideo(item) === (mediaFilter === 'video'));
+    const mine = published.filter(item => mediaFilter === 'all' || isInspirationVideo(item) === (mediaFilter === 'video'));
+    const seeded = INSPIRATION_ITEMS.filter(item => mediaFilter === 'all' || isInspirationVideo(item) === (mediaFilter === 'video'));
     return [...mine, ...seeded].filter(item => matchesInspirationSearch(item, 'all', query));
   }, [published, mediaFilter, query]);
 
@@ -151,12 +192,13 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
 
   return (
     <div className="w-full space-y-3.5 pt-2 select-none">
-      <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-white">精选作品</h2>
+      <h2 className="sr-only">精选作品</h2>
       <InspirationToolbar query={query} onQueryChange={setQuery} mediaFilter={mediaFilter} onMediaChange={setMediaFilter} />
 
       {filteredItems.length === 0 ? (
         <div className="py-16 text-center text-sm text-slate-400">
-          这里还没有{mediaFilter === 'video' ? '视频' : '图片'}
+          <p role="status">{query.trim() ? '没有找到匹配的作品' : `这里还没有${mediaFilter === 'all' ? '作品' : mediaFilter === 'video' ? '视频' : '图片'}`}</p>
+          {(query) && <button type="button" onClick={event => { const search = event.currentTarget.closest('[data-hub-scroll]')?.querySelector<HTMLInputElement>('input[aria-label="搜索作品"]'); setQuery(''); setMediaFilter('all'); requestAnimationFrame(() => search?.focus()); }} className="mt-3 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 dark:text-stone-300 dark:hover:bg-white/5">重置筛选</button>}
         </div>
       ) : (
         <>
@@ -206,6 +248,9 @@ export default function InspirationFeed({ onUsePrompt }: Props) {
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/55 to-transparent px-2.5 pb-2 pt-8 opacity-0 transition-opacity group-hover:opacity-100">
                         <p className="truncate text-xs font-medium text-white">{item.title}</p>
                       </div>
+                      {'publishedKind' in item && item.publishedKind === 'canvas' && (
+                        <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-full bg-black/55 px-2 py-1 text-xs text-white backdrop-blur-sm">画布作品</span>
+                      )}
                       {isVideo && (
                         <span aria-label="视频" className="pointer-events-none absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/35 text-white/90 backdrop-blur-sm">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">

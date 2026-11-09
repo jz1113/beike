@@ -1,25 +1,77 @@
+import type { AppState, AssistantSession } from '@client/store';
 import { generationBatchContext, generationPromptSources } from '@client/shared/agent/generationBatchSources';
 import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import type { AssistantRunMode, ReferenceScope } from '@shared/domain/assistant/taskPolicy';
 import { persistAssistantMedia } from '@client/shared/api/persistAssistantMedia';
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
-import { recordAssistantChatUsage } from '../model/assistantUsage';
-import { snapshotAssistantSkill } from '../model/assistantSkillSnapshot';
+import {
+  deriveLegacyState,
+  finishInterruptedItems,
+  readAssistantRetryDecision,
+  readAssistantTurnReceipt,
+  recordAssistantChatUsage,
+  saveAssistantTurnReceipt,
+  snapshotAssistantSkill,
+} from '../model/assistantActivity';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { buildBrandKitSystemPrompt } from '@shared/domain/products/brandKitModels';
 import { composeSkillCatalog, composeSkillRuntime, withSkillFileTool } from '@shared/domain/assistant/skills';
 import { useAppStore, AssistantMessage, MediaAttachment } from '@client/store';
 import { useAssistantTurn } from '@client/features/assistant/hooks/useAssistantTurn';
 import type { PendingApproval } from '@client/features/assistant/model/assistantTurnTypes';
-import { createStreamPatchBatcher } from './streamPatchBatcher';
-import { readAssistantTurnReceipt, saveAssistantTurnReceipt } from '../model/assistantTurnRecovery';
-import { deriveLegacyState, finishInterruptedItems } from './assistantTurnItems';
 import { normalizeAssistantItems, normalizeAssistantTask } from '@shared/domain/assistant/normalizeAssistantItems';
-import { buildAssistantRequestMessages, validateAssistantSubmission } from '../model/assistantSubmission';
+import { assistantMessageSchema } from '@shared/contracts/assistant';
+
+/** Coalesce partial snapshots without dropping fields or delaying final state. */
+function createStreamPatchBatcher<T extends object>(commit: (patch: Partial<T>) => void, delay = 32) {
+  let pending: Partial<T> | null = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const flush = () => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+    const patch = pending;
+    pending = null;
+    if (patch) commit(patch);
+  };
+  return {
+    push(patch: Partial<T>) {
+      pending = {...pending, ...patch};
+      if (timer === undefined) timer = setTimeout(flush, delay);
+    },
+    flush,
+  };
+}
+
+function validateAssistantSubmission(content: string, attachments: MediaAttachment[], systemPrompt = ''): string | undefined {
+  if (content.length > 100_000) return '单条消息最多 100000 字符，请缩短内容或作为文档上传；草稿已保留';
+  if (attachments.length > 50) return '每条消息最多 50 个附件，请分批发送；草稿已保留';
+  if (systemPrompt.length > 100_000) return '技能与品牌指令过长，请缩短配置后再发送；草稿已保留';
+  const parsed = assistantMessageSchema.safeParse({ role: 'user', content, attachments });
+  return parsed.success ? undefined : '附件名称、地址或正文超出支持范围，请调整后再发送；草稿已保留';
+}
+
+function buildAssistantRequestMessages(messages: AssistantMessage[]) {
+  const requestMessages = messages.slice(-500).map((message) => ({
+    id: message.id, timestamp: message.timestamp, error: message.error,
+    role: message.role, content: message.content || '',
+    productWidget: message.role === 'assistant' ? message.productWidget : undefined,
+    attachments: message.attachments?.length ? message.attachments.map((attachment) => ({
+      type: attachment.type, url: attachment.type === 'document' ? undefined : attachment.url,
+      name: attachment.name, mentionName: attachment.mentionName, extractedText: attachment.extractedText,
+    })) : undefined,
+  }));
+  for (const message of requestMessages) {
+    if (!assistantMessageSchema.safeParse(message).success) throw new Error('历史消息超出支持范围，请新建会话或调整对应附件；本次草稿已保留');
+  }
+  if (new TextEncoder().encode(JSON.stringify(requestMessages)).byteLength > 31_000_000) {
+    throw new Error('当前对话素材过多，请新建会话并引用所需文件；本次草稿已保留');
+  }
+  return requestMessages;
+}
 
 interface UseAssistantChatStreamOptions {
-  currentSession: any;
+  currentSession: AssistantSession;
   runMode?: AssistantRunMode;
   referenceScope?: ReferenceScope;
   assistantModel: string;
@@ -32,16 +84,13 @@ interface UseAssistantChatStreamOptions {
   addAssistantMessage: (sessionId: string, msg: AssistantMessage) => void;
   updateAssistantMessage: (sessionId: string, msgId: string, patch: Partial<AssistantMessage>) => void;
   currentView: string;
-  currentStep: any;
-  product: any;
-  selectedArchId: any;
-  workshopMode: any;
-  activeWorkshopTab: any;
-  activeBrandKit: any;
+  product: AppState['product'];
+  selectedArchId: AppState['selectedArchId'];
+  activeBrandKit: ReturnType<AppState['getActiveBrandKit']>;
   getWorkspaceSnapshot?: () => Record<string, unknown> | undefined;
   /** 由当前工作区显式选中的视觉节点；只在新消息时作为参考素材随本轮发送。 */
   getWorkspaceAttachments?: () => MediaAttachment[] | undefined;
-  getActiveAssistantSkill: () => any;
+  getActiveAssistantSkill: AppState['getActiveAssistantSkill'];
   showToast: (msg: string) => void;
 }
 
@@ -59,11 +108,8 @@ export function useAssistantChatStream({
   addAssistantMessage,
   updateAssistantMessage,
   currentView,
-  currentStep,
   product,
   selectedArchId,
-  workshopMode,
-  activeWorkshopTab,
   activeBrandKit,
   getWorkspaceSnapshot,
   getWorkspaceAttachments,
@@ -113,13 +159,11 @@ export function useAssistantChatStream({
       if (previousTurnId) {
         retryVerificationGuard.current = true;
         try {
-          const response = await apiFetch(`/api/assistant/turns/${encodeURIComponent(previousTurnId)}/snapshot`);
-          const data = await response.json();
-          const snapshot = data.snapshot;
-          if (snapshot && (snapshot.threadId !== currentSession.id || snapshot.id !== previousTurnId)) throw new Error('任务不匹配');
-          if (!response.ok || !data.success || !snapshot || !Array.isArray(snapshot.items)) throw new Error('无法核实');
-          snapshot.items = normalizeAssistantItems(snapshot.items);
-          if (snapshot.status === 'completed') {
+          const decision = await readAssistantRetryDecision(previousTurnId, currentSession.id, url => apiFetch(url));
+          if (decision.kind === 'blocked') { showToast(decision.message); return; }
+          if (decision.kind === 'completed') {
+            const snapshot = decision.snapshot;
+            snapshot.items = normalizeAssistantItems(snapshot.items);
             updateAssistantMessage(currentSession.id, retryAssistantId, {
               items: snapshot.items,
               task: normalizeAssistantTask(snapshot.task),
@@ -131,10 +175,7 @@ export function useAssistantChatStream({
             showToast('已找回执行结果，没有重新调用模型');
             return;
           }
-          if (!['failed', 'cancelled', 'interrupted'].includes(snapshot.status)) {
-            showToast('原任务尚未确认失败，请稍后再检查；为避免重复扣费，本次不会重新提交');
-            return;
-          }
+
         } catch {
           showToast('暂时无法核实原任务结果，已阻止重复提交，请恢复连接后再试');
           return;
@@ -312,15 +353,9 @@ export function useAssistantChatStream({
         clientContext: {
           generationBatches: generationBatchContext(generationPromptSources(useAppStore.getState(), 'assistant', sessionId, assistantMsgId)),
           currentView,
-          workshopStep: currentStep,
           productTitle: product?.title,
           productItemId: product?.itemId,
           selectedArchId,
-          workshopMode,
-          assetLibraryTab:
-            currentView === 'workshop' && activeWorkshopTab === 'prompt_assets'
-              ? 'full_prompt'
-              : undefined,
           workspaceSnapshot: getWorkspaceSnapshot?.(),
         },
         sessionApprovals: sessionApprovalsRef.current.get(sessionId) || [],
@@ -332,7 +367,7 @@ export function useAssistantChatStream({
           saveAssistantTurnReceipt(sessionId, assistantMsgId, turnId);
           useAppStore.getState().persistAssistantNow();
         },
-        onUpdate: (patch: any) => {
+        onUpdate: (patch) => {
           if (patch.pendingApprovals) setLivePendingApprovals(patch.pendingApprovals);
           if (patch.sessionApprovals) sessionApprovalsRef.current.set(sessionId, patch.sessionApprovals);
           const msgPatch: Partial<AssistantMessage> = { error: false, turnId: turnIdRef.current || undefined };
@@ -367,12 +402,12 @@ export function useAssistantChatStream({
       });
       setLivePendingApprovals([]);
 
-      recordAssistantChatUsage(modelUsed, finalState.usage);
+      recordAssistantChatUsage(modelUsed, finalState.usage, preparedTurnId || '');
 
       useAppStore.getState().persistAssistantNow();
-    } catch (err: any) {
+    } catch (err: unknown) {
       streamUpdates.flush();
-      if (abortCtrl.signal.aborted || err.name === 'AbortError') {
+      if (abortCtrl.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
         const message = useAppStore.getState().assistantSessions.find((session) => session.id === sessionId)?.messages.find((item) => item.id === assistantMsgId);
         const items = finishInterruptedItems(message?.items || [], true);
         updateAssistantMessage(sessionId, assistantMsgId, {

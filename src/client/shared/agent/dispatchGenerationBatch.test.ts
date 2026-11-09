@@ -1,13 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState } from '@client/store/types';
 import type { AssistantMessage, GenerationTask } from '@client/store/appStoreTypes';
-import { buildGenerationPromptBatch, type BatchGenerationSettings } from './buildGenerationPromptBatch';
+import { buildGenerationPromptBatch, type BatchGenerationSettings, type BatchPromptDraft } from './buildGenerationPromptBatch';
 import { assistantPromptSource, generationPromptSources } from './generationBatchSources';
-import { readGenerationBatchReceipts } from './generationBatchReceipts';
-import { saveGenerationBatchDraft } from './generationBatchDrafts';
-import { currentBatchSettings, dispatchGenerationBatch, executeGenerationBatchAction, type GenerationBatchRequest } from './dispatchGenerationBatch';
+import {
+  currentBatchSettings,
+  dispatchGenerationBatch,
+  executeGenerationBatchAction,
+  readGenerationBatchDraft,
+  readGenerationBatchReceipts,
+  reserveGenerationBatch,
+  saveGenerationBatchDraft,
+  type GenerationBatchReceipt,
+  type GenerationBatchRequest,
+} from './dispatchGenerationBatch';
 
-const mocks = vi.hoisted(() => ({ getState: vi.fn(), setState: vi.fn(), persist: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getState: vi.fn(), setState: vi.fn(), persist: vi.fn(), canvasSnapshot: vi.fn() }));
+vi.mock('@client/shared/workspace/canvasWorkspace', () => ({ getCanvasWorkspaceSnapshot: mocks.canvasSnapshot }));
 vi.mock('@client/store', () => ({ useAppStore: { getState: mocks.getState, setState: mocks.setState } }));
 vi.mock('@client/store/persist/generation', () => ({ persistDrawingStateToStorage: mocks.persist }));
 vi.mock('./buildGenerationPromptBatch', async importOriginal => {
@@ -21,7 +30,7 @@ vi.mock('@shared/domain/models/modalityStorage', () => ({
     : [{ id: 'doubao-seedance-2.0-mini', name: '视频渠道', modelId: 'doubao-seedance-2.0-mini' }],
 }));
 
-type DispatchState = Pick<AppState, 'generationHistoryReady' | 'currentSessionId' | 'currentAssistantSessionId' | 'sessions'
+type DispatchState = Pick<AppState, 'currentView' | 'generationHistoryReady' | 'currentSessionId' | 'currentAssistantSessionId' | 'sessions'
   | 'assistantSessions' | 'generationTasks' | 'quickModel' | 'quickAspectId' | 'quickQuality' | 'quickVideoModel'
   | 'quickVideoAspectId' | 'quickVideoResolution' | 'quickVideoDuration' | 'quickVideoRefMode'>;
 const RECEIPTS = 'beike_agent_generation_receipts_v1';
@@ -55,7 +64,7 @@ beforeEach(() => {
     setItem: vi.fn((key: string, value: string) => { values.set(key, value); }),
     removeItem: vi.fn((key: string) => { values.delete(key); }),
   });
-  state = { generationHistoryReady: true, currentSessionId: 'generation-session', currentAssistantSessionId: 'assistant-session',
+  state = { currentView: 'generate', generationHistoryReady: true, currentSessionId: 'generation-session', currentAssistantSessionId: 'assistant-session',
     sessions: [{ id: 'generation-session', title: '原生成会话', createdAt: 1, tasks: [] }],
     assistantSessions: [{ id: 'assistant-session', title: '原助手会话', createdAt: 1, updatedAt: 1, messages: [structuredClone(reply)] }],
     generationTasks: [], quickModel: settings.imageModel, quickAspectId: settings.imageAspect, quickQuality: settings.imageQuality,
@@ -68,6 +77,27 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('generation batch dispatch safety gates', () => {
+  it('keeps canvas Agent batches in the originating project without selecting its session', () => {
+    const original = agentTask(); state.sessions[0].tasks = [original];
+    state.sessions[0].canvasProjectId = 'project-a';
+    state.currentSessionId = 'ordinary-chat'; state.currentView = 'canvas';
+    mocks.canvasSnapshot.mockReturnValue({ projectId: 'project-a' });
+    const source = generationPromptSources(state, 'agent', 'generation-session')[0];
+    dispatchGenerationBatch({ sourceId: source.sourceId, entryIds: source.entries.map(entry => entry.id), kind: 'agent', sessionId: source.sessionId });
+    expect(state.currentSessionId).toBe('ordinary-chat');
+    expect(state.generationTasks.every(task => task.canvasProjectId === 'project-a' && task.sessionId === source.sessionId)).toBe(true);
+    expect(state.sessions[0].canvasProjectId).toBe('project-a');
+  });
+
+  it.each(['other-project', 'left-canvas'])('rejects a canvas batch after changing workspace: %s', change => {
+    state.sessions[0].tasks = [agentTask()]; state.sessions[0].canvasProjectId = 'project-a';
+    state.currentView = change === 'left-canvas' ? 'generate' : 'canvas';
+    mocks.canvasSnapshot.mockReturnValue({ projectId: change === 'other-project' ? 'project-b' : 'project-a' });
+    const source = generationPromptSources(state, 'agent', 'generation-session')[0];
+    expect(() => dispatchGenerationBatch({ sourceId: source.sourceId, entryIds: source.entries.map(entry => entry.id), kind: 'agent', sessionId: source.sessionId })).toThrow('已切换会话');
+    expectNoPublication();
+  });
+
   it('blocks while generation history is restoring, before preparation or storage writes', () => {
     state.generationHistoryReady = false;
     expect(() => dispatchGenerationBatch(request())).toThrow('历史正在恢复');
@@ -254,5 +284,170 @@ describe('shared button and followup batch submission', () => {
     expect(currentBatchSettings().videoContextIrEnabled).toBe(false);
     state.quickQuality = 'medium';
     expect(currentBatchSettings().imageQuality).toBe('medium');
+  });
+});
+
+
+const receiptFixture = (overrides: Partial<GenerationBatchReceipt> = {}): GenerationBatchReceipt => ({
+  sourceId: 'assistant:session:reply:hash',
+  batchId: 'batch-1',
+  sessionId: 'generation-session',
+  taskIds: ['task-1'],
+  entryIds: ['entry-1'],
+  createdAt: 1,
+  ...overrides,
+});
+
+describe('generation receipt journal', () => {
+  it('starts empty and persists exact task-to-entry linkage across module reloads', async () => {
+    expect(readGenerationBatchReceipts('source')).toEqual([]);
+    const original = receiptFixture();
+    reserveGenerationBatch(original);
+    expect(readGenerationBatchReceipts(original.sourceId)).toEqual([original]);
+    vi.resetModules();
+    const reloaded = await import('./dispatchGenerationBatch');
+    expect(reloaded.readGenerationBatchReceipts(original.sourceId)).toEqual([original]);
+    expect(() => reloaded.reserveGenerationBatch(original)).toThrow('已经提交');
+  });
+
+  it('appends only disjoint entries and keeps identical entry IDs in other sources independent', () => {
+    const first = receiptFixture();
+    const second = receiptFixture({ batchId: 'batch-2', taskIds: ['task-2'], entryIds: ['entry-2'] });
+    reserveGenerationBatch(first);
+    reserveGenerationBatch(second);
+    reserveGenerationBatch(receiptFixture({ sourceId: 'another-session-source' }));
+    expect(readGenerationBatchReceipts(first.sourceId)).toEqual([first, second]);
+    expect(readGenerationBatchReceipts('another-session-source')).toHaveLength(1);
+    const before = values.get(RECEIPTS);
+    expect(() => reserveGenerationBatch(receiptFixture({ taskIds: ['task-3', 'task-4'], entryIds: ['entry-3', 'entry-2'] }))).toThrow('已经提交');
+    expect(values.get(RECEIPTS)).toBe(before);
+  });
+
+  it.each([
+    '{', 'null', '[]', '17', '"text"', JSON.stringify({ source: {} }),
+    JSON.stringify({ source: [{ ...receiptFixture(), taskIds: ['task-1', 'task-2'] }] }),
+    JSON.stringify({ source: [{ ...receiptFixture(), entryIds: [7] }] }),
+    JSON.stringify({ source: [{ ...receiptFixture(), taskIds: [null] }] }),
+    JSON.stringify({ source: [{ ...receiptFixture(), sessionId: null }] }),
+  ])('fails closed for a corrupted journal: %s', raw => {
+    values.set(RECEIPTS, raw);
+    expect(() => readGenerationBatchReceipts(receiptFixture().sourceId)).toThrow();
+    expect(() => reserveGenerationBatch(receiptFixture())).toThrow();
+    expect(values.get(RECEIPTS)).toBe(raw);
+    expect(localStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('does not discard corrupt receipts for a different source', () => {
+    values.set(RECEIPTS, JSON.stringify({ unrelated: [{ taskIds: [] }] }));
+    expect(() => readGenerationBatchReceipts('fresh-source')).toThrow('损坏');
+    expect(() => reserveGenerationBatch(receiptFixture({ sourceId: 'fresh-source' }))).toThrow('损坏');
+  });
+
+  it('surfaces storage read denial rather than treating the journal as empty', () => {
+    vi.mocked(localStorage.getItem).mockImplementation(() => { throw new Error('SecurityError'); });
+    expect(() => readGenerationBatchReceipts(receiptFixture().sourceId)).toThrow('SecurityError');
+    expect(() => reserveGenerationBatch(receiptFixture())).toThrow('SecurityError');
+    expect(localStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('rejects quota denial while preserving the previously committed receipts', () => {
+    const first = receiptFixture();
+    reserveGenerationBatch(first);
+    const before = values.get(RECEIPTS);
+    vi.mocked(localStorage.setItem).mockImplementation(() => { throw new Error('QuotaExceededError'); });
+    expect(() => reserveGenerationBatch(receiptFixture({ taskIds: ['task-2'], entryIds: ['entry-2'] }))).toThrow('已阻止提交');
+    expect(values.get(RECEIPTS)).toBe(before);
+    expect(readGenerationBatchReceipts(first.sourceId)).toEqual([first]);
+  });
+});
+
+const draftReply = {
+  id: 'reply',
+  role: 'assistant' as const,
+  timestamp: 1,
+  content: '## 封面\n```image-prompt\n柔和光影，商品居中\n```\n## 视频\n```video-prompt\n镜头推进，总时长5秒\n```',
+};
+const draftSource = assistantPromptSource([draftReply], draftReply, 'session');
+const draftSettings: BatchGenerationSettings = {
+  imageModel: 'image-channel',
+  imageAspect: '3:4',
+  imageQuality: 'high',
+  videoModel: 'video-channel',
+  videoAspect: '9:16',
+  videoResolution: '720P',
+  videoDuration: 5,
+  videoRefMode: 'omni',
+};
+
+describe('saved generation prompt drafts', () => {
+  it('persists explicit Context IR false and the native 768P tier', () => {
+    saveGenerationBatchDraft(draftSource.sourceId, draftSource.entries, { ...draftSettings, videoResolution: '768P', videoContextIrEnabled: false });
+    expect(readGenerationBatchDraft(draftSource)?.settings).toMatchObject({ videoResolution: '768P', videoContextIrEnabled: false });
+  });
+
+  it('round-trips complete edits and settings without altering original source identity', () => {
+    const entries: BatchPromptDraft[] = draftSource.entries.map((entry, index) => ({
+      ...entry,
+      title: `编辑标题${index}`,
+      prompt: `编辑后的光影构图 ${index}`,
+      referenceIndexes: [0, 2],
+      aspect: '1:1',
+      duration: 8,
+    }));
+    const before = structuredClone(draftSource);
+    saveGenerationBatchDraft(draftSource.sourceId, entries, draftSettings);
+    expect(readGenerationBatchDraft(draftSource)).toEqual({ entries, settings: draftSettings });
+    expect(draftSource).toEqual(before);
+    expect(readGenerationBatchDraft({ ...draftSource, sourceId: 'different-session-source' })).toBeUndefined();
+  });
+
+  it('replaces this source only and retains another session draft', () => {
+    saveGenerationBatchDraft('other-session-source', draftSource.entries, draftSettings);
+    saveGenerationBatchDraft(draftSource.sourceId, draftSource.entries, draftSettings);
+    const edited = [{ ...draftSource.entries[0], prompt: '最新保存的构图' }];
+    saveGenerationBatchDraft(draftSource.sourceId, edited, { ...draftSettings, imageQuality: 'low' });
+    expect(readGenerationBatchDraft(draftSource)).toEqual({ entries: edited, settings: { ...draftSettings, imageQuality: 'low' } });
+    expect(readGenerationBatchDraft({ ...draftSource, sourceId: 'other-session-source' })).toEqual({ entries: draftSource.entries, settings: draftSettings });
+  });
+
+  it('returns no draft only when the journal or the source entry is absent', () => {
+    expect(readGenerationBatchDraft(draftSource)).toBeUndefined();
+    values.set(DRAFTS, '{}');
+    expect(readGenerationBatchDraft(draftSource)).toBeUndefined();
+  });
+
+  it.each(['{', 'null', '[]', 'false'])('rejects invalid journal %s without overwriting it', raw => {
+    values.set(DRAFTS, raw);
+    expect(() => readGenerationBatchDraft(draftSource)).toThrow();
+    expect(() => saveGenerationBatchDraft(draftSource.sourceId, draftSource.entries, draftSettings)).toThrow();
+    expect(values.get(DRAFTS)).toBe(raw);
+    expect(localStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('rejects a draft referencing entries from another reply', () => {
+    saveGenerationBatchDraft(draftSource.sourceId, [{ ...draftSource.entries[0], id: 'foreign-entry' }], draftSettings);
+    expect(() => readGenerationBatchDraft(draftSource)).toThrow('已失效');
+  });
+
+  it.each([
+    { entries: [{ ...draftSource.entries[0], prompt: '' }], settings: draftSettings },
+    { entries: [{ ...draftSource.entries[0], referenceIndexes: [-1] }], settings: draftSettings },
+    { entries: [{ ...draftSource.entries[0], referenceIndexes: [50] }], settings: draftSettings },
+    { entries: draftSource.entries, settings: { ...draftSettings, imageQuality: 'invalid' } },
+    { entries: draftSource.entries, settings: { ...draftSettings, videoDuration: null } },
+  ])('rejects invalid stored draft fields before followup can use them', invalid => {
+    values.set(DRAFTS, JSON.stringify({ [draftSource.sourceId]: invalid }));
+    expect(() => readGenerationBatchDraft(draftSource)).toThrow('已失效');
+    expect(localStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('validates before writing and preserves an existing draft on quota refusal', () => {
+    saveGenerationBatchDraft(draftSource.sourceId, draftSource.entries, draftSettings);
+    const before = values.get(DRAFTS);
+    expect(() => saveGenerationBatchDraft(draftSource.sourceId, [{ ...draftSource.entries[0], prompt: '' }], draftSettings)).toThrow();
+    vi.mocked(localStorage.setItem).mockImplementation(() => { throw new Error('QuotaExceededError'); });
+    expect(() => saveGenerationBatchDraft(draftSource.sourceId, [{ ...draftSource.entries[0], prompt: '新的光影' }], draftSettings)).toThrow('不会启动生成');
+    expect(values.get(DRAFTS)).toBe(before);
+    expect(readGenerationBatchDraft(draftSource)?.entries).toEqual(draftSource.entries);
   });
 });

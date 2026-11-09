@@ -1,25 +1,182 @@
-import { canRetryAssistantMessage } from './assistantMessagePresentation';
-import { getAssistantProductIdeaPrompt } from '../../model/assistantSuggestions';
-import AssistantApprovalNotice from './AssistantApprovalNotice';
-import AssistantWelcome from './AssistantWelcome';
-import AssistantLiveStatus from './AssistantLiveStatus';
-import { duplicateCollectionCards } from '../../model/collectionCardVisibility';
-import { AssistantSkillIcon } from '../skill/AssistantSkillIcon';
+import type { AppState } from '@client/store';
+import { getAssistantProductIdeaPrompt, getReplyReferenceMedia } from '../../model/assistantConstants';
+import { AssistantSkillIcon } from '@client/shared/icons/assistant/AssistantIcons';
 import { useAssistantAutoScroll } from '../../hooks/useAssistantAutoScroll';
-import { AssistantReplyFooter } from './AssistantReplyFooter';
 import React, { useState, useMemo, useRef, useLayoutEffect } from 'react';
-import { Eye, FileText, Play, RotateCcw } from 'lucide-react';
+import { ArrowRight, Eye, FileText, Images, Link, Play, RefreshCw, RotateCcw, ScanLine, Shield, WandSparkles } from 'lucide-react';
 import { AssistantMessage, MediaAttachment, useAppStore } from '@client/store';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { normalizeImageUrlToStandardJpg } from '@shared/domain/media/drawing';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
-import FormattedMarkdown from '@client/features/assistant/components/message/FormattedMarkdown';
-import { getReplyReferenceMedia } from '../../model/assistantPromptReferences';
-import ProductCardWidget from '@client/features/assistant/components/message/ProductCardWidget';
-import TurnTimeline from '@client/features/assistant/components/message/TurnTimeline';
-import CodexAssistantBubble from './CodexAssistantBubble';
-import { AssistantImageBatch } from '../panels/AssistantBatchPanel';
-import type { PendingApproval, ApprovalDecision } from '@client/features/assistant/model/assistantTurnTypes';
+import { ApprovalCard, FormattedMarkdown } from './AssistantTurnList';
+import ProductCardWidget from '@client/shared/agent/ProductCardWidget';
+import CodexAssistantBubble, {
+  AssistantImageBatch,
+  AssistantReplyFooter,
+  canRetryAssistantMessage,
+} from './CodexAssistantBubble';
+import type { PendingApproval, ApprovalDecision, ToolActivityEntry } from '@client/features/assistant/model/assistantTurnTypes';
+import type { AssistantTaskState } from '@shared/domain/assistant/taskPolicy';
+import AssistantExecution, { AssistantMark } from './AssistantExecution';
+
+function AssistantApprovalNotice({ count, onView }: { count: number; onView: () => void }) {
+  if (!count) return null;
+  return <div role="status" className="agent-approval-notice">
+    <Shield className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+    <span className="flex-1">有 {count} 项操作等待确认</span>
+    <button type="button" onClick={onView} className="rounded underline underline-offset-2">查看待确认操作</button>
+  </div>;
+}
+
+function AssistantLiveStatus({ message }: { message?: string }) {
+  return <AssistantExecution isSending message={message} />;
+}
+
+interface AssistantWelcomeProps {
+  onUpload: () => void;
+  onPrompt: (prompt: string) => void;
+}
+
+function AssistantWelcome({ onUpload, onPrompt }: AssistantWelcomeProps) {
+  const [page, setPage] = useState(0);
+  const cards = [
+    {
+      id: 'reference',
+      category: '参考图创作',
+      title: '让一张图，开启新灵感',
+      description: '上传参考图，一起探索画面与风格。',
+      Icon: Images,
+      tone: 'sage',
+      action: onUpload,
+    },
+    {
+      id: 'idea',
+      category: '头脑风暴',
+      title: '把想法，变成创作方案',
+      description: '从主题到分镜，梳理你的创作方向。',
+      Icon: WandSparkles,
+      tone: 'sand',
+      action: () => onPrompt('我有一个创作想法，请先帮我梳理主题、风格和制作步骤。'),
+    },
+    {
+      id: 'link',
+      category: '灵感采集',
+      title: '从一个链接，发现灵感',
+      description: '收集参考素材，整理值得借鉴的细节。',
+      Icon: Link,
+      tone: 'sage',
+      action: () => onPrompt('请采集这个链接中的素材：'),
+    },
+    {
+      id: 'prompt',
+      category: '画面构思',
+      title: '把一句话，写成画面',
+      description: '细化主体、构图与光影，打磨提示词。',
+      Icon: ScanLine,
+      tone: 'sand',
+      action: () => onPrompt('请帮我把下面的想法整理成图片生成提示词，细化主体、构图、风格与光影：'),
+    },
+  ];
+  return (
+    <div className="agent-welcome">
+      <div className="agent-welcome-intro">
+        <div className="agent-welcome-brand">
+          <span className="agent-welcome-mark">
+            <AssistantMark />
+          </span>
+          <span>你好，我是贝壳</span>
+        </div>
+        <h2>今天，一起创作点什么？</h2>
+      </div>
+      <div className="agent-start-cards" aria-label="开始创作">
+        {cards.slice(page * 2, page * 2 + 2).map(({ id, category, title, description, Icon, tone, action }) => (
+          <button type="button" className="agent-start-card" data-tone={tone} key={id} onClick={action}>
+            <span className="agent-start-category">
+              <Icon size={15} />
+              <span>{category}</span>
+              <ArrowRight className="agent-start-arrow" size={16} />
+            </span>
+            <strong>{title}</strong>
+            <span className="agent-start-description">{description}</span>
+          </button>
+        ))}
+      </div>
+      <div className="agent-welcome-bottom">
+        <button
+          type="button"
+          onClick={() => setPage((current) => (current + 1) % 2)}
+          aria-label="换一组创作建议"
+          title="换一组创作建议"
+        >
+          <RefreshCw size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface TurnTimelineProps {
+  toolActivity: ToolActivityEntry[];
+  thinking?: string;
+  task?: AssistantTaskState;
+  startedAt?: number;
+  streamingStatus?: string;
+  hasReply?: boolean;
+  pendingApprovals: PendingApproval[];
+  onApprovalDecision: (approvalId: string, decision: ApprovalDecision) => void;
+  isSending?: boolean;
+}
+
+function TurnTimeline({
+  toolActivity,
+  thinking,
+  task,
+  startedAt,
+  streamingStatus,
+  hasReply,
+  pendingApprovals,
+  onApprovalDecision,
+  isSending,
+}: TurnTimelineProps) {
+  return (
+    <div className="agent-turn-content">
+      <AssistantExecution
+        legacy={toolActivity}
+        thinking={thinking}
+        task={task}
+        startedAt={startedAt}
+        message={streamingStatus}
+        isSending={isSending}
+        active={Boolean(isSending && (!hasReply || toolActivity.some((item) => item.status === 'running')))}
+        awaitingApproval={Boolean(isSending && pendingApprovals.length > 0)}
+      />
+      {pendingApprovals.map((approval) => (
+        <ApprovalCard
+          key={approval.approvalId}
+          approval={approval}
+          onDecision={(decision) => onApprovalDecision(approval.approvalId, decision)}
+          disabled={!isSending}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Presentation-only deduplication: keep original messages and reference numbering intact. */
+function duplicateCollectionCards(messages: AssistantMessage[]): Set<string> {
+  const seen = new Set<string>();
+  const hidden = new Set<string>();
+  for (const message of messages) {
+    const widget = message.productWidget;
+    if (!widget || !['social', 'xiaohongshu', 'douyin', 'kuaishou', 'weibo'].includes(widget.platform)) continue;
+    const images = [...new Set((widget.allImages || []).filter(Boolean))].sort();
+    if (!images.length) continue;
+    const key = JSON.stringify([widget.platform, images]);
+    if (seen.has(key)) hidden.add(message.id);
+    else seen.add(key);
+  }
+  return hidden;
+}
 
 export interface AssistantMessageListProps {
   onUpload: () => void;
@@ -45,9 +202,8 @@ export interface AssistantMessageListProps {
   showToast: (msg: string) => void;
   setChatPreview: (v: { url: string; type: 'image' | 'video'; poster?: string } | null) => void;
   addAssistantAttachment: (att: MediaAttachment) => void;
-  setProductData: (...args: any[]) => void;
-  setStep: (step: number) => void;
-  setCurrentView: (view: any) => void;
+  setProductData: AppState['setProductData'];
+  setCurrentView: AppState['setCurrentView'];
   setIsAssistantOpen: (v: boolean) => void;
 }
 
@@ -73,7 +229,6 @@ export default function AssistantMessageList({
   setChatPreview,
   addAssistantAttachment,
   setProductData,
-  setStep,
   setCurrentView,
   setIsAssistantOpen,
 }: AssistantMessageListProps) {
@@ -81,9 +236,12 @@ export default function AssistantMessageList({
   const [messageWindow, setMessageWindow] = useState(80);
   const historyAnchor = useRef<{ sessionId: string; height: number; top: number } | null>(null);
   useLayoutEffect(() => {
-    const anchor = historyAnchor.current; historyAnchor.current = null;
+    const anchor = historyAnchor.current;
+    historyAnchor.current = null;
     const list = scrollRef.current;
-    if (anchor?.sessionId === sessionId && list) list.scrollTop = anchor.top + list.scrollHeight - anchor.height;
+    if (anchor?.sessionId === sessionId && list) {
+      list.scrollTop = anchor.top + list.scrollHeight - anchor.height;
+    }
   }, [messageWindow, sessionId, scrollRef]);
   const displayMessages = useMemo(() => {
     if (messages.length <= messageWindow) return messages;
@@ -97,14 +255,29 @@ export default function AssistantMessageList({
       {/* 🌟 消息流与空状态主区域 */}
       <div ref={scrollRef} onScroll={onScroll} data-empty={messages.length === 0} className="agent-messages flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 min-h-0 scrollbar-thin">
         {messages.length === 0 ? (
-          <AssistantWelcome key={sessionId} onUpload={onUpload} onPrompt={prompt => { const draft = useAppStore.getState().assistantInputDraft; setInputContent(draft.trim() ? `${draft.trimEnd()}\n\n${prompt}` : prompt); textareaRef.current?.focus(); }} />
+          <AssistantWelcome
+            key={sessionId}
+            onUpload={onUpload}
+            onPrompt={(prompt) => {
+              const draft = useAppStore.getState().assistantInputDraft;
+              setInputContent(draft.trim() ? `${draft.trimEnd()}\n\n${prompt}` : prompt);
+              textareaRef.current?.focus();
+            }}
+          />
         ) : (
             /* 消息列表 */
             <>
             {hiddenMessageCount > 0 && (
               <button
                 type="button"
-                onClick={() => { releaseFollow(); const list = scrollRef.current; if (list) historyAnchor.current = { sessionId, height: list.scrollHeight, top: list.scrollTop }; setMessageWindow(n => n + 40); }}
+                onClick={() => {
+                  releaseFollow();
+                  const list = scrollRef.current;
+                  if (list) {
+                    historyAnchor.current = { sessionId, height: list.scrollHeight, top: list.scrollTop };
+                  }
+                  setMessageWindow((n) => n + 40);
+                }}
                 className="w-full py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 cursor-pointer dark:text-slate-400 dark:hover:bg-white/10"
               >
                 显示更早的 {hiddenMessageCount} 条消息
@@ -124,7 +297,14 @@ export default function AssistantMessageList({
                   key={msg.id}
                   sessionId={sessionId}
                   msg={hiddenCollectionCards.has(msg.id) ? { ...msg, productWidget: undefined } : msg}
-                  onAnalyzeImages={canAnalyzeCollection ? () => { setInputContent('请分析刚才采集的图片，按我们讨论的用途挑选合适素材，标明素材编号、来源和理由。'); textareaRef.current?.focus(); } : undefined}
+                  onAnalyzeImages={
+                    canAnalyzeCollection
+                      ? () => {
+                          setInputContent('请分析刚才采集的图片，按我们讨论的用途挑选合适素材，标明素材编号、来源和理由。');
+                          textareaRef.current?.focus();
+                        }
+                      : undefined
+                  }
                   referenceMedia={referenceMedia}
                   isSendingCurrent={isSendingCurrent && streamingAssistantMsgId === msg.id}
                   livePendingApprovals={streamingAssistantMsgId === msg.id ? livePendingApprovals : []}
@@ -135,7 +315,6 @@ export default function AssistantMessageList({
                   copiedMsgId={copiedMsgId}
                   addAssistantAttachment={addAssistantAttachment}
                   setProductData={setProductData}
-                  setStep={setStep}
                   setCurrentView={setCurrentView}
                   setIsAssistantOpen={setIsAssistantOpen}
                   setChatPreview={setChatPreview}
@@ -299,18 +478,15 @@ export default function AssistantMessageList({
                         });
                         showToast('已将图片加入待发送附件，发送前可预览或移除');
                       }}
-                      onLoadToStudio={(prod, imgs) => {
-                        setProductData(prod, imgs, '🤖 AI 助手智能抓取导入');
-                        const store = useAppStore.getState();
-                        store.setWorkshopMode('storyboard_generate');
-                        store.setActiveWorkshopTab('studio');
-                        setStep(2);
-                        setCurrentView('workshop');
-                        setIsAssistantOpen(false);
-                        showToast('🚀 已载入电商图文！');
-                      }}
-                      onAnalyzeImages={canAnalyzeCollection ? () => { setInputContent('请分析刚才采集的图片，按我们讨论的用途挑选合适素材，标明素材编号、来源和理由。'); textareaRef.current?.focus(); } : undefined}
-          onGenerateShotsForProduct={(title) => {
+                      onAnalyzeImages={
+                        canAnalyzeCollection
+                          ? () => {
+                              setInputContent('请分析刚才采集的图片，按我们讨论的用途挑选合适素材，标明素材编号、来源和理由。');
+                              textareaRef.current?.focus();
+                            }
+                          : undefined
+                      }
+                      onGenerateShotsForProduct={(title) => {
                         handleSendMessage(getAssistantProductIdeaPrompt(title));
                       }}
                       onPreviewImage={(imgUrl) => {
@@ -329,10 +505,14 @@ export default function AssistantMessageList({
                       onCopy={() => handleCopyText(msg.content, msg.id)}
                     >
                       {canRetryAssistantMessage(msg) && (
-                        <button type="button" disabled={Boolean(sendingSessionId)}
+                        <button
+                          type="button"
+                          disabled={Boolean(sendingSessionId)}
                           onClick={() => handleSendMessage(undefined, { retryAssistantId: msg.id })}
-                          className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 disabled:opacity-50">
-                          <RotateCcw className="h-3 w-3" />继续重试
+                          className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          继续重试
                         </button>
                       )}
                     </AssistantReplyFooter>
@@ -351,10 +531,14 @@ export default function AssistantMessageList({
 
         <div ref={messagesEndRef} />
       </div>
-      <AssistantApprovalNotice count={isSendingCurrent ? livePendingApprovals.length : 0} onView={() => {
-        const card = scrollRef.current?.querySelector<HTMLElement>('[data-pending-approval]');
-        card?.scrollIntoView({ block: 'center' }); card?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
-      }} />
+      <AssistantApprovalNotice
+        count={isSendingCurrent ? livePendingApprovals.length : 0}
+        onView={() => {
+          const card = scrollRef.current?.querySelector<HTMLElement>('[data-pending-approval]');
+          card?.scrollIntoView({ block: 'center' });
+          card?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
+        }}
+      />
     </>
   );
 }

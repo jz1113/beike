@@ -1,5 +1,9 @@
 import type { SalesScriptBeat, SalesScriptDomain } from '@shared/domain/sales';
-import type { BeatAddress } from './salesScriptEditor';
+
+export interface BeatAddress {
+  shot: number;
+  beat: number;
+}
 
 export function formatStoryboardTime(seconds: number): string {
   const ticks = Math.round(Math.max(0, seconds) * 10);
@@ -122,24 +126,4 @@ export function storyboardSections(rows: StoryboardRow[]) {
 export function sectionCaption(section: ReturnType<typeof storyboardSections>[number], index: number) {
   const first = section.rows[0].segments[0].beat, last = section.rows.at(-1)!.segments[0].beat;
   return `第 ${index+1} 段 · ${section.label || '全片'}（${first.start}–${last.end} 秒，${section.rows.length} 行）`;
-}
-
-export function exportScriptStoryboard(script: SalesScriptDomain, shots = buildScriptStoryboard(script)): string {
-  const row = (cells: readonly string[]) => '| ' + cells.map((cell) => cell.replaceAll('|', '\\|').replace(/\s*\r?\n\s*/g, ' ')).join(' | ') + ' |';
-  const common = commonStoryboardNotes(shots);
-  const tables = storyboardSections(shots).map((section, i) => [
-    sectionCaption(section,i), '', row(storyboardColumns), row(storyboardColumns.map(() => '---')),
-    ...section.rows.map(shot => row([shot.number, shot.range+'（'+(shot.estimated ? '约 ' : '')+shot.duration+' 秒）',
-      [shot.action, ...rowStoryboardNotes(shot, common).map(note => note.label+'：'+note.text)].join('　'), shot.camera])),
-  ].join('\n'));
-  return [`### 分镜总览（${script.durationSec} 秒 · ${script.shots.length} 个镜头 · ${shots.length} 行）`,
-    ...(shots.some(shot => shot.estimated) ? ['约数表示动作起止时间为估计。'] : []),
-    ...common.map(note => '全片'+note.label+'：'+note.text), ...tables, '### 视频总体风格', storyboardStyle(script)].join('\n\n');
-}
-
-export function exportScriptRecords(script: SalesScriptDomain, shots = buildScriptStoryboard(script)): string {
-  return [script.title, script.overview, exportScriptStoryboard(script, shots),
-    ...shots.map((shot) => [`${shot.title} · ${shot.range}`, ...shot.fields.map((f) => `${f.label}：${f.text}`), ...shot.segments.map((s) => s.prompt)].join('\n')),
-    ...script.sourceExclusions.map((item) => `原片专属元素记录：${item.type}：${item.term}（${item.replacementRule}）`),
-  ].filter(Boolean).join('\n\n');
 }

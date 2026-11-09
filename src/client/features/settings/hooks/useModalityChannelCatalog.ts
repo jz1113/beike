@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { MODALITY_GLOBAL_CHANNEL_ID } from '@shared/domain/models/modalityStorage';
-import { loadStoredProviders, type ApiProvider } from '../model/apiProviderTypes';
-import { catalogRequestProtocol } from '../model/catalogRequestProtocol';
-import { parseRemoteModelFetch } from '../model/remoteModelFetch';
-import type { ModalityChannelOption, ModalityGlobalConfig } from '../model/modalityModelTypes';
+import {
+  loadStoredProviders,
+  catalogRequestProtocol,
+  parseRemoteModelFetch,
+  type ApiProvider,
+} from '../model/apiProviderTypes';
+import type { ModalityChannelOption, ModalityGlobalConfig } from '../model/modalityModelStorage';
 import { PROVIDER_CREDENTIALS_CHANGED_EVENT } from '../model/providerCredentialSync';
 
 export interface ModalityChannelLookup {

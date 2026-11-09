@@ -3,8 +3,6 @@ import {
   type ModalityKind,
   type ModalityModelItem,
   type ModalityGlobalConfig,
-} from '../model/modalityModelTypes';
-import {
   loadStoredModalityGlobalConfig,
   saveStoredModalityGlobalConfig,
   appendImportedModalityModels,
@@ -13,25 +11,20 @@ import {
   saveStoredModalityModels,
   resetStoredModalityModels,
   markModalityGlobalConfigManualOverride,
-} from '../model/modalityModelStorage';
-import { inferVendorFromModelId } from '../model/modalityMeta';
-import {
   modalityHasWorkflowPool,
   notifyWorkflowModels,
   registerWorkflowDefault,
   withLinkedCustomName,
   writeModalityDefaultKey,
-} from '../model/modalityDefaultSync';
+} from '../model/modalityModelStorage';
+import { inferVendorFromModelId } from '../model/modalityMeta';
 import { PROVIDER_CREDENTIALS_CHANGED_EVENT } from '../model/providerCredentialSync';
 
 const MODALITY_LABEL: Record<ModalityKind, string> = {
   chat: '多模态',
   image: '绘画',
   video: '视频',
-  three_d: '3D',
-  music: '音乐',
   voice: '语音',
-  avatar: '数字人',
 };
 
 export function useModalityModels(kind: ModalityKind, showToast: (msg: string) => void) {

@@ -1,14 +1,13 @@
-import { PERSONA_CATEGORIES } from '../model/salesPersonaClassification';
+import { PERSONA_AGES, PERSONA_CATEGORIES, PERSONA_GENDERS, personaCategory, personaGender, type PersonaAge, type PersonaCategory } from '../model/salesActionViews';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Image, Loader2, Trash2, Upload, X } from 'lucide-react';
 import { ConfiguredModelPicker } from '@client/shared/models/ConfiguredModelPicker';
 import { loadSystemConfiguredModels } from '@client/shared/models/configuredModels';
-import { importSalesImageAsset } from '../api/salesImageImport';
+import { fetchSalesStudioAssets, importSalesImageAsset } from '../api/salesMaterials';
 import { uploadSalesViewImage } from '../api/salesAssetViews';
-import { fetchSalesStudioAssets } from '../api/salesProduction';
 import { addSalesImageImportFiles, MAX_IMAGE_IMPORT_FILES, runSalesImageImportBatch, type SalesImageImportCategory, type SalesImageImportItem, type SalesImageImportKind } from '../model/salesImageImport';
-import { SCENE_SPACE_LABELS } from '../model/salesMaterialCatalog';
-import { supportsSalesAssetReferences } from '../model/salesAssetModels';
+import { SCENE_SPACE_LABELS, type SalesSceneSpace } from '../model/salesMaterialCatalog';
+import { supportsSalesAssetReferences } from '../model/salesAssetDraft';
 import { salesFocusClass, salesGhostButtonClass } from './salesChrome';
 import '../salesAssetDialog.css';
 import '../salesBgmImport.css';
@@ -19,10 +18,17 @@ interface Props extends SalesImageImportCategory {
   initialFiles?: File[];
   onClose: () => void;
   onImported: (count: number) => void;
+  onTargetSelected?: (target: SalesImageImportCategory) => void;
 }
 const STATUS = { queued: '待导入', uploading: '上传中…', saving: '保存中…', done: '已入库', error: '导入失败' } as const;
+const AGE_OPTIONS: Array<{ id: PersonaAge; label: string }> = [
+  { id: 'young', label: '青年' },
+  { id: 'middle', label: '中年' },
+  { id: 'senior', label: '老年' },
+  { id: 'child', label: '儿童' },
+];
 
-export function SalesImageImportDialog({ kind, existingNames, initialFiles = [], personaGroup, sceneSpace, onClose, onImported }: Props) {
+export function SalesImageImportDialog({ kind, existingNames, initialFiles = [], personaGroup, sceneSpace, onClose, onImported, onTargetSelected }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const operation = useRef<AbortController | null>(null);
@@ -35,8 +41,12 @@ export function SalesImageImportDialog({ kind, existingNames, initialFiles = [],
   const [configured] = useState(loadSystemConfiguredModels);
   const models = configured.availableImageModels.filter(({ id }) => supportsSalesAssetReferences(id));
   const [model, setModel] = useState(() => models.some(({ id }) => id === configured.selectedImageGenModel) ? configured.selectedImageGenModel : models[0]?.id || '');
+  const [targetGroup, setTargetGroup] = useState<PersonaCategory>(personaGroup);
+  const [targetSpace, setTargetSpace] = useState<SalesSceneSpace>(sceneSpace);
+  const activeGender = personaGender(targetGroup);
+  const activeAge: PersonaAge = targetGroup === activeGender ? 'young' : (targetGroup.split('_')[0] as PersonaAge);
   const subject = kind === 'persona' ? '人物' : '场景';
-  const category = kind === 'persona' ? PERSONA_CATEGORIES[personaGroup] : SCENE_SPACE_LABELS[sceneSpace];
+  const category = kind === 'persona' ? PERSONA_CATEGORIES[targetGroup] : SCENE_SPACE_LABELS[targetSpace];
   const done = items.filter((item) => item.status === 'done').length;
   const remaining = items.length - done;
   useEffect(() => {
@@ -57,7 +67,8 @@ export function SalesImageImportDialog({ kind, existingNames, initialFiles = [],
     const controller = new AbortController(); operation.current = controller;
     setPending(true); setError('');
     try {
-      const count = await runSalesImageImportBatch(kind, items, { personaGroup, sceneSpace }, controller.signal, {
+      const targetCategory = { personaGroup: targetGroup, sceneSpace: targetSpace };
+      const count = await runSalesImageImportBatch(kind, items, targetCategory, controller.signal, {
         catalog: async (signal) => {
           const catalog = await fetchSalesStudioAssets(signal);
           return kind === 'persona' ? catalog.personas : catalog.scenes.map((scene) => ({ ...scene, name: scene.title }));
@@ -65,7 +76,10 @@ export function SalesImageImportDialog({ kind, existingNames, initialFiles = [],
         upload: (file, signal) => uploadSalesViewImage(file, file.name, signal),
         save: (assetKind, data, signal) => importSalesImageAsset(assetKind, data, background ? { model } : undefined, signal),
       }, (key, patch) => setItems((previous) => previous.map((item) => item.key === key ? { ...item, ...patch } : item)));
-      if (!controller.signal.aborted && count) onImported(count);
+      if (!controller.signal.aborted && count) {
+        onTargetSelected?.(targetCategory);
+        onImported(count);
+      }
     } catch (err) { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : '读取资产库失败，请重试'); }
     finally { if (operation.current === controller) { operation.current = null; if (!controller.signal.aborted) setPending(false); } }
   };
@@ -76,6 +90,68 @@ export function SalesImageImportDialog({ kind, existingNames, initialFiles = [],
         <button type="button" disabled={pending} aria-label={`关闭${subject}批量导入`} onClick={onClose} className={salesGhostButtonClass}><X size={18} /></button>
       </header>
       <div className="sales-asset-content">
+        <div className="bml-import-target-box" role="group" aria-label={`选择${subject}导入分类`}>
+          <div className="bml-import-target-header">
+            <strong>导入归属分类</strong>
+            <span>将归入「{kind === 'persona' ? `人物 / ${activeGender === 'male' ? '男' : '女'} / ${AGE_OPTIONS.find(a => a.id === activeAge)?.label ?? PERSONA_AGES[activeAge]}` : `场景 / ${targetSpace === 'outdoor' ? '室外' : '室内'}`}」</span>
+          </div>
+          {kind === 'scene' ? (
+            <div className="bml-import-target-row">
+              <span>空间</span>
+              <div className="bml-import-pills">
+                {(['indoor', 'outdoor'] as const).map((space) => (
+                  <button
+                    key={space}
+                    type="button"
+                    disabled={pending}
+                    aria-pressed={targetSpace === space}
+                    className={`bml-import-pill${targetSpace === space ? ' is-active' : ''}`}
+                    onClick={() => setTargetSpace(space)}
+                  >
+                    {space === 'indoor' ? '室内' : '室外'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bml-import-target-grid">
+              <div className="bml-import-target-row">
+                <span>性别</span>
+                <div className="bml-import-pills">
+                  {PERSONA_GENDERS.map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      disabled={pending}
+                      aria-pressed={activeGender === id}
+                      className={`bml-import-pill${activeGender === id ? ' is-active' : ''}`}
+                      onClick={() => setTargetGroup(personaCategory(id, activeAge))}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="bml-import-target-row">
+                <span>年龄段</span>
+                <div className="bml-import-pills">
+                  {AGE_OPTIONS.map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      disabled={pending}
+                      aria-pressed={activeAge === id}
+                      className={`bml-import-pill${activeAge === id ? ' is-active' : ''}`}
+                      onClick={() => setTargetGroup(personaCategory(activeGender, id))}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
         <p className="sales-material-notice">每张图片创建一个{subject}资产，归入「{category}」。名称按库中「{subject}1、{subject}2…」的已有编号顺延，导入后可编辑。</p>
         <div className="flex flex-col gap-2 rounded-lg border border-[var(--sales-line)] p-3">
           <label className="flex items-center gap-2"><input type="checkbox" checked={background} disabled={pending} onChange={(event) => setBackground(event.target.checked)} />导入后后台补全{kind === 'persona' ? '人物三视图与特写' : '场景九宫格'}</label>

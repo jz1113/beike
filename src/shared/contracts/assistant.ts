@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TextRequestRoutingFields } from './textRouting';
+import { TextRequestRoutingFields } from './generate';
 
 const assistantIdSchema = z.string().trim().min(1).max(255);
 
@@ -82,6 +82,7 @@ const skillResourceSchema = z.object({
 });
 
 const skillCatalogEntrySchema = z.object({
+  builtinRevision: z.string().trim().max(128).optional(),
   id: z.string().max(128),
   name: z.string().max(200),
   description: z.string().max(400).optional().default(''),
@@ -144,3 +145,41 @@ export type TurnApproveBody = z.infer<typeof turnApproveBodySchema>;
 export type ClientContext = z.infer<typeof clientContextSchema>;
 export type WorkspaceSnapshot = z.infer<typeof workspaceSnapshotSchema>;
 export type McpServerConfig = z.infer<typeof mcpServerConfigSchema>;
+
+const skillLibraryVersionSchema = z.string().min(1);
+const assistantSkillContentSchema = z.object({
+  id: z.string().min(1), name: z.string().min(1), description: z.string().default(''), prompt: z.string().min(1),
+  libraryVersion: skillLibraryVersionSchema, isFavorite: z.boolean().optional(),
+  files: z.array(z.object({ path: z.string(), content: z.string() })).optional(),
+  tools: z.array(z.string()).optional(),
+}).passthrough();
+
+const workshopSkillContentSchema = z.object({
+  id: z.string().min(1), name: z.string(), category: z.string(), promptSnippet: z.string(),
+  libraryVersion: skillLibraryVersionSchema, isFavorite: z.boolean().optional(), isOfficial: z.boolean().optional(),
+  desc: z.string().nullable().optional(), coverUrl: z.string().nullable().optional(),
+  sampleImages: z.union([z.string(), z.array(z.string())]).nullable().optional(),
+}).passthrough();
+
+export const skillLibraryResponseSchema = z.object({
+  success: z.literal(true),
+  skills: z.array(z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('assistant'), content: assistantSkillContentSchema }),
+    z.object({ kind: z.literal('workshop'), content: workshopSkillContentSchema }),
+  ])),
+  hiddenOfficialRecipes: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+
+export const savedSkillResponseSchema = z.object({ success: z.literal(true), skill: assistantSkillContentSchema });
+
+export const sharedMaterialKindSchema = z.enum(['script', 'action', 'persona', 'scene', 'voice', 'bgm']);
+export type SharedMaterialKind = z.infer<typeof sharedMaterialKindSchema>;
+export const sharedMaterialsPageSchema = z.object({
+  success: z.literal(true),
+  items: z.array(z.object({ id: z.string(), name: z.string(), kind: sharedMaterialKindSchema, importedId: z.string().optional() })),
+  more: z.boolean(),
+});
+export const sharedMaterialImportSchema = z.object({ success: z.literal(true), id: z.string().min(1) });
+
+export const libraryPreferencesSchema = z.object({ showEntry: z.boolean(), sharingEnabled: z.boolean() });
+export type LibraryPreferences = z.infer<typeof libraryPreferencesSchema>;

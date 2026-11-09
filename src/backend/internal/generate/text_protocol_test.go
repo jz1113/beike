@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/gateway"
 )
 
@@ -139,7 +138,7 @@ func TestNativeCopyFailureDoesNotFallbackOrReplay(t *testing.T) {
 		gateway.ModelHTTP = func() *http.Client { return server.Client() }
 		body := `{"model":"gemini-2.5-flash","productTitle":"台灯","customApiKey":"secret","customBaseUrl":"` + server.URL + `"}`
 		rec := httptest.NewRecorder()
-		Copywriting(config.Config{}).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body)))
+		Copywriting(canvasTextTestConfig(t, "development")).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body)))
 		gateway.ModelHTTP = previous
 		server.Close()
 		if rec.Code != 502 || calls != 1 || strings.Contains(rec.Body.String(), `"fromFallback":true`) {

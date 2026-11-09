@@ -2,14 +2,15 @@ import { useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import {
   agentTriggerModelName,
+  listModelChannels,
   PromptBarModelPickerModal,
 } from '@client/shared/prompt-bar/controls/PromptBarModelPickerModal';
 import { PromptBarReasoningPill } from '@client/shared/prompt-bar/controls/PromptBarReasoningPill';
-import { listModelChannels } from '@client/shared/prompt-bar/controls/modelPickerChannels';
 import type { PreferenceModelItem } from '@client/shared/prompt-bar/hooks/usePromptBarWorkflowModels';
 import { ModelIcon } from '@client/shared/ui/ModelIcons';
+import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
-import { selectedTextModel } from '@shared/domain/models/textModelRoute';
+import { selectedTextModel } from '@shared/domain/models/workflowModelStorage';
 import { upstreamModelId } from '@shared/domain/models/workflowModels';
 
 export interface ConfiguredModelPickerOption {
@@ -35,6 +36,8 @@ export interface ConfiguredModelPickerProps {
   className?: string;
   variant?: 'default' | 'agent';
   showReasoning?: boolean;
+  reasoningValue?: ReasoningEffort;
+  onReasoningChange?: (effort: ReasoningEffort) => void;
 }
 
 function splitModelNameAndChannel(rawName: string, explicitProvider?: string) {
@@ -88,6 +91,8 @@ export function ConfiguredModelPicker({
   className = '',
   variant = 'default',
   showReasoning = false,
+  reasoningValue,
+  onReasoningChange,
 }: ConfiguredModelPickerProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -98,11 +103,11 @@ export function ConfiguredModelPicker({
   );
   const channels = useMemo(() => listModelChannels(models), [models]);
   const selected = useMemo(
-    () => models.find((item) => item.id === value || item.upstreamId === value) || models[0],
+    () => models.find((item) => item.id === value || item.upstreamId === value) || (!value ? models[0] : undefined),
     [models, value],
   );
   const upstream = selected?.upstreamId || selected?.id || '';
-  const label = selected ? agentTriggerModelName(upstream, selected.name) : emptyLabel;
+  const label = selected ? agentTriggerModelName(upstream, selected.name) : value ? `模型不可用 · ${value}` : emptyLabel;
   const isDisabled = disabled || models.length === 0;
   const isAgent = variant === 'agent';
 
@@ -115,7 +120,7 @@ export function ConfiguredModelPicker({
         aria-haspopup="listbox"
         aria-expanded={open && !isDisabled}
         aria-label={ariaLabel}
-        title={selected ? (selected.provider ? `${label} · ${selected.provider}` : label) : emptyLabel}
+        title={selected?.provider ? `${label} · ${selected.provider}` : label}
         onClick={() => setOpen((current) => !current)}
         className={isAgent
           ? `flex h-8 max-w-[220px] min-w-0 cursor-pointer items-center gap-1 rounded-lg px-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -131,6 +136,9 @@ export function ConfiguredModelPicker({
       >
         {isAgent ? (
           <>
+            {(upstream || value) && (
+              <ModelIcon modelId={upstream || value} className="h-3.5 w-3.5 shrink-0 object-contain" />
+            )}
             <span className="truncate">{label}</span>
             {open && !isDisabled ? <ChevronUp className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />}
           </>
@@ -167,6 +175,8 @@ export function ConfiguredModelPicker({
           assistantModel={selected?.id || upstream || value}
           isUp={isUp}
           disabled={isDisabled}
+          value={reasoningValue}
+          onChange={onReasoningChange}
         />
       )}
     </div>

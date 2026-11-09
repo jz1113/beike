@@ -1,12 +1,45 @@
 import { apiFetch } from '@client/shared/api/apiClient';
-import { catalogRequestProtocol } from '../model/catalogRequestProtocol';
-import { parseCodexCatalog } from '../model/codexCatalog';
-import { parseGatewayModels, type GatewayModelItem, type GatewayChannel } from '../model/gatewayModelCatalog';
+import { catalogRequestProtocol } from '../model/apiProviderTypes';
+import { parseGatewayModels, type GatewayModelItem, type GatewayChannel } from '../model/modelManagement';
+import { getApprovedModel } from '@shared/domain/models/modelCatalog';
+import { inferWorkflowCapabilitiesFromId } from '@shared/domain/models/workflowModels';
+
+/** CC Switch/Codex catalog is a local model list, not an authentication file. */
+function parseCodexCatalog(raw: unknown): GatewayModelItem[] {
+  const entries = raw && typeof raw === 'object' && 'models' in raw ? (raw as { models: unknown }).models : null;
+  if (!Array.isArray(entries)) throw new Error('请选择含 models 数组的 CC Switch/Codex 模型目录 JSON');
+  const seen = new Set<string>();
+  const models = entries.flatMap((entry): GatewayModelItem[] => {
+    const id = typeof entry === 'string' ? entry.trim()
+      : entry && typeof entry === 'object'
+        ? String((entry as { slug?: unknown; id?: unknown; model?: unknown }).slug
+          || (entry as { id?: unknown }).id
+          || (entry as { model?: unknown }).model || '').trim()
+        : '';
+    if (!id || seen.has(id)) return [];
+    seen.add(id);
+    const item = entry && typeof entry === 'object' ? entry as { display_name?: unknown; displayName?: unknown } : {};
+    const approved = getApprovedModel(id);
+    const caps = inferWorkflowCapabilitiesFromId(id);
+    const name = approved?.name || (typeof item.display_name === 'string' ? item.display_name
+      : typeof item.displayName === 'string' ? item.displayName : id);
+    return [{
+      id, name, shortName: approved?.shortName || name,
+      category: caps.isImage ? 'image' : caps.isVideo ? 'video' : caps.isAudio ? 'audio' : caps.isEmbedding ? 'embedding' : 'text',
+      isVision: caps.isVision, isThinking: caps.isThinking, isImage: caps.isImage,
+      isVideo: caps.isVideo, isAudio: caps.isAudio, isEmbedding: caps.isEmbedding,
+      isTool: false, owned_by: 'openai', isCustom: false,
+      supported: Boolean(approved?.capability === 'multimodal' && /^gpt-(?:5\.6|6)(?:-|$)/i.test(id)),
+    }];
+  });
+  if (models.length === 0) throw new Error('目录中没有可读取的模型 ID');
+  return models;
+}
 
 export interface GatewayRequestState { version: number; controller: AbortController | null }
 interface GatewayCatalogDeps {
   apiKey: string; baseUrl: string; showToast: (msg: string) => void;
-  allGatewayModels: GatewayModelItem[]; lianchiModels: GatewayModelItem[]; openAIModels: GatewayModelItem[];
+  allGatewayModels: GatewayModelItem[]; openAIModels: GatewayModelItem[];
   requestRef: { current: GatewayRequestState };
   cacheRef: { current: Partial<Record<GatewayChannel, string>> };
   setGatewaySource: (source: GatewayChannel) => void;
@@ -14,9 +47,6 @@ interface GatewayCatalogDeps {
   setAllGatewayModels: (models: GatewayModelItem[]) => void;
   setIsFetchingGateway: (fetching: boolean) => void;
   setGatewayModelError: (message: string) => void;
-  setLianchiModels: (models: GatewayModelItem[]) => void;
-  setIsFetchingLianchi: (fetching: boolean) => void;
-  setLianchiModelError: (message: string) => void;
   setOpenAIModels: (models: GatewayModelItem[]) => void;
   setOpenAIModelError: (message: string) => void;
   setOpenAIModelSuggestedBaseUrl: (url: string) => void;
@@ -32,7 +62,7 @@ export function cancelGatewayCatalogRequests(ref: GatewayCatalogDeps['requestRef
 export function createGatewayCatalogActions(deps: GatewayCatalogDeps) {
   const begin = (channel: GatewayChannel) => {
     cancelGatewayCatalogRequests(deps.requestRef);
-    deps.setIsFetchingGateway(false); deps.setIsFetchingLianchi(false); deps.setIsFetchingOpenAI(false);
+    deps.setIsFetchingGateway(false); deps.setIsFetchingOpenAI(false);
     deps.setGatewaySource(channel);
     const controller = new AbortController();
     deps.requestRef.current.controller = controller;
@@ -41,11 +71,11 @@ export function createGatewayCatalogActions(deps: GatewayCatalogDeps) {
   };
   const fetchCatalog = async (channel: GatewayChannel, body: Record<string, unknown>, forceRefresh: boolean) => {
     const request = begin(channel);
-    const setModels = channel === 'openai' ? deps.setOpenAIModels : channel === 'lianchi' ? deps.setLianchiModels : deps.setAllGatewayModels;
-    const setFetching = channel === 'openai' ? deps.setIsFetchingOpenAI : channel === 'lianchi' ? deps.setIsFetchingLianchi : deps.setIsFetchingGateway;
-    const setError = channel === 'openai' ? deps.setOpenAIModelError : channel === 'lianchi' ? deps.setLianchiModelError : deps.setGatewayModelError;
-    const models = channel === 'openai' ? deps.openAIModels : channel === 'lianchi' ? deps.lianchiModels : deps.allGatewayModels;
-    const name = channel === 'openai' ? 'OpenAI' : channel === 'lianchi' ? '联池' : 'Comfly';
+    const setModels = channel === 'openai' ? deps.setOpenAIModels : deps.setAllGatewayModels;
+    const setFetching = channel === 'openai' ? deps.setIsFetchingOpenAI : deps.setIsFetchingGateway;
+    const setError = channel === 'openai' ? deps.setOpenAIModelError : deps.setGatewayModelError;
+    const models = channel === 'openai' ? deps.openAIModels : deps.allGatewayModels;
+    const name = channel === 'openai' ? 'OpenAI' : 'Comfly';
     const identity = JSON.stringify(body);
     deps.setIsGatewayModalOpen(true);
     if (!forceRefresh && models.length && deps.cacheRef.current[channel] === identity) return;
@@ -86,7 +116,6 @@ export function createGatewayCatalogActions(deps: GatewayCatalogDeps) {
     }
   };
   const handleOpenGatewayDiscovery = (forceRefresh = false) => fetchCatalog('comfly', { baseUrl: deps.baseUrl.trim(), apiKey: deps.apiKey.trim() }, forceRefresh);
-  const handleOpenLianchiDiscovery = (apiKey: string, forceRefresh = false) => fetchCatalog('lianchi', { provider: 'lianchi', apiKey: apiKey.trim(), strict: true }, forceRefresh);
   const handleOpenOpenAIDiscovery = (baseUrl: string, apiKey: string, allowInsecureHttp = false, forceRefresh = false) => fetchCatalog('openai', { provider: 'openai', baseUrl: baseUrl.trim(), apiKey: apiKey.trim(), allowInsecureHttp, strict: true }, forceRefresh);
   const handleImportCodexCatalog = async (file: File) => {
     const request = begin('openai');
@@ -105,5 +134,5 @@ export function createGatewayCatalogActions(deps: GatewayCatalogDeps) {
       deps.setOpenAIModelError(message); deps.showToast(message);
     }
   };
-  return { handleOpenGatewayDiscovery, handleOpenLianchiDiscovery, handleOpenOpenAIDiscovery, handleImportCodexCatalog };
+  return { handleOpenGatewayDiscovery, handleOpenOpenAIDiscovery, handleImportCodexCatalog };
 }

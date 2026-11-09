@@ -88,4 +88,18 @@ if (hits.length) {
   process.exit(1);
 }
 
+const localDir = path.join(root, '.local');
+if (fs.existsSync(localDir)) {
+  try {
+    for (const entry of fs.readdirSync(localDir, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      if (/(?:^|[-_.])(key|pem)(?:$|[-_.])/i.test(entry.name) && !entry.name.endsWith('.pub')) {
+        console.warn(`[lint:secrets] 提示：检测到未入库目录 .local/${entry.name} 含有密钥文件，建议迁移至 ~/.ssh/ 并设置 chmod 600。`);
+      }
+    }
+  } catch {
+    /* ignore local directory inspection errors */
+  }
+}
+
 console.log('Secret scan passed.');

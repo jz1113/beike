@@ -1,14 +1,38 @@
-import { useLibraryPreferences } from '@client/shared/api/libraryPreferences';
-import { FolderOpen, History, MessageSquare, Moon, MoreHorizontal, PanelLeft, Settings, Sun, UserRound, Wrench } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useLibraryPreferences } from '@client/shared/api/credentialClient';
+import { FolderOpen, Frame, History, MessageSquare, PanelLeft, Wrench } from 'lucide-react';
+import { useState, type ReactNode, type SVGProps } from 'react';
 import type { AppView } from '@client/store/appView';
 import { useToast } from '@client/shared/hooks/useToast';
 import { useI18n } from '@client/shared/i18n';
-import { NavGenerateIcon } from '@client/shared/icons';
 import { SidebarHistory } from './SidebarHistory';
-import { useAppTheme } from '@client/shared/hooks/useAppTheme';
-import { useCreatorProfile } from '@client/features/settings/hooks/useCreatorProfile';
-import { queueSettingsSection, type SettingsNavSection } from '@client/features/settings/model/settingsNavigation';
+import { useCreatorProfile } from '@client/features/settings/hooks/useApiProviders';
+import { queueSettingsSection } from '@client/features/settings/model/settingsNavigation';
+
+export interface NavIconProps extends SVGProps<SVGSVGElement> {
+  active?: boolean;
+}
+
+/**
+ * 全局导航 · 生成创作双星图标 (支持 active 实心与非 active 描边)
+ */
+export function NavGenerateIcon({ active = false, className = 'w-full h-full', strokeWidth = 1.8, ...props }: NavIconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill={active ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+      {...props}
+    >
+      <path d="M9.5 5Q9.5 13.5 18 13.5Q9.5 13.5 9.5 22Q9.5 13.5 1 13.5Q9.5 13.5 9.5 5Z" />
+      <path d="M18 1.5Q18 5.5 22 5.5Q18 5.5 18 9.5Q18 5.5 14 5.5Q18 5.5 18 1.5Z" />
+    </svg>
+  );
+}
 
 const SIDEBAR_COLLAPSED_KEY = 'beike.sidebar.collapsed';
 
@@ -16,11 +40,12 @@ interface Props {
   currentView: AppView;
   onNavigateHub: () => void;
   onNavigateAssets: () => void;
+  onNavigateCanvas: () => void;
+  canvasHomeActive: boolean;
   onNavigateLibrary: () => void;
   onNavigateSkills: () => void;
   onOpenSettings: () => void;
   onOpenSession: (id: string) => void;
-  onOpenAssistantSession: (id: string) => void;
   onCreateConversation: () => void;
 }
 
@@ -77,7 +102,7 @@ function NavItem({
 
 function CreatorAvatar({ name, avatar }: { name: string; avatar?: string }) {
   return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#E7D3C5] text-[13px] font-semibold text-[#9A3412]">
+    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#E7D3C5] text-[13px] font-semibold leading-none text-[#9A3412]">
       {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : name.slice(0, 1)}
     </span>
   );
@@ -91,74 +116,32 @@ function CreatorDock({
   onOpenSettings: () => void;
 }) {
   const { profile } = useCreatorProfile();
-  const { isDark, toggleTheme } = useAppTheme();
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    window.addEventListener('mousedown', close);
-    return () => window.removeEventListener('mousedown', close);
-  }, [open]);
-
-  const openSection = (section: SettingsNavSection) => {
-    queueSettingsSection(section);
-    setOpen(false);
+  const openProfileSettings = () => {
+    queueSettingsSection('profile');
     onOpenSettings();
   };
 
   return (
-    <div ref={rootRef} className="relative w-full">
-      {open ? (
-        <div
-          role="menu"
-          className="absolute bottom-[calc(100%+8px)] left-0 z-50 min-w-[196px] overflow-hidden rounded-xl border border-slate-200/80 bg-white p-1 shadow-xl dark:border-white/10 dark:bg-[#1B1B1E]"
-        >
-          <button type="button" role="menuitem" onClick={() => openSection('profile')} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-100 dark:text-[#EDEDED] dark:hover:bg-white/10">
-            <UserRound className="h-4 w-4" />创作档案
-          </button>
-          <button type="button" role="menuitem" onClick={() => openSection('appearance')} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-100 dark:text-[#EDEDED] dark:hover:bg-white/10">
-            {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-indigo-500" />}外观与主题
-          </button>
-          <button type="button" role="menuitem" onClick={() => { toggleTheme(); setOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-100 dark:text-[#EDEDED] dark:hover:bg-white/10">
-            {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-indigo-500" />}
-            {isDark ? '切换至浅色模式' : '切换至深色模式'}
-          </button>
-          <button type="button" role="menuitem" onClick={() => openSection('api')} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-100 dark:text-[#EDEDED] dark:hover:bg-white/10">
-            <Settings className="h-4 w-4" />系统设置
-          </button>
-        </div>
-      ) : null}
-      <div className={`flex w-full items-center ${collapsed ? 'justify-center' : 'gap-1 rounded-xl px-1.5 py-1.5 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'}`}>
-        <button
-          type="button"
-          onClick={() => {
-            const wide = window.matchMedia('(min-width: 768px)').matches;
-            if (!wide || collapsed) setOpen((value) => !value);
-            else openSection('profile');
-          }}
-          aria-label={profile.name}
-          className={`group relative flex min-w-0 items-center ${collapsed ? 'h-10 w-10 justify-center rounded-xl' : 'h-10 flex-1 gap-2.5 rounded-lg px-1.5'}`}
-        >
-          <CreatorAvatar name={profile.name} avatar={profile.avatar} />
-          {!collapsed ? <span className="hidden min-w-0 truncate text-[14px] font-medium text-slate-800 dark:text-[#EDEDED] md:inline">{profile.name}</span> : null}
-          {collapsed ? <SidebarTooltip>{profile.name}</SidebarTooltip> : null}
-        </button>
+    <div className="relative flex w-full items-center justify-center">
+      <button
+        type="button"
+        onClick={openProfileSettings}
+        aria-label={profile.name}
+        className={`group relative flex min-w-0 items-center ${
+          collapsed
+            ? 'h-10 w-10 justify-center rounded-xl hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
+            : 'h-11 w-full items-center gap-2.5 rounded-xl px-3 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
+        }`}
+      >
+        <CreatorAvatar name={profile.name} avatar={profile.avatar} />
         {!collapsed ? (
-          <button
-            type="button"
-            aria-label="更多"
-            aria-expanded={open}
-            onClick={() => setOpen((value) => !value)}
-            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-black/[0.05] hover:text-slate-800 dark:text-[#8E8E93] dark:hover:bg-white/10 dark:hover:text-white md:flex"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
+          <span className="hidden min-w-0 truncate text-[14px] font-medium leading-none text-slate-800 dark:text-[#EDEDED] md:inline-flex md:items-center">
+            {profile.name}
+          </span>
         ) : null}
-      </div>
+        {collapsed ? <SidebarTooltip>{profile.name}</SidebarTooltip> : null}
+      </button>
     </div>
   );
 }
@@ -167,11 +150,12 @@ export default function AppSidebar({
   currentView,
   onNavigateHub,
   onNavigateAssets,
+  onNavigateCanvas,
+  canvasHomeActive,
   onNavigateLibrary,
   onNavigateSkills,
   onOpenSettings,
   onOpenSession,
-  onOpenAssistantSession,
   onCreateConversation,
 }: Props) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -247,10 +231,17 @@ export default function AppSidebar({
         <nav className={`flex w-full flex-col items-center gap-1 ${collapsed ? '' : 'md:items-stretch md:gap-[6px]'}`} aria-label="主导航">
           <NavItem
             label={t('sidebar.create')}
-            active={currentView === 'home' || currentView === 'generate'}
+            active={(currentView === 'home' && !canvasHomeActive) || currentView === 'generate'}
             onClick={onNavigateHub}
             showLabel={showLabel}
             icon={<NavGenerateIcon className="h-[20px] w-[20px]" strokeWidth={1.8} />}
+          />
+          <NavItem
+            label={t('assets.canvas')}
+            active={canvasHomeActive || currentView === 'canvas'}
+            onClick={onNavigateCanvas}
+            showLabel={showLabel}
+            icon={<Frame className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
           <NavItem
             label={t('sidebar.skills')}
@@ -259,13 +250,6 @@ export default function AppSidebar({
             showLabel={showLabel}
             icon={<Wrench className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
-          <NavItem
-            label={t('sidebar.assetWorkspace')}
-            active={currentView === 'assets'}
-            onClick={onNavigateAssets}
-            showLabel={showLabel}
-            icon={<History className="h-[20px] w-[20px]" strokeWidth={1.8} />}
-          />
           {showLibraryEntry && <NavItem
             label={t('assets.materialLibrary')}
             active={currentView === 'asset_library'}
@@ -273,6 +257,13 @@ export default function AppSidebar({
             showLabel={showLabel}
             icon={<FolderOpen className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />}
+          <NavItem
+            label={t('sidebar.assetWorkspace')}
+            active={currentView === 'assets'}
+            onClick={onNavigateAssets}
+            showLabel={showLabel}
+            icon={<History className="h-[20px] w-[20px]" strokeWidth={1.8} />}
+          />
         </nav>
         {!showLabel && (
           <button
@@ -292,13 +283,12 @@ export default function AppSidebar({
           <SidebarHistory
             currentView={currentView}
             onOpenSession={onOpenSession}
-            onOpenAssistantSession={onOpenAssistantSession}
             onCreateConversation={onCreateConversation}
           />
         </div>
       )}
 
-      <div className={`mt-auto flex w-full flex-col items-center border-t border-slate-200/80 pt-3 dark:border-white/10 ${collapsed ? '' : 'md:items-stretch md:pb-1 md:pt-3'}`}>
+      <div className={`mt-auto flex w-full flex-col items-center pt-2 ${collapsed ? '' : 'md:items-stretch md:pb-1 md:pt-2'}`}>
         <CreatorDock collapsed={!showLabel} onOpenSettings={onOpenSettings} />
       </div>
 

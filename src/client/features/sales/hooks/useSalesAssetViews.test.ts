@@ -3,7 +3,7 @@ import { useSalesAssetViews } from './useSalesAssetViews';
 import type { AssetViewRequest, AssetViewStage } from '../api/salesAssetViews';
 import type { SalesAssetDraft, SalesAssetDraftPersistence } from '../model/salesAssetDraft';
 import { uploadSalesViewImage } from '../api/salesAssetViews';
-import { PERSONA_VIEWS, readPersonaViews } from '../model/salesPersonaViews';
+import { PERSONA_VIEWS, readPersonaViews } from '../model/salesActionViews';
 
 const hooks = vi.hoisted(() => ({ index: 0, slots: [] as unknown[], cleanup: undefined as (() => void) | undefined }));
 vi.mock('react', () => ({

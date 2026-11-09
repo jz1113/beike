@@ -2,12 +2,15 @@ package gateway
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -232,5 +235,205 @@ func TestTextUsageOnlyUsesReportedValues(t *testing.T) {
 	}
 	if usage := geminiUsage(map[string]any{"promptTokenCount": float64(10)}); usage["completion_tokens"] != nil || usage["total_tokens"] != nil {
 		t.Fatal(usage)
+	}
+}
+
+func TestTextInvalidOutputPreservesOnlyBillingReceipt(t *testing.T) {
+	for _, tc := range []struct {
+		name, protocol, body string
+		responses            bool
+	}{
+		{"openai", "openai", `{"choices":[],"usage":{"prompt_tokens":11,"completion_tokens":7},"unsafe":"must not leak"}`, false},
+		{"gemini", "gemini", `{"candidates":[],"usageMetadata":{"promptTokenCount":11,"candidatesTokenCount":7,"totalTokenCount":18},"unsafe":"must not leak"}`, false},
+		{"anthropic", "anthropic", `{"content":[{"type":"tool_use","input":{}}],"stop_reason":"tool_use","usage":{"input_tokens":11,"output_tokens":7},"unsafe":"must not leak"}`, false},
+		{"responses", "openai", `{"status":"incomplete","usage":{"input_tokens":11,"output_tokens":7},"output_text":"must not use"}`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); _, _ = io.WriteString(w, tc.body) }))
+			defer server.Close()
+			req := TextRequest{BaseURL: server.URL, Protocol: tc.protocol, Payload: textTestPayload("test-model")}
+			var body map[string]any
+			var err error
+			if tc.responses {
+				_, body, err = CompleteResponses(context.Background(), req)
+			} else {
+				_, body, err = CompleteText(context.Background(), req)
+			}
+			if err == nil || body["submissionUnknown"] != true || calls.Load() != 1 {
+				t.Fatal("invalid output accepted/repeated", err, body, calls.Load())
+			}
+			if usage := NormalizeUsage(body); usage == nil || usage["totalTokens"] != float64(18) {
+				t.Fatal("reported usage lost", body)
+			}
+			if body["choices"] != nil || body["unsafe"] != nil || body["output_text"] != nil {
+				t.Fatal("invalid content leaked", body)
+			}
+		})
+	}
+}
+
+func TestTextClaudeJSONObjectCompatibility(t *testing.T) {
+	for _, tc := range []struct {
+		name, answer, content string
+		valid                 bool
+	}{
+		{"raw", `{"ok":true}`, `{"ok":true}`, true},
+		{"fence", "```json\n{\"ok\":true}\n```", `{"ok":true}`, true},
+		{"prose", "说明 {\"ok\":true} 结束", `{"ok":true}`, true},
+		{"array", `[]`, "", false},
+		{"text", `plain text`, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var payload map[string]any
+				json.NewDecoder(r.Body).Decode(&payload)
+				if len(textArray(payload["system"])) < 2 {
+					t.Error("missing JSON object instruction", payload)
+				}
+				json.NewEncoder(w).Encode(map[string]any{"content": []any{map[string]any{"type": "text", "text": tc.answer}}, "stop_reason": "end_turn"})
+			}))
+			defer server.Close()
+			payload := textTestPayload("claude-5.5-haiku")
+			payload["response_format"] = map[string]any{"type": "json_object"}
+			_, result, err := CompleteText(context.Background(), TextRequest{BaseURL: server.URL, Payload: payload})
+			if (err == nil) != tc.valid {
+				t.Fatalf("result=%v err=%v", result, err)
+			}
+			if !tc.valid {
+				if result != nil {
+					t.Fatal("invalid JSON returned as usable output")
+				}
+				return
+			}
+			message := textMap(textMap(textArray(result["choices"])[0])["message"])
+			if textString(message["content"]) != tc.content {
+				t.Fatalf("content %q", message["content"])
+			}
+		})
+	}
+}
+
+func TestTextGeminiJSONSchemaResult(t *testing.T) {
+	for _, answer := range []string{`{"ok":true}`, `not JSON`} {
+		t.Run(answer, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				encoded, _ := json.Marshal(answer)
+				io.WriteString(w, `{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":`+string(encoded)+`}]}}]}`)
+			}))
+			defer server.Close()
+			payload := textTestPayload("gemini-4-argon")
+			payload["response_format"] = map[string]any{"type": "json_schema", "json_schema": map[string]any{"schema": map[string]any{"type": "object"}}}
+			_, _, err := CompleteText(context.Background(), TextRequest{BaseURL: server.URL, Payload: payload})
+			if (err == nil) != (answer != "not JSON") {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestAdaptiveDefaultOmitsLegacySampling(t *testing.T) {
+	p := textTestPayload("claude-haiku-5-5")
+	p["temperature"], p["top_p"] = .2, .9
+	out, err := anthropicRequest(context.Background(), p, "claude-haiku-5-5", false)
+	if err != nil || out["temperature"] != nil || out["top_p"] != nil || out["thinking"] != nil {
+		t.Fatalf("default adaptive sampling: %v %v", out, err)
+	}
+}
+
+func TestVerifiedCapabilityNormalization(t *testing.T) {
+	for _, tc := range []struct{ model, effort, want string }{
+		{"gemini-4-argon", "xhigh", "high"},
+		{"gemini-3-pro-preview", "medium", "high"},
+		{"claude-haiku-5-5", "xhigh", "xhigh"},
+		{"claude-haiku-5-5", "max", "max"},
+		{"claude-sonnet-4-6", "max", "max"},
+		{"claude-sonnet-4-6", "xhigh", "high"},
+		{"gemini-4-argon", "max", "high"},
+		{"claude-5.5-haiku", "high", ""},
+		{"gemini-unknown", "high", ""},
+		{"claude-haiku-4-5-20251001", "high", "high"},
+	} {
+		if got := nativeTextEffort(tc.model, tc.effort); got != tc.want {
+			t.Errorf("%s/%s: got %q want %q", tc.model, tc.effort, got, tc.want)
+		}
+	}
+}
+
+func TestUnknownNativeModelsOmitUnverifiedThinking(t *testing.T) {
+	for _, protocol := range []string{"gemini", "anthropic"} {
+		out := map[string]any{"max_tokens": 4096}
+		p := map[string]any{"reasoning_effort": "high"}
+		var err error
+		if protocol == "gemini" {
+			err = geminiReasoning(out, p, "gemini-private-alias")
+		} else {
+			err = anthropicReasoning(out, p, "claude-private-alias")
+		}
+		if err != nil || out["thinking"] != nil || out["thinkingConfig"] != nil || out["output_config"] != nil {
+			t.Fatalf("%s unverified thinking: %v %v", protocol, out, err)
+		}
+	}
+}
+
+func TestGeminiReceivesInlineVideoWithoutTools(t *testing.T) {
+	data := base64.StdEncoding.EncodeToString([]byte("\x00\x00\x00\x18ftypisomvideo"))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		parts := textArray(textMap(textArray(body["contents"])[0])["parts"])
+		video := textMap(textMap(parts[1])["inlineData"])
+		if video["mimeType"] != "video/mp4" || video["data"] != data || body["tools"] != nil {
+			t.Error("native video bytes, MIME or direct request changed")
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"视频分析完成\"}]},\"finishReason\":\"STOP\"}]}\n\n")
+	}))
+	defer server.Close()
+	_, reply, err := StreamText(context.Background(), TextRequest{BaseURL: server.URL, Protocol: "gemini", Payload: map[string]any{
+		"model": "gemini-3.8-flash", "messages": []any{map[string]any{"role": "user", "content": []any{
+			map[string]any{"type": "text", "text": "分析视频"},
+			map[string]any{"type": "video_url", "video_url": map[string]any{"url": "data:video/mp4;base64," + data}},
+		}}},
+	}}, nil)
+	if err != nil || textString(textMap(textMap(textArray(reply["choices"])[0])["message"])["content"]) != "视频分析完成" {
+		t.Fatalf("video completion: %v", err)
+	}
+}
+
+func TestTextVideoRejectsInvalidSources(t *testing.T) {
+	for _, source := range []string{"blob:local", "/storage/local/video.mp4", "https://example.com/video.mp4", "data:image/png;base64,AAAA", "data:video/mp4;base64,broken", "data:video/webm;base64," + base64.StdEncoding.EncodeToString([]byte("not a webm"))} {
+		if _, _, err := textVideo(context.Background(), source); err == nil {
+			t.Fatalf("invalid video source accepted: %s", source)
+		}
+	}
+}
+
+func TestTextUpstreamKeepsNestedErrorReasonAndRedactsKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `{"error":{"message":"Invalid functionResponse for secret-token"}}`)
+	}))
+	defer server.Close()
+	_, _, err := StreamText(context.Background(), TextRequest{BaseURL: server.URL, APIKey: "secret-token", Protocol: "gemini", Payload: map[string]any{"model": "gemini-3.8-flash", "messages": []any{map[string]any{"role": "user", "content": "你好"}}}}, nil)
+	if err == nil || !strings.Contains(err.Error(), "Invalid functionResponse") || strings.Contains(err.Error(), "secret-token") {
+		t.Fatalf("upstream reason or redaction lost: %v", err)
+	}
+}
+
+func TestComflyVideoUsesDocumentedImageURLPart(t *testing.T) {
+	for _, tc := range []struct{ base, want string }{
+		{"https://ai.comfly.org/v1", "image_url"},
+		{"https://example.com/v1", "video_url"},
+	} {
+		part := map[string]any{"type": "video_url", "video_url": map[string]any{"url": "https://cdn.example/source.mp4"}, "fps": 2}
+		payload := map[string]any{"messages": []any{map[string]any{"content": []any{part}}}}
+		adaptComflyVideoParts(tc.base, payload)
+		if part["type"] != tc.want {
+			t.Fatalf("%s: got %v", tc.base, part)
+		}
+		if tc.want == "image_url" && textMap(part["image_url"])["url"] != "https://cdn.example/source.mp4" {
+			t.Fatal(part)
+		}
 	}
 }

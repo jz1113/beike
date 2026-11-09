@@ -5,7 +5,6 @@ import { type PreferenceModelItem } from '../hooks/usePromptBarWorkflowModels';
 import { usePromptBarPopoverLayout } from '../hooks/usePromptBarPopoverLayout';
 import { ModelIcon } from '@client/shared/ui/ModelIcons';
 import { useAppStore } from '@client/store';
-import { canonicalModelId } from '@shared/domain/models/modelCatalog';
 import { upstreamModelId } from '@shared/domain/models/workflowModels';
 import {
   groupModelsByGeneration,
@@ -13,7 +12,26 @@ import {
   type GenerationRowItem,
 } from '@shared/domain/models/modelGrouping';
 import { looksBroken, PromptBarModelVariantStrip } from './PromptBarModelVariantStrip';
-import { DEFAULT_MODEL_CHANNEL, listModelChannels, modelChannel, modelsInChannel } from './modelPickerChannels';
+
+export const DEFAULT_MODEL_CHANNEL = '默认';
+
+export function modelChannel(model: { provider?: string }): string {
+  return model.provider?.trim() || DEFAULT_MODEL_CHANNEL;
+}
+
+/** Channels keep first-seen order. An empty provider is the default channel. */
+export function listModelChannels<T extends { provider?: string }>(models: readonly T[]): string[] {
+  const channels: string[] = [];
+  for (const model of models) {
+    const channel = modelChannel(model);
+    if (!channels.includes(channel)) channels.push(channel);
+  }
+  return channels;
+}
+
+export function modelsInChannel<T extends { provider?: string }>(models: readonly T[], channel: string): T[] {
+  return models.filter((model) => modelChannel(model) === channel);
+}
 
 interface PromptBarModelPickerModalProps {
   isOpen: boolean;
@@ -56,12 +74,13 @@ function groupKey(model: PreferenceModelItem) {
   return model.upstreamId || model.id;
 }
 
-function sameModel(left: string, right: string) {
-  const cleanLeft = upstreamModelId(left || '').toLowerCase().trim();
-  const cleanRight = upstreamModelId(right || '').toLowerCase().trim();
-  return cleanLeft === cleanRight
-    || canonicalModelId(cleanLeft).toLowerCase() === canonicalModelId(cleanRight).toLowerCase()
-    || left.toLowerCase() === right.toLowerCase();
+export function samePickerModel(left: string, right: string) {
+  return upstreamModelId(left || '').toLowerCase().trim() === upstreamModelId(right || '').toLowerCase().trim();
+}
+
+export function pickerSelectionId<T extends { id: string; upstreamId?: string }>(models: T[], groupedModelId: string, selectedModelId: string): string {
+  const matches = models.filter(model => samePickerModel(model.upstreamId || model.id, groupedModelId));
+  return matches.find(model => model.id === selectedModelId)?.id || matches[0]?.id || groupedModelId;
 }
 
 export function PromptBarModelPickerModal({
@@ -74,7 +93,7 @@ export function PromptBarModelPickerModal({
   modalityKind = 'chat',
   onSelectModel,
 }: PromptBarModelPickerModalProps) {
-  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(isOpen, isUp, triggerRef, 300, 460, false, true);
+  const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(isOpen, isUp, triggerRef, 300, 460, false, true, { alignEnd: true, minimumAbove: 120 });
   const channels = useMemo(() => listModelChannels(models), [models]);
   const selectedChannel = modelChannel(models.find((model) => model.id === selectedModelId) || {});
   const [channel, setChannel] = useState(selectedChannel);
@@ -123,16 +142,12 @@ export function PromptBarModelPickerModal({
   const selectedHere = channelModels.some((model) => model.id === selectedModelId);
   const chosenUpstream = selectedHere ? models.find((model) => model.id === selectedModelId)?.upstreamId : undefined;
   const matchesSelection = (candidate: string) => selectedHere && (
-    sameModel(candidate, selectedModelId) || Boolean(chosenUpstream && sameModel(candidate, chosenUpstream))
+    samePickerModel(candidate, selectedModelId) || Boolean(chosenUpstream && samePickerModel(candidate, chosenUpstream))
   );
-  const selectionIdFor = (groupedModelId: string) => {
-    const matches = channelModels.filter((model) => sameModel(groupKey(model), groupedModelId));
-    const current = matches.find((model) => model.id === selectedModelId || (model.upstreamId && sameModel(model.upstreamId, selectedModelId)));
-    return current?.id || matches[0]?.id || groupedModelId;
-  };
+  const selectionIdFor = (groupedModelId: string) => pickerSelectionId(channelModels, groupedModelId, selectedModelId);
   const activeRowId = useMemo(() => {
     for (const row of allRows) {
-      if (row.allModelIds.some((id) => sameModel(id, selectedModelId) || Boolean(chosenUpstream && sameModel(id, chosenUpstream)))) return row.rowId;
+      if (row.allModelIds.some((id) => samePickerModel(id, selectedModelId) || Boolean(chosenUpstream && samePickerModel(id, chosenUpstream)))) return row.rowId;
     }
     return null;
   }, [allRows, chosenUpstream, selectedModelId]);
@@ -322,7 +337,10 @@ function ModelRow({
         className="flex min-h-9 cursor-pointer items-center justify-between gap-2 px-2.5 py-1"
       >
         <div className="flex min-w-0 items-center gap-2.5">
-          <ModelIcon modelId={row.vendorId === 'unknown' ? row.familyId : row.vendorId} className="h-4 w-4 shrink-0 object-contain" />
+          <ModelIcon
+            modelId={picked?.primaryModelId || row.allModelIds[0] || (row.vendorId === 'unknown' ? row.familyId : row.vendorId)}
+            className="h-4 w-4 shrink-0 object-contain"
+          />
           <span title={title} className={`truncate text-sm ${selected ? 'font-semibold' : 'font-medium'}`}>{title}</span>
         </div>
         {single ? (

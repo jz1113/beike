@@ -1,9 +1,56 @@
-import { usePetObstacles } from './usePetObstacles';
-import { useCallback, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent, type RefObject } from 'react';
 import {
-  clampPetPosition, PET_DRAG_THRESHOLD, petPanelLayout, readPetPosition, writePetPosition,
+  avoidPetObstacles, clampPetPosition, PET_DRAG_THRESHOLD, petPanelLayout, readPetPosition, writePetPosition,
   type PetBounds, type PetPoint, type PetSize,
 } from './petGeometry';
+
+type Obstacle = PetPoint & PetSize;
+
+/** Track composers and critical operation panels, including lazy route mounts. */
+export function usePetObstacles(rootRef: RefObject<HTMLDivElement | null>, enabled: boolean) {
+  const [obstacles, setObstacles] = useState<Obstacle[]>([]);
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!enabled || !root || typeof document === 'undefined') return;
+    let composers: Element[] = [];
+    const measure = () => {
+      const rect = root.getBoundingClientRect();
+      const sx = rect.width / root.clientWidth || 1;
+      const sy = rect.height / root.clientHeight || 1;
+      const next = composers.flatMap(composer => {
+        const box = composer.getBoundingClientRect();
+        return box.width > 0 && box.height > 0 ? [{
+          x: (box.left - rect.left) / sx, y: (box.top - rect.top) / sy,
+          width: box.width / sx, height: box.height / sy,
+        }] : [];
+      });
+      setObstacles(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
+    };
+    const resize = new ResizeObserver(measure);
+    resize.observe(root);
+    const sync = () => {
+      const next = Array.from(document.querySelectorAll('[data-prompt-composer], [data-pet-obstacle]'));
+      if (next.length === composers.length && next.every((node, index) => node === composers[index])) return;
+      composers.forEach(node => resize.unobserve(node));
+      composers = next;
+      composers.forEach(node => resize.observe(node));
+      measure();
+    };
+    sync();
+    const mutations = new MutationObserver(sync);
+    mutations.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('scroll', measure);
+    return () => {
+      resize.disconnect(); mutations.disconnect();
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('scroll', measure);
+    };
+  }, [rootRef, enabled]);
+  return obstacles;
+}
 
 type Geometry = { point: PetPoint; size: PetSize; bounds: PetBounds; panelHeight: number };
 type Gesture = { id: number; x: number; y: number; origin: PetPoint; moved: boolean; target: HTMLButtonElement };
@@ -12,12 +59,12 @@ function persist(point: PetPoint, key?: string) {
   try { writePetPosition(window.localStorage, point, key); } catch { /* Storage getter can also fail. */ }
 }
 
-export function usePetAnchor(panelOpen: boolean, onDragStart: () => void, canvas = false) {
+export function usePetAnchor(panelOpen: boolean, onDragStart: () => void, canvas = false, enabled = true) {
   const key = canvas ? "beike.pet.canvas.position.v1" : undefined;
   const rootRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const obstacles = usePetObstacles(rootRef, panelOpen);
+  const obstacles = usePetObstacles(rootRef, enabled);
   const geometry = useRef<Geometry | null>(null);
   const gesture = useRef<Gesture | null>(null);
   const suppressClick = useRef(false);
@@ -42,7 +89,7 @@ export function usePetAnchor(panelOpen: boolean, onDragStart: () => void, canvas
   useLayoutEffect(() => {
     const root = rootRef.current;
     const anchor = anchorRef.current;
-    if (!root || !anchor) return;
+    if (!enabled || !root || !anchor) return;
     const measure = () => {
       const rect = root.getBoundingClientRect();
       const pet = anchor.getBoundingClientRect();
@@ -90,7 +137,7 @@ export function usePetAnchor(panelOpen: boolean, onDragStart: () => void, canvas
       window.visualViewport?.removeEventListener('resize', measure);
       window.visualViewport?.removeEventListener('scroll', measure);
     };
-  }, [panelOpen, finish, update, canvas, key]);
+  }, [panelOpen, finish, update, canvas, key, enabled]);
 
   useLayoutEffect(() => () => {
     const active = gesture.current;
@@ -105,7 +152,7 @@ export function usePetAnchor(panelOpen: boolean, onDragStart: () => void, canvas
       try { event.currentTarget.setPointerCapture(event.pointerId); } catch { return; }
       gesture.current = {
         id: event.pointerId, x: event.clientX, y: event.clientY,
-        origin: geometry.current.point, moved: false, target: event.currentTarget,
+        origin: avoidPetObstacles(geometry.current.point, geometry.current.size, geometry.current.bounds, obstacles), moved: false, target: event.currentTarget,
       };
     },
     onPointerMove(event: PointerEvent<HTMLButtonElement>) {
@@ -141,16 +188,11 @@ export function usePetAnchor(panelOpen: boolean, onDragStart: () => void, canvas
       event.stopPropagation();
     },
   };
-  const panel = layout ? petPanelLayout(layout.point, layout.size, layout.bounds, layout.panelHeight) : undefined;
-  const overlap = (left: number) => panel && obstacles.some(area => left < area.x + area.width
-    && left + panel.width > area.x && panel.top < area.y + area.height && panel.top + Math.min(layout!.panelHeight, panel.maxHeight) > area.y);
-  const otherEdge = panel && layout
-    ? (panel.left - layout.bounds.left > (layout.bounds.width - panel.width) / 2 ? layout.bounds.left : layout.bounds.width - layout.bounds.right - panel.width)
-    : 0;
+  const placed = layout ? avoidPetObstacles(layout.point, layout.size, layout.bounds, obstacles) : null;
   return {
     rootRef, anchorRef, panelRef, moving, pointerProps,
-    frame: layout ? { point: layout.point, size: layout.size, bounds: layout.bounds } : null,
-    anchorStyle: layout ? { left: layout.point.x, top: layout.point.y } : { right: 16, bottom: 16 },
-    panelStyle: panel && overlap(panel.left) && !overlap(otherEdge) ? { ...panel, left: otherEdge } : panel,
+    frame: layout && placed ? { point: placed, size: layout.size, bounds: layout.bounds } : null,
+    anchorStyle: placed ? { left: placed.x, top: placed.y } : { right: 16, bottom: 16 },
+    panelStyle: layout && placed ? petPanelLayout(placed, layout.size, layout.bounds, layout.panelHeight) : undefined,
   };
 }
