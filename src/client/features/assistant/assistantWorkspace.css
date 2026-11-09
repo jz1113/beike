@@ -122,11 +122,7 @@
 .agent-runtime-info small { font-size:10px; color:#9aA1ab; }
 
 /* Shared app branding, including compact activity indicators. */
-.agent-launcher { width: 72px; height: 72px; display: grid; place-items: center; border-radius: 50%; color: #343a3a; background: transparent; border: 0; box-shadow: none; cursor: pointer; transition: transform .2s; }
 .agent-brand-logo { display:block; width:100%; height:100%; object-fit:contain; }
-.agent-launcher .agent-brand-logo { width: 60px; height: 60px; }
-.agent-launcher:hover { transform: translateY(-3px); }
-.agent-launcher:focus-visible { outline: 2px solid #3676eb; outline-offset: 4px; }
 .agent-session-button { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 7px 4px; border-radius: 7px; font-size: 13px; font-weight: 550; }
 .agent-session-button span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 190px; }
 .agent-session-button svg { flex-shrink: 0; color: #999c9e; }
@@ -213,7 +209,7 @@
   .agent-welcome-brand { margin-bottom:8px; }
   .agent-start-card { min-height:132px; }
 }
-@media(prefers-reduced-motion:reduce) { .agent-launcher,.agent-start-card,.agent-start-arrow { transition:none; } }
+@media(prefers-reduced-motion:reduce) { .agent-start-card,.agent-start-arrow { transition:none; } }
 
 .agent-model-trigger[aria-expanded=true]>svg:last-child,.agent-effort-trigger[aria-expanded=true]>svg:last-child { transform: rotate(180deg); }
 
@@ -363,6 +359,7 @@ html.dark .agent-mention-upload {
 
 /* Execution reads as an activity log, with one disclosure per phase. */
 .agent-turn-content { width:100%; min-width:0; display:flex; flex-direction:column; gap:18px; }
+.agent-turn-content[data-collected-product=true] { gap:10px; }
 .agent-response-body { color:#303538; padding:2px 0; }
 .agent-execution { width:100%; min-width:0; color:#7e868c; font-size:13px; }
 .agent-execution-summary { display:flex; align-items:center; gap:8px; min-height:30px; max-width:100%; padding:3px 0; text-align:left; }

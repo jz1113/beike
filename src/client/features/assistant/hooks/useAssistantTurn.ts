@@ -1,8 +1,25 @@
+import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
+import { getGatewayClientHeaders } from '@client/shared/api/gatewayClient';
+import {
+  applyItemEvent,
+  deriveLegacyState,
+  finishInterruptedItems,
+  initialState,
+  prepareAssistantUsage,
+  readAssistantEvents,
+  recordAssistantChatUsage,
+  submitPreparedAssistantTurn,
+} from '../model/assistantActivity';
+import type { ProductWidgetData } from '@client/store';
 import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import type { AssistantRunMode, ReferenceScope } from '@shared/domain/assistant/taskPolicy';
 import { useCallback, useRef } from 'react';
-import { apiFetch } from '@client/shared/api/apiClient';
-import { approveAssistantTool, executeClientToolAction } from '@client/features/assistant/api/assistantClientActions';
+import { apiFetch, withModelRoute } from '@client/shared/api/apiClient';
+import {
+  approveAssistantTool,
+  executeClientToolAction,
+  fetchAssistantTurnSnapshot,
+} from '@client/features/assistant/api/assistantClientActions';
 import type {
   TurnStreamState,
   ApprovalDecision,
@@ -12,15 +29,10 @@ import type {
   AssistantItem,
   ApprovalRequestItem,
 } from '@shared/domain/assistant/types';
-import { initialState, applyItemEvent, deriveLegacyState, finishInterruptedItems } from './assistantTurnItems';
 import { normalizeAssistantItems, normalizeAssistantTask } from '@shared/domain/assistant/normalizeAssistantItems';
-import { readAssistantEvents } from '../model/readAssistantEvents';
 import { readReportedUsage } from '@client/shared/utils/modelUsage';
-import { submitPreparedAssistantTurn } from '../model/assistantTurnRecovery';
-import { fetchAssistantTurnSnapshot } from '../api/runs';
 import { loadPromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 import { shouldAnalyzeVideoDirectly } from '@shared/domain/assistant/mediaAnalysis';
-export { deriveLegacyState } from './assistantTurnItems';
 
 export interface RunTurnParams {
   sessionId: string;
@@ -38,6 +50,7 @@ export interface RunTurnParams {
   skillResources?: Array<{ path: string; content: string }>;
   skillCatalog?: Array<{
     id: string;
+    builtinRevision?: string;
     name: string;
     description: string;
     prompt?: string;
@@ -109,6 +122,7 @@ export function useAssistantTurn() {
       try {
         const snapshot = await fetchAssistantTurnSnapshot(targetTurnId, sessionId);
         if (!snapshot) return null;
+        recordAssistantChatUsage(snapshot.modelUsed || '', snapshot.usage, targetTurnId);
         showToast('已恢复上轮对话进度');
         return snapshot;
       } catch {
@@ -152,10 +166,12 @@ export function useAssistantTurn() {
     const prefs = loadPromptPreferences();
     const directVideo = shouldAnalyzeVideoDirectly(messages, skillId);
 
-    const res = await submitPreparedAssistantTurn(nextTurnId, params.onTurnPrepared, () => apiFetch('/api/assistant/turn/start', {
+    const request = withModelRoute('/api/assistant/turn/start', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-custom-base-url': '', 'x-custom-api-key': '', 'x-custom-protocol': '',
+        ...getGatewayClientHeaders(model), 'x-workspace-token': getWorkspaceSecret(),
       },
       body: JSON.stringify({
         threadId: sessionId,
@@ -179,11 +195,17 @@ export function useAssistantTurn() {
         sessionApprovals: stateRef.current.sessionApprovals,
       }),
       signal,
-    }), signal);
+    });
+    if (!request || typeof request.body !== 'string') throw new Error('对话请求准备失败，本次未提交');
+    const wire = { customBaseUrl: '', customApiKey: '', ...JSON.parse(request.body) };
+    request.body = JSON.stringify(wire);
+    prepareAssistantUsage(nextTurnId, wire, Object.fromEntries(new Headers(request.headers)));
+    const res = await submitPreparedAssistantTurn(nextTurnId, params.onTurnPrepared, () => apiFetch('/api/assistant/turn/start', request), signal);
 
     const contentType = res.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
       const data = await res.json();
+      recordAssistantChatUsage(data.modelUsed || model, data.usage, nextTurnId);
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'AI 助手服务响应异常');
       }
@@ -199,8 +221,11 @@ export function useAssistantTurn() {
     const executedActions = new Set<string>();
     try {
       for await (const evt of readAssistantEvents(res.body, signal)) {
-        if (evt.type === 'usage' || (evt.type === 'turn/snapshot' && evt.snapshot?.usage)) {
-          const reported = readReportedUsage(evt.type === 'usage' ? evt.usage : evt.snapshot.usage);
+        if (evt.type === 'turn/snapshot' && ((evt.snapshot?.threadId && evt.snapshot.threadId !== sessionId) || (evt.snapshot?.id && evt.snapshot.id !== turnIdRef.current))) throw new Error('对话快照与当前任务不匹配');
+        if (evt.type === 'usage' || evt.type === 'turn/completed' || (evt.type === 'turn/snapshot' && evt.snapshot?.usage)) {
+          const usage = evt.type === 'turn/snapshot' ? evt.snapshot.usage : evt.usage;
+          recordAssistantChatUsage(evt.type === 'turn/snapshot' ? evt.snapshot.modelUsed || stateRef.current.modelUsed : stateRef.current.modelUsed, usage, nextTurnId);
+          const reported = readReportedUsage(usage);
           if (reported) stateRef.current = { ...stateRef.current, usage: reported };
         }
         if (evt.type === 'done' || evt.type === 'turn/completed') receivedTerminal = true;
@@ -239,7 +264,7 @@ export function useAssistantTurn() {
           patch(
             {
               modelUsed: evt.modelUsed || model,
-              productWidget: evt.productWidget,
+              productWidget: evt.productWidget as ProductWidgetData | undefined,
               streamingStatus: undefined,
             },
             onUpdate,
@@ -315,13 +340,13 @@ export function useAssistantTurn() {
         if ((evt.type === 'tool_call' || evt.type === 'tool_result') && !itemsRef.current.some((item) => item.kind === 'toolCall')) {
           const prev = [...stateRef.current.toolActivity];
           const idx = prev.findIndex((t) => t.name === evt.name && t.status === 'running');
-          const visualImages = (evt as any).visualImages;
+          const visualImages = evt.type === 'tool_result' ? evt.visualImages : undefined;
           const entry: ToolActivityEntry = {
             name: evt.name,
             displayName: evt.displayName || evt.name,
             status: (evt.status === 'done' || evt.status === 'error' || evt.status === 'declined' || evt.status === 'cancelled' ? evt.status : 'running') as ToolActivityEntry['status'],
             detail: evt.detail,
-            action: evt.action,
+            action: evt.type === 'tool_result' ? evt.action : undefined,
             ...(visualImages ? { visualImages } : {}),
           };
 
@@ -341,8 +366,8 @@ export function useAssistantTurn() {
           patch({ toolActivity: prev }, onUpdate);
         }
 
-        if ((evt as any).type === 'tool_visual_inspection') {
-          const inspEvt = evt as any;
+        if (evt.type === 'tool_visual_inspection') {
+          const inspEvt = evt;
           const prev = [...stateRef.current.toolActivity];
           const idx = prev.findIndex((t) => t.name === inspEvt.toolName);
           if (idx >= 0) {

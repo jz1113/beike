@@ -42,3 +42,44 @@ export function pointerLookIndex(dx: number, dy: number, deadzone: number) {
 export function petSheetSize(version: PetSpriteVersion) {
   return { width: PET_COLUMNS * PET_CELL.width, height: (version === 2 ? 11 : 9) * PET_CELL.height };
 }
+
+const feedPoses: Record<string, PetPose> = {
+  dragging: 'working',
+  uploading: 'working',
+  analyzing: 'working',
+  success: 'success',
+  partial: 'failed',
+  error: 'failed',
+};
+
+export function resolvePetPose(input: {
+  preview?: PetPose | null;
+  feedPhase?: string | null;
+  flash?: PetPose | null;
+  busy?: boolean;
+}): PetPose {
+  if (input.preview) return input.preview;
+  const fed = input.feedPhase ? feedPoses[input.feedPhase] : undefined;
+  if (fed) return fed;
+  if (input.flash) return input.flash;
+  if (input.busy) return 'working';
+  return 'idle';
+}
+
+const petCommand = /^npx\s+codex-pets\s+add\s+([a-z0-9]+(?:-[a-z0-9]+)*)\s*$/;
+const shellNoise = /[|&;`$<>(){}\\]|\s(?:&&|\|\|)\s/;
+
+export interface ParsedPetCommand {
+  input: string;
+  id?: string;
+  error?: string;
+}
+
+export function parsePetCommands(text: string): ParsedPetCommand[] {
+  return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((input) => {
+    if (shellNoise.test(input)) return { input, error: '只接受 npx codex-pets add 宠物标识' };
+    const match = petCommand.exec(input);
+    if (!match) return { input, error: '只接受 npx codex-pets add 宠物标识' };
+    return { input, id: match[1] };
+  });
+}

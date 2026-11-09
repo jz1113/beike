@@ -5,12 +5,13 @@ import { videoPlaybackManager } from '@client/shared/media/videoPlaybackManager'
 interface Props {
   src: string;
   fallbackSrc?: string;
+  poster?: string;
   className?: string;
   objectFit?: 'cover' | 'contain';
   autoPlay?: boolean;
 }
 
-function VideoCover({ src, fallbackSrc, className, objectFit = 'cover', autoPlay = true }: Props) {
+function VideoCover({ src, fallbackSrc, poster, className, objectFit = 'cover', autoPlay = true }: Props) {
   const sources = Array.from(new Set([src, fallbackSrc].filter((source): source is string => Boolean(source))));
   const [attempt, setAttempt] = useState(0);
   const [ready, setReady] = useState(false);
@@ -76,6 +77,7 @@ function VideoCover({ src, fallbackSrc, className, objectFit = 'cover', autoPlay
         key={activeSource}
         ref={videoRef}
         src={ready ? activeSource : undefined}
+        poster={poster}
         loop
         muted
         playsInline
@@ -91,7 +93,7 @@ function VideoCover({ src, fallbackSrc, className, objectFit = 'cover', autoPlay
         }}
         className={`h-full w-full ${objectFit === 'contain' ? 'object-contain' : 'object-cover'} transition-opacity duration-300 ${hasLoaded && !failed ? 'opacity-100' : 'opacity-0'}`}
       />
-      {!hasLoaded && !failed && <div className="pointer-events-none absolute inset-0 animate-pulse bg-slate-900" />}
+      {!hasLoaded && !failed && (poster ? <img src={poster} alt="" aria-hidden className={`pointer-events-none absolute inset-0 h-full w-full ${objectFit === 'contain' ? 'object-contain' : 'object-cover'}`} /> : <div className="pointer-events-none absolute inset-0 animate-pulse bg-slate-900" />)}
       {failed && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-100 p-3 text-slate-500" role="status">
           <VideoOff className="h-6 w-6" aria-hidden="true" />

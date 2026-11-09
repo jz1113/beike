@@ -2,11 +2,33 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { credentialGet, credentialSetBatch } from '@client/shared/api/credentialClient';
 import { getGatewayClientOverrides } from '@client/shared/api/gatewayClient';
-import { formatUsageCost, formatUsageDate } from '../model/usageFormatting';
-import { gatewayAccountKey, isGatewayUserInfo, readGatewayCache } from './gatewayUserCache';
+import { formatUsageCost, formatUsageDate, type GatewayUserInfo } from '../model/usageHeatmap';
 
-import type { GatewayUserInfo } from '../model/gatewayUserTypes';
-export type { GatewayUserInfo } from '../model/gatewayUserTypes';
+const numericFields = ['quota', 'usedQuota', 'quotaFormatted', 'quotaRmb', 'usedQuotaFormatted', 'usedQuotaRmb', 'remainingPercent', 'requestCount'] as const;
+
+function isGatewayUserInfo(value: unknown): value is GatewayUserInfo {
+  if (!value || typeof value !== 'object') return false;
+  const user = value as Record<string, unknown>;
+  return (typeof user.id === 'string' || typeof user.id === 'number')
+    && typeof user.username === 'string' && typeof user.displayName === 'string'
+    && ['balanceAvailable', 'usageAvailable'].every((field) => user[field] === undefined || typeof user[field] === 'boolean')
+    && numericFields.every((field) => typeof user[field] === 'number' && Number.isFinite(user[field]));
+}
+
+function gatewayAccountKey(userId: string, baseUrl: string): string {
+  return `${baseUrl.trim().replace(/\/+$/, '').replace(/\/v1$/i, '')}|${userId.trim()}`;
+}
+
+function readGatewayCache(raw: string | null, accountKey: string, now = Date.now()) {
+  try {
+    const cached = JSON.parse(raw || 'null');
+    if (cached?.accountKey !== accountKey || !isGatewayUserInfo(cached.user)
+      || !Number.isFinite(cached.updatedAt) || cached.updatedAt > now || cached.updatedAt <= 0) return null;
+    return { user: cached.user as GatewayUserInfo, updatedAt: cached.updatedAt as number };
+  } catch { return null; }
+}
+
+export type { GatewayUserInfo } from '../model/usageHeatmap';
 
 const CACHE_KEY = 'gateway_user_cache_v1';
 const USER_ID_KEY = 'gateway_user_id';

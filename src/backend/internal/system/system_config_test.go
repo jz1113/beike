@@ -1,6 +1,8 @@
 package system
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -47,7 +49,7 @@ func TestSystemConfigHidesServerSecrets(t *testing.T) {
 	if development["hasExternalScraper"] != true || development["hasQiyun"] != true || development["normalizedBaseUrl"] != "https://gateway.example" {
 		t.Fatalf("development config %#v", development)
 	}
-	if development["defaultVisionModel"] != "gpt-5.6-luna" || development["defaultImageModel"] != "gpt-image-2" {
+	if development["defaultVisionModel"] != "gpt-6-luna" || development["defaultImageModel"] != "gpt-image-2" {
 		t.Fatalf("defaults %#v", development)
 	}
 	if len(development["visionModels"].([]any)) == 0 || len(development["imageModels"].([]any)) == 0 || len(development["fallbackChain"].([]any)) != 0 {
@@ -56,6 +58,49 @@ func TestSystemConfigHidesServerSecrets(t *testing.T) {
 	encoded, _ := json.Marshal(development)
 	if strings.Contains(string(encoded), "super-secret-key-should-not-leak") || strings.Contains(string(encoded), "wanbang-secret-should-not-leak") {
 		t.Fatal("配置响应泄露了密钥明文")
+	}
+}
+
+func TestSystemConfigPostRequiresCredentials(t *testing.T) {
+	handler := systemConfigPostHandler(config.Config{})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/system/config", bytes.NewBufferString(`{"type":"wanbang"}`)))
+	if response.Code != http.StatusBadRequest || !bytes.Contains(response.Body.Bytes(), []byte("万邦 API Key")) {
+		t.Fatalf("wanbang %d %s", response.Code, response.Body.String())
+	}
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/system/config", bytes.NewBufferString(`{}`)))
+	if response.Code != http.StatusBadRequest || !bytes.Contains(response.Body.Bytes(), []byte("缺少 AI API Key")) {
+		t.Fatalf("ai %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestProbeWanbangReadsQuota(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("key") != "key" || r.URL.Query().Get("secret") != "secret" {
+			t.Errorf("query %s", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error_code":"0000","api_info":"today:2 max:100 expires:2026-12-31"}`))
+	}))
+	defer server.Close()
+	ok, quota, message := probeWanbang(context.Background(), server.Client(), "key", "secret", []string{server.URL + "/taobao/item_get/?num_iid=1"})
+	if !ok || !strings.Contains(quota, "每日上限: 100") || message != "" {
+		t.Fatalf("ok %v quota %s message %s", ok, quota, message)
+	}
+}
+
+func TestProbeMediaCatalogSeesModel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer key" {
+			t.Errorf("auth %s", r.Header.Get("Authorization"))
+		}
+		_, _ = w.Write([]byte(`{"data":[{"id":"gpt-image-2"}]}`))
+	}))
+	defer server.Close()
+	status, body := probeMediaCatalog(context.Background(), server.Client(), server.URL, "key", "gpt-image-2")
+	if status != http.StatusOK || body["modelVisible"] != true {
+		t.Fatalf("status %d body %#v", status, body)
 	}
 }
 

@@ -1,8 +1,24 @@
-import type { GenerationTask } from '@client/store';
-import type { DepthQuality, DepthVideoStyle } from '@shared/domain/media/depthVideo';
+import type { GenerationTask } from '@client/store/appStoreTypes';
+import { DEPTH_IMAGE_MODEL_ID, DEPTH_VIDEO_MODEL_ID, type DepthQuality, type DepthVideoStyle } from '@shared/domain/media/depthVideo';
 import { peekDepthSubmit, registerDepthSubmit, resolveDepthSubmit } from '@client/shared/api/generation/depthGeneration';
 import { registerRefMedia, resolveRefMediaFile } from '@client/shared/media/refMediaRegistry';
-import { isDepthImageTask, isDepthVideoTask } from './generationTaskMedia';
+
+export function isDepthImageTask(task: GenerationTask): boolean {
+  return task.mediaType === 'depth-image' || task.model === DEPTH_IMAGE_MODEL_ID;
+}
+
+export function isDepthVideoTask(task: GenerationTask): boolean {
+  if (isDepthImageTask(task)) return false;
+  return task.mediaType === 'depth-video' || task.model === DEPTH_VIDEO_MODEL_ID ||
+    task.id.startsWith('depth_') || Boolean(task.taskId?.startsWith('depth_'));
+}
+
+export function isGenerationVideoTask(task: GenerationTask): boolean {
+  if (isDepthImageTask(task)) return false;
+  return isDepthVideoTask(task) || task.mediaType === 'video' ||
+    /\.(?:mp4|webm|mov|m4v)(?:[?#]|$)/i.test(task.resultUrl || '') ||
+    /seedance|veo|kling|sora|gen3|minimax|h3|hailuo|wan|vidu|luma|hunyuan/i.test(task.model || '');
+}
 
 export function createGenerationAttemptId(prefix = 'hub-gen'): string {
   const randomId = globalThis.crypto?.randomUUID?.() ||
@@ -26,6 +42,8 @@ export async function prepareGenerationAttempt(
     mediaType: isAgent ? 'agent' : task.mediaType,
     taskId: undefined,
     dbId: undefined,
+    // A new attempt uses the credentials at its own dispatch, unlike receipt recovery.
+    usageScope: undefined,
     sessionId: task.sessionId,
     sessionTitle: task.sessionTitle,
     status: 'IN_PROGRESS',

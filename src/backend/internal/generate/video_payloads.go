@@ -2,6 +2,8 @@ package generate
 
 import (
 	"context"
+	"encoding/json"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -61,6 +63,85 @@ func viduOfficialPayload(model, prompt, mode, ratio, resolution string, duration
 		body["aspect_ratio"] = ratio
 	}
 	return body
+}
+
+// Vidu accepts accessible URLs or image data URIs, never browser-local storage
+// paths. Resolve in place so image numbers in the reviewed prompt stay stable.
+func prepareViduImageReferences(ctx context.Context, body map[string]any, workspace string, production bool) error {
+	images, _ := body["images"].([]string)
+	resolved := make([]string, len(images))
+	for index, ref := range images {
+		ref = strings.TrimSpace(ref)
+		if strings.HasPrefix(ref, "//") {
+			ref = "https:" + ref
+		}
+		converted, err := dashscopeImageRef(ctx, ref, index, workspace, production)
+		if err != nil {
+			return err
+		}
+		if converted == "" {
+			return imageEditPrepareError{"参考图地址为空"}
+		}
+		resolved[index] = converted
+	}
+	if len(images) > 0 {
+		body["images"] = resolved
+	}
+	// Measure the final JSON, including prompt and already-prepared sound URLs.
+	// The provider's 20MB cap also applies to the overhead of Base64 encoding.
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	if len(encoded) > 20<<20 {
+		return imageEditPrepareError{"Vidu 请求总大小超过 20MB，请减少参考图片数量或压缩图片后重试"}
+	}
+	return nil
+}
+
+func prepareViduAudioReferences(ctx context.Context, root string, body map[string]any, workspace string, production bool, cfg *storage.ObjectConfig) error {
+	sounds, _ := body["sounds"].([]string)
+	if len(sounds) == 0 {
+		return nil
+	}
+	resolved := make([]string, len(sounds))
+	for index, ref := range sounds {
+		ref = strings.TrimSpace(ref)
+		if strings.HasPrefix(ref, "/storage/") {
+			if cfg == nil {
+				return imageEditPrepareError{"当前未配置对象存储，Vidu 参考音频需要公网可访问链接，请先完成对象存储配置"}
+			}
+			path, err := localReferenceAudioPath(ref, workspace, production)
+			if err != nil {
+				return err
+			}
+			data, err := prepareLocalViduReferenceAudio(ctx, root, path)
+			if err != nil {
+				return err
+			}
+			key := storage.ObjectKeyWithConfig(*cfg, "refs", "mp3", "")
+			if err := storage.Objects.Put(ctx, *cfg, key, "audio/mpeg", data); err != nil {
+				return imageEditPrepareError{"对象存储上传参考音频失败，请检查存储配置"}
+			}
+			ref, err = storage.ReferenceObjectURL(ctx, *cfg, key)
+			if err != nil {
+				return imageEditPrepareError{"参考音频已上传，但无法生成访问链接，请检查存储配置"}
+			}
+		}
+		parsed, err := url.Parse(ref)
+		if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Scheme != "https" && parsed.Scheme != "http" {
+			return imageEditPrepareError{"Vidu 参考音频需要公网 HTTP(S) 链接或当前工作区音频"}
+		}
+		resolved[index] = ref
+	}
+	body["sounds"] = resolved
+	return nil
+}
+
+// Vidu accepts MP3 only; preserve the voice-library original and its timing.
+func prepareLocalViduReferenceAudio(ctx context.Context, root, path string) ([]byte, error) {
+	converted, _, _, err := transcodeReferenceAudio(ctx, root, path, "mp3", 0)
+	return converted, err
 }
 
 func flatVideoPayload(model, prompt, ratio, resolution string, duration int, images, videos []string, audio, audioSet, watermark bool) map[string]any {
@@ -279,8 +360,7 @@ func klingOfficialPayload(model, prompt, mode, ratio, resolution string, duratio
 		quality = "pro"
 	}
 	body := map[string]any{
-		"model": model, "prompt": prompt, "duration": strconv.Itoa(duration), "ratio": ratio, "aspect_ratio": ratio,
-		"resolution": resolution, "watermark": watermark, "size": videoPixelSize(ratio, resolution),
+		"prompt": prompt, "duration": strconv.Itoa(duration), "aspect_ratio": ratio, "watermark_info": map[string]bool{"enabled": watermark},
 		"mode": quality, "model_name": strings.Replace(model, "kling-video-v", "kling-v", 1), "cfg_scale": 0.5,
 	}
 	if strings.Contains(model, "v3") || strings.Contains(model, "v2-6") {
@@ -307,10 +387,6 @@ func klingOfficialPayload(model, prompt, mode, ratio, resolution string, duratio
 			list = append(list, entry)
 		}
 		body["image_list"] = list
-		if mode == "first_last_frame" && len(images) > 0 {
-			body["image"] = images[0]
-			body["image_tail"] = images[len(images)-1]
-		}
 		return body
 	}
 	if mode == "first_last_frame" && len(images) > 1 {
@@ -318,7 +394,6 @@ func klingOfficialPayload(model, prompt, mode, ratio, resolution string, duratio
 		body["image_tail"] = images[len(images)-1]
 	} else if len(images) > 0 {
 		body["image"] = images[0]
-		body["images"] = images
 	}
 	return body
 }

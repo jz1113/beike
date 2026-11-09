@@ -1,6 +1,5 @@
-import { selectedTextModel, selectedTextProtocol } from '../models/textModelRoute';
-import { textModelCapability, type TextProtocol } from '../models/textProtocol';
-import { deepSeekModel, isDeepSeekRoute } from '../models/deepseek';
+import { selectedTextModel, selectedTextProtocol } from '../models/workflowModelStorage';
+import { deepSeekModel, isDeepSeekRoute, textModelCapability, type TextProtocol } from '../models/deepseek';
 /** UI levels follow the verified model and selected protocol. See docs/reasoning.md. */
 export const REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 /** auto is accepted only for legacy preferences and unsupported-model defaults. */

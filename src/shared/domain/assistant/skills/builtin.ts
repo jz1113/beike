@@ -1,26 +1,49 @@
-import { BUILTIN_CREATION_SKILLS } from './builtinCreationSkills';
-import { BUILTIN_DOMAIN_ASSISTANT_SKILLS } from './builtinDomainSkills';
-import { BUILTIN_IMAGE_ASSISTANT_SKILLS, PROMPT_REVERSE_ENGINEER_SKILL_ID } from './builtinImageSkills';
-import { BUILTIN_VIDEO_ASSISTANT_SKILLS } from './builtinVideoSkills';
+import packages from './compiledSkillPackages.json';
 import type { AssistantSkill } from './types';
 
-export { PROMPT_REVERSE_ENGINEER_SKILL_ID };
+/** Generated only by skills:build; SKILL.md is the maintained instruction source. */
+const byId = new Map((packages as unknown as AssistantSkill[]).map(skill => [skill.id, skill]));
+
+function getBuiltinPackages(ids: readonly string[]): AssistantSkill[] {
+  return ids.map(id => {
+    const skill = byId.get(id);
+    if (!skill) throw new Error(`Missing builtin skill package: ${id}`);
+    return skill;
+  });
+}
+
+const BUILTIN_VIDEO_ASSISTANT_SKILLS = getBuiltinPackages([
+  'h3-prompt-writing',
+  'sd2-pe',
+  'sd25-pe',
+  'wan3-pe',
+  'kling-3-prompting',
+  'scenario-kling',
+  'scenario-veo',
+  'scenario-vidu',
+  'scenario-grok-imagine-video',
+  'gemini-omni-flash-api',
+  'ai-video-prompt-writer',
+]);
 
 export const ASSISTANT_SKILL_CATEGORIES = [
-  '模型提示词规范', '视觉理解与素材分析', '内容生产流程',
-  '内容采集与资料读取', '数据审核', '技能维护与扩展',
+  '官方视频提示词', '社区视频提示词', '模型提示词规范',
+  '素材分析', '专业影视', '人物设定', '营销广告',
 ] as const;
 
 export const BUILTIN_AGENT_RUNTIME_SKILLS: AssistantSkill[] = [
-  ...BUILTIN_IMAGE_ASSISTANT_SKILLS,
   ...BUILTIN_VIDEO_ASSISTANT_SKILLS,
-  ...BUILTIN_DOMAIN_ASSISTANT_SKILLS,
 ];
 
 /** 可被用户选择的全部助手兼容技能；自动运行目录仅包含运行技能。 */
 export const BUILTIN_ASSISTANT_SKILLS: AssistantSkill[] = [
   ...BUILTIN_AGENT_RUNTIME_SKILLS,
-  ...BUILTIN_CREATION_SKILLS,
+  ...getBuiltinPackages([
+    'beike-prompt-extraction',
+    'beike-cinematic-storyboard',
+    'beike-character-three-view',
+    'beike-ugc-product-sales',
+  ]),
 ];
 
 export function getBuiltinAssistantSkill(id: string): AssistantSkill | undefined {
@@ -56,7 +79,8 @@ export function resolveSkillAllowedTools(
   skillId: string | undefined,
   clientAllowedTools?: string[],
 ): string[] | undefined {
-  const builtinTools = skillId ? getBuiltinAssistantSkill(skillId)?.tools : undefined;
+  const builtin = skillId ? getBuiltinAssistantSkill(skillId) : undefined;
+  const builtinTools = builtin?.runtimeTools ?? builtin?.tools;
   if (Array.isArray(clientAllowedTools)) {
     return builtinTools ? clientAllowedTools.filter(name => builtinTools.includes(name)) : [...clientAllowedTools];
   }

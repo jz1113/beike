@@ -33,9 +33,13 @@ if ! (cd "$REPO_DIR" && GO_BIN=/usr/local/go/bin/go node --input-type=module -e 
     arm64) GO_ARCH=arm64 ;;
     *) echo "不支持的架构：$(dpkg --print-architecture)"; exit 1 ;;
   esac
+  GO_VERSION="${GO_VERSION:-1.26.0}"
   GO_DOWNLOAD_DIR="$(mktemp -d /tmp/beike-go.XXXXXX)"
   trap 'rm -rf "$GO_DOWNLOAD_DIR"' EXIT
-  curl -fsSL -o "$GO_DOWNLOAD_DIR/go.tgz" "https://go.dev/dl/go1.26.9.linux-${GO_ARCH}.tar.gz"
+  curl -fsSL -o "$GO_DOWNLOAD_DIR/go.tgz" "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
+  if curl -fsSL -o "$GO_DOWNLOAD_DIR/go.tgz.sha256" "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz.sha256" 2>/dev/null; then
+    echo "$(tr -d ' \t\r\n' < "$GO_DOWNLOAD_DIR/go.tgz.sha256")  $GO_DOWNLOAD_DIR/go.tgz" | sha256sum -c -
+  fi
   rm -rf /usr/local/go
   tar -C /usr/local -xzf "$GO_DOWNLOAD_DIR/go.tgz"
 fi
@@ -46,6 +50,7 @@ id -u "$SITE_USER" >/dev/null 2>&1 || useradd --system --home "$DATA_DIR" --shel
 mkdir -p "$DATA_DIR/storage" "$DATA_DIR/database-backups"
 if [[ ! -f "$DATA_DIR/.env" && -f "$REPO_DIR/tools/deploy/env.production.example" ]]; then
   cp "$REPO_DIR/tools/deploy/env.production.example" "$DATA_DIR/.env"
+  chmod 600 "$DATA_DIR/.env"
   echo "已写入 $DATA_DIR/.env ，请立刻填入 LOCAL_ACCESS_TOKEN；个人网关模式下 AI_DRAWING_API_KEY 保持为空"
 fi
 

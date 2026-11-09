@@ -1,7 +1,7 @@
+import { isAgentConversation } from '@client/store/agentHistory';
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, MessageSquare, MoreHorizontal, Pencil, Pin, SquarePen, Trash2, X } from 'lucide-react';
-import { useCanvasStore } from '@client/features/canvas/store/useCanvasStore';
 import { useAppStore, type ChatSession } from '@client/store';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 
@@ -54,21 +54,16 @@ function SessionLeadingMark({ session }: { session: ChatSession }) {
 interface Props {
   currentView: string;
   onOpenSession: (id: string) => void;
-  onOpenAssistantSession: (id: string) => void;
   onCreateConversation: () => void;
 }
 
 export function SidebarHistory({
   currentView,
   onOpenSession,
-  onOpenAssistantSession,
   onCreateConversation,
 }: Props) {
   const sessions = useAppStore((s) => s.sessions);
-  const assistantSessions = useAppStore((s) => s.assistantSessions ?? []);
   const currentSessionId = useAppStore((s) => s.currentSessionId);
-  const currentAssistantSessionId = useAppStore((s) => s.currentAssistantSessionId);
-  const activeCanvasProjectId = useCanvasStore((s) => s.activeProjectId);
   const renameSession = useAppStore((s) => s.renameSession);
   const pinSession = useAppStore((s) => s.pinSession);
   const deleteSession = useAppStore((s) => s.deleteSession);
@@ -78,8 +73,7 @@ export function SidebarHistory({
   const [editTitle, setEditTitle] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
-  const ordered = [...sessions].sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)) || b.createdAt - a.createdAt);
-  const assistantOrdered = [...assistantSessions].sort((a, b) => b.updatedAt - a.updatedAt);
+  const ordered = sessions.filter(isAgentConversation).sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)) || b.createdAt - a.createdAt);
 
   useEffect(() => {
     if (!menu && !deleteTarget) return;
@@ -116,7 +110,7 @@ export function SidebarHistory({
             className="flex items-center gap-1 text-[13px] font-medium text-slate-500 hover:text-slate-800 dark:text-[#8E8E93] dark:hover:text-[#EDEDED] transition-colors cursor-pointer"
             aria-expanded={chatsOpen}
           >
-            对话
+            创作对话
             <ChevronRight className={`h-3.5 w-3.5 transition-transform ${chatsOpen ? 'rotate-90' : ''}`} />
           </button>
           <button
@@ -133,14 +127,12 @@ export function SidebarHistory({
           <div className="mt-1.5 space-y-1">
             {ordered.length === 0 ? (
               <div className="px-2 py-3 text-[12px] text-slate-400 dark:text-[#636366] select-none">
-                暂无历史对话
+                尚无创作对话
               </div>
             ) : (
               <div className="space-y-0.5">
                 {ordered.map((session) => {
-                    const active = session.canvasProjectId
-                      ? currentView === 'canvas' && session.canvasProjectId === activeCanvasProjectId
-                      : currentView === 'generate' && session.id === currentSessionId;
+                    const active = currentView === 'generate' && session.id === currentSessionId;
                     const title = session.title || '新创作对话';
                     return (
                       <div
@@ -159,7 +151,6 @@ export function SidebarHistory({
                           {session.isPinned && (
                             <Pin className="h-3 w-3 shrink-0 text-amber-500 fill-amber-500 rotate-45" />
                           )}
-                          <span className="shrink-0 text-[10px] text-slate-400 dark:text-[#8E8E93]">{session.canvasProjectId ? '画布' : '生成'}</span>
                           {editingId === session.id ? (
                             <input
                               autoFocus
@@ -194,70 +185,102 @@ export function SidebarHistory({
                   })}
                 </div>
             )}
-            {assistantOrdered.length > 0 && (
-              <div className="mt-2 space-y-0.5">
-                {assistantOrdered.map((session) => {
-                  const active = currentView === 'canvas' && session.id === currentAssistantSessionId;
-                  const title = session.title || '画布助手';
-                  return (
-                    <button
-                      key={session.id}
-                      type="button"
-                      onClick={() => onOpenAssistantSession(session.id)}
-                      className={`flex w-full items-center gap-1.5 rounded-xl px-2 py-1.5 text-left ${active ? 'bg-[#ECEDEF] font-medium text-slate-950 dark:bg-[#1F1F24] dark:text-white' : 'text-slate-800 hover:bg-white dark:text-[#E5E5EA] dark:hover:bg-white/[0.06]'}`}
-                    >
-                      <ChatBubbleIcon />
-                      <span className="shrink-0 text-[10px] text-slate-400 dark:text-[#8E8E93]">助手</span>
-                      <span className="truncate text-[13px] leading-5">{title}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+
           </div>
         )}
       </section>
 
-      {menu && createPortal(
-        <div className="fixed z-[70] w-32 rounded-xl border border-slate-100 bg-white p-1 text-[13px] shadow-lg dark:border-white/[0.08] dark:bg-[#1B1B1E]" style={{ top: menu.top, left: menu.left }} onClick={(event) => event.stopPropagation()}>
-          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-slate-700 dark:text-[#EDEDED] dark:hover:bg-white/10" onClick={() => { pinSession(menu.id); setMenu(null); }}>
-            <Pin className="h-3.5 w-3.5" />置顶
-          </button>
-          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-slate-700 dark:text-[#EDEDED] dark:hover:bg-white/10" onClick={() => {
-            const session = sessions.find((item) => item.id === menu.id);
-            setEditingId(menu.id);
-            setEditTitle(session?.title || '');
-            setMenu(null);
-          }}>
-            <Pencil className="h-3.5 w-3.5" />重命名
-          </button>
-          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-rose-50 hover:text-rose-600 cursor-pointer text-slate-700 dark:text-[#EDEDED] dark:hover:bg-rose-950/40 dark:hover:text-rose-400" onClick={() => {
-            const session = sessions.find((item) => item.id === menu.id);
-            setDeleteTarget({ id: menu.id, title: session?.title || '未命名对话' });
-            setMenu(null);
-          }}>
-            <Trash2 className="h-3.5 w-3.5" />删除
-          </button>
-        </div>,
-        document.body,
-      )}
-
-      {deleteTarget && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteTarget(null)}>
-          <div className="relative w-full max-w-[440px] rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl dark:border-white/[0.08] dark:bg-[#1B1B1E]" onClick={(event) => event.stopPropagation()} role="dialog" aria-label={`确认删除「${deleteTarget.title}」`}>
-            <button type="button" aria-label="取消" onClick={() => setDeleteTarget(null)} className="absolute right-5 top-5 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white">
-              <X className="h-4 w-4" />
+      {menu &&
+        createPortal(
+          <div
+            className="fixed z-[70] w-32 rounded-xl border border-slate-100 bg-white p-1 text-[13px] shadow-lg dark:border-white/[0.08] dark:bg-[#1B1B1E]"
+            style={{ top: menu.top, left: menu.left }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-slate-700 dark:text-[#EDEDED] dark:hover:bg-white/10"
+              onClick={() => {
+                pinSession(menu.id);
+                setMenu(null);
+              }}
+            >
+              <Pin className="h-3.5 w-3.5" />
+              置顶
             </button>
-            <h3 className="pr-8 text-[16px] font-semibold text-slate-900 dark:text-white">确认删除「{deleteTarget.title}」</h3>
-            <p className="mt-3 text-[13px] leading-relaxed text-slate-500 dark:text-[#8E8E93]">此操作无法撤回，删除对话后，仍可在「资产」中找回已生成的内容，确认删除么？</p>
-            <div className="mt-7 flex justify-end gap-3">
-              <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-xl bg-[#F2F3F5] px-5 py-2 text-[13px] text-slate-800 hover:bg-[#E5E6EB] dark:bg-[#26262B] dark:text-[#EDEDED] dark:hover:bg-[#2F2F36]">取消</button>
-              <button type="button" onClick={() => { deleteSession(deleteTarget.id); setDeleteTarget(null); }} className="rounded-xl bg-red-600 hover:bg-red-500 text-white px-5 py-2 text-[13px] font-medium transition-colors cursor-pointer shadow-xs active:scale-[0.98] dark:bg-red-600 dark:hover:bg-red-500 dark:text-white dark:shadow-[0_0_14px_rgba(239,68,68,0.25)]">删除</button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-slate-700 dark:text-[#EDEDED] dark:hover:bg-white/10"
+              onClick={() => {
+                const session = sessions.find((item) => item.id === menu.id);
+                setEditingId(menu.id);
+                setEditTitle(session?.title || '');
+                setMenu(null);
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              重命名
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-rose-50 hover:text-rose-600 cursor-pointer text-slate-700 dark:text-[#EDEDED] dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+              onClick={() => {
+                const session = sessions.find((item) => item.id === menu.id);
+                setDeleteTarget({ id: menu.id, title: session?.title || '未命名对话' });
+                setMenu(null);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              删除
+            </button>
+          </div>,
+          document.body,
+        )}
+
+      {deleteTarget &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteTarget(null)}>
+            <div
+              className="relative w-full max-w-[440px] rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl dark:border-white/[0.08] dark:bg-[#1B1B1E]"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-label={`确认删除「${deleteTarget.title}」`}
+            >
+              <button
+                type="button"
+                aria-label="取消"
+                onClick={() => setDeleteTarget(null)}
+                className="absolute right-5 top-5 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <h3 className="pr-8 text-[16px] font-semibold text-slate-900 dark:text-white">确认删除「{deleteTarget.title}」</h3>
+              <p className="mt-3 text-[13px] leading-relaxed text-slate-500 dark:text-[#8E8E93]">
+                此操作无法撤回，删除对话后，仍可在「历史」中找回已生成的内容，确认删除么？
+              </p>
+              <div className="mt-7 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  className="rounded-xl bg-[#F2F3F5] px-5 py-2 text-[13px] text-slate-800 hover:bg-[#E5E6EB] dark:bg-[#26262B] dark:text-[#EDEDED] dark:hover:bg-[#2F2F36]"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    deleteSession(deleteTarget.id);
+                    setDeleteTarget(null);
+                  }}
+                  className="rounded-xl bg-red-600 hover:bg-red-500 text-white px-5 py-2 text-[13px] font-medium transition-colors cursor-pointer shadow-xs active:scale-[0.98] dark:bg-red-600 dark:hover:bg-red-500 dark:text-white dark:shadow-[0_0_14px_rgba(239,68,68,0.25)]"
+                >
+                  删除
+                </button>
+              </div>
             </div>
-          </div>
-        </div>,
-        document.body,
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

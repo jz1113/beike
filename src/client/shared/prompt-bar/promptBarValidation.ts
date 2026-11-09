@@ -1,9 +1,14 @@
 import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
+import type { GenerationTask } from '@client/store';
 import {
   isDepthGenMode,
   DEPTH_IMAGE_LIMITS,
   DEPTH_VIDEO_LIMITS,
+  type DepthQuality,
+  type DepthVideoStyle,
+  type QuickGenMode,
 } from '@shared/domain/media/depthVideo';
+import { formatSubjectMention } from '@shared/domain/prompts/prompt-engine/mentions';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { isVideoFile } from '@client/shared/api/mediaUpload';
 import { videoInputError } from '@shared/domain/media/videoCapabilities';
@@ -23,10 +28,77 @@ import {
   parseSubjectMention,
 } from '@shared/domain/media/drawing';
 import { resolveSubjectByMention } from './promptMentions';
-import { normalizeSubjectReferences } from './promptSubjectReferences';
 import { formatSubjectName, type SubjectItem } from './promptBarConstants';
-import { resolveRefMediaFile, resolveRefMediaName } from '@client/shared/media/refMediaRegistry';
-import type { PromptBarSubmitInput } from './promptBarSubmitTypes';
+import { getRefMediaIdentity, resolveRefMediaFile, resolveRefMediaIdentity, resolveRefMediaName } from '@client/shared/media/refMediaRegistry';
+
+export interface PromptBarSubmitInput {
+  quickGenMode: QuickGenMode;
+  quickPrompt: string;
+  quickRefImages: string[];
+  quickVideoAudioRefs?: string[];
+  activeSubjects: SubjectItem[];
+  allSubjects: SubjectItem[];
+  quickVideoRefMode: string;
+  quickVideoFirstFrame: string | null;
+  quickVideoLastFrame: string | null;
+  quickVideoMultiFrames: string[];
+  quickCount: number;
+  quickVideoCount: number;
+  quickModel: string;
+  quickVideoModel: string;
+  sizeStr: string;
+  quickQuality: string;
+  quickVideoAspectId: string;
+  quickVideoResolution: string;
+  quickVideoDuration: number;
+  currentView: string;
+  hasImageModels: boolean;
+  hasVideoModels?: boolean;
+  hasAudioModels?: boolean;
+  quickAudioModel?: string;
+  assistantModel?: string;
+  quickDepthStyle: DepthVideoStyle;
+  quickDepthQuality: DepthQuality;
+  quickVideoGenerateAudio?: boolean;
+  quickVideoContextIrEnabled?: boolean;
+  refMediaFile?: File | null;
+  depthModelReady?: boolean;
+}
+
+export type PromptBarSubmitResult =
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      tasks: GenerationTask[];
+      cleanedPrompt: string;
+      sessionTitle: string;
+      shouldCreateNewSession: boolean;
+    };
+
+export function serializeSubjectMention(subject: SubjectItem): string {
+  return formatSubjectMention(getRefMediaIdentity(subject.url), subject.name);
+}
+
+/** Resolve selected pills before name-based compatibility normalization. */
+export function normalizeSubjectReferences(prompt: string, slots: { url: string; name: string }[]): string {
+  return prompt.replace(new RegExp(PROMPT_MENTION_REGEX.source, 'gi'), token => {
+    const subject = parseSubjectMention(token);
+    if (!subject) return token;
+    const url = resolveRefMediaIdentity(subject.id);
+    const slot = slots.find(item => item.url === url);
+    return slot ? `@${slot.name}` : token;
+  });
+}
+
+/** Bind remaining numbered aliases to their original target before indices change. */
+export function removePromptReferences(prompt: string, oldUrls: string[], removedUrls: Set<string>, subjects: SubjectItem[]): string {
+  return prompt.replace(new RegExp(PROMPT_MENTION_REGEX.source, 'gi'), token => {
+    const subject = resolveSubjectByMention(token, subjects, oldUrls);
+    if (!subject) return token;
+    if (removedUrls.has(subject.url)) return '';
+    return serializeSubjectMention(subject);
+  }).replace(/[ \t]{2,}/g, ' ').trim();
+}
 
 export function buildPromptBarSubjects(opts: {
   customSubjects: SubjectItem[];
@@ -173,6 +245,8 @@ export function validateSubmitInput(
 ): string | null {
   const { quickGenMode, quickPrompt, quickVideoRefMode, hasImageModels, hasVideoModels, refMediaFile } = input;
 
+  if (quickGenMode === 'collect') return quickPrompt.trim() ? null : '请输入商品链接或京东商品编号';
+
   if (quickGenMode === 'agent') {
     if (!quickPrompt.trim() && effectiveImages.length === 0) {
       return '请输入与 Agent 助手交流的内容';
@@ -246,6 +320,7 @@ export function validateSubmitInput(
       refMode: quickVideoRefMode,
       images: effectiveImages.filter((url) => !isVideoMediaUrl(url)),
       videos: effectiveImages.filter(isVideoMediaUrl),
+      audios: input.quickVideoAudioRefs, audio: input.quickVideoGenerateAudio,
       duration: input.quickVideoDuration,
       resolution: input.quickVideoResolution,
       aspectRatio: input.quickVideoAspectId,
@@ -253,6 +328,7 @@ export function validateSubmitInput(
     if (mediaError) return mediaError;
     const normalized = normalizeVideoReferenceMentions(quickPrompt, effectiveImages, input.allSubjects);
     const slots = new Set(mediaReferenceSlots(effectiveImages).map((slot) => slot.name));
+    input.quickVideoAudioRefs?.forEach((_,index)=>slots.add(`音频${index+1}`));
     for (const token of extractPromptMentions(normalized)) {
       const name = mentionTokenToName(token);
       if (parseSubjectMention(token) || !slots.has(name)) {

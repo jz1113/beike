@@ -1,10 +1,8 @@
 /** Check static imports, exports and literal dynamic imports; exemptions may only shrink. */
 import fs from 'node:fs';
 import path from 'node:path';
-import { isBuiltin } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import { browserBundleBuiltins } from './browser-bundle-builtins.mjs';
 import { boundaryViolations, featureOf } from './boundary-rules.mjs';
 import { isTestFile, moduleReferences, walkSourceFiles } from './source-files.mjs';
 
@@ -21,12 +19,7 @@ for (const absolute of files) {
   const source = ts.createSourceFile(absolute, fs.readFileSync(absolute, 'utf8'), ts.ScriptTarget.Latest, true);
   const from = relative(absolute);
   const references = moduleReferences(source);
-  // Public vendor bundles can ship both browser and Node implementations.
-  // Keep every source rule for application code and every non-builtin import.
-  const runtimeBuiltins = from.startsWith('src/client/public/canvas-studio/assets/') && references.some(isBuiltin)
-    ? await browserBundleBuiltins(absolute) : null;
   for (const specifier of references) {
-    if (runtimeBuiltins && isBuiltin(specifier) && !runtimeBuiltins.has(specifier)) continue;
     const resolved = ts.resolveModuleName(specifier, absolute, options, ts.sys).resolvedModule?.resolvedFileName;
     const to = resolved ? relative(resolved) : '';
     const staticAsset = specifier.startsWith('@client/') && fs.existsSync(path.join(root, 'src/client', specifier.slice('@client/'.length).split('?')[0]));

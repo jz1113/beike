@@ -1,55 +1,61 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '@client/shared/i18n';
-import type { ChatSession } from '@client/store/appStoreTypes';
-import type { AssetCanvasProject } from '../../model/canvasAssets';
-import type { MergedAssetTask } from '../../model/mergeAssetTasks';
-import MaterialProjectView from './MaterialProjectView';
-import { buildMaterialProjects, taskBelongsToProject, type ProjectFolderItem } from '../../model/materialProjects';
-import { useMaterialSelection } from '../../hooks/useMaterialSelection';
-import MaterialProjectDetailView from './MaterialProjectDetailView';
 import MaterialFloatingDock from './MaterialFloatingDock';
 import MaterialAssetCard from './MaterialAssetCard';
 import MaterialLibraryToolbar from './MaterialLibraryToolbar';
 import { groupTasksByTimeline, filterMaterialTasks } from '../../model/materialTimeline';
-import { getAssetMediaKind } from '../../model/assetMedia';
-import { openAgentDocument } from '@client/shared/ui/agentDocumentBus';
+import { getAssetMediaKind, type MergedAssetTask } from '../../model/agentAssetFilter';
+import { openAgentDocument } from '@client/shared/ui/AppErrorBoundary';
+
+/** Selection can only act on items visible in the current filter and project. */
+export function useMaterialSelection(items: { id: string }[], scope: string) {
+  const [selection, setSelection] = useState<{ scope: string; ids: string[] }>({ scope, ids: [] });
+  const available = useMemo(() => new Set(items.map((item) => item.id)), [items]);
+  const ids = useMemo(() => selection.scope === scope ? selection.ids.filter((id) => available.has(id)) : [], [selection, scope, available]);
+
+  useEffect(() => {
+    setSelection((previous) => {
+      const next = previous.scope === scope ? previous.ids.filter((id) => available.has(id)) : [];
+      return previous.scope === scope && next.length === previous.ids.length ? previous : { scope, ids: next };
+    });
+  }, [scope, available]);
+
+  const clear = useCallback(() => setSelection({ scope, ids: [] }), [scope]);
+  const toggle = useCallback((id: string, event?: { stopPropagation: () => void }) => {
+    event?.stopPropagation();
+    if (!available.has(id)) return;
+    setSelection((previous) => {
+      const current = previous.scope === scope ? previous.ids.filter((key) => available.has(key)) : [];
+      return { scope, ids: current.includes(id) ? current.filter((key) => key !== id) : [...current, id] };
+    });
+  }, [scope, available]);
+  const toggleAll = useCallback(() => {
+    setSelection((previous) => ({ scope, ids: previous.scope === scope && available.size > 0 && [...available].every((id) => previous.ids.includes(id)) ? [] : [...available] }));
+  }, [scope, available]);
+
+  return { ids, clear, toggle, toggleAll };
+}
 
 interface Props {
-  sessions: ChatSession[];
-  canvasProjects: AssetCanvasProject[];
   mergedTasks: MergedAssetTask[];
   sourceType?: 'ai' | 'uploaded';
   setPreviewTask: (task: MergedAssetTask, queue?: MergedAssetTask[]) => void;
   onBatchDelete: (ids: string[]) => Promise<boolean>;
   onBatchDownload: (ids: string[]) => void;
-  onOpenCanvasProject?: (projectId: string) => void;
-  onBatchDeleteProjects?: (projects: ProjectFolderItem[]) => Promise<boolean | void> | boolean | void;
-  projectHistoryReady?: boolean;
   isDownloadingZip?: boolean;
   isDeleting?: boolean;
 }
 
 export default function MaterialLibraryView({
-  sessions,
-  canvasProjects,
   mergedTasks,
   sourceType = 'ai',
   setPreviewTask,
   onBatchDelete,
   onBatchDownload,
-  onOpenCanvasProject,
-  onBatchDeleteProjects,
-  projectHistoryReady = false,
   isDownloadingZip = false,
   isDeleting = false,
 }: Props) {
   const { t, locale } = useI18n();
-  // 🌟 核心视图模式：平铺视图 vs 项目视图
-  const [viewMode, setViewMode] = useState<'flat' | 'project'>('flat');
-  const [returnProjectId, setReturnProjectId] = useState<string | null>(null);
-  const [selectedProject, setSelectedProject] = useState<ProjectFolderItem | null>(null);
-
-  // 🌟 媒体分类筛选：全部 / 图片 / 视频 / 音频 / 文档（仅平铺模式）
   const [mediaCategory, setMediaCategory] = useState<'all' | 'image' | 'video' | 'audio' | 'document'>('all');
 
   // 排序与搜索
@@ -57,8 +63,12 @@ export default function MaterialLibraryView({
   const [searchInput, setSearchInput] = useState('');
 
   const [isBatchMode, setIsBatchMode] = useState(false);
+  const [unavailableImages, setUnavailableImages] = useState<Set<string>>(() => new Set());
+  const handleImageUnavailable = useCallback((url: string) => {
+    setUnavailableImages(previous => previous.has(url) ? previous : new Set([...previous, url]));
+  }, []);
 
-  // 平铺视图过滤逻辑（默认全量状态与时间，中等网格）
+  // 失败记录和所有回退地址均无法加载的图片不参与分组、计数与批量操作。
   const flatTasks = useMemo(() => {
     return filterMaterialTasks(mergedTasks, {
       sourceType,
@@ -67,8 +77,8 @@ export default function MaterialLibraryView({
       sortOrder,
       statusFilter: 'all',
       timeFilter: 'all',
-    });
-  }, [mergedTasks, sourceType, mediaCategory, searchInput, sortOrder]);
+    }).filter(task => getAssetMediaKind(task) !== 'image' || !task.resultUrl || !unavailableImages.has(task.resultUrl));
+  }, [mergedTasks, sourceType, mediaCategory, searchInput, sortOrder, unavailableImages]);
 
   // 按日期时间分组
   const timelineGroups = useMemo(
@@ -76,37 +86,15 @@ export default function MaterialLibraryView({
     [flatTasks, sortOrder, locale]
   );
 
-  const sourceTasks = useMemo(() => filterMaterialTasks(mergedTasks, {
-    sourceType, mediaCategory: 'all', searchInput: '', sortOrder,
-  }), [mergedTasks, sourceType, sortOrder]);
-  const allProjects = useMemo(() => buildMaterialProjects(sessions, canvasProjects, sourceTasks), [sessions, canvasProjects, sourceTasks]);
-  const projectList = useMemo(() => {
-    const keyword = searchInput.trim().toLowerCase();
-    return allProjects.filter((project) => !keyword || project.title.toLowerCase().includes(keyword)).sort((a, b) => {
-      if (sortOrder === 'name') return a.title.localeCompare(b.title, locale);
-      return sortOrder === 'oldest' ? (a.updatedAt || 0) - (b.updatedAt || 0) : (b.updatedAt || 0) - (a.updatedAt || 0);
-    });
-  }, [allProjects, searchInput, sortOrder, locale]);
-  const tasksSelection = useMaterialSelection(flatTasks, JSON.stringify([viewMode, sourceType, mediaCategory, searchInput]));
-  const projectsSelection = useMaterialSelection(projectList, JSON.stringify([viewMode, sourceType, searchInput]));
+  const tasksSelection = useMaterialSelection(flatTasks, JSON.stringify([sourceType, mediaCategory, searchInput]));
   const selectedTaskIds = tasksSelection.ids;
-  const selectedProjectIds = projectsSelection.ids;
   const toggleSelectTask = tasksSelection.toggle;
-  const toggleSelectProject = projectsSelection.toggle;
   const clearTasks = tasksSelection.clear;
-  const clearProjects = projectsSelection.clear;
 
   const handleExitBatchMode = useCallback(() => {
     setIsBatchMode(false);
     clearTasks();
-    clearProjects();
-  }, [clearTasks, clearProjects]);
-  const handleViewModeChange = (nextMode: 'flat' | 'project') => {
-    handleExitBatchMode();
-    setReturnProjectId(null);
-    setViewMode(nextMode);
-  };
-  const handleToggleSelectAll = viewMode === 'project' ? projectsSelection.toggleAll : tasksSelection.toggleAll;
+  }, [clearTasks]);
 
   useEffect(() => {
     if (!isBatchMode) return;
@@ -131,39 +119,10 @@ export default function MaterialLibraryView({
     setPreviewTask(task, valid.length > 0 ? valid : [task]);
   }, [flatTasks, setPreviewTask]);
 
-  const handleBatchDeleteSelectedProjects = async () => {
-    const targets = projectList.filter((project) => selectedProjectIds.includes(project.id));
-    if (!targets.length || !onBatchDeleteProjects) return;
-    if (await onBatchDeleteProjects(targets) !== false) handleExitBatchMode();
-  };
-
-  const currentProject = selectedProject && allProjects.find((project) => project.id === selectedProject.id && project.type === selectedProject.type);
-  if (currentProject) {
-    return (
-      <MaterialProjectDetailView
-        key={`${currentProject.type}:${currentProject.id}`}
-        project={currentProject}
-        mergedTasks={mergedTasks}
-        sourceType={sourceType}
-        onBack={() => { setReturnProjectId(currentProject.id); setSelectedProject(null); handleExitBatchMode(); }}
-        setPreviewTask={setPreviewTask}
-        onBatchDelete={onBatchDelete}
-        onBatchDownload={onBatchDownload}
-        isDownloadingZip={isDownloadingZip}
-        isDeleting={isDeleting}
-      />
-    );
-  }
-
-  const selectedCount = viewMode === 'project' ? selectedProjectIds.length : selectedTaskIds.length;
-  const totalCount = viewMode === 'project' ? projectList.length : flatTasks.length;
-
   return (
     <div className="flex flex-col min-h-0 flex-1">
       {/* 🌟 二级工具控制栏 */}
       <MaterialLibraryToolbar
-        viewMode={viewMode}
-        onViewModeChange={handleViewModeChange}
         mediaCategory={mediaCategory}
         onMediaCategoryChange={setMediaCategory}
         searchInput={searchInput}
@@ -173,86 +132,52 @@ export default function MaterialLibraryView({
         isBatchMode={isBatchMode}
         onEnterBatchMode={() => setIsBatchMode(true)}
         onExitBatchMode={handleExitBatchMode}
-        selectedCount={selectedCount}
-        totalCount={totalCount}
-        onToggleSelectAll={handleToggleSelectAll}
+        selectedCount={selectedTaskIds.length}
+        totalCount={flatTasks.length}
+        onToggleSelectAll={tasksSelection.toggleAll}
       />
 
       {/* 主视图内容区域 */}
-      {viewMode === 'project' ? (
-        <>
-          <MaterialProjectView
-            projects={projectList}
-            onSelectProject={(project) => {
-              if (project.type === 'canvas' && onOpenCanvasProject) { onOpenCanvasProject(project.id); return; }
-              setSelectedProject(project);
-            }}
-            returnProjectId={returnProjectId}
-            selectedProjectIds={selectedProjectIds}
-            isBatchMode={isBatchMode}
-            onToggleSelectProject={toggleSelectProject}
-          />
-
-          {/* 🌟 项目视图专属浮动操作栏：支持批量删除项目 */}
-          <MaterialFloatingDock
-            selectedCount={selectedProjectIds.length}
-            onClearSelection={clearProjects}
-            onExitSelection={handleExitBatchMode}
-            onBatchDownload={() => {
-              const selected = projectList.filter(project => selectedProjectIds.includes(project.id));
-              const ids = sourceTasks.filter(task => selected.some(project => taskBelongsToProject(task, project))).map(task => task.id);
-              onBatchDownload(ids);
-            }}
-            downloadUnavailable={!projectHistoryReady}
-            onBatchDelete={handleBatchDeleteSelectedProjects}
-            itemUnit="个项目"
-            isDeleting={isDeleting}
-            isDownloading={isDownloadingZip}
-          />
-        </>
+      {timelineGroups.length === 0 ? (
+        <div className="flex h-64 flex-col items-center justify-center gap-2 text-slate-400">
+          <p className="text-xs font-medium">{t('assets.noMatchingMaterials')}</p>
+        </div>
       ) : (
-        <>
-          {timelineGroups.length === 0 ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-2 text-slate-400">
-              <p className="text-xs font-medium">{t('assets.noMatchingMaterials')}</p>
-            </div>
-          ) : (
-            <div className="space-y-7 pb-24 pt-1">
-              {timelineGroups.map((group) => (
-                <section key={group.key} className="space-y-3">
-                  {group.label && <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white select-none">
-                    {group.label}
-                  </h2>}
+        <div className="space-y-7 pb-24 pt-1">
+          {timelineGroups.map((group) => (
+            <section key={group.key} className="space-y-3">
+              {group.label && <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white select-none">
+                {group.label}
+              </h2>}
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-3.5">
-                    {group.tasks.map((task) => (
-                      <MaterialAssetCard
-                        key={task.id}
-                        task={task}
-                        isSelected={selectedTaskIds.includes(task.id)}
-                        isBatchMode={isBatchMode}
-                        onToggleSelect={toggleSelectTask}
-                        onClick={handleCardClick}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          )}
-
-          <MaterialFloatingDock
-            selectedCount={selectedTaskIds.length}
-            onClearSelection={clearTasks}
-            onExitSelection={handleExitBatchMode}
-            onBatchDelete={async () => { if (await onBatchDelete(selectedTaskIds)) handleExitBatchMode(); }}
-            onBatchDownload={() => onBatchDownload(selectedTaskIds)}
-            itemUnit="项"
-            isDownloading={isDownloadingZip}
-            isDeleting={isDeleting}
-          />
-        </>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-3.5">
+                {group.tasks.map((task) => (
+                  <MaterialAssetCard
+                    key={task.id}
+                    task={task}
+                    isSelected={selectedTaskIds.includes(task.id)}
+                    isBatchMode={isBatchMode}
+                    onToggleSelect={toggleSelectTask}
+                    onClick={handleCardClick}
+                    onImageUnavailable={handleImageUnavailable}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       )}
+
+      <MaterialFloatingDock
+        selectedCount={selectedTaskIds.length}
+        onClearSelection={clearTasks}
+        onExitSelection={handleExitBatchMode}
+        onBatchDelete={async () => { if (await onBatchDelete(selectedTaskIds)) handleExitBatchMode(); }}
+        onBatchDownload={() => onBatchDownload(selectedTaskIds)}
+        itemUnit="项"
+        isDownloading={isDownloadingZip}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }

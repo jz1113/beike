@@ -1,7 +1,36 @@
 import { getGatewayClientHeaders, getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { getWorkspaceSecret } from '@client/shared/api/workspaceClient';
 
-export interface UsageScope { workspaceId: string; channelId: string; mediaType: string }
+export const USAGE_EPOCH_KEY = 'beike.usage-clear.v1';
+export const INITIAL_USAGE_EPOCH = 'initial';
+export const currentUsageEpoch = () => localStorage.getItem(USAGE_EPOCH_KEY) || INITIAL_USAGE_EPOCH;
+
+export interface UsageScope { workspaceId: string; channelId: string; mediaType: string; epoch?: string }
+
+export interface UsageLogItem {
+  id: string;
+  timestamp: number; // Date.now()
+  taskId?: string;
+  localTaskId?: string;
+  recordId?: string;
+  scope?: UsageScope;
+  costSource?: 'estimated' | 'reported';
+  modelId: string;
+  modelName: string;
+  provider: string;
+  type: 'image' | 'video' | 'chat' | 'vision' | 'distill' | 'audio';
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  mediaCount?: number;
+  billableCount?: number;
+  duration?: number;
+  resolution?: string;
+  costUsd: number;  // 算力消耗 (点)
+  costRmb: number;  // 折算人民币金额 (¥) = costUsd * 1.2
+  success: boolean;
+  cached?: boolean;
+}
 
 // Synchronous SHA-256 keeps the existing synchronous log API atomic within a tab.
 // Only the digest is stored/exported; credentials and workspace secrets stay out.
@@ -40,14 +69,14 @@ export function createUsageScope(mediaType: string, selection?: string, supplied
   const text = !suppliedHeaders && ['chat','vision','distill'].includes(mediaType) ? getMultimodalClientOverrides(selection || '') : null;
   const headers = suppliedHeaders || (text ? { 'x-custom-base-url': text.customBaseUrl || '', 'x-custom-api-key': text.customApiKey || '', 'x-custom-protocol': text.textProtocol || '' } : getGatewayClientHeaders(selection || ''));
   const local = mediaType.startsWith('depth-') || selection === 'depth-image' || selection === 'depth-video';
-  const lianchi = selection === 'openai/gpt-image-2';
   return {
     workspaceId: usageDigest(getWorkspaceSecret() || 'local'),
     channelId: usageDigest(local ? 'local-depth' : JSON.stringify([
-      lianchi ? 'lianchi' : headers['x-custom-base-url'] || 'default', lianchi ? headers['x-lianchi-api-key'] || '' : headers['x-custom-api-key'] || '',
+      headers['x-custom-base-url'] || 'default', headers['x-custom-api-key'] || '',
       headers['x-custom-protocol'] || '', headers['x-request-template'] || '',
     ])),
     mediaType,
+    epoch: typeof localStorage === 'undefined' ? 'initial' : currentUsageEpoch(),
   };
 }
 
@@ -55,17 +84,25 @@ export function sameUsageScope(a: UsageScope | undefined, b: UsageScope): boolea
   return !!a && a.workspaceId === b.workspaceId && a.channelId === b.channelId && a.mediaType === b.mediaType;
 }
 
+/** Read existing attribution without inventing ownership for historical recovery. */
+export function savedOperationUsageScope(operationId: string | undefined, mediaType: string): UsageScope | undefined {
+  if (!operationId || typeof localStorage === 'undefined') return;
+  const workspaceId = usageDigest(getWorkspaceSecret() || 'local');
+  const slot = `beike.usage-operation-scope.v1:${usageDigest(JSON.stringify([workspaceId,mediaType,operationId]))}`;
+  const raw = localStorage.getItem(slot);
+  if (!raw) return;
+  const saved = JSON.parse(raw) as UsageScope;
+  if (saved.workspaceId !== workspaceId || saved.mediaType !== mediaType || typeof saved.channelId !== 'string' || !/^[a-f0-9]{64}$/.test(saved.channelId)) throw new Error('原操作用量范围无法核对，请保留原任务，不要重新生成');
+  return saved;
+}
+
 /** Immutable operations retain the channel captured before their first dispatch. */
 export function operationUsageScope(operationId: string | undefined, mediaType: string, selection?: string, headers?: Record<string,string>): UsageScope {
   const scope = createUsageScope(mediaType,selection,headers);
+  const saved = savedOperationUsageScope(operationId, mediaType);
+  if (saved) return saved;
   if (!operationId || typeof localStorage === 'undefined') return scope;
   const slot = `beike.usage-operation-scope.v1:${usageDigest(JSON.stringify([scope.workspaceId,mediaType,operationId]))}`;
-  const raw = localStorage.getItem(slot);
-  if (raw) {
-    const saved = JSON.parse(raw) as UsageScope;
-    if (saved.workspaceId !== scope.workspaceId || saved.mediaType !== mediaType || typeof saved.channelId !== 'string' || !/^[a-f0-9]{64}$/.test(saved.channelId)) throw new Error('原操作用量范围无法核对，请保留原任务，不要重新生成');
-    return saved;
-  }
   localStorage.setItem(slot,JSON.stringify(scope));
   if (localStorage.getItem(slot) !== JSON.stringify(scope)) throw new Error('用量范围保存未确认，未提交生成');
   return scope;

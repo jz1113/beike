@@ -1,6 +1,3 @@
-.sales-material-duration { flex-shrink: 0; color: var(--sales-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.sales-bgm-duration-choice { display: flex; flex-direction: column; gap: 6px; }
-.sales-bgm-duration-choice small { color: var(--sales-muted); font-size: 12px; }
 .sales-bgm-dropzone {
   display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%;
   border: 1px dashed var(--sales-line); border-radius: 10px; padding: 24px 16px;
@@ -18,15 +15,83 @@
 .sales-bgm-import-item > svg { flex-shrink: 0; }
 .sales-bgm-import-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .sales-bgm-import-item strong { color: var(--sales-ink); font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
-.sales-bgm-import-item.is-builtin { flex-direction: column; align-items: stretch; gap: 10px; }
-.sales-bgm-import-item.is-builtin label { display: flex; gap: 10px; align-items: flex-start; margin: 0; cursor: pointer; }
-.sales-bgm-import-item.is-builtin input { flex-shrink: 0; width: 16px; height: 16px; margin-top: 5px; accent-color: var(--sales-accent); }
-.sales-bgm-import-item.is-builtin label > span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
-.sales-bgm-import-item audio { width: 100%; height: 34px; }
 .sales-bgm-import .sales-material-error { margin: 0; overflow-wrap: anywhere; }
 .sales-material-dialog .sales-script-batch-depth-choice {
   display: flex; align-items: center; gap: 8px; margin: 0;
 }
 .sales-material-dialog .sales-script-batch-depth-choice input {
   flex-shrink: 0; width: 16px; height: 16px; margin: 0; accent-color: var(--sales-accent);
+}
+.bml-import-target-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--sales-line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.bml-import-target-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bml-import-target-header strong {
+  color: var(--sales-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.bml-import-target-header span {
+  color: #60a5fa;
+  font-size: 12px;
+  font-weight: 500;
+}
+.bml-import-target-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+}
+.bml-import-target-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.bml-import-target-row > span {
+  color: var(--sales-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.bml-import-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bml-import-pill {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--sales-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.bml-import-pill:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--sales-ink);
+}
+.bml-import-pill.is-active {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  font-weight: 600;
+}
+.bml-import-pill:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

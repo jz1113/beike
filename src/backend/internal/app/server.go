@@ -2,6 +2,7 @@
 package app
 
 import (
+	"beike.local/cloud/src/backend/internal/canvas"
 	"log"
 	"net/http"
 	"strings"
@@ -32,6 +33,8 @@ type route struct {
 
 func nativeRoutes(cfg config.Config) []route {
 	return []route{
+		{"POST /api/canvas/mcp", false, canvas.MCP(cfg)},
+		{"GET /api/canvas/drafts/{id}", true, canvas.DraftGet(cfg)},
 		{"GET /api/health", false, health(cfg)},
 		{"GET /api/assistant/sessions", true, sessions.Sessions(cfg)},
 		{"PUT /api/assistant/sessions", true, sessions.SaveSessions(cfg)},
@@ -133,7 +136,6 @@ func nativeRoutes(cfg config.Config) []route {
 		{"GET /api/sales/bgm/{id}", false, sales.BuiltinBgmAudio()},
 		{"POST /api/sales/video-review", true, sales.VideoReview(cfg)},
 		{"POST /api/sales/audio-mix", true, sales.BackgroundMedia(cfg, "mix", sales.AudioMix(cfg))},
-		{"POST /api/catalog/assets/seed", true, catalog.DisabledSeed()},
 		{"POST /api/assets/storage/upload", true, assets.Upload(cfg)},
 		{"POST /api/assets/storage/test", true, assets.TestStorage(cfg)},
 		{"POST /api/assets/storage/migrate", true, assets.Migrate(cfg)},
@@ -171,7 +173,11 @@ func nativeRoutes(cfg config.Config) []route {
 		{"GET /api/catalog/workshop-workspace", true, workshop.WorkspaceGet(cfg)},
 		{"PUT /api/catalog/workshop-workspace", true, workshop.WorkspacePut(cfg)},
 		{"POST /api/generate/upload-ref", true, generate.UploadRef()},
+		{"POST /api/generate/canvas-specialized", true, generate.CanvasSpecialized(cfg)},
+		{"GET /api/generate/canvas-specialized", true, generate.CanvasSpecialized(cfg)},
 		{"POST /api/generate/canvas-text", true, generate.CanvasText(cfg)},
+		{"GET /api/generate/canvas-text", true, generate.CanvasText(cfg)},
+		{"GET /api/generate/layer-decomposition", true, generate.LayerDecomposition(cfg)},
 		{"POST /api/generate/layer-decomposition", true, generate.LayerDecomposition(cfg)},
 		{"POST /api/generate/headline-title", true, poster.HeadlineTitle(cfg)},
 		{"GET /api/generate/headline-title", true, poster.HeadlineTitle(cfg)},
@@ -188,7 +194,9 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/generate/headline-memory/revisions/{id}/restore", true, poster.HeadlineMemoryRevision(cfg)},
 		{"PATCH /api/generate/headline-memory/usages/{id}", true, poster.HeadlineMemoryFeedback(cfg)},
 		{"POST /api/generate/analyze", true, generate.Analyze(cfg)},
+		{"GET /api/generate/analyze", true, generate.Analyze(cfg)},
 		{"POST /api/generate/copywriting", true, generate.Copywriting(cfg)},
+		{"GET /api/generate/copywriting", true, generate.Copywriting(cfg)},
 		{"POST /api/generate/image", true, generate.Image(cfg)},
 		{"GET /api/generate/image", true, generate.Image(cfg)},
 		{"POST /api/generate/image-batch", true, generate.ImageBatch(cfg)},

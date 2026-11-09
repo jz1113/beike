@@ -1,4 +1,0 @@
-interface:
-  display_name: "大字报商品封面生成"
-  short_description: "反推参考封面并迁移新主体，批量生成独立绘图提示词"
-  default_prompt: "使用 $headline-poster-generator 完成当前任务。"

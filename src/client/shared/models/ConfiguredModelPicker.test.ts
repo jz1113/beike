@@ -31,6 +31,14 @@ afterEach(() => {
 });
 
 describe('ConfiguredModelPicker', () => {
+  it('shows an unavailable saved model instead of displaying the first configured model as selected', () => {
+    const html = renderToStaticMarkup(createElement(ConfiguredModelPicker, {
+      ariaLabel: '视觉分析模型', options: [{ id: 'gpt-6-luna', name: 'GPT 6 Luna' }], value: 'deleted-model', onChange: vi.fn(),
+    }));
+    expect(html).toContain('模型不可用');
+    expect(html).toContain('deleted-model');
+    expect(html).not.toContain('GPT 6 Luna');
+  });
   it('extracts channels and upstream model IDs for the grouped model picker', () => {
     const items = toPreferenceModelItems([
       { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash · Comfly 网关' },

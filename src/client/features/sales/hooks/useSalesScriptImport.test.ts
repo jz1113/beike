@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeScriptTemplate } from '@shared/domain/sales';
 import { deleteSalesScript, type StoredSalesScript } from '../api/salesScripts';
-import { addSalesScriptImportFiles, type SalesScriptImportItem } from '../model/salesScriptImport';
+import { addSalesScriptImportFiles, readSalesScriptImport, saveSalesScriptImport, type SalesScriptImportItem } from '../model/salesScriptImport';
 import { runSalesScriptImportBatch } from '../api/salesScriptImport';
-import { readSalesScriptImport, saveSalesScriptImport } from '../model/salesScriptImportStorage';
 import { useSalesScriptImport } from './useSalesScriptImport';
 
 const hooks = vi.hoisted(() => ({ index: 0, slots: [] as unknown[], effects: [] as (() => unknown)[], cleanup: undefined as (() => void) | undefined }));
@@ -25,9 +24,8 @@ vi.mock('react', () => ({
     }];
   },
 }));
-vi.mock('../model/salesScriptImport', () => ({ addSalesScriptImportFiles: vi.fn() }));
+vi.mock('../model/salesScriptImport', () => ({ addSalesScriptImportFiles: vi.fn(), readSalesScriptImport: vi.fn(), saveSalesScriptImport: vi.fn() }));
 vi.mock('../api/salesScriptImport', () => ({ runSalesScriptImportBatch: vi.fn() }));
-vi.mock('../model/salesScriptImportStorage', () => ({ readSalesScriptImport: vi.fn(), saveSalesScriptImport: vi.fn() }));
 vi.mock('../api/salesScripts', () => ({ deleteSalesScript: vi.fn() }));
 
 const source: SalesScriptImportItem = { key: 'video-1', name: '跳舞.mp4', size: 8, lastModified: 1, status: 'queued', error: '', saveId: 'stable-script-1' };

@@ -1,3 +1,4 @@
+import { createUsageScope, sameUsageScope, type UsageScope } from './usageScope';
 import { buildUsageSummary, type UsageRange, type UsageSummary } from './usageSummary';
 // src/lib/usageTracker.ts
 
@@ -25,15 +26,45 @@ export { resolveModelVendor } from './modelVendor';
 import { COMFY_MODEL_PRICING } from './modelPricing.data';
 import { resolveModelVendor } from './modelVendor';
 
-import type { UsageLogItem } from './usageLog';
-export type { UsageLogItem } from './usageLog';
+import type { UsageLogItem } from './usageScope';
+export type { UsageLogItem } from './usageScope';
 
-const STORAGE_KEY = 'app_real_usage_logs';
-export const USAGE_LOG_EVENT = 'beike-usage-updated';
+import { readUsageReceipts, saveUsageReceipt, clearUsageReceipts, currentUsageEpoch } from './usageStorage';
+export { USAGE_LOG_EVENT } from './usageStorage';
 
-function notifyUsageLogs(): void {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new Event(USAGE_LOG_EVENT));
+type Identity = { scope: UsageScope; taskId?: string; localTaskId?: string; recordId?: string };
+
+function findUsageLog(logs: UsageLogItem[], identity: Identity): UsageLogItem | undefined {
+  const candidates = logs.filter(log => sameUsageScope(log.scope, identity.scope));
+  const exact = candidates.find(log => identity.recordId && log.recordId === identity.recordId
+    || identity.localTaskId && log.localTaskId === identity.localTaskId && (!identity.recordId || !log.recordId || log.recordId === identity.recordId));
+  if (exact) return exact;
+  const remote = candidates.filter(log => identity.taskId && log.taskId === identity.taskId
+    && (!identity.recordId || !log.recordId || log.recordId === identity.recordId)
+    && (!identity.localTaskId || !log.localTaskId || log.localTaskId === identity.localTaskId));
+  return remote.length === 1 ? remote[0] : undefined;
+}
+
+function count(value: unknown): number { return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0; }
+
+/** Merge cumulative receipts, including disjoint detail fields and stale replays. */
+function mergeUsageTokens(existing: UsageLogItem, incoming: { promptTokens?: number; completionTokens?: number; totalTokens?: number }): boolean {
+  const prompt = Math.max(count(existing.promptTokens), count(incoming.promptTokens));
+  const completion = Math.max(count(existing.completionTokens), count(incoming.completionTokens));
+  const total = Math.max(count(existing.totalTokens), count(incoming.totalTokens), prompt + completion);
+  const changed = existing.promptTokens !== prompt || existing.completionTokens !== completion || existing.totalTokens !== total;
+  existing.promptTokens = prompt; existing.completionTokens = completion; existing.totalTokens = total;
+  return changed;
+}
+
+/** Output counts only grow after a confirmed result; stale page receipts cannot undo success. */
+function mergeUsageOutcome(existing: UsageLogItem, incoming: { success: boolean; mediaCount?: number; billableCount?: number }): boolean {
+  const success = existing.success || incoming.success;
+  const mediaCount = Math.max(count(existing.mediaCount), count(incoming.mediaCount));
+  const billableCount = existing.billableCount === undefined && incoming.billableCount === undefined ? undefined : Math.max(count(existing.billableCount), count(incoming.billableCount));
+  const changed = existing.success !== success || existing.mediaCount !== mediaCount || existing.billableCount !== billableCount;
+  existing.success = success; existing.mediaCount = mediaCount; existing.billableCount = billableCount;
+  return changed;
 }
 
 /**
@@ -47,7 +78,7 @@ function notifyUsageLogs(): void {
 export function estimateModelCost(
   modelId: string,
   type: 'image' | 'video' | 'chat' | 'vision' | 'distill' | 'audio',
-  params: { promptTokens?: number; completionTokens?: number; totalTokens?: number; mediaCount?: number; duration?: number; resolution?: string }
+  params: { promptTokens?: number; completionTokens?: number; totalTokens?: number; mediaCount?: number; billableCount?: number; duration?: number; resolution?: string }
 ): number {
   const m = modelId.toLowerCase().trim();
 
@@ -61,7 +92,7 @@ export function estimateModelCost(
 
   // 2. 图片生成计费
   if (type === 'image') {
-    const count = params.mediaCount ?? 1;
+    const count = params.billableCount ?? params.mediaCount ?? 1;
     if (rule?.fixedPerUnit) return count * rule.fixedPerUnit;
     if (m.includes('gpt-image-2-4k') || m.includes('image2-4k')) return count * 0.08;
     if (m.includes('gpt-image-2-2k')) return count * 0.06;
@@ -80,7 +111,7 @@ export function estimateModelCost(
 
   // 3. 视频生成计费
   if (type === 'video') {
-    const count = params.mediaCount ?? 1;
+    const count = params.billableCount ?? params.mediaCount ?? 1;
     const dur = params.duration || 5;
     const resolution = params.resolution?.trim().toUpperCase();
     const resolutionPrice = resolution ? rule?.perSecPriceByResolution?.[resolution] : undefined;
@@ -130,55 +161,22 @@ export function estimateModelCost(
  */
 export function getUsageLogs(): UsageLogItem[] {
   if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.error('读取用量统计日志失败:', e);
-    return [];
-  }
-}
-
-/**
- * 安全保存用量日志到 LocalStorage，保留最近 5000 条真实调用记录
- */
-function safeSaveUsageLogs(logs: UsageLogItem[]): void {
-  if (typeof window === 'undefined') return;
-
-  // 默认保留最近 5000 条，兼顾精细全周期统计与 LocalStorage 存储安全
-  let targetList = logs.slice(0, 5000);
-
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(targetList));
-      notifyUsageLogs();
-      return;
-    } catch (error: unknown) {
-      const e = error as { name?: string; code?: number; number?: number; message?: string } | null;
-      const isQuota =
-        e?.name === 'QuotaExceededError' ||
-        e?.code === 22 ||
-        e?.code === 1014 ||
-        e?.number === -2147024882 ||
-        (typeof e?.message === 'string' && e.message.toLowerCase().includes('quota'));
-
-      if (isQuota) {
-        // 容量超标，按梯度动态裁减：5000 -> 2500 -> 1000 -> 300
-        const nextLen = Math.floor(targetList.length * 0.5);
-        if (nextLen < 50) {
-          try {
-            localStorage.removeItem(STORAGE_KEY);
-          } catch {}
-          return;
-        }
-        targetList = targetList.slice(0, nextLen);
-      } else {
-        return;
-      }
+  const logs: UsageLogItem[] = [];
+  for (const incoming of readUsageReceipts().sort((a, b) => a.timestamp - b.timestamp)) {
+    const existing = logs.find(row => row.id === incoming.id) || (incoming.scope ? findUsageLog(logs, { ...incoming, scope: incoming.scope }) : undefined);
+    if (!existing) { logs.push({ ...incoming }); continue; }
+    const reported = incoming.costSource === 'reported' ? { ...incoming } : existing.costSource === 'reported' ? { ...existing } : undefined;
+    const tokens = { ...existing };
+    mergeUsageTokens(tokens, incoming);
+    mergeUsageOutcome(tokens, incoming);
+    Object.assign(existing, incoming, { promptTokens: tokens.promptTokens, completionTokens: tokens.completionTokens, totalTokens: tokens.totalTokens, success: tokens.success, mediaCount: tokens.mediaCount, billableCount: tokens.billableCount });
+    if (reported) { existing.costUsd = reported.costUsd; existing.costRmb = reported.costRmb; existing.costSource = 'reported'; }
+    else if (existing.costSource === 'estimated' && !['image', 'video'].includes(existing.type)) {
+      existing.costUsd = estimateModelCost(existing.modelId, existing.type, existing);
+      existing.costRmb = Number((existing.costUsd * getQuotaToRmbRatio()).toFixed(6));
     }
   }
+  return logs.sort((a, b) => b.timestamp - a.timestamp);
 }
 
 /**
@@ -197,20 +195,30 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
       const totalTokens = item.totalTokens || (promptTokens + completionTokens) || 0;
       const taskId = item.taskId?.trim() || undefined;
       const localTaskId = item.localTaskId?.trim() || undefined;
-      const existing = logs.find((log) => (localTaskId && log.localTaskId === localTaskId) || (taskId && log.taskId === taskId));
+      const scope = item.scope || createUsageScope(item.type, item.modelId);
+      // A recovered receipt belongs to the statistics generation captured before dispatch.
+      if ((scope.epoch || 'initial') !== currentUsageEpoch()) return;
+      const recordId = item.recordId?.trim() || undefined;
+      const existing = findUsageLog(logs, { scope, recordId, taskId, localTaskId });
       if (existing) {
-        let changed = false;
+        let changed = mergeUsageOutcome(existing, item);
         if (taskId && !existing.taskId) { existing.taskId = taskId; changed = true; }
         if (localTaskId && !existing.localTaskId) { existing.localTaskId = localTaskId; changed = true; }
-        if (totalTokens > 0 && !(existing.totalTokens || 0)) {
-          existing.promptTokens = promptTokens;
-          existing.completionTokens = completionTokens;
-          existing.totalTokens = totalTokens;
-          changed = true;
+        if (recordId && !existing.recordId) { existing.recordId = recordId; changed = true; }
+        const tokensChanged = mergeUsageTokens(existing, { promptTokens, completionTokens, totalTokens });
+        changed ||= tokensChanged;
+        if (item.costUsd !== undefined) {
+          existing.costUsd = item.costUsd; existing.costRmb = Number((item.costUsd * getQuotaToRmbRatio()).toFixed(6));
+          existing.costSource = 'reported'; changed = true;
+        } else if (tokensChanged && existing.costSource === 'estimated' && !['image','video'].includes(item.type)) {
+          existing.costUsd = estimateModelCost(existing.modelId, existing.type, existing);
+          existing.costRmb = Number((existing.costUsd * getQuotaToRmbRatio()).toFixed(6));
         }
         if (item.type === 'video' && item.duration !== undefined) {
+          if (existing.costSource === 'estimated') {
           const refreshedCost = Number(estimateModelCost(item.modelId, item.type, {
-            mediaCount: item.mediaCount,
+            mediaCount: existing.mediaCount,
+            billableCount: existing.billableCount,
             duration: item.duration,
             resolution: item.resolution,
           }).toFixed(6));
@@ -218,6 +226,7 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
             existing.costUsd = refreshedCost;
             existing.costRmb = Number((refreshedCost * getQuotaToRmbRatio()).toFixed(6));
             changed = true;
+          }
           }
           if (item.resolution && existing.resolution !== item.resolution) {
             existing.resolution = item.resolution;
@@ -228,7 +237,7 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
             changed = true;
           }
         }
-        if (changed) safeSaveUsageLogs(logs);
+        if (changed) saveUsageReceipt(existing);
         return;
       }
       const calculatedCostUsd = item.costUsd !== undefined
@@ -238,6 +247,7 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
             completionTokens: item.completionTokens,
             totalTokens: item.totalTokens,
             mediaCount: item.mediaCount,
+            billableCount: item.billableCount,
             duration: item.duration,
             resolution: item.resolution,
           });
@@ -250,8 +260,11 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
       const vendor = resolveModelVendor(item.modelId, item.provider);
 
       const newLog: UsageLogItem = {
-        id: 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        id: 'log_' + Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join(''),
         timestamp: item.timestamp ?? Date.now(),
+        scope,
+        ...(recordId ? { recordId } : {}),
+        costSource: item.costUsd === undefined ? 'estimated' : 'reported',
         ...(taskId ? { taskId } : {}),
         ...(localTaskId ? { localTaskId } : {}),
         modelId: item.modelId,
@@ -261,6 +274,7 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
         promptTokens,
         completionTokens,
         totalTokens,
+        ...(item.billableCount !== undefined ? { billableCount: item.billableCount } : {}),
         mediaCount: item.mediaCount ?? ((item.type === 'image' || item.type === 'video') && item.success !== false ? 1 : 0),
         ...(item.duration !== undefined ? { duration: item.duration } : {}),
         ...(item.resolution ? { resolution: item.resolution } : {}),
@@ -270,8 +284,7 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
         cached: !!item.cached
       };
 
-      logs.unshift(newLog);
-      safeSaveUsageLogs(logs);
+      saveUsageReceipt(newLog);
     } catch {}
   }
 }
@@ -281,8 +294,7 @@ export function recordModelUsage(item: Omit<UsageLogItem, 'id' | 'timestamp' | '
  */
 export function clearUsageLogs(): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(STORAGE_KEY);
-  notifyUsageLogs();
+  clearUsageReceipts();
 }
 
 export { type UsageSummary, type UsageRange } from './usageSummary';

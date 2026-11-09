@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AssetTasksListResponseSchema } from './generate';
+import { turnStartBodySchema } from './assistant';
+import { AssetTasksListResponseSchema, HeadlineTitleRequestSchema, TextProtocolSchema } from './generate';
 
 describe('asset task receipts', () => {
   it('validates mixed completed and unknown submissions without dropping recovery fields', () => {
@@ -18,5 +19,16 @@ describe('asset task receipts', () => {
     expect(AssetTasksListResponseSchema.safeParse({
       tasks: [{ id: 'receipt', prompt: '商品图', status: 'QUERY_FAILED' }],
     }).success).toBe(false);
+  });
+});
+
+describe('shared text routing DTOs', () => {
+  it('retains routing preferences without replacing Responses', () => {
+    const base = { textProtocol: 'gemini', apiFormat: 'openai-responses' };
+    expect(turnStartBodySchema.parse({ ...base, messages: [{ role: 'user', content: 'hello' }] })).toMatchObject(base);
+    expect(HeadlineTitleRequestSchema.parse({ textProtocol: 'anthropic', imageUrls: ['https://example.test/a.png'] }).textProtocol).toBe('anthropic');
+  });
+  it('rejects unsupported protocol names', () => {
+    expect(TextProtocolSchema.safeParse('azure').success).toBe(false);
   });
 });

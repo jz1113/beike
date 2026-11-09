@@ -19,31 +19,47 @@ export function createSkillNode(skillName: string): HTMLElement {
   return pill;
 }
 
+export function formatMentionDisplayLabel(name: string): string {
+  return name.replace(/^(图片|视频|音频|文本|主体)(\d+)$/, '$1 $2');
+}
+
 export function createMentionNode(subject: SubjectItem): HTMLElement {
   const pill = document.createElement('span');
   pill.contentEditable = 'false';
+  const isTextRef = subject.url.startsWith('text:') || subject.id.startsWith('text-ref-');
   pill.setAttribute('data-mention-id', subject.id);
-  pill.setAttribute('data-mention-media-id', getRefMediaIdentity(subject.url));
+  const identity = isTextRef ? '' : subject.id.startsWith('canvas-node:') ? subject.id : getRefMediaIdentity(subject.url);
+  pill.setAttribute('data-mention-media-id', identity);
   pill.setAttribute('data-mention-name', subject.name);
   pill.className =
-    'inline-mention-pill inline-flex items-center gap-1 mx-1 px-1.5 py-0 h-[20px] rounded-md bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-semibold border border-slate-300/80 shadow-2xs select-none align-middle relative -top-[1.5px] cursor-default';
+    'inline-mention-pill inline-flex items-center gap-1.5 mx-0.5 px-1.5 py-0.5 h-[24px] rounded-[7px] bg-slate-100 hover:bg-slate-200/80 dark:bg-[#252529] dark:hover:bg-[#2f2f35] text-slate-800 dark:text-zinc-100 text-xs font-medium border border-slate-200/90 dark:border-white/[0.14] shadow-2xs select-none align-middle relative -top-[1px] cursor-default transition-colors';
 
-  if (isVideoMediaUrl(subject.url)) {
+  if (isTextRef) {
+    const icon = document.createElement('span');
+    icon.textContent = '≡';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.className =
+      'inline-flex w-4 h-4 items-center justify-center rounded-[4px] bg-slate-200 dark:bg-white/10 text-[11px] font-bold text-slate-600 dark:text-zinc-300 flex-shrink-0';
+    pill.appendChild(icon);
+  } else if (/^视频\d+$/.test(subject.name) || isVideoMediaUrl(subject.url)) {
     const icon = document.createElement('span');
     icon.textContent = '▶';
     icon.setAttribute('aria-hidden', 'true');
+    icon.className =
+      'inline-flex w-4 h-4 items-center justify-center rounded-[4px] bg-black/55 text-[9px] text-white flex-shrink-0';
     pill.appendChild(icon);
   } else {
     const img = document.createElement('img');
     img.src = subject.url;
     img.alt = '';
-    img.className = 'w-3.5 h-3.5 rounded-xs object-cover border border-slate-300/80 bg-white inline-block flex-shrink-0';
+    img.className = 'w-4 h-4 rounded-[4px] object-cover bg-black/20 inline-block flex-shrink-0';
     pill.appendChild(img);
   }
 
   const label = document.createElement('span');
-  label.textContent = subject.name;
-  label.className = 'font-bold text-slate-900 font-mono text-[11px] leading-none pr-0.5 truncate max-w-[120px]';
+  label.textContent = formatMentionDisplayLabel(subject.name);
+  label.className =
+    'font-medium text-slate-800 dark:text-zinc-100 text-[12px] leading-none pr-0.5 truncate max-w-[140px]';
   pill.appendChild(label);
   return pill;
 }
@@ -58,7 +74,9 @@ export function extractTextFromDOM(container: HTMLElement): string {
       if (el.hasAttribute('data-skill-name')) {
         text += `#[skill:${el.getAttribute('data-skill-name')}]`;
       } else if (el.hasAttribute('data-mention-name')) {
-        text += formatSubjectMention(el.getAttribute('data-mention-media-id') || '', el.getAttribute('data-mention-name') || '');
+        const mediaId = el.getAttribute('data-mention-media-id') || '';
+        const mentionName = el.getAttribute('data-mention-name') || '';
+        text += mediaId ? formatSubjectMention(mediaId, mentionName) : `@${mentionName}`;
       } else if (el.tagName === 'BR') {
         text += '\n';
       } else if (el.tagName === 'DIV' || el.tagName === 'P') {
@@ -116,7 +134,11 @@ export function resolveEditorInsertionRange(editor: HTMLElement): { range: Range
     range.collapse(false);
   }
   if (range.collapsed && range.startContainer.nodeType !== Node.TEXT_NODE && range.startOffset > 0) {
-    const prevChild = range.startContainer.childNodes[range.startOffset - 1];
+    let idx = range.startOffset - 1;
+    while (idx >= 0 && range.startContainer.childNodes[idx]?.nodeName === 'BR') {
+      idx--;
+    }
+    const prevChild = idx >= 0 ? range.startContainer.childNodes[idx] : null;
     if (prevChild && prevChild.nodeType === Node.TEXT_NODE) {
       const len = prevChild.textContent?.length || 0;
       range.setStart(prevChild, len);
@@ -240,5 +262,3 @@ export function insertPastedTextWithMentions(
 
   return extractTextFromDOM(editor);
 }
-
-

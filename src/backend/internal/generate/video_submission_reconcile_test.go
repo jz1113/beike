@@ -74,7 +74,7 @@ func TestVideoUnknownSubmissionReconcilesTerminalWithoutResubmit(t *testing.T) {
 			if err != nil || changed != 0 {
 				t.Fatalf("unrelated receipts changed: %d %v", changed, err)
 			}
-			if item.withUsage && readTaskUsage(context.Background(), db, taskScope{"local", "video"}, "known-uncertain") == "" {
+			if item.withUsage && readTaskUsage(context.Background(), db, taskScope{workspace: "local", media: "video"}, "known-uncertain") == "" {
 				t.Fatal("terminal usage was not saved")
 			}
 			keyed := videoSubmissionTestGet(handler, "reconcile", "local")
@@ -120,5 +120,62 @@ func TestVideoUnknownSubmissionStaysUnknownWithoutTerminalEvidence(t *testing.T)
 	var changed int
 	if err = db.QueryRow(`SELECT count(*) FROM "ImageTask" WHERE "status" != 'SUBMISSION_UNKNOWN'`).Scan(&changed); err != nil || changed != 0 {
 		t.Fatalf("uncertain state changed without evidence: %d %v", changed, err)
+	}
+}
+
+func TestVideoMissingIntentClosesKeyBeforeAllowingRetry(t *testing.T) {
+	var posts atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		posts.Add(1)
+		_, _ = w.Write([]byte(`{"task_id":"retried"}`))
+	}))
+	defer server.Close()
+	cfg := videoSubmissionTestConfig(t, server)
+	handler := Video(cfg)
+	request := httptest.NewRequest(http.MethodGet, "/api/generate/video?taskKey=before-enqueue&closeMissing=true", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if !strings.Contains(response.Body.String(), `"submissionRejected":true`) {
+		t.Fatalf("intent stuck: %s", response.Body.String())
+	}
+	late := videoSubmissionTestPost(handler, server.URL, "before-enqueue", "海边", "local")
+	if late.Code == http.StatusOK || posts.Load() != 0 {
+		t.Fatalf("late request dispatched: %d posts=%d", late.Code, posts.Load())
+	}
+	retry := videoSubmissionTestPost(handler, server.URL, "fresh-retry", "海边", "local")
+	if retry.Code != http.StatusOK || posts.Load() != 1 {
+		t.Fatalf("retry failed: %d %s", retry.Code, retry.Body.String())
+	}
+	// Existing accepted receipts are never closed by refresh recovery.
+	request = httptest.NewRequest(http.MethodGet, "/api/generate/video?taskKey=fresh-retry&closeMissing=true", nil)
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if !strings.Contains(response.Body.String(), `"taskId":"retried"`) {
+		t.Fatal(response.Body.String())
+	}
+}
+
+func TestVideoCloseMissingPreservesUnknownReceipt(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { t.Error("must not contact upstream") }))
+	defer server.Close()
+	cfg := videoSubmissionTestConfig(t, server)
+	db, err := openTaskDB(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	_, err = insertImageTask(context.Background(), db, "local", imageTaskDraft{Prompt: "paid", TaskID: "pending_paid", Status: "SUBMISSION_UNKNOWN", MediaType: "video", IdempotencyKey: "paid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/generate/video?taskKey=paid&closeMissing=true", nil)
+	response := httptest.NewRecorder()
+	Video(cfg).ServeHTTP(response, req)
+	if !strings.Contains(response.Body.String(), `"submissionUnknown":true`) || strings.Contains(response.Body.String(), `"submissionRejected":true`) {
+		t.Fatal(response.Body.String())
+	}
+	row, err := lookupVideoSubmission(cfg, req, "paid")
+	if err != nil || row.status != "SUBMISSION_UNKNOWN" {
+		t.Fatalf("changed paid receipt: %+v %v", row, err)
 	}
 }

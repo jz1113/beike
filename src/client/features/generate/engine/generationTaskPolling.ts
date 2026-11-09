@@ -7,31 +7,34 @@ import {
   isDepthImageTask,
   isVideoTask,
   getMaxPollCount,
-  type TaskUpdater,
   SLOW_POLL_HINT,
-} from './generationTaskTypes';
-import { peekDepthSubmit } from '@client/shared/api/generation/depthGeneration';
-import { classifyGenerationPollResult, isTransientPollError, accumulateTransientPollFailure } from '@client/shared/api/generation/generationErrors';
-import { isImageTaskActive } from '@shared/domain/core/taskStatus';
-import { GENERATION_QUERY_RETRY_HINT, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generation/generationRecovery';
-import { recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
-import {
   forgetSubmissionRequestError,
   isSubmissionInFlight,
   nextSubmissionRecovery,
   submissionRequestError,
-} from './submissionFlight';
+} from './generationTaskSubmitter';
+import type { TaskUpdater } from './recoverAgentTurn';
+import { peekDepthSubmit } from '@client/shared/api/generation/depthGeneration';
+import { classifyGenerationPollResult, isTransientPollError, accumulateTransientPollFailure } from '@client/shared/api/generation/generationErrors';
+import { isImageTaskActive } from '@shared/domain/core/taskStatus';
+import { GENERATION_QUERY_RETRY_HINT, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generation/generationRecovery';
+import { readReportedUsage, recordMediaTaskUsage } from '@client/shared/utils/modelUsage';
 
 const pollingTaskIds = new Set<string>();
 
-function recordFinishedTaskUsage(task: GenerationTask, data: { taskId?: unknown; usage?: unknown } | null) {
+function recordFinishedTaskUsage(task: GenerationTask, data: { taskId?: unknown; recordId?: unknown; usage?: unknown } | null, complete = false) {
+  if (!task.usageScope || (!complete && !readReportedUsage(data?.usage))) return;
   const reportedId = typeof data?.taskId === 'string' ? data.taskId : '';
   recordMediaTaskUsage({
     localTaskId: task.id,
+    recordId: typeof data?.recordId === 'string' ? data.recordId : task.dbId,
+    scope: task.usageScope,
     taskId: reportedId || task.taskId,
     modelId: task.model || 'unknown',
     type: task.mediaType === 'audio' ? 'audio' : isVideoTask(task) ? 'video' : 'image',
-    mediaCount: 1,
+    mediaCount: complete ? 1 : 0,
+    success: complete,
+    billableCount: 1,
     duration: task.videoDuration,
     resolution: isVideoTask(task) ? task.videoResolution : undefined,
     usage: data?.usage,
@@ -63,6 +66,7 @@ export async function pollTasksOnce(
       const video = isVideoTask(t);
       const maxCount = getMaxPollCount(t);
       const recovering = Boolean(t.submissionRecoveryRequired && !t.taskId);
+      const requiresClosure = !depthVideo && !isDepthImageTask(t) && !video;
       let count = pollCounts[t.id] || 0;
 
       // 原请求还在飞时不要累计核对次数。同步出图可能要几分钟，记录要等提交返回后才写入。
@@ -111,16 +115,27 @@ export async function pollTasksOnce(
             ? '/api/generate/audio'
             : '/api/generate/image';
         const queryParams = new URLSearchParams(recovering ? { taskKey: t.id, model: t.model } : { taskId: t.taskId!, model: t.model });
+        if (recovering && (video || requiresClosure)) queryParams.set('closeMissing', 'true');
+        if (t.canvasProjectId && !video && !isAudio && !isDepthImageTask(t) && !depthVideo) queryParams.set('requireRoute', 'true');
         const taskGatewayHeaders = getGatewayClientHeaders(t.modelRouteKey || t.model);
 
         const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
           headers: {
             ...taskGatewayHeaders,
+            ...(t.dbId ? { 'x-task-record-id': t.dbId } : {}),
             ...storageConfigHeaders(),
           },
         });
 
         const data = await res.json().catch(() => null);
+        if (data?.usage) recordFinishedTaskUsage(t, data);
+        if (data?.code === 'task_route_changed' || data?.code === 'task_route_unavailable') {
+          update(t.id, { routeQueryBlock: String(data.error || '无法核对原任务渠道，请恢复原渠道后继续查询') }, noPersist);
+          return;
+        }
+
+        if (res.ok && t.routeQueryBlock) update(t.id, { routeQueryBlock: undefined }, noPersist);
+
         if (recovering && data?.submissionPending === true) {
           delete pollCounts[t.id];
           update(t.id, {
@@ -131,9 +146,9 @@ export async function pollTasksOnce(
           }, noPersist);
           return;
         }
-        if (recovering && isUnrecordedSubmission(data)) {
+        if (recovering && res.ok && isUnrecordedSubmission(data)) {
           const decision = nextSubmissionRecovery(pollCounts[t.id] || 0, 'missing', submissionRequestError(t.id));
-          if (decision.abandon) {
+          if (decision.abandon && !requiresClosure) {
             forgetSubmissionRequestError(t.id);
             slowPollIds.delete(t.id);
             delete pollCounts[t.id];
@@ -150,22 +165,24 @@ export async function pollTasksOnce(
           update(t.id, { failReason: SUBMISSION_RECOVERY_HINT }, noPersist);
           return;
         }
-        const recoveredTaskId = recovering && typeof data?.taskId === 'string' && data.taskId && !String(data.taskId).startsWith('pending_') ? data.taskId : undefined;
+        const recoveredTaskId = recovering && (!isAudio || data?.submissionUnknown !== true) && typeof data?.taskId === 'string' && data.taskId && !String(data.taskId).startsWith('pending_') ? data.taskId : undefined;
         let outcome = classifyGenerationPollResult(data, { httpOk: res.ok, httpStatus: res.status });
         // Authentication/query errors cannot prove that an unknown POST was rejected.
         if (recovering && outcome === 'failure' && !recoveredTaskId && data?.submissionRejected !== true && !isStoredSubmissionFailure(data)) outcome = 'pending';
-        const recoveredLink = recovering ? {
+        const recordLink = typeof data?.recordId === 'string' && !t.dbId ? { dbId: data.recordId } : {};
+        const recoveredLink = {
+          ...recordLink,
           ...(recoveredTaskId ? { taskId: recoveredTaskId, submissionRecoveryRequired: false } : {}),
-          ...(typeof data?.recordId === 'string' ? { dbId: data.recordId } : {}),
-          ...(typeof data?.model === 'string' ? { model: data.model } : {}),
-        } : {};
+          ...(recovering && typeof data?.model === 'string' && data.model ? { model: data.model } : {}),
+        };
 
         if (outcome === 'success') {
           forgetSubmissionRequestError(t.id);
           slowPollIds.delete(t.id);
           delete pollCounts[t.id];
+          delete pollCounts[`_start_${t.id}`];
           delete pollFailureCounts[t.id];
-          recordFinishedTaskUsage(t, data);
+          recordFinishedTaskUsage(t, data, true);
           update(t.id, {
             status: 'SUCCESS',
             resultUrl: data.resultUrl,
@@ -178,6 +195,7 @@ export async function pollTasksOnce(
           forgetSubmissionRequestError(t.id);
           slowPollIds.delete(t.id);
           delete pollCounts[t.id];
+          delete pollCounts[`_start_${t.id}`];
           delete pollFailureCounts[t.id];
           update(t.id, {
             status: 'FAILURE',
@@ -191,8 +209,10 @@ export async function pollTasksOnce(
           if (recoveredTaskId) {
             delete pollCounts[t.id];
             update(t.id, { ...recoveredLink, failReason: undefined });
+          } else if (recordLink.dbId) {
+            update(t.id, recordLink);
           } else if (recovering || !res.ok || data?.retryable === true || data?.status === 'QUERY_FAILED') {
-            update(t.id, { failReason: recovering ? SUBMISSION_RECOVERY_HINT : GENERATION_QUERY_RETRY_HINT }, noPersist);
+            update(t.id, { failReason: data?.submissionUnknown && typeof data.error === 'string' ? data.error : recovering ? SUBMISSION_RECOVERY_HINT : GENERATION_QUERY_RETRY_HINT }, noPersist);
           } else if (depthVideo && data?.progress) {
             update(t.id, { progress: String(data.progress) }, noPersist);
           }
@@ -226,8 +246,8 @@ export async function pollTasksOnce(
   );
 }
 
-function isUnrecordedSubmission(data: { status?: unknown; submissionPending?: unknown; taskId?: unknown } | null): boolean {
-  if (!data || data.submissionPending === true) return false;
+function isUnrecordedSubmission(data: { status?: unknown; submissionPending?: unknown; submissionUnknown?: unknown; taskId?: unknown } | null): boolean {
+  if (!data || data.submissionPending === true || data.submissionUnknown === true) return false;
   // An uncertain receipt can already contain the real upstream ID. Poll that original task.
   if (typeof data.taskId === 'string' && data.taskId && !data.taskId.startsWith('pending_')) return false;
   return typeof data.status === 'string' && data.status.toUpperCase() === 'QUERY_FAILED';
@@ -282,21 +302,24 @@ export async function probeFailedTasks(
       try {
         const pollEndpoint = failedTaskPollEndpoint(t);
         const queryParams = new URLSearchParams({ taskId: t.taskId!, model: t.model, recheck_failed: '1' });
+        if (t.canvasProjectId && pollEndpoint === '/api/generate/image') queryParams.set('requireRoute','true');
         const taskGatewayHeaders = getGatewayClientHeaders(t.modelRouteKey || t.model);
 
         const res = await apiFetch(`${pollEndpoint}?${queryParams.toString()}`, {
           headers: {
             ...taskGatewayHeaders,
+            ...(t.dbId ? { 'x-task-record-id': t.dbId } : {}),
             ...storageConfigHeaders(),
           },
         }).catch(() => null);
 
         if (!res) return;
         const data = await res.json().catch(() => null);
+        if (data?.usage) recordFinishedTaskUsage(t, data);
         if (classifyGenerationPollResult(data, { httpOk: res.ok, httpStatus: res.status }) === 'success') {
           recoveredOnce.add(t.id);
           slowPollIds.delete(t.id);
-          recordFinishedTaskUsage(t, data);
+          recordFinishedTaskUsage(t, data, true);
           update(t.id, {
             status: 'SUCCESS',
             resultUrl: data.resultUrl,

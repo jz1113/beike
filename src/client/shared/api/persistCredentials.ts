@@ -83,10 +83,6 @@ export function persistOpenAIConfig(baseUrl: string, apiKey: string, options?: {
   return persistLocalConfig([['openai_api_key', apiKey.trim()]], metadata);
 }
 
-export function persistLianchiConfig(apiKey: string): Promise<void> {
-  return persistLocalConfig([['lianchi_api_key', apiKey.trim()]]);
-}
-
 export function persistWanbangConfig(key: string, secret: string, enabled?: boolean): Promise<void> {
   return persistLocalConfig([['wanbang_api_key', key.trim()], ['wanbang_api_secret', secret.trim()]],
     enabled === undefined ? {} : { wanbang_enabled: String(enabled) });

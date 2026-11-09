@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -17,15 +18,39 @@ import (
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/database"
+	"beike.local/cloud/src/backend/internal/platform/taskrecords"
 )
 
 type mediaPromptKey struct{}
 
 var mediaJobMu sync.Mutex
+var mediaJobWG sync.WaitGroup
 var mediaJobActive = map[string]context.CancelFunc{}
 var mediaJobSlots = make(chan struct{}, 2)
+
+func DrainMediaJobs(timeout time.Duration) {
+	mediaJobMu.Lock()
+	for _, cancel := range mediaJobActive {
+		if cancel != nil {
+			cancel()
+		}
+	}
+	mediaJobMu.Unlock()
+	done := make(chan struct{})
+	go func() {
+		mediaJobWG.Wait()
+		close(done)
+	}()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-done:
+	case <-timer.C:
+	}
+}
 
 type mediaJob struct {
 	Trace     json.RawMessage `json:"trace,omitempty"`
@@ -113,6 +138,10 @@ func BackgroundMedia(cfg config.Config, kind string, handler http.Handler) http.
 			}
 		}
 		// The fingerprint includes routing and storage settings. Credentials never enter the job table.
+		operationKey := ""
+		if kind == "video" {
+			operationKey = assetCreationText(input["clientTaskId"])
+		}
 		delete(input, "clientTaskId")
 		name, _ := url.QueryUnescape(r.Header.Get("X-Sales-Name"))
 		if len([]rune(name)) > 180 {
@@ -124,6 +153,9 @@ func BackgroundMedia(cfg config.Config, kind string, handler http.Handler) http.
 			versions, cacheable = videoInputVersions(input, workspace)
 		}
 		data, _ := json.Marshal([]any{kind, name, input, version, versions, r.Header.Get("X-Sales-Speech"), r.Header.Get("x-custom-base-url"), r.Header.Get("x-custom-protocol"), r.Header.Get("x-request-template"), r.Header.Get("x-custom-api-key")})
+		if operationKey != "" {
+			data, _ = json.Marshal([]any{string(data), operationKey})
+		}
 		digest := sha256.Sum256(data)
 		key := hex.EncodeToString(digest[:])
 		savedPrompt, _ := ctx.Value(mediaPromptKey{}).(salesPrompt)
@@ -198,7 +230,8 @@ func BackgroundMedia(cfg config.Config, kind string, handler http.Handler) http.
 		if kind == "analysis" {
 			releaseSource = holdScriptSource(workspace, assetCreationText(input["videoUrl"]))
 		}
-		go func() { defer releaseSource(); runMediaJob(db, j, req, handler, cancel, cfg) }()
+		mediaJobWG.Add(1)
+		go func() { defer mediaJobWG.Done(); defer releaseSource(); runMediaJob(db, j, req, handler, cancel, cfg) }()
 		w.Header().Set("Cache-Control", "no-store")
 		httpx.WriteJSON(w, 202, map[string]any{"success": true, "job": j})
 	}
@@ -306,6 +339,7 @@ func MediaJobs(cfg config.Config) http.HandlerFunc {
 			var links struct {
 				Stage      string `json:"stage,omitempty"`
 				VideoURL   string `json:"videoUrl,omitempty"`
+				AudioURL   string `json:"audioUrl,omitempty"`
 				ResultURL  string `json:"resultUrl,omitempty"`
 				ExistingID string `json:"existingId,omitempty"`
 				TaskID     string `json:"taskId,omitempty"`
@@ -331,4 +365,64 @@ func refreshMediaJob(db *sql.DB, workspace string, j *mediaJob) error {
 	updated, err := scanMediaJob(db.QueryRow(`SELECT `+mediaJobColumns+` FROM SalesMediaJob WHERE workspaceId=? AND id=?`, workspace, j.ID))
 	*j = updated
 	return err
+}
+
+// Background wrappers retain cumulative usage when later receipts omit details.
+func mergeVideoUsageReceipt(receipt, data map[string]any) {
+	if assetCreationText(receipt["recordId"]) == "" && assetCreationText(data["recordId"]) != "" {
+		receipt["recordId"] = data["recordId"]
+	}
+	incoming := gateway.NormalizeUsage(data)
+	if incoming == nil {
+		return
+	}
+	previous := gateway.NormalizeUsage(receipt)
+	if previous != nil {
+		for _, key := range []string{"promptTokens", "completionTokens", "totalTokens"} {
+			incoming[key] = math.Max(incoming[key].(float64), previous[key].(float64))
+		}
+	}
+	incoming["totalTokens"] = math.Max(incoming["totalTokens"].(float64), incoming["promptTokens"].(float64)+incoming["completionTokens"].(float64))
+	receipt["usage"] = incoming
+}
+
+const salesTaskSource = `
+ SELECT id,name,kind,status,createdAt,startedAt,
+ CASE WHEN status IN ('queued','running') THEN '' ELSE updatedAt END,
+ COALESCE(json_extract(NULLIF(retryInput,''),'$.selection'),''), COALESCE(json_extract(NULLIF(result,''),'$.taskId'),''),
+ '',error,COALESCE(json_extract(NULLIF(result,''),'$.stage'),''),
+ COALESCE(json_extract(NULLIF(result,''),'$.videoUrl'),json_extract(NULLIF(result,''),'$.resultUrl'),json_extract(NULLIF(result,''),'$.audioUrl'),'')
+ FROM SalesMediaJob WHERE workspaceId=?1
+ UNION ALL
+ SELECT id,COALESCE(NULLIF(json_extract(assetDataJson,'$.name'),''),NULLIF(json_extract(assetDataJson,'$.title'),''),NULLIF(assetId,''),id),kind,CASE WHEN status IN ('analyzing','creating','generating','saving') THEN 'running' ELSE status END,createdAt,'',
+ CASE WHEN status IN ('failed','completed') THEN updatedAt ELSE '' END,model,taskId,'',error,CASE status WHEN 'analyzing' THEN '分析素材' WHEN 'creating' THEN '创建资产' WHEN 'generating' THEN '生成视角图' WHEN 'saving' THEN '保存资产' ELSE '' END,resultUrl
+ FROM SalesAssetViewJob WHERE workspaceId=?1`
+
+func TaskRecords(cfg config.Config) http.HandlerFunc {
+	return taskrecords.Handler(cfg, salesTaskSource, func(db *sql.DB, workspace string) error {
+		rows, err := db.Query("SELECT "+mediaJobColumns+" FROM SalesMediaJob WHERE workspaceId=? AND status IN ('queued','running')", workspace)
+		if err != nil {
+			return err
+		}
+		var jobs []mediaJob
+		for rows.Next() {
+			j, err := scanMediaJob(rows)
+			if err != nil {
+				rows.Close()
+				return err
+			}
+			jobs = append(jobs, j)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
+		for i := range jobs {
+			if err := refreshMediaJob(db, workspace, &jobs[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

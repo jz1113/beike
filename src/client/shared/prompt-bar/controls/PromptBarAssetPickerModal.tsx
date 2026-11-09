@@ -1,389 +1,163 @@
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import React, { useState, useMemo } from 'react';
-import {
-  Search,
-  ChevronDown,
-  Plus,
-  Maximize2,
-  Check,
-} from 'lucide-react';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { Film, Image, Search } from 'lucide-react';
+import { useModalDialog } from '@client/shared/hooks/useModalDialog';
 import { useAppStore } from '@client/store';
+import { fetchAssetTasks } from '@client/shared/api/generation/generationApi';
+import { fetchSalesStudioAssets, getGlobalAssetLibrary } from '@client/shared/api/assetLibraryCache';
+import { loadCustomAssets } from '@client/shared/media/customAssetStorage';
+import { getNextAssetPage, resolveAssetMediaType } from '@client/shared/utils/assetTaskData';
 
-export interface PromptBarAssetPickerModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirmSelect?: (mediaUrls: string[]) => void;
+type Source = 'history' | 'library';
+type Media = { url: string; title: string; video: boolean };
+
+function MediaPreview({ item }: { item: Media }) {
+  const [failed, setFailed] = useState(false);
+  const Icon = item.video ? Film : Image;
+  const className = 'absolute inset-0 h-full w-full object-cover';
+  return (
+    <span className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-lg bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-300">
+      <Icon className="h-5 w-5" aria-hidden="true" />
+      {!failed && (item.video
+        ? <video src={item.url} muted playsInline preload="metadata" className={className} onError={() => setFailed(true)} />
+        : <img src={item.url} alt="" loading="lazy" className={className} onError={() => setFailed(true)} />)}
+    </span>
+  );
 }
 
-// 模拟一些初始资产与本地素材，若 store 中有真实生成任务则优先展示真实生成素材
-const MOCK_PRESET_ASSETS = [
-  { id: 'mat-1', title: '12335496499212.mp4', url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop&q=80', duration: '7s', isVideo: true, type: 'ai' },
-  { id: 'mat-2', title: '12336941720588.mp4', url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80', duration: '3s', isVideo: true, type: 'ai' },
-  { id: 'mat-3', title: '12335514780172.mp4', url: 'https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?w=600&auto=format&fit=crop&q=80', duration: '3s', isVideo: true, type: 'ai' },
-  { id: 'mat-4', title: '12336815976204.mp4', url: 'https://images.unsplash.com/photo-1511447333015-45b65e60f6d5?w=600&auto=format&fit=crop&q=80', duration: '3s', isVideo: true, type: 'ai' },
-  { id: 'mat-5', title: 'character_001', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80', isVideo: false, type: 'upload' },
-  { id: 'mat-6', title: 'character_003', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&auto=format&fit=crop&q=80', isVideo: false, type: 'upload' },
-  { id: 'mat-7', title: 'character_002', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop&q=80', isVideo: false, type: 'upload' },
-  { id: 'mat-8', title: 'style_003', url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80', isVideo: false, type: 'ai' },
-  { id: 'mat-9', title: 'style_002', url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=600&auto=format&fit=crop&q=80', isVideo: false, type: 'ai' },
-  { id: 'mat-10', title: 'style_001', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80', isVideo: false, type: 'ai' },
-  { id: 'mat-11', title: 'style_004', url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=600&auto=format&fit=crop&q=80', isVideo: false, type: 'ai' },
-];
+export function PromptBarAssetPickerModal({ onClose }: { onClose: () => void }) {
+  const dialogRef = useModalDialog(true, onClose);
+  const [source, setSource] = useState<Source>('history');
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [library] = useState(loadCustomAssets);
+  const history = useInfiniteQuery({
+    queryKey: ['assets', 'reference-picker-history'],
+    initialPageParam: 1,
+    queryFn: ({ pageParam, signal }) => fetchAssetTasks(pageParam, 40, signal),
+    getNextPageParam: (page, _pages, index) => getNextAssetPage(page, index),
+    enabled: source === 'history',
+  });
 
-export const PromptBarAssetPickerModal: React.FC<PromptBarAssetPickerModalProps> = ({
-  isOpen,
-  onClose,
-  onConfirmSelect,
-}) => {
-  // 顶层主标签：素材库 | 资产库 (图2 vs 图3)
-  const [activeMainTab, setActiveMainTab] = useState<'materials' | 'assets'>('materials');
+  const catalog = useQuery({
+    queryKey: ['assets', 'reference-picker-catalog'],
+    queryFn: ({ signal }) => fetchSalesStudioAssets(signal),
+    enabled: source === 'library',
+  });
+  const shared = useQuery({
+    queryKey: ['assets', 'reference-picker-shared'],
+    queryFn: () => getGlobalAssetLibrary(),
+    enabled: source === 'library',
+  });
 
-  // 素材库子状态 (图2)
-  const [materialSourceTab, setMaterialSourceTab] = useState<'ai' | 'upload'>('ai');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-  // 资产库子状态 (图3)
-  const [assetCategory, setAssetCategory] = useState<'role' | 'product' | 'file'>('role');
-
-  // 从真实 Store 读取已生成的任务媒体
-  const generationTasks = useAppStore((s) => s.generationTasks);
-
-  // 整合素材列表
-  const allMaterials = useMemo(() => {
-    const list = [...MOCK_PRESET_ASSETS];
-    if (generationTasks && generationTasks.length > 0) {
-      generationTasks.forEach((t) => {
-        const url = t.resultUrl || (t.images && t.images[0]) || '';
-        if (url) {
-          list.unshift({
-            id: t.id,
-            title: t.title || `${t.id.slice(0, 14)}.mp4`,
-            url,
-            duration: t.mediaType === 'video' ? '5s' : undefined,
-            isVideo: t.mediaType === 'video',
-            type: 'ai',
-          });
+  const items = new Map<string, Media>();
+  const add = (url: string, title: string, kind: string) => {
+    if (!url || items.has(url) || !['image', 'video', 'depth-image', 'depth-video'].includes(kind)) return;
+    items.set(url, { url, title, video: kind.endsWith('video') });
+  };
+  if (source === 'history') {
+    for (const { tasks } of history.data?.pages ?? []) {
+      for (const task of tasks) {
+        if (task.status !== 'SUCCESS' || ('isUploaded' in task && task.isUploaded === true)) continue;
+        for (const url of [task.resultUrl, ...(task.images ?? [])]) {
+          if (url) add(url, task.title || task.prompt || '生成作品', resolveAssetMediaType(task.mediaType, task.model, url));
         }
-      });
-    }
-    return list;
-  }, [generationTasks]);
-
-  // 过滤素材
-  const filteredMaterials = useMemo(() => {
-    return allMaterials.filter((item) => {
-      if (item.type !== materialSourceTab) return false;
-      if (searchQuery.trim() && !item.title.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
       }
-      return true;
-    });
-  }, [allMaterials, materialSourceTab, searchQuery]);
-
-  if (!isOpen) return null;
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    }
+  } else {
+    for (const scene of catalog.data?.scenes ?? []) {
+      const url = scene.coverUrl || scene.sourceImages[0];
+      if (url) add(url, scene.title, 'image');
+    }
+    for (const persona of catalog.data?.personas ?? []) {
+      const url = persona.avatarUrl || persona.identityUrl || persona.fullBodyUrl || persona.faceUrl || persona.sourceImages[0];
+      if (url) add(url, persona.name, 'image');
+    }
+    for (const asset of [...(shared.data?.scenes ?? []), ...(shared.data?.personas ?? [])]) {
+      if (asset.coverUrl) add(asset.coverUrl, asset.title || asset.name || '素材', 'image');
+    }
+    for (const asset of library) {
+      const url = asset.mediaUrl || asset.coverUrl;
+      if (url && !asset.scriptId && !asset.placementKey) add(url, asset.name, resolveAssetMediaType(asset.mediaKind, '', url));
+    }
+  }
+  const visible = [...items.values()].filter(item => item.title.toLowerCase().includes(query.trim().toLowerCase()));
+  const selection = [...selected].filter(url => items.has(url));
+  const loading = source === 'history' ? history.isPending : catalog.isPending || shared.isPending;
+  const failed = source === 'history' ? history.isError : catalog.isError || shared.isError;
+  const retry = () => {
+    if (source === 'history') void history.refetch();
+    else {
+      if (catalog.isError) void catalog.refetch();
+      if (shared.isError) void shared.refetch();
+    }
   };
 
-  const handleConfirm = () => {
-    if (selectedIds.size === 0) return;
-    const selectedUrls: string[] = [];
-    allMaterials.forEach((item) => {
-      if (selectedIds.has(item.id) && item.url) {
-        selectedUrls.push(item.url);
-      }
-    });
-
-    if (onConfirmSelect) {
-      onConfirmSelect(selectedUrls);
-    } else {
-      selectedUrls.forEach((url) => {
-        useAppStore.getState().addQuickRefImage(url);
-      });
-    }
-    setSelectedIds(new Set());
-    onClose();
-  };
-
-  const modal = (
-    <div
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in select-none"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-4xl bg-white rounded-[28px] shadow-[0_24px_60px_rgba(0,0,0,0.18)] border border-slate-200/80 p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[88vh] dark:border-white/10 dark:bg-[#18191c]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* 🌟 1. 顶栏：左侧【素材库 | 资产库】Tab，右侧搜索框 */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-white/10">
-          <div className="flex items-center gap-6">
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('materials')}
-              className={`relative pb-1 text-sm font-semibold transition-colors cursor-pointer ${
-                activeMainTab === 'materials'
-                  ? 'text-slate-900 dark:text-slate-100'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
-              }`}
-            >
-              素材库
-              {activeMainTab === 'materials' && (
-                <span className="absolute bottom-[-13px] left-0 right-0 h-[2.5px] bg-slate-900 rounded-full dark:bg-white" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('assets')}
-              className={`relative pb-1 text-sm font-semibold transition-colors cursor-pointer ${
-                activeMainTab === 'assets'
-                  ? 'text-slate-900 dark:text-slate-100'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
-              }`}
-            >
-              资产库
-              {activeMainTab === 'assets' && (
-                <span className="absolute bottom-[-13px] left-0 right-0 h-[2.5px] bg-slate-900 rounded-full dark:bg-white" />
-              )}
-            </button>
+  return createPortal(
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs" onClick={onClose}>
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="历史或素材" onClick={event => event.stopPropagation()}
+        className="flex max-h-[88vh] w-full max-w-4xl flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-[#18191c]">
+        <div className="flex flex-wrap shrink-0 items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-white/10">
+          <div className="flex gap-2">
+            {(['history', 'library'] as const).map(tab => (
+              <button key={tab} type="button" aria-pressed={source === tab} onClick={() => {
+                setSource(tab);
+                setQuery('');
+                setSelected(new Set());
+              }} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 aria-pressed:bg-slate-100 aria-pressed:text-slate-950 dark:text-slate-300 dark:aria-pressed:bg-white/10 dark:aria-pressed:text-white">
+                {tab === 'history' ? '历史' : '素材'}
+              </button>
+            ))}
           </div>
-
-          {/* 右侧：搜索资产 */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="搜索资产"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-48 sm:w-56 pl-8 pr-3 py-1.5 rounded-full bg-slate-100/90 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 transition-all dark:text-slate-100 dark:placeholder:text-slate-500 dark:bg-white/10"
-            />
-          </div>
+          <label className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm dark:bg-white/10">
+            <Search className="h-4 w-4" aria-hidden="true" />
+            <input aria-label="搜索素材" placeholder={source === 'history' ? '搜索已加载的作品' : '搜索素材'} value={query}
+              onChange={event => setQuery(event.target.value)} className="w-40 bg-transparent" />
+          </label>
         </div>
-
-        {/* 🌟 2. 素材库视图（图 2 状态） */}
-        {activeMainTab === 'materials' && (
-          <div className="flex flex-col gap-3 flex-1 min-h-[380px]">
-            {/* 次级控制行 */}
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="px-2.5 py-1 rounded-full text-slate-700 hover:text-slate-900 hover:bg-slate-100 flex items-center gap-1 transition-colors cursor-pointer dark:hover:text-white dark:text-slate-200 dark:hover:bg-white/10"
-                >
-                  <span>平铺视图</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </button>
-                <span className="text-slate-200">|</span>
-                <div className="flex items-center gap-1 bg-slate-100/80 p-0.5 rounded-full dark:bg-white/10">
-                  <button
-                    type="button"
-                    onClick={() => setMaterialSourceTab('ai')}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                      materialSourceTab === 'ai'
-                        ? 'bg-white text-slate-900 shadow-2xs dark:text-slate-100 dark:bg-[#18191c]'
-                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
-                    }`}
-                  >
-                    AI 生成
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMaterialSourceTab('upload')}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                      materialSourceTab === 'upload'
-                        ? 'bg-white text-slate-900 shadow-2xs dark:text-slate-100 dark:bg-[#18191c]'
-                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
-                    }`}
-                  >
-                    我上传的
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer dark:hover:text-white dark:text-slate-300"
-                >
-                  <span>筛选</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </button>
-                <button
-                  type="button"
-                  className="text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer dark:hover:text-white dark:text-slate-300"
-                >
-                  <span>排序</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </button>
-              </div>
-            </div>
-
-            {/* 素材网格 */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3.5 overflow-y-auto max-h-[50vh] pr-1 py-1">
-              {filteredMaterials.map((mat) => {
-                const isSelected = selectedIds.has(mat.id);
-                return (
-                  <div
-                    key={mat.id}
-                    onClick={() => toggleSelect(mat.id)}
-                    className="flex flex-col group cursor-pointer"
-                  >
-                    <div
-                      className={`relative aspect-[16/10] rounded-xl overflow-hidden border bg-slate-100 transition-all dark:bg-white/10 ${
-                        isSelected
-                          ? 'border-indigo-600 ring-2 ring-indigo-500/60 shadow-sm'
-                          : 'border-slate-200/80 hover:border-slate-300 dark:border-white/10'
-                      }`}
-                    >
-                      <img
-                        src={mat.url}
-                        alt={mat.title}
-                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-102"
-                      />
-
-                      {/* 左上角选择框 */}
-                      <div
-                        className={`absolute top-1.5 left-1.5 w-4 h-4 rounded flex items-center justify-center transition-all ${
-                          isSelected
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-black/30 border border-white/60 group-hover:bg-black/50'
-                        }`}
-                      >
-                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                      </div>
-
-                      {/* 视频左下角时长 */}
-                      {mat.isVideo && mat.duration && (
-                        <div className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-black/60 text-white text-[9px] font-medium leading-none">
-                          {mat.duration}
-                        </div>
-                      )}
-
-                      {/* Hover 全屏小图标 */}
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
-                        <div className="p-1 rounded-md bg-black/50 text-white">
-                          <Maximize2 className="w-3 h-3" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <span className="text-[11px] text-slate-600 truncate mt-1 group-hover:text-slate-900 dark:text-slate-300">
-                      {mat.title}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-1">
+          {loading && <p role="status" className="py-10 text-center text-sm">{source === 'history' ? '正在加载生成历史…' : '正在加载素材…'}</p>}
+          {failed && <p role="alert" className="py-4 text-center text-sm">{source === 'history' ? '生成历史加载失败' : '部分素材加载失败'} <button type="button" className="underline" onClick={retry}>重试</button></p>}
+          {!loading && !failed && visible.length === 0 && (
+            <p className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+              {query.trim() ? '已加载的内容中没有匹配项' : source === 'history'
+                ? '暂无可引用的生成作品' : '素材库暂无可引用的图片或视频。'}
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
+            {visible.map(item => (
+              <button type="button" key={item.url} title={item.title} aria-pressed={selected.has(item.url)}
+                className="min-w-0 rounded-lg text-left aria-pressed:ring-2 aria-pressed:ring-indigo-500"
+                onClick={() => setSelected(previous => {
+                  const next = new Set(previous);
+                  if (next.has(item.url)) next.delete(item.url);
+                  else next.add(item.url);
+                  return next;
+                })}>
+                <MediaPreview item={item} />
+                <span className="block line-clamp-2 min-h-10 px-1 pt-2 text-xs leading-4">{item.title}</span>
+              </button>
+            ))}
           </div>
-        )}
-
-        {/* 🌟 3. 资产库视图（图 3 状态） */}
-        {activeMainTab === 'assets' && (
-          <div className="flex flex-col gap-3 flex-1 min-h-[380px]">
-            {/* 次级控制行 */}
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5 bg-slate-100/80 p-0.5 rounded-full dark:bg-white/10">
-                <button
-                  type="button"
-                  onClick={() => setAssetCategory('role')}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                    assetCategory === 'role'
-                      ? 'bg-white text-slate-900 shadow-2xs dark:text-slate-100 dark:bg-[#18191c]'
-                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
-                  }`}
-                >
-                  角色
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAssetCategory('product')}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                    assetCategory === 'product'
-                      ? 'bg-white text-slate-900 shadow-2xs dark:text-slate-100 dark:bg-[#18191c]'
-                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
-                  }`}
-                >
-                  商品
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAssetCategory('file')}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                    assetCategory === 'file'
-                      ? 'bg-white text-slate-900 shadow-2xs dark:text-slate-100 dark:bg-[#18191c]'
-                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400'
-                  }`}
-                >
-                  文件
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer dark:hover:text-white dark:text-slate-300"
-                >
-                  <span>类别</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </button>
-                <button
-                  type="button"
-                  className="text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer dark:hover:text-white dark:text-slate-300"
-                >
-                  <span>排序</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </button>
-                <span className="text-slate-200">|</span>
-                <button
-                  type="button"
-                  className="px-2.5 py-1 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-1 cursor-pointer transition-colors dark:text-slate-200 dark:hover:bg-white/5 dark:border-white/10"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>新增</span>
-                </button>
-              </div>
-            </div>
-
-            {/* 空态区 (图 3 同款居中空态) */}
-            <div className="flex-1 flex flex-col items-center justify-center py-24 text-slate-400 text-xs">
-              <span>
-                我的暂无{assetCategory === 'role' ? '角色' : assetCategory === 'product' ? '商品' : '文件'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* 🌟 4. 底部操作栏：取消与添加按钮 */}
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-white/10">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 rounded-full text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer dark:hover:text-white dark:text-slate-300 dark:hover:bg-white/10"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={selectedIds.size === 0}
-            className={`px-6 py-2 rounded-full text-xs font-medium transition-all ${
-              selectedIds.size > 0
-                ? 'bg-slate-900 text-white hover:bg-black cursor-pointer shadow-xs dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-white/10'
-            }`}
-          >
-            添加
+          {source === 'history' && history.hasNextPage && !failed && (
+            <button type="button" disabled={history.isFetching} onClick={() => void history.fetchNextPage()}
+              className="mx-auto mt-4 block rounded-lg px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-white/10">
+              {history.isFetchingNextPage ? '正在加载…' : '加载更多'}
+            </button>
+          )}
+        </div>
+        <div className="flex justify-end shrink-0 gap-3 border-t border-slate-200 pt-3 dark:border-white/10">
+          <button type="button" onClick={onClose} className="rounded-full px-5 py-2 text-sm">取消</button>
+          <button type="button" disabled={!selection.length} onClick={() => {
+            selection.forEach(url => useAppStore.getState().addQuickRefImage(url));
+            onClose();
+          }} className="rounded-full bg-slate-900 px-5 py-2 text-sm text-white disabled:opacity-40 dark:bg-white dark:text-slate-900">
+            {selection.length ? `添加（${selection.length}）` : '添加'}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
-  return typeof document === 'undefined' ? modal : createPortal(modal, document.body);
-};
+}

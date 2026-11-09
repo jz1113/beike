@@ -1,9 +1,19 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
-import type { SalesPrompt } from '@shared/contracts/salesPrompts';
+import { describe, expect, it, vi } from 'vitest';
+import type { SalesPrompt } from '@shared/contracts/salesAssetViews';
 import type { useSalesPrompts } from '../hooks/useSalesPrompts';
+import type { SalesScriptImportItem } from '../model/salesScriptImport';
+import { SalesLibrarySelect } from './SalesLibrarySelect';
 import { SalesPromptWorkspace } from './SalesPromptWorkspace';
+import { SalesScriptBatchImportDialog } from './SalesScriptBatchImportDialog';
+
+vi.mock('../hooks/useSalesAssetViews', () => ({
+  useSalesSummaryModels: () => ({ options: [], model: 'vision-model' }),
+}));
+vi.mock('@client/shared/models/ConfiguredModelPicker', () => ({
+  ConfiguredModelPicker: ({ ariaLabel, disabled }: { ariaLabel: string; disabled: boolean }) => createElement('button', { 'aria-label': ariaLabel, disabled }),
+}));
 
 const initial: SalesPrompt = { id: 'final-video', title: '最终视频生成', description: '完整视频规则', prompt: '', defaultPrompt: '初始模板 {{referenceFacts}}', configured: false, customized: false, version: 'v1' };
 const manager = (selected: SalesPrompt): ReturnType<typeof useSalesPrompts> => ({
@@ -11,6 +21,7 @@ const manager = (selected: SalesPrompt): ReturnType<typeof useSalesPrompts> => (
   loading: false, saving: false, verified: true, error: '', conflict: false, notice: '', hasUnsaved: false,
   dirty: (item) => !item.configured, select: () => {}, refresh: async () => {}, updateDraft: () => {}, discardDraft: () => {}, save: async () => {},
 });
+
 describe('managed final video prompt editor', () => {
   it('shows the final stage and distinguishes an initial template from an executable saved prompt', () => {
     const html = renderToStaticMarkup(createElement(SalesPromptWorkspace, { manager: manager(initial) }));
@@ -94,5 +105,74 @@ describe('managed final video prompt editor', () => {
     }
     const gridHtml = renderToStaticMarkup(createElement(SalesPromptWorkspace, { manager: { ...manager(items[2]), items } }));
     expect(gridHtml).toContain('aria-label="人物生成，未配置" aria-current="true"');
+  });
+});
+
+it('shows counts with a unit in filter options without repeating totals in closed controls', () => {
+  const html = renderToStaticMarkup(createElement(SalesLibrarySelect, { value: 'all', label: '按风格筛选', onChange: () => {},
+    showSelectedCount: false, countUnit: '组', options: [{ value: 'all', label: '全部风格', count: 1 }, { value: 'dance', label: '舞蹈', count: 1 }] }));
+  const trigger = html.slice(html.indexOf('<button'), html.indexOf('</button>'));
+  expect(trigger).toContain('全部风格');
+  expect(trigger).not.toContain('sales-library-select-count');
+  expect(html.match(/>1 组</g)).toHaveLength(2);
+});
+
+const batchProps = {
+  preferredModel: 'vision-model', onModelChange: vi.fn(), items: [] as SalesScriptImportItem[],
+  pending: false, error: '', errors: [] as string[], includeDepth: true, onIncludeDepthChange: vi.fn(),
+  blockedReason: '',
+  onAddFiles: vi.fn(), onRemove: vi.fn(), onClearCompleted: vi.fn(), onStart: vi.fn(), onStop: vi.fn(), onClose: vi.fn(),
+};
+const batchItem: SalesScriptImportItem = {
+  key: 'video-1', name: '跳舞1.mp4', size: 12, lastModified: 1, status: 'queued', error: '', saveId: 'script-1',
+};
+function renderBatch(patch: Partial<typeof batchProps> = {}) {
+  return renderToStaticMarkup(createElement(SalesScriptBatchImportDialog, { ...batchProps, ...patch }));
+}
+
+describe('action reference batch import dialog', () => {
+  it('accepts multiple videos and explains what remains after processing', () => {
+    const html = renderBatch();
+    expect(html).toMatch(/<input[^>]*type="file"[^>]*multiple=""/);
+    expect(html).toContain('video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm');
+    expect(html).toContain('处理结束即清理原片');
+    expect(html).toContain('同时生成深度动作视频');
+    expect(html).toContain('超出限制仍保存分析脚本');
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
+    expect(html).toContain('需要原片时请重新选择本地文件');
+  });
+
+  it('allows hiding a running batch while protecting queue options', () => {
+    const html = renderBatch({ pending: true, items: [{ ...batchItem, status: 'depth', scriptId: 'saved-1', depthProgress: '处理进度 40%' }] });
+    expect(html).toMatch(/<button[^>]*aria-label="收起动作素材批量导入"[^>]*>/);
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*aria-label="收起动作素材批量导入"/);
+    expect(html).not.toMatch(/<button[^>]*aria-label="收起动作素材批量导入"[^>]*disabled=""/);
+    expect(html).toMatch(/<button[^>]*aria-label="动作素材批量分析模型"[^>]*disabled=""/);
+    expect(html).toMatch(/<input[^>]*type="checkbox"[^>]*disabled=""/);
+    expect(html).toContain('暂停队列');
+    expect(html).toContain('脚本已入库，可在动作分类查看');
+    expect(html).toContain('处理进度 40%');
+    expect(html).toContain('已入库 1 / 1');
+  });
+
+  it('keeps failed and completed results distinct for resuming only unfinished items', () => {
+    const html = renderBatch({ items: [
+      { ...batchItem, status: 'done', scriptId: 'saved-1', depthState: 'skipped' },
+      { ...batchItem, key: 'video-2', name: '跳舞2.mp4', status: 'error', error: '模型暂不可用' },
+    ], errors: ['忽略了不支持的格式'], error: '队列已暂停' });
+    expect(html).toContain('仅保存脚本，深度视频可稍后处理');
+    expect(html).toContain('模型暂不可用');
+    expect(html).toContain('忽略了不支持的格式');
+    expect(html).toContain('队列已暂停');
+    expect(html).toContain('继续未完成项（1）');
+    expect(html).toContain('清除已完成记录');
+    expect(html).not.toContain('移除待处理视频 跳舞1.mp4');
+    expect(html).toContain('移除待处理视频 跳舞2.mp4');
+  });
+
+  it('explains why a pending single-video task must be preserved before starting the batch', () => {
+    const html = renderBatch({ items: [batchItem], blockedReason: '请先暂存正在处理的单个视频，再开始批量分析。' });
+    expect(html).toContain('请先暂存正在处理的单个视频，再开始批量分析。');
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
   });
 });

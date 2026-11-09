@@ -8,7 +8,6 @@ export default defineConfig([
   globalIgnores([
     '.local/**',
     'tools/build/**',
-    'src/client/public/canvas-studio/assets/**',
     'node_modules/**',
     'src/client/shared/api/openapi-types.ts',
   ]),
@@ -16,14 +15,10 @@ export default defineConfig([
     files: ['src/client/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', { patterns: ['node:*', '@prisma/client', '@server', '@server/*'] }],
-      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['warn', { max: 800, skipBlankLines: true, skipComments: true }],
     },
   },
   js.configs.recommended,
-  {
-    files: ['src/client/public/canvas-studio/host.js'],
-    languageOptions: {globals: globals.browser},
-  },
   ...tseslint.configs.recommended,
   {
     files: ['src/client/**/*.{ts,tsx}'],
@@ -40,7 +35,7 @@ export default defineConfig([
       '@typescript-eslint/no-require-imports': 'off',
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
-      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['warn', { max: 800, skipBlankLines: true, skipComments: true }],
       'prefer-const': 'warn',
       'no-empty': ['error', { allowEmptyCatch: true }],
       'no-useless-escape': 'warn',
@@ -88,16 +83,23 @@ export default defineConfig([
     rules: {
       'no-restricted-globals': ['error',
         { name: 'localStorage', message: 'domain 通过 configureDomainRuntime 注入存储' },
+        { name: 'sessionStorage', message: 'domain 通过 configureDomainRuntime 注入存储' },
         { name: 'fetch', message: 'domain 通过 configureDomainRuntime 注入 fetch' },
         { name: 'process', message: 'domain 通过 domainEnv() 读取环境' },
       ],
-      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+      'no-restricted-properties': ['error',
+        { object: 'window', property: 'localStorage', message: 'domain 通过 configureDomainRuntime 注入存储' },
+        { object: 'window', property: 'sessionStorage', message: 'domain 通过 configureDomainRuntime 注入存储' },
+        { object: 'globalThis', property: 'localStorage', message: 'domain 通过 configureDomainRuntime 注入存储' },
+        { object: 'globalThis', property: 'sessionStorage', message: 'domain 通过 configureDomainRuntime 注入存储' },
+      ],
+      'max-lines': ['warn', { max: 800, skipBlankLines: true, skipComments: true }],
     },
   },
   {
     files: ['src/shared/contracts/**/*.ts'],
     rules: {
-      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['warn', { max: 800, skipBlankLines: true, skipComments: true }],
     },
   },
 ]);

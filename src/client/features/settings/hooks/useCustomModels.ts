@@ -2,19 +2,44 @@ import { deepSeekRouteId } from '@shared/domain/models/deepseek';
 import { useState, useEffect, useRef, useCallback, type SetStateAction } from 'react';
 import { apiFetch } from '@client/shared/api/apiClient';
 import { confirmAction } from '@client/shared/utils/confirmAction';
-import { DEFAULT_PRESET_MODELS } from '../model/presetModels';
-import type { WorkflowModel } from '../model/workflowModel';
-import { mergeGatewayModels, type GatewayModelItem } from '../model/gatewayModelCatalog';
 import {
   gatewayModelToWorkflowModel,
   workflowModelRouteId,
   repairWorkflowModelsInStorage,
   repairWorkflowModelsForSettings,
 } from '@shared/domain/models/workflowModels';
-import { loadCustomModels, persistCustomModels } from '../model/customModelsStorage';
-import { type ComflyPriceMap } from '../model/multimodalPriceSort';
-import { channelName, reorderVisibleModels, restoreChannelPresets, type ModelChannel } from '../model/modelManagement';
+import {
+  channelName,
+  reorderVisibleModels,
+  restoreChannelPresets,
+  loadCustomModels,
+  persistCustomModels,
+  sortMultimodalModelsByPrice,
+  mergeGatewayModels,
+  type ModelChannel,
+  type WorkflowModel,
+  type GatewayModelItem,
+  type ComflyPriceMap,
+} from '../model/modelManagement';
 import { createGatewayCatalogActions, cancelGatewayCatalogRequests, type GatewayRequestState } from './gatewayCatalogActions';
+import { APPROVED_MODELS } from '@shared/domain/models/modelCatalog';
+
+const DEFAULT_PRESET_MODELS: WorkflowModel[] = sortMultimodalModelsByPrice(APPROVED_MODELS.map((m) => ({
+  id: m.id,
+  channel: 'comfly',
+  name: m.name,
+  shortName: m.shortName,
+  badge: m.badge,
+  desc: m.description,
+  isMultimodal: m.capability === 'multimodal',
+  isVision: m.capability === 'multimodal',
+  isImage: m.capability === 'image',
+  isVideo: m.capability === 'video',
+  isAssistant: m.capability === 'multimodal',
+  isDistill: m.capability === 'multimodal',
+  isThinking: Boolean(m.isThinking),
+  isCustom: false,
+})));
 
 async function fetchComflyPrices(signal?: AbortSignal): Promise<ComflyPriceMap> {
   const response = await apiFetch('/api/system/models/pricing', { signal });
@@ -43,10 +68,9 @@ export function useCustomModels({
 
   const [areModelsLoaded, setAreModelsLoaded] = useState(false);
   const requestRef = useRef<GatewayRequestState>({ version: 0, controller: null });
-  const cacheRef = useRef<Partial<Record<'comfly' | 'lianchi' | 'openai', string>>>({});
+  const cacheRef = useRef<Partial<Record<'comfly' | 'openai', string>>>({});
   const priceRequestRef = useRef<AbortController | null>(null);
   const [gatewayModelError, setGatewayModelError] = useState('');
-  const [lianchiModelError, setLianchiModelError] = useState('');
   const [comflyPrices, setComflyPrices] = useState<ComflyPriceMap | null>(null);
   const [isFetchingPrices, setIsFetchingPrices] = useState(false);
 
@@ -54,14 +78,12 @@ export function useCustomModels({
   const [isGatewayModalOpen, setIsGatewayModalOpen] = useState(false);
   const [isFetchingGateway, setIsFetchingGateway] = useState(false);
   const [allGatewayModels, setAllGatewayModels] = useState<GatewayModelItem[]>([]);
-  const [isFetchingLianchi, setIsFetchingLianchi] = useState(false);
-  const [lianchiModels, setLianchiModels] = useState<GatewayModelItem[]>([]);
   const [openAIModels, setOpenAIModels] = useState<GatewayModelItem[]>([]);
   const [openAIModelError, setOpenAIModelError] = useState('');
   const [openAIModelSuggestedBaseUrl, setOpenAIModelSuggestedBaseUrl] = useState('');
   const [openAIModelSource, setOpenAIModelSource] = useState<'gateway' | 'codex'>('gateway');
   const [isFetchingOpenAI, setIsFetchingOpenAI] = useState(false);
-  const [gatewaySource, setGatewaySource] = useState<'comfly' | 'lianchi' | 'openai'>('comfly');
+  const [gatewaySource, setGatewaySource] = useState<'comfly' | 'openai'>('comfly');
 
   // 安全触发模型更新事件通知
   const notifyModelsUpdated = () => {
@@ -77,11 +99,7 @@ export function useCustomModels({
     if (typeof window !== 'undefined' && isOpen) {
       repairWorkflowModelsInStorage();
       const loaded = loadCustomModels(modelsRef.current);
-      const lianchiModel = DEFAULT_PRESET_MODELS.find(model => model.id === 'openai/gpt-image-2');
-      const needsLianchiMigration = !loaded.invalid && !localStorage.getItem('lianchi_model_added_v1') && Boolean(lianchiModel);
-      const models = needsLianchiMigration && !loaded.models.some(model => model.id === lianchiModel?.id)
-        ? [...loaded.models, lianchiModel!]
-        : loaded.models;
+      const models = loaded.models;
       const needsGpt6Migration = !loaded.invalid && !localStorage.getItem('gpt6_multimodal_models_added_v1');
       const gpt6Models = needsGpt6Migration
         ? DEFAULT_PRESET_MODELS.filter(model => ['gpt-6-luna', 'gpt-6-sol'].includes(model.id) && !models.some(existing => workflowModelRouteId(existing) === model.id))
@@ -90,9 +108,7 @@ export function useCustomModels({
       const grok47Model = needsGrok47Migration
         ? DEFAULT_PRESET_MODELS.find(model => model.id === 'grok-4.7' && ![...models, ...gpt6Models].some(existing => workflowModelRouteId(existing) === model.id))
         : undefined;
-      const renamed = [...models, ...gpt6Models, ...(grok47Model ? [grok47Model] : [])].map(model => model.id === 'openai/gpt-image-2' && model.name === 'GPT Image 2（联池）'
-        ? { ...model, name: '联池image2', shortName: '联池image2' }
-        : model);
+      const renamed = [...models, ...gpt6Models, ...(grok47Model ? [grok47Model] : [])];
       const migrateDeepSeek = !loaded.invalid && !!localStorage.getItem('deepseek_api_key') && !localStorage.getItem('deepseek_shared_models_v1');
       if (migrateDeepSeek && !renamed.some(model => workflowModelRouteId(model) === deepSeekRouteId('deepseek-flash'))) renamed.push(gatewayModelToWorkflowModel({ id: 'deepseek-flash', name: 'DeepSeek Flash', shortName: 'DeepSeek Flash' }, 'deepseek') as WorkflowModel);
       const normalized = repairWorkflowModelsForSettings(renamed);
@@ -101,7 +117,6 @@ export function useCustomModels({
       setAreModelsLoaded(true);
       if (!loaded.invalid && persistCustomModels(normalized)) {
         if (migrateDeepSeek) { localStorage.setItem('deepseek_shared_models_v1', 'true'); notifyModelsUpdated(); }
-        if (needsLianchiMigration) localStorage.setItem('lianchi_model_added_v1', 'true');
         if (needsGpt6Migration) localStorage.setItem('gpt6_multimodal_models_added_v1', 'true');
         if (needsGrok47Migration) localStorage.setItem('grok47_multimodal_model_added_v1', 'true');
       }
@@ -177,23 +192,19 @@ export function useCustomModels({
 
   const {
     handleOpenGatewayDiscovery,
-    handleOpenLianchiDiscovery,
     handleOpenOpenAIDiscovery,
     handleImportCodexCatalog,
   } = createGatewayCatalogActions({
     apiKey,
     baseUrl,
-    requestRef, cacheRef, setGatewayModelError, setLianchiModelError,
+    requestRef, cacheRef, setGatewayModelError,
     showToast,
     allGatewayModels,
-    lianchiModels,
     openAIModels,
     setGatewaySource,
     setIsGatewayModalOpen,
     setAllGatewayModels,
     setIsFetchingGateway,
-    setLianchiModels,
-    setIsFetchingLianchi,
     setOpenAIModels,
     setOpenAIModelError,
     setOpenAIModelSuggestedBaseUrl,
@@ -227,9 +238,14 @@ export function useCustomModels({
   const closeGatewayDiscovery = useCallback(() => {
     cancelGatewayCatalogRequests(requestRef);
     setIsGatewayModalOpen(false);
-    setIsFetchingGateway(false); setIsFetchingLianchi(false); setIsFetchingOpenAI(false);
+    setIsFetchingGateway(false); setIsFetchingOpenAI(false);
   }, []);
   const setGatewayModalOpen = (open: boolean) => { if (open) setIsGatewayModalOpen(true); else closeGatewayDiscovery(); };
+  const reloadStoredModels = () => {
+    const loaded = loadCustomModels(modelsRef.current);
+    modelsRef.current = loaded.models;
+    setModelsState(loaded.models);
+  };
   const setCustomModels = (action: SetStateAction<WorkflowModel[]>) => {
     commitModels(typeof action === 'function' ? action(modelsRef.current) : action);
   };
@@ -241,8 +257,9 @@ export function useCustomModels({
     customModels,
     areModelsLoaded,
     closeGatewayDiscovery,
-    gatewayModelError, lianchiModelError,
+    gatewayModelError,
     setCustomModels,
+    reloadStoredModels,
     comflyPrices,
     isFetchingPrices,
     handleRefreshPrices,
@@ -255,16 +272,13 @@ export function useCustomModels({
     setIsGatewayModalOpen: setGatewayModalOpen,
     isFetchingGateway,
     allGatewayModels,
-    lianchiModels,
     openAIModels,
     openAIModelError,
     openAIModelSuggestedBaseUrl,
     openAIModelSource,
     gatewaySource,
-    isFetchingLianchi,
     isFetchingOpenAI,
     handleOpenGatewayDiscovery,
-    handleOpenLianchiDiscovery,
     handleOpenOpenAIDiscovery,
     handleImportCodexCatalog,
     handleToggleGatewayModel,

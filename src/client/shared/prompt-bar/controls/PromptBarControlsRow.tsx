@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Plus, Wrench } from 'lucide-react';
+import React, { useEffect, useRef, useState, type RefObject } from 'react';
+import { ArrowUp, ChevronDown, ChevronUp, Loader2, Plus, Wrench } from 'lucide-react';
 import PromptBarModeSelector from './PromptBarModeSelector';
 import PromptBarUploadMenu from './PromptBarUploadMenu';
 import { PromptBarAssetPickerModal } from './PromptBarAssetPickerModal';
@@ -9,12 +9,138 @@ import { PromptBarReasoningPill } from './PromptBarReasoningPill';
 import { PromptBarParamsPill } from './PromptBarParamsPill';
 import PromptBarSkillsModal from './PromptBarSkillsModal';
 import { PromptBarSkillCreatorHost, usePromptBarSkillCreator } from './PromptBarSkillCreator';
-import { PromptBarSendActions } from './PromptBarSendActions';
-import type { PromptBarControlsRowProps } from './PromptBarControlsRowTypes';
 import { useAppStore } from '@client/store';
 import { useI18n } from '@client/shared/i18n';
+import { densityComposerSendBtn } from '@client/shared/ui/layoutClasses';
+import { ModelIcon } from '@client/shared/ui/ModelIcons';
 import { matchesStoredModel, usePreferenceModels } from '../hooks/usePromptBarWorkflowModels';
-import type { QuickGenMode } from '@shared/domain/media/depthVideo';
+import type { DropdownMenuState } from '../hooks/usePromptActionBar';
+import type { IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
+import type { RichPromptInputRef } from '@client/shared/prompt-bar/RichPromptInput';
+import type { usePromptBarMedia } from '@client/shared/prompt-bar/hooks/usePromptBarMedia';
+import type { DepthVideoStyle, DepthQuality, QuickGenMode } from '@shared/domain/media/depthVideo';
+import type { VideoAspectRatioItem, VideoRefModeItem } from '@shared/domain/media/video';
+
+export type PromptBarModel = {
+  id: string;
+  name: string;
+  shortName?: string;
+  provider?: string;
+  badge?: string;
+  isPrimary?: boolean;
+  isVip?: boolean;
+};
+
+export interface PromptBarControlsRowProps {
+  isUp: boolean;
+  anyDropdownOpen?: boolean;
+  quickGenMode: QuickGenMode;
+  isDepthMode: boolean;
+  modeMenu: DropdownMenuState;
+  modeButtonClass: string;
+  handleModeSwitch: (mode: QuickGenMode) => void;
+  modelMenu: DropdownMenuState;
+  activeVideoModelObj: PromptBarModel;
+  activeImageModelObj: PromptBarModel;
+  availableVideoModels: PromptBarModel[];
+  availableImageModels: PromptBarModel[];
+  quickVideoModel: string;
+  quickModel: string;
+  quickAudioModel: string;
+  setQuickAudioModel: (modelId: string) => void;
+  quickVideoDuration: number;
+  quickVideoContextIrEnabled?: boolean;
+  setQuickVideoContextIrEnabled?: (enabled: boolean) => void;
+  setQuickVideoModel: (m: string) => void;
+  setQuickVideoDuration: (d: number) => void;
+  setQuickModel: (m: string) => void;
+  quickDepthStyle: DepthVideoStyle;
+  setQuickDepthStyle: (s: DepthVideoStyle) => void;
+  depthStyleMenu: DropdownMenuState;
+  quickDepthQuality: DepthQuality;
+  setQuickDepthQuality: (q: DepthQuality) => void;
+  depthQualityMenu: DropdownMenuState;
+  videoRefModeMenu: DropdownMenuState;
+  activeVideoRefModeObj: VideoRefModeItem;
+  quickVideoRefMode: string;
+  setQuickVideoRefMode: (mode: string) => void;
+  aspectMenu: DropdownMenuState;
+  activeVideoRatioObj: VideoAspectRatioItem;
+  quickVideoResolution: string;
+  quickVideoCount: number;
+  activeImageRatioObj: (typeof IMAGE_RATIO_ITEMS)[number];
+  quickQuality: string;
+  quickCount: number;
+  quickVideoAspectId: string;
+  setQuickVideoAspectId: (id: string) => void;
+  setQuickVideoResolution: (res: '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K') => void;
+  setQuickVideoCount: (c: number) => void;
+  quickAspectId: string;
+  setQuickAspectId: (id: string) => void;
+  setQuickQuality: (q: 'high' | 'medium' | 'low') => void;
+  setQuickCount: (c: number) => void;
+  currentW: number;
+  currentH: number;
+  durationMenu: DropdownMenuState;
+  videoDurationBounds: { min: number; max: number };
+  quickPrompt: string;
+  media: ReturnType<typeof usePromptBarMedia>;
+  richInputRef: RefObject<RichPromptInputRef | null>;
+  handleSendPrompt: () => void;
+  canSend: boolean;
+  isSubmitting: boolean;
+  onDropdownOpenChange?: (open: boolean) => void;
+}
+
+interface PromptBarSendActionsProps {
+  isAgentMode: boolean;
+  canSend: boolean;
+  isSubmitting: boolean;
+  handleSendPrompt: () => void;
+  quickGenMode: QuickGenMode;
+}
+
+export const PromptBarSendActions = React.memo(function PromptBarSendActions({
+  isAgentMode,
+  canSend,
+  isSubmitting,
+  handleSendPrompt,
+  quickGenMode,
+}: PromptBarSendActionsProps) {
+  return (
+    <div className="flex items-center ml-auto shrink-0">
+      <button
+        type="button"
+        onClick={handleSendPrompt}
+        disabled={!canSend}
+        className={`${densityComposerSendBtn} rounded-full flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shrink-0 ${
+          canSend
+            ? 'bg-slate-900 hover:bg-black dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 shadow-sm'
+            : 'bg-[#E5E7EB] dark:bg-white/10 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+        }`}
+        title={
+          quickGenMode === 'collect' ? '开始采集商品' : isAgentMode
+            ? '发送给 Agent 助手'
+            : quickGenMode === 'depth-image'
+              ? '生成深度图片'
+              : quickGenMode === 'depth-video'
+                ? '生成深度动作捕捉'
+                : quickGenMode === 'video'
+                  ? '开始生成视频'
+                  : quickGenMode === 'audio'
+                    ? '开始生成音频'
+                    : '立即生成图片'
+        }
+      >
+        {isSubmitting ? (
+          <Loader2 className="w-4 h-4 animate-spin text-white" />
+        ) : (
+          <ArrowUp className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.5]" />
+        )}
+      </button>
+    </div>
+  );
+});
 
 function flatTriggerClass(active: boolean) {
   return `flex h-8 min-w-0 cursor-pointer items-center gap-1 rounded-lg px-1.5 text-[13px] font-medium transition-colors ${
@@ -94,7 +220,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
   const storedModelId = isAgent ? assistantModel : isVideo ? quickVideoModel : isAudio ? quickAudioModel : quickModel;
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || quickGenMode === 'collect') return;
     const apply = isAgent ? setAssistantModel : isVideo ? setQuickVideoModel : isAudio ? setQuickAudioModel : setQuickModel;
     if (!currentModelsList.length) {
       if (storedModelId) apply('');
@@ -103,6 +229,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
     if (!currentModelsList.some((model) => matchesStoredModel(model, storedModelId))) apply(currentModelsList[0].id);
   }, [
     ready,
+    quickGenMode,
     isAgent,
     isVideo,
     isAudio,
@@ -127,7 +254,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
   return (
     <div className={`relative mt-auto flex select-none flex-wrap items-center gap-1.5 pt-1 sm:gap-2 sm:pt-1.5 ${menuOpen ? 'z-40' : 'z-10'}`}>
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-        <div className="relative">
+        <div className={quickGenMode === 'collect' ? 'hidden' : 'relative'}>
           <button
             ref={uploadButtonRef}
             type="button"
@@ -162,7 +289,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
           />
         </div>
 
-        <div className="relative" ref={media.atMenuButtonRef}>
+        <div className={quickGenMode === 'collect' ? 'hidden' : 'relative'} ref={media.atMenuButtonRef}>
           <button
             type="button"
             aria-label="引用角色与素材"
@@ -224,7 +351,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
         />
       </div>
 
-      <div className="flex min-w-0 max-w-full flex-auto flex-wrap items-center justify-start gap-1 sm:justify-center">
+      {quickGenMode !== 'collect' && <div className="flex min-w-0 max-w-full flex-auto flex-wrap items-center justify-start gap-1">
         <div className="relative">
           <button
             ref={skillsButtonRef}
@@ -250,7 +377,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
           />
         </div>
 
-        <div className="relative min-w-0 max-w-full">
+        <div className="relative ml-auto min-w-0 max-w-full">
           <button
             ref={modelButtonRef}
             aria-haspopup="dialog"
@@ -260,6 +387,9 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
             className={`${flatTriggerClass(showModelPicker)} max-w-[min(220px,100%)]`}
             title={selectedModelId ? `当前模型：${isAgent ? agentModelName : modelSourceId}` : '未配置模型'}
           >
+            {(modelSourceId || selectedModelId) && (
+              <ModelIcon modelId={modelSourceId || selectedModelId} className="h-3.5 w-3.5 shrink-0 object-contain" />
+            )}
             <span className="truncate">{isAgent ? agentModelName : modelDisplayName}</span>
             {showModelPicker ? <ChevronUp className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />}
           </button>
@@ -267,7 +397,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
             isOpen={showModelPicker}
             onClose={() => setShowModelPicker(false)}
             triggerRef={modelButtonRef}
-            isUp={isUp}
+            isUp={false}
             models={currentModelsList}
             selectedModelId={selectedModelId}
             modalityKind={modalityOf(quickGenMode)}
@@ -281,7 +411,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
         </div>
 
         {isAgent ? (
-          <PromptBarReasoningPill assistantModel={selectedModelId || modelSourceId} isUp={isUp} onOpenChange={setPillMenuOpen} />
+          <PromptBarReasoningPill assistantModel={selectedModelId || modelSourceId} isUp onOpenChange={setPillMenuOpen} />
         ) : (
           <PromptBarParamsPill
             isUp={isUp}
@@ -306,7 +436,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
             onOpenChange={setPillMenuOpen}
           />
         )}
-      </div>
+      </div>}
 
       <div className="ml-auto flex shrink-0 items-center">
         <PromptBarSendActions
@@ -318,7 +448,7 @@ export const PromptBarControlsRow = React.memo(function PromptBarControlsRow(pro
         />
       </div>
 
-      <PromptBarAssetPickerModal isOpen={showAssetPickerModal} onClose={() => setShowAssetPickerModal(false)} />
+      {showAssetPickerModal && <PromptBarAssetPickerModal onClose={() => setShowAssetPickerModal(false)} />}
       <PromptBarSkillCreatorHost creator={skillCreator} />
     </div>
   );

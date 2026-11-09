@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { FileText, ImageOff, Music, RotateCw } from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import LazyVideoCover from '@client/shared/media/widgets/LazyVideoCover';
-import { getAssetMediaKind } from '../../model/assetMedia';
+import { getAssetMediaKind } from '../../model/agentAssetFilter';
 
 interface Props {
   src: string;
@@ -15,9 +15,10 @@ interface Props {
   videoAutoPlay?: boolean;
   posterUrl?: string;
   title?: string;
+  onUnavailable?: () => void;
 }
 
-function ImagePreview({ src, objectFit, width, title, onUnavailable }: Props & { onUnavailable?: () => void }) {
+function ImagePreview({ src, objectFit, width, title, onUnavailable }: Props) {
   const thumbnail = proxyMediaUrl(src, { thumb: true, width: width || 480 });
   const original = proxyMediaUrl(src);
   const rawDirect = src?.startsWith('//') ? `https:${src}` : src;

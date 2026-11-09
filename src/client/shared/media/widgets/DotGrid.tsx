@@ -2,13 +2,15 @@ import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { gsap } from 'gsap';
 import { InertiaPlugin } from 'gsap/InertiaPlugin';
 import './DotGrid.css';
-import { hexToRgb, throttle, type GridDot } from './DotGrid.utils';
 import {
   buildDotGrid,
   handleDotGridClick,
   handleDotGridMove,
+  hexToRgb,
   paintDotGridFrame,
   resetPointerAway,
+  throttle,
+  type GridDot,
   type GridMeta,
   type PointerState,
 } from './DotGrid.runtime';

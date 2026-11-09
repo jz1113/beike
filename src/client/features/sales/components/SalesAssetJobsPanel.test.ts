@@ -92,7 +92,7 @@ it('restores the selected vision route when retrying asset creation after a serv
   vi.mocked(listSalesAssetJobs).mockResolvedValue([failed]);
   vi.mocked(submitSalesAssetJob).mockResolvedValue(job({ creation }));
   Render(); await vi.advanceTimersByTimeAsync(0);
-  (button('继续处理原任务').props.onClick as () => void)();
+  (button('查询原分析回执').props.onClick as () => void)();
   expect(submitSalesAssetJob).toHaveBeenCalledWith('persona', {
     key: failed.key, model: failed.model, assetId: failed.assetId, references: [],
     creation, analysisModel: 'vision-channel:model',
@@ -136,4 +136,20 @@ it('keeps active jobs visible before their newly created assets appear in a refr
   vi.mocked(listSalesAssetJobs).mockResolvedValue([job()]);
   Render(); await vi.advanceTimersByTimeAsync(0);
   expect(statusRows()).toHaveLength(1);
+});
+
+it('queries an unknown analysis receipt with the original key and never allocates another asset', async () => {
+  const creation = { referenceImageUrl: '/ref.jpg', promptModel: 'vision-channel:model' };
+  const failed = job({ status: 'failed', error: '资产分析结果待核对，不会重新调用模型', creation });
+  vi.mocked(listSalesAssetJobs).mockResolvedValue([failed]);
+  vi.mocked(submitSalesAssetJob).mockResolvedValue(failed);
+  Render(); await vi.advanceTimersByTimeAsync(0);
+  expect(button('继续处理原任务')).toBeUndefined();
+  (button('查询原分析回执').props.onClick as () => void)();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(submitSalesAssetJob).toHaveBeenCalledOnce();
+  expect(submitSalesAssetJob).toHaveBeenCalledWith('persona', {
+    key: failed.key, model: failed.model, assetId: failed.assetId, references: [], creation, analysisModel: creation.promptModel,
+  }, {}, failed.assetId);
+  expect(createSalesMaterial).not.toHaveBeenCalled();
 });

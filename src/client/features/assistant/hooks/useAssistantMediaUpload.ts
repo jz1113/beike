@@ -4,7 +4,7 @@ import { isImageFile, isVideoFile, readImageFileAsDataUrl } from '@client/shared
 import { extractVideoThumbnail } from '@client/shared/media/mediaHelper';
 import { useFileDropZone } from '@client/shared/hooks/useFileDropZone';
 import { useBlobUrl } from '@client/shared/hooks/useBlobUrl';
-import { SHORTCUT_REPEAT_GUARD_MS } from '@client/shared/constants/timing';
+import { SHORTCUT_REPEAT_GUARD_MS } from '@client/shared/hooks/useToast';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import {
   LEGACY_OFFICE_EXT_RE,

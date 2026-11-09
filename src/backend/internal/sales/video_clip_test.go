@@ -3,12 +3,14 @@ package sales
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
@@ -202,5 +204,125 @@ func TestVideoClipFractionalFrameRateRespectsReferenceBudgetAndMinimum(t *testin
 				t.Fatalf("fractional-frame-rate clip violates reference bounds: %d %s", res.Code, res.Body.String())
 			}
 		})
+	}
+}
+
+func TestVideoReviewDecodesActualPictureAndAudio(t *testing.T) {
+	root, _ := filepath.Abs("../../../..")
+	ffmpeg, ok := system.FFmpegBinary(root)
+	if !ok {
+		t.Skip("FFmpeg is not installed")
+	}
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "local"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AZHUO_CACHE_DIR", dir)
+	handler := VideoReview(config.Config{Root: root})
+	for _, tc := range []struct{ color, source, picture, audio string }{
+		{"white", "sine=frequency=440", "visible", "audible"},
+		{"black", "anullsrc", "dark", "quiet"},
+		{"white", "", "visible", "missing"},
+	} {
+		t.Run(tc.audio, func(t *testing.T) {
+			rel := "local/review-" + tc.audio + ".mp4"
+			path := filepath.Join(dir, rel)
+			args := []string{"-v", "error", "-f", "lavfi", "-i", "color=c=" + tc.color + ":s=64x96"}
+			if tc.source != "" {
+				args = append(args, "-f", "lavfi", "-i", tc.source)
+			}
+			args = append(args, "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", path)
+			if out, err := exec.Command(ffmpeg, args...).CombinedOutput(); err != nil {
+				t.Fatalf("%v: %s", err, out)
+			}
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest("POST", "/api/sales/video-review", strings.NewReader(fmt.Sprintf(`{"videoUrl":"/storage/%s"}`, rel))))
+			var data struct {
+				Picture, Audio string
+				Width, Height  int
+				DurationSec    float64
+			}
+			if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &data) != nil || data.Picture != tc.picture || data.Audio != tc.audio || data.Width != 64 || data.Height != 96 || data.DurationSec < 1 {
+				t.Fatal(rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func voiceDeliveryFixture(t *testing.T, seconds string) (string, []byte) {
+	t.Helper()
+	root, _ := filepath.Abs("../../../..")
+	ffmpeg, ok := system.FFmpegBinary(root)
+	if !ok {
+		t.Skip("missing ffmpeg")
+	}
+	file := filepath.Join(t.TempDir(), "voice.mp3")
+	if data, err := exec.Command(ffmpeg, "-v", "error", "-f", "lavfi", "-i", "sine=frequency=220:duration="+seconds, "-c:a", "libmp3lame", file).CombinedOutput(); err != nil {
+		t.Fatal(err, string(data))
+	}
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return file, raw
+}
+
+func TestVoiceDeliveryArchivesCompleteRemoteNarration(t *testing.T) {
+	cfg := mediaJobConfig(t)
+	_, raw := voiceDeliveryFixture(t, "20")
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "audio/mpeg")
+		w.Write(raw)
+	}))
+	defer upstream.Close()
+	url, err := storeSalesVoiceWithClient(t.Context(), cfg, "local", upstream.URL+"/expires.mp3", upstream.Client())
+	if err != nil || !strings.HasPrefix(url, "/storage/local/audio/") {
+		t.Fatal(url, err)
+	}
+	upstream.Close()
+	file := storage.StoredFile(strings.TrimPrefix(url, "/storage/"))
+	duration, err := system.ProbeAudioDuration(t.Context(), cfg.Root, file)
+	if err != nil || duration < 19.9 || duration > 20.2 {
+		t.Fatal(duration, err)
+	}
+	saved, err := os.ReadFile(file)
+	if err != nil || string(saved) != string(raw) {
+		t.Fatal("voice bytes changed or missing", err)
+	}
+	if _, err := storeSalesVoiceWithClient(t.Context(), cfg, "other", url, upstream.Client()); err == nil {
+		t.Fatal("foreign workspace audio accessible")
+	}
+}
+
+func TestBackgroundVoiceSurvivesBrowserDisconnectAndCoalescesDuplicates(t *testing.T) {
+	cfg := mediaJobConfig(t)
+	_, raw := voiceDeliveryFixture(t, "1")
+	file := storage.SafeWithin(storage.ResolveRoot(), "local/audio/voice.mp3")
+	os.MkdirAll(filepath.Dir(file), 0755)
+	os.WriteFile(file, raw, 0600)
+	gate := make(chan struct{})
+	var calls atomic.Int32
+	handler := BackgroundMedia(cfg, "voice", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		select {
+		case <-gate:
+		case <-r.Context().Done():
+			t.Error("browser canceled background voice")
+			return
+		}
+		httpx.WriteJSON(w, 200, map[string]any{"success": true, "taskId": "original-voice", "audioUrl": "/storage/local/audio/voice.mp3", "recordId": "voice-record", "usage": map[string]any{"totalTokens": 17}})
+	}))
+	id := enqueueTestMedia(t, handler, `{"clientTaskId":"first","text":"同一句话","voice":"test"}`, true)
+	again := enqueueTestMedia(t, handler, `{"clientTaskId":"second","text":"同一句话","voice":"test"}`, true)
+	close(gate)
+	job := readJobForTest(t, cfg, id)
+	if id != again || calls.Load() != 1 || job.Status != "completed" {
+		t.Fatal(id, again, calls.Load(), job.Status, job.Error)
+	}
+	var result map[string]any
+	json.Unmarshal(job.Result, &result)
+	usage, _ := result["usage"].(map[string]any)
+	if result["audioUrl"] != "/storage/local/audio/voice.mp3" || result["recordId"] != "voice-record" || usage["totalTokens"] != float64(17) {
+		t.Fatal(result)
 	}
 }

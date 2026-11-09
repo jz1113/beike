@@ -1,8 +1,8 @@
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LazyFeedVideo } from './LazyFeedVideo';
-import { FeedImage } from './FeedImage';
-import { InspirationReferences } from './InspirationReferences';
+import { FeedImage } from './LazyFeedVideo';
+import { InspirationReferences } from './InspirationModal';
 
 const harness = vi.hoisted(() => ({
   states: [] as unknown[], refs: [] as { current: unknown }[], effects: [] as (() => void | (() => void))[],
@@ -29,7 +29,7 @@ vi.mock('react', async original => ({
 }));
 vi.mock('react-dom', () => ({ createPortal: (children: ReactElement) => children }));
 vi.mock('@client/shared/media/videoPlaybackManager', () => ({ videoPlaybackManager: { safePlay: harness.play, safePause: harness.pause } }));
-vi.mock('@client/shared/hooks/useViewVisibility', () => ({ useViewVisibility: () => harness.active }));
+vi.mock('@client/shared/hooks/useSafeTimeout', () => ({ useViewVisibility: () => harness.active }));
 vi.mock('@client/shared/api/apiClient', () => ({ proxyMediaUrl: (url: string) => `/api/system/proxy-image?url=${encodeURIComponent(url)}` }));
 
 type VideoTree = ReactElement<{ onMouseEnter: () => void; onMouseLeave: () => void; children: ReactElement<{ src?: string; ref: { current: unknown } }>[] }>;

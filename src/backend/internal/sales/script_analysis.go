@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"beike.local/cloud/src/backend/internal/config"
@@ -109,6 +110,9 @@ func lookupCachedScriptAnalysis(ctx context.Context, sqliteFile, workspace, vide
 			item.Script = parsed
 			return &item
 		}
+	}
+	if rows.Err() != nil {
+		return nil
 	}
 	return nil
 }
@@ -382,4 +386,134 @@ func readScriptVideo(source, workspace string) (string, error) {
 		return "", errors.New("参考视频超过 16 MB，模型无法直接读取；请压缩后分析")
 	}
 	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data), nil
+}
+
+var scriptAnalysisPending sync.Map
+
+// Waiters recheck persisted results after the owner exits, including after a canceled first attempt.
+func lockScriptAnalysis(ctx context.Context, key string) (func(), error) {
+	for {
+		done := make(chan struct{})
+		current, loaded := scriptAnalysisPending.LoadOrStore(key, done)
+		if !loaded {
+			return func() { scriptAnalysisPending.Delete(key); close(done) }, nil
+		}
+		select {
+		case <-current.(chan struct{}):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+}
+func analysisRouteKey(model, base, protocol, effort string, responses bool) string {
+	route, _ := json.Marshal([]any{"analysis-v3", scriptOutputFields, model, base, protocol, responses, effort})
+	digest := sha256.Sum256(route)
+	return hex.EncodeToString(digest[:])
+}
+
+// Capture what was actually attached to the model. The file may have an audio
+// track even though the selected protocol received only still images.
+func recordScriptObservations(content []any, script map[string]any) {
+	if len(content) == 0 {
+		return
+	}
+	first, _ := content[0].(map[string]any)
+	var meta struct {
+		Kind  string    `json:"mediaType"`
+		Times []float64 `json:"sampleTimesSec"`
+	}
+	if json.Unmarshal([]byte(assetCreationText(first["text"])), &meta) != nil || meta.Kind != "sampled_frames" {
+		return
+	}
+	script["sampleTimesSec"] = meta.Times
+	notes, _ := script["review"].([]any)
+	note := fmt.Sprintf("本次模型只读取 %d 帧采样画面。镜头边界为估计值，未提供音轨；口播、音乐、音效需对照原视频核对。", len(meta.Times))
+	if len(notes) < 20 {
+		script["review"] = append(notes, note)
+	}
+	shots, _ := script["shots"].([]any)
+	for _, item := range shots {
+		shot, _ := item.(map[string]any)
+		beats, _ := shot["beats"].([]any)
+		for _, item := range beats {
+			beat, _ := item.(map[string]any)
+			voice, _ := beat["voice"].(map[string]any)
+			if voice != nil {
+				voice["text"] = ""
+				voice["linePattern"] = ""
+				voice["uncertain"] = true
+			}
+		}
+	}
+}
+
+// Optional historical fields remain optional, but provided visual data must not
+// pass as objects/null and then disappear during browser normalization.
+func validateScriptVisualFields(object map[string]any) error {
+	checkText := func(record map[string]any, key, label string, limit int) error {
+		value, exists := record[key]
+		if !exists {
+			return nil
+		}
+		text, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("%s（%s）必须为字符串", label, key)
+		}
+		if len([]rune(text)) > limit {
+			return fmt.Errorf("%s（%s）超过 %d 字，请精简后重试", label, key, limit)
+		}
+		return nil
+	}
+	if raw, exists := object["visualSpec"]; exists {
+		visual, ok := raw.(map[string]any)
+		if !ok {
+			return fmt.Errorf("全局摄影描述（visualSpec）必须为对象")
+		}
+		for key, limit := range map[string]int{"styleSummary": 600, "lighting": 300, "cameraFeel": 300} {
+			if err := checkText(visual, key, "全局摄影描述", limit); err != nil {
+				return err
+			}
+		}
+	}
+	shots, _ := object["shots"].([]any)
+	for shotIndex, rawShot := range shots {
+		shot, _ := rawShot.(map[string]any)
+		if raw, exists := shot["analysis"]; exists {
+			analysis, ok := raw.(map[string]any)
+			if !ok {
+				return fmt.Errorf("镜头 %d 的分镜分析必须为对象", shotIndex+1)
+			}
+			for _, key := range []string{"style", "subject", "action", "camera", "expression"} {
+				if err := checkText(analysis, key, fmt.Sprintf("镜头 %d 的分镜分析", shotIndex+1), 300); err != nil {
+					return err
+				}
+			}
+		}
+		beats, _ := shot["beats"].([]any)
+		for beatIndex, rawBeat := range beats {
+			beat, _ := rawBeat.(map[string]any)
+			label := fmt.Sprintf("镜头 %d 动作段 %d 的画面描述", shotIndex+1, beatIndex+1)
+			if value, exists := beat["productVisible"]; exists {
+				if _, ok := value.(bool); !ok {
+					return fmt.Errorf("%s（productVisible）必须为布尔值", label)
+				}
+			}
+			for key, limit := range map[string]int{
+				"shotSize": 120, "camera": 500, "subject": 800,
+				"action": 1500, "actionTemplate": 1500, "referenceActionRaw": 1500,
+				"scene": 600, "expression": 600, "transition": 400,
+				"sectionLabel": 80, "cameraLabel": 80, "shows": 800,
+			} {
+				if err := checkText(beat, key, label, limit); err != nil {
+					return err
+				}
+			}
+			action, _ := beat["action"].(string)
+			template, _ := beat["actionTemplate"].(string)
+			if strings.TrimSpace(action) == "" && strings.TrimSpace(template) == "" {
+				return fmt.Errorf("镜头 %d 的动作段 %d 缺少动作模板描述", shotIndex+1, beatIndex+1)
+			}
+		}
+	}
+	return nil
 }

@@ -1,5 +1,103 @@
-import { colorPresets } from './palette';
-import { colorField, grouped, selectField, slider, switchField, type StudioSchema } from './types';
+export type StudioValue = number | string | boolean;
+
+export type StudioValues = Record<string, StudioValue>;
+
+export type StudioFieldGroup = 'appearance' | 'layout' | 'motion' | 'advanced';
+
+type SliderField = { key: string; label: string; type: 'slider'; min: number; max: number; step: number };
+type ColorField = { key: string; label: string; type: 'color' };
+type SelectField = { key: string; label: string; type: 'select'; options: Array<{ id: string; label: string }> };
+type SwitchField = { key: string; label: string; type: 'switch' };
+
+export type UngroupedStudioField = SliderField | ColorField | SelectField | SwitchField;
+
+export type StudioField = UngroupedStudioField & { group: StudioFieldGroup };
+
+export type StudioPreset = {
+  id: string;
+  label: string;
+  mainColor: string;
+  accentColor: string;
+  values: StudioValues;
+};
+
+export type StudioSchema = {
+  fields: StudioField[];
+  defaults: StudioValues;
+  presets: StudioPreset[];
+};
+
+export type StudioRenderMode = 'live' | 'stage' | 'thumb';
+
+export type StudioRenderContext = {
+  isDark: boolean;
+  mode: StudioRenderMode;
+};
+
+export const STUDIO_FIELD_GROUPS: Array<{ id: StudioFieldGroup; label: string; collapsible: boolean }> = [
+  { id: 'appearance', label: '外观与色彩', collapsible: false },
+  { id: 'layout', label: '布局与尺寸', collapsible: false },
+  { id: 'motion', label: '交互与动效', collapsible: false },
+  { id: 'advanced', label: '高阶微调', collapsible: true },
+];
+
+export function slider(key: string, label: string, min: number, max: number, step: number): SliderField {
+  return { key, label, type: 'slider', min, max, step };
+}
+
+export function colorField(key: string, label: string): ColorField {
+  return { key, label, type: 'color' };
+}
+
+export function selectField(
+  key: string,
+  label: string,
+  options: Array<{ id: string; label: string }>,
+): SelectField {
+  return { key, label, type: 'select', options };
+}
+
+export function switchField(key: string, label: string): SwitchField {
+  return { key, label, type: 'switch' };
+}
+
+export function grouped(group: StudioFieldGroup, fields: UngroupedStudioField[]): StudioField[] {
+  return fields.map((field) => ({ ...field, group }));
+}
+
+const PALETTE = [
+  { id: 'amethyst', label: '紫晶', main: '#7c3aed', accent: '#a855f7' },
+  { id: 'glacier', label: '冰川', main: '#0284c7', accent: '#38bdf8' },
+  { id: 'copper', label: '铜橙', main: '#ea580c', accent: '#f59e0b' },
+  { id: 'graphite', label: '石墨', main: '#475569', accent: '#94a3b8' },
+  { id: 'halo', label: '光晕', main: '#6366f1', accent: '#c4b5fd' },
+] as const;
+
+export type PaletteId = (typeof PALETTE)[number]['id'];
+
+export type PresetStyle = {
+  label?: string;
+  values?: StudioValues;
+};
+
+export function colorPresets(
+  keys: { main?: string; accent?: string },
+  styles?: Partial<Record<PaletteId, PresetStyle>>,
+): StudioPreset[] {
+  return PALETTE.map((item) => {
+    const style = styles?.[item.id];
+    const values: StudioValues = { ...(style?.values ?? {}) };
+    if (keys.main) values[keys.main] = item.main;
+    if (keys.accent) values[keys.accent] = item.accent;
+    return {
+      id: item.id,
+      label: style?.label ?? item.label,
+      mainColor: item.main,
+      accentColor: item.accent,
+      values,
+    };
+  });
+}
 
 export const shardsSchema: StudioSchema = {
   fields: [

@@ -3,6 +3,12 @@ import { Plus, Maximize2, X, AlertCircle } from 'lucide-react';
 import type { RefMediaKind } from '@client/shared/api/mediaUpload';
 import { RefMediaThumb } from './PromptBarRefMediaThumb';
 
+function isRejectedMedia(image: unknown): boolean {
+  return Boolean(image && typeof image === 'object' && (
+    ('rejected' in image && image.rejected) || ('status' in image && image.status === 'rejected')
+  ));
+}
+
 interface Props {
   images: string[];
   isExpanded: boolean;
@@ -35,8 +41,8 @@ export function PromptBarRefImageStack({
 
   const firstImg = images[0];
   const secondImg = images[1];
-  const isFirstRejected = Boolean((firstImg as any)?.rejected || (firstImg as any)?.status === 'rejected');
-  const isSecondRejected = Boolean((secondImg as any)?.rejected || (secondImg as any)?.status === 'rejected');
+  const isFirstRejected = isRejectedMedia(firstImg);
+  const isSecondRejected = isRejectedMedia(secondImg);
 
   // 🌟 容器物理占位宽度：严格保持单张卡片尺寸（w-[72px] sm:w-[76px] md:w-[80px]），右侧输入框文本紧贴右侧规整对齐
   const containerW = 'w-[72px] sm:w-[76px] md:w-[80px]';

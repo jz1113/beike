@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { petFrame, pointerLookIndex } from './atlas';
+import { parsePetCommands, petFrame, pointerLookIndex, resolvePetPose } from './atlas';
 
 describe('codex pet atlas frames', () => {
   it('uses only the populated frames and their real durations', () => {
@@ -21,5 +21,35 @@ describe('codex pet atlas frames', () => {
     expect(petFrame('look', 2, 0, 12)).toEqual({ row: 10, column: 4 });
     expect(petFrame('look', 1, 0, 4)).toEqual({ row: 0, column: 0 });
     expect(petFrame('look', 2, 0, null)).toEqual({ row: 0, column: 0 });
+  });
+});
+
+describe('pet pose priority', () => {
+  it('lets the settings preview and cover feeding override global work', () => {
+    expect(resolvePetPose({ preview: 'look', feedPhase: 'analyzing', busy: true })).toBe('look');
+    expect(resolvePetPose({ feedPhase: 'uploading', flash: 'success', busy: true })).toBe('working');
+    expect(resolvePetPose({ feedPhase: 'error', busy: true })).toBe('failed');
+    expect(resolvePetPose({ feedPhase: 'idle', flash: 'success', busy: true })).toBe('success');
+    expect(resolvePetPose({ feedPhase: 'ready', busy: true })).toBe('working');
+    expect(resolvePetPose({})).toBe('idle');
+  });
+});
+
+describe('codex pet import commands', () => {
+  it('reads one or more add commands and ignores blank lines', () => {
+    expect(parsePetCommands('  npx codex-pets add q-ban-da-fei-yu \r\n\nnpx   codex-pets   add   pet-6ac83c93535081918861d5c78bb9a8fc')).toEqual([
+      { input: 'npx codex-pets add q-ban-da-fei-yu', id: 'q-ban-da-fei-yu' },
+      { input: 'npx   codex-pets   add   pet-6ac83c93535081918861d5c78bb9a8fc', id: 'pet-6ac83c93535081918861d5c78bb9a8fc' },
+    ]);
+  });
+
+  it('rejects shell syntax, other commands and arbitrary addresses', () => {
+    const parsed = parsePetCommands([
+      'npx codex-pets add tiny-dino && rm -rf /',
+      'npx codex-pets add-collection cats',
+      'npx codex-pets add https://evil.example/pet',
+      'curl https://codex-pets.net/tiny-dino',
+    ].join('\n'));
+    expect(parsed.every((item) => item.error && !item.id)).toBe(true);
   });
 });

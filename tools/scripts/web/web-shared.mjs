@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { createServer } from 'node:net';
 import { get } from 'node:http';
+import { parseEnv } from 'node:util';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { recordWebProcess } from './web-processes.mjs';
@@ -176,8 +177,19 @@ export function webProcessOptions({ apiPort, appDataDir, accessToken }) {
   return { apiPort, appDataDir: resolve(appDataDir), tokenFingerprint: createHash('sha256').update(accessToken).digest('hex') };
 }
 
-export function buildApiEnv({ apiPort, appDataDir, accessToken, extra = {} }) {
+export function readDevApiDefaults(workspaceRoot, isolated) {
+  if (isolated) return {};
+  try {
+    return parseEnv(readFileSync(join(workspaceRoot, '.env'), 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') return {};
+    throw new Error('无法读取开发 .env，请检查文件和权限', { cause: error });
+  }
+}
+
+export function buildApiEnv({ apiPort, appDataDir, accessToken, defaults = {}, extra = {} }) {
   return {
+    ...defaults,
     ...process.env,
     PORT: String(apiPort),
     HOSTNAME: '127.0.0.1',
@@ -203,7 +215,7 @@ export function buildGateway(workspaceRoot) {
   return out;
 }
 
-export function startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, extraEnv, isolated = false, record = true, build = true }) {
+export function startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, extraEnv, envDefaults, isolated = false, record = true, build = true }) {
   const binary = build ? buildGateway(workspaceRoot) : gatewayBinary(workspaceRoot);
   const child = spawn(binary, [], {
     cwd: workspaceRoot,
@@ -212,6 +224,7 @@ export function startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, 
       apiPort,
       appDataDir,
       accessToken,
+      defaults: envDefaults,
       extra: extraEnv,
     }),
   });

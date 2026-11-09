@@ -1,4 +1,5 @@
 import { parseModelDetails, type ParsedRawModel } from './modelParsing';
+import { VENDOR_PRIORITY } from './modelSorting';
 
 export { isLegacyOrDiscontinuedModel, parseModelDetails } from './modelParsing';
 export type { ParsedRawModel } from './modelParsing';
@@ -157,10 +158,9 @@ export function groupModelsByGeneration(
     });
   }
 
-  const vendorRank = ['openai', 'anthropic', 'google', 'deepseek', 'bytedance', 'alibaba', 'flux', 'xai'];
   sections.sort((a, b) => {
-    const aIdx = vendorRank.indexOf(a.vendorId);
-    const bIdx = vendorRank.indexOf(b.vendorId);
+    const aIdx = VENDOR_PRIORITY.indexOf(a.vendorId);
+    const bIdx = VENDOR_PRIORITY.indexOf(b.vendorId);
     if (aIdx >= 0 && bIdx >= 0) return aIdx - bIdx;
     if (aIdx >= 0) return -1;
     if (bIdx >= 0) return 1;

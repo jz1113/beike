@@ -1,9 +1,7 @@
-import { PERSONA_CATEGORIES, type PersonaCategory } from './salesPersonaClassification';
+import { PERSONA_CATEGORIES, personaImageFields, readPersonaViews, readSceneViews, sceneImageFields, type PersonaCategory } from './salesActionViews';
 import { audienceDimensions } from '@shared/domain/assets/appearanceAudience';
 import { SCENE_SPACE_LABELS, type SalesSceneSpace } from './salesMaterialCatalog';
-import { personaImageFields, readPersonaViews } from './salesPersonaViews';
-import { readSceneViews, sceneImageFields } from './salesSceneViews';
-import { nextSequentialSalesAssetName, salesAssetNumber } from './salesAssetNames';
+import { nextSequentialSalesAssetName, salesAssetNumber } from './salesAssetDraft';
 
 export type SalesImageImportKind = 'persona' | 'scene';
 export interface SalesImageImportItem {

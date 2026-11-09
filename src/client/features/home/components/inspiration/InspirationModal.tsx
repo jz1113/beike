@@ -1,25 +1,172 @@
-import type { InspirationItem, InspirationUseOptions } from '../../model/inspirationItem';
-import {InspirationReferences} from './InspirationReferences';
-import { InspirationPromptPanel } from './InspirationPromptPanel';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { inspirationVideoUseOptions, type InspirationItem, type InspirationUseOptions } from '../../model/inspirationItem';
+import { useState, useEffect, useCallback, useMemo, useRef, useId, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { handleImgError } from '@client/shared/media/imageError';
+import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { downloadMediaOrOpen } from '@client/shared/media/downloadMedia';
 import {
   RotateCcw,
   Image as ImageIcon,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Download,
   Check,
   X,
 } from 'lucide-react';
-import { formatDisplayModel } from '@shared/domain/media/drawing';
+import { formatDisplayModel, formatPromptParagraphs } from '@shared/domain/media/drawing';
 import { useModalDialog } from '@client/shared/hooks/useModalDialog';
-import { useScrollLock } from '@client/shared/hooks/useScrollLock';
+import { useScrollLock } from '@client/shared/hooks/useSafeTimeout';
 import { videoPlaybackManager } from '@client/shared/media/videoPlaybackManager';
-import { inspirationVideoUseOptions } from '../../model/inspirationMedia';
+
+export const MEDIA_FALLBACK_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(`
+<svg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="400" rx="16" fill="#F8FAFC"/>
+  <rect x="2" y="2" width="396" height="396" rx="14" stroke="#E2E8F0" stroke-width="2"/>
+  <path d="M140 260L180 200L210 240L250 180L280 260H140Z" fill="#CBD5E1"/>
+  <circle cx="175" cy="165" r="18" fill="#CBD5E1"/>
+  <text x="200" y="300" text-anchor="middle" fill="#94A3B8" font-size="14" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif" font-weight="600">素材加载失败</text>
+</svg>
+`)}`;
+
+const isRemoteMediaUrl = (url: string) =>
+  url.startsWith('http://') || url.startsWith('https://') || url.startsWith('//');
+
+export const handleImgError = (e: SyntheticEvent<HTMLImageElement>, rawUrl?: string) => {
+  const target = e.currentTarget;
+  if (!rawUrl) {
+    target.src = MEDIA_FALLBACK_IMG;
+    return;
+  }
+  if (!target.dataset.hasRetried) {
+    target.dataset.hasRetried = 'true';
+    let fixed = rawUrl;
+    if (/ci\.xiaohongshu\.com/i.test(fixed)) {
+      fixed = fixed.replace(/https?:\/\/ci\.xiaohongshu\.com/i, 'https://sns-img-hw.xhscdn.com');
+    }
+    if (isRemoteMediaUrl(fixed)) {
+      target.src = proxyMediaUrl(fixed);
+    } else {
+      const sep = fixed.includes('?') ? '&' : '?';
+      target.src = `${fixed}${sep}retry=${Date.now()}`;
+    }
+  } else {
+    target.src = MEDIA_FALLBACK_IMG;
+  }
+};
+
+export function InspirationReferences({ images, labels, mode, onPreviewChange }: { images: string[]; labels?: string[]; mode?: string; onPreviewChange?: (dismiss: (() => void) | null) => void }) {
+  const [index, setIndex] = useState(0);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewId = useId();
+  const isOpen = !!position;
+  useEffect(() => {
+    onPreviewChange?.(isOpen ? () => {
+      if (timer.current) clearTimeout(timer.current);
+      trigger.current?.focus();
+      setPosition(null);
+    } : null);
+    return () => onPreviewChange?.(null);
+  }, [isOpen, onPreviewChange]);
+  const cancel = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
+  const closeSoon = () => { cancel(); timer.current = setTimeout(() => setPosition(null), 160); };
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  useEffect(() => {
+    if (!position) return;
+    const close = () => setPosition(null);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+    return () => { window.removeEventListener('resize', close); window.removeEventListener('scroll', close, true); };
+  }, [position]);
+  if (!images.length) return null;
+  const active = Math.min(index, images.length - 1);
+  const url = images[active];
+  const label = labels?.[active] || (mode === 'first_last_frame' && active < 2 ? (active === 0 ? '首帧' : '尾帧') : `图片 ${active + 1}`);
+  const open = () => {
+    cancel(); const rect = trigger.current?.getBoundingClientRect(); if (!rect) return;
+    setPosition({ left: Math.max(8, Math.min(rect.left, window.innerWidth - 232)), top: rect.top >= 240 ? rect.top - 232 : Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - 232)) });
+  };
+  const media = (source: string, small = false) => isVideoMediaUrl(source)
+    ? <video src={source} muted playsInline preload="metadata" controls={!small} className={small ? 'h-5 w-6 rounded object-cover' : 'h-full w-full object-contain'} />
+    : <img src={source} alt={small ? '' : label} loading={small ? 'lazy' : 'eager'} className={small ? 'h-5 w-6 rounded object-cover' : 'h-full w-full object-contain'} />;
+  return <>
+    <button ref={trigger} type="button" aria-expanded={!!position} aria-controls={position ? previewId : undefined} aria-label={`查看参考素材，共 ${images.length} 个`} onMouseEnter={open} onMouseLeave={closeSoon} onFocus={open} onBlur={closeSoon} onClick={open} onKeyDown={event => { if (event.key === 'Escape') { setPosition(null); event.stopPropagation(); } }} className="flex shrink-0 items-center gap-1 rounded text-slate-600 hover:text-slate-900 focus-visible:outline-indigo-500 dark:hover:text-white dark:text-slate-300">
+      {media(images[0], true)}<span>{mode === 'first_last_frame' ? '首尾帧参考' : '全能参考'}</span>
+    </button>
+    {position && createPortal(<div id={previewId} role="region" aria-label="参考素材预览" onMouseEnter={cancel} onMouseLeave={closeSoon} onFocus={cancel} onBlur={closeSoon} onKeyDown={event => { if (event.key === 'Escape') { trigger.current?.focus(); setPosition(null); event.stopPropagation(); } }} className="fixed z-[10000] h-56 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-[#18191c]" style={position}>
+      <div className="absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-white/90 px-3 py-2 text-[11px] text-slate-600 backdrop-blur-sm dark:text-slate-300 dark:bg-[#18191c]/95">
+        <span className="min-w-0 flex-1 truncate" title={label}>{label}</span><span className="shrink-0">{active + 1}/{images.length}</span>
+        {images.length > 1 && <div className="flex gap-1"><button type="button" aria-label="上一张参考素材" onClick={() => setIndex((active + images.length - 1) % images.length)} className="rounded p-0.5 hover:bg-slate-200 dark:hover:bg-white/10"><ChevronLeft size={14} /></button><button type="button" aria-label="下一张参考素材" onClick={() => setIndex((active + 1) % images.length)} className="rounded p-0.5 hover:bg-slate-200 dark:hover:bg-white/10"><ChevronRight size={14} /></button></div>}
+      </div>
+      <div className="h-full w-full pt-9 p-2">{media(url)}</div>
+    </div>, trigger.current?.closest('[role="dialog"]') || document.body)}
+  </>;
+}
+
+function InspirationPromptPanel({ itemId, prompt, isVideo }: { itemId: string | number; prompt: string; isVideo: boolean }) {
+  const [isPromptExpanded, setIsPromptExpanded] = useState(true);
+  const promptParagraphs = useMemo(() => formatPromptParagraphs(prompt), [prompt]);
+  const isLongPrompt = prompt.length > 120 || promptParagraphs.length > 2;
+
+  useEffect(() => {
+    setIsPromptExpanded(true);
+  }, [itemId]);
+
+  return (
+    <div className="space-y-2 pt-1">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-xs font-normal text-slate-400 shrink-0">
+            {isVideo ? '视频提示词' : '图片提示词'}
+          </span>
+        </div>
+        {isLongPrompt && (
+          <button
+            type="button"
+            onClick={() => setIsPromptExpanded(!isPromptExpanded)}
+            className="inline-flex items-center gap-0.5 text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium transition-colors cursor-pointer py-0.5 px-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+            title={isPromptExpanded ? '收起长文本' : '展开查看完整提示词'}
+          >
+            <span>{isPromptExpanded ? '收起' : '展开全文'}</span>
+            {isPromptExpanded ? (
+              <ChevronUp className="w-3.5 h-3.5 stroke-[2.5]" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 stroke-[2.5]" />
+            )}
+          </button>
+        )}
+      </div>
+
+      <div className="relative">
+        <div
+          className={`text-[13px] sm:text-[13.5px] text-slate-800 dark:text-[#EDEDED] leading-relaxed font-normal select-text transition-all duration-300 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400 pr-1 space-y-2.5 ${
+            isPromptExpanded
+              ? 'max-h-[50vh] pb-2'
+              : 'max-h-40'
+          }`}
+        >
+          {promptParagraphs.map((para, pIdx) => (
+            <p key={pIdx} className="break-words leading-relaxed">
+              {para}
+            </p>
+          ))}
+        </div>
+
+        {/* 收起状态且为长文本时，底部半透明渐变平滑遮罩（点击亦可展开全文） */}
+        {!isPromptExpanded && isLongPrompt && (
+          <div
+            onClick={() => setIsPromptExpanded(true)}
+            className="absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-white via-white/70 to-transparent dark:from-[#1B1B1E] dark:via-[#1B1B1E]/70 dark:to-transparent pointer-events-auto cursor-pointer"
+            title="点击展开全文"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   item: InspirationItem | null;

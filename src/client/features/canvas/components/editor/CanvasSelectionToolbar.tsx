@@ -5,8 +5,16 @@ import {
 } from 'lucide-react';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { nodeBounds } from '../../model/canvasGraph';
-import { canvasGroupPatches, canvasUngroupPatches, expandCanvasGroups, isCanvasSelectionGrouped } from '../../model/canvasGroups';
-import { alignSelectedNodes, distributeSelectedNodes, autoArrangeCanvasNodes, type AlignmentType } from '../../model/canvasAlignment';
+import {
+  alignSelectedNodes,
+  distributeSelectedNodes,
+  autoArrangeCanvasNodes,
+  canvasGroupPatches,
+  canvasUngroupPatches,
+  expandCanvasGroups,
+  isCanvasSelectionGrouped,
+  type AlignmentType,
+} from '../../model/canvasAlignment';
 import type { CanvasNode } from '../../model/types';
 
 interface Props {

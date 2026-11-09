@@ -14,17 +14,16 @@ const catalogSrc = [
   fs.readFileSync(path.join(workspaceRoot, 'src/shared/domain/models/modelCatalog.ts'), 'utf8'),
   ...fs.readdirSync(catalogDir).filter((name) => name.endsWith('.ts')).map((name) => fs.readFileSync(path.join(catalogDir, name), 'utf8')),
 ].join('\n');
-const imageAdaptersSrc = fs.readFileSync(
-  path.join(workspaceRoot, 'src/shared/domain/models/model-adapters/image/adapters.ts'),
-  'utf8',
-);
-const videoAdaptersSrc = ['adapters.ts', 'omniFlash.ts'].map(name => fs.readFileSync(
-  path.join(workspaceRoot, 'src/shared/domain/models/model-adapters/video', name), 'utf8',
-)).join('\n');
+function productionFamilies(file, functionName) {
+  const source = fs.readFileSync(path.join(workspaceRoot, 'src/backend/internal/generate', file), 'utf8');
+  const body = source.match(new RegExp(`func ${functionName}\\([^]*?\\n\\}`))?.[0];
+  if (!body) throw new Error(`Missing production model router: ${functionName}`);
+  return [...body.matchAll(/return "([^"]+)"/g)].map(match => match[1]);
+}
 
 const adapterIds = new Set([
-  ...[...imageAdaptersSrc.matchAll(/^\s+id: '([^']+)',/gm)].map((m) => m[1]),
-  ...[...videoAdaptersSrc.matchAll(/^\s+id: '([^']+)',/gm)].map((m) => m[1]),
+  ...productionFamilies('image_run.go', 'imageFamily'),
+  ...productionFamilies('video_run.go', 'videoFamily'),
   'openai-chat',
 ]);
 
@@ -43,7 +42,7 @@ for (const match of blocks) {
   seen.add(id);
 
   if (!adapterIds.has(adapter)) {
-    errors.push(`${id} 的 adapter「${adapter}」不在 IMAGE/VIDEO 适配器或 openai-chat 中`);
+    errors.push(`${id} 的 adapter「${adapter}」不在 Go 图像/视频路由或 openai-chat 中`);
   }
 
   const abs = path.join(workspaceRoot, docs);

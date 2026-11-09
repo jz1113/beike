@@ -85,12 +85,16 @@ func TestComflyEditRecoversOnlyExplicitFormRejection(t *testing.T) {
 	previous := gateway.ModelHTTP
 	t.Cleanup(func() { gateway.ModelHTTP = previous })
 	for _, tc := range []struct {
+		model     string
 		message   string
 		wantCalls int
 	}{
-		{"failed to parse multipart form", 2}, {"upstream timed out", 1},
+		{"gpt-image-2", "failed to parse multipart form", 2},
+		{"gpt-image-2.5-flare", "failed to parse multipart form", 2},
+		{"gpt-image-2.5-sunburst", "failed to parse multipart form", 2},
+		{"gpt-image-2.5-flare", "upstream timed out", 1},
 	} {
-		t.Run(tc.message, func(t *testing.T) {
+		t.Run(tc.model+"/"+tc.message, func(t *testing.T) {
 			calls := 0
 			gateway.ModelHTTP = func() *http.Client {
 				return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
@@ -105,7 +109,7 @@ func TestComflyEditRecoversOnlyExplicitFormRejection(t *testing.T) {
 				})}
 			}
 			ref := "data:image/png;base64," + tinyPNG
-			result, err := (openaiImageProtocol{}).Submit(imageRequest{Model: "gpt-image-2", Base: "https://ai.comfly.org", Prompt: "scene", Refs: []string{ref, ref}})
+			result, err := (openaiImageProtocol{}).Submit(imageRequest{Model: tc.model, Base: "https://ai.comfly.org", Prompt: "scene", Refs: []string{ref, ref}})
 			if err != nil || calls != tc.wantCalls || (tc.wantCalls == 2 && result.TaskID != "accepted") {
 				t.Fatal(err, calls, result.TaskID)
 			}

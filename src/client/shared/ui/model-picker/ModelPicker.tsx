@@ -2,10 +2,58 @@ import { isDeepSeekRoute } from '@shared/domain/models/deepseek';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { getModelIcon } from '@client/shared/ui/ModelIcons';
-import { groupAssistantModels } from './groupModels';
-import { usePickerFocus } from './usePickerFocus';
+import { getApprovedModel, vendorLabel } from '@shared/domain/models/modelCatalog';
+import { getVendorDisplayName, inferVendorId, VENDOR_PRIORITY } from '@shared/domain/models/modelSorting';
+import { upstreamModelId } from '@shared/domain/models/workflowModels';
 import { normalizeReasoningEffort, REASONING_EFFORT_LABELS, reasoningCapability, type ReasoningEffort } from '@shared/domain/assistant/reasoning';
 import './modelPicker.css';
+
+const FOCUSABLE = 'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], summary, [tabindex]:not([tabindex="-1"])';
+
+/** Keep keyboard focus inside an open picker surface. */
+function usePickerFocus(isOpen: boolean, onClose?: () => void, initialFocusSelector?: string) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!isOpen || !dialog) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE))
+      .filter(element => element.getClientRects().length > 0);
+    dialog.querySelector<HTMLElement>(initialFocusSelector || '')?.focus();
+    if (!dialog.contains(document.activeElement)) (focusable()[0] || dialog).focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing) return;
+      if (event.key === 'Escape' && closeRef.current) {
+        event.preventDefault();
+        closeRef.current();
+      } else if (event.key === 'Tab') {
+        const elements = focusable();
+        const first = elements[0];
+        const last = elements[elements.length - 1];
+        if (!first || !dialog.contains(document.activeElement)) {
+          event.preventDefault();
+          (event.shiftKey ? last || dialog : first || dialog).focus();
+        } else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      if (dialog.contains(document.activeElement) && previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [isOpen, initialFocusSelector]);
+
+  return dialogRef;
+}
 
 export interface AssistantModelOption { id: string; modelId?: string; name?: string; shortName?: string; provider?: string; badge?: string }
 const descriptions = { auto: '使用模型默认设置。', low: '更快回应，适合提取、改写与简单问答。', medium: '兼顾响应速度与分析深度。', high: '适合复杂规划、比较和多步分析。', xhigh: '投入更多推理时间，可能增加等待与消耗。', max: '使用模型的最高推理强度，适合极复杂任务。' };
@@ -65,7 +113,7 @@ export default function ModelPicker({
   }}>
     <div className="agent-model-controls">
       <button ref={triggerRef} type="button" className="agent-model-trigger" aria-label={`选择模型：${label || '未选择'}`} aria-haspopup="listbox" aria-expanded={open && tab === 'model'} aria-controls={`${id}-models`} onClick={() => toggle('model')}>
-        {getModelIcon(models.find((item) => item.id === model)?.modelId || model, 'w-3.5 h-3.5 shrink-0')}<span className="truncate">{label || '选择模型'}</span><ChevronDown size={12} />
+        {getModelIcon(models.find((item) => item.id === model)?.modelId || current.modelId || model, 'w-3.5 h-3.5 shrink-0')}<span className="truncate">{label || '选择模型'}</span><ChevronDown size={12} />
       </button>
       {showEffort && <button ref={effortRef} type="button" className="agent-effort-trigger" aria-label="调整思考强度" aria-haspopup="dialog" aria-expanded={open && tab === 'effort'} onClick={() => toggle('effort')}>
         <span>{supported ? REASONING_EFFORT_LABELS[resolved] : capability.unavailableLabel}</span><ChevronDown size={11} />
@@ -109,4 +157,31 @@ export default function ModelPicker({
       {!supported && <p className="agent-effort-description">{capability.description}</p>}
     </section>}
   </div>;
+}
+
+/** Group only the displayed options; order vendor groups by unified VENDOR_PRIORITY. */
+function groupAssistantModels<T extends { id: string; modelId?: string }>(models: readonly T[]) {
+  const groups = new Map<string, { vendor: string; label: string; models: T[] }>();
+  for (const model of models) {
+    const identity = model.modelId || model.id;
+    const approved = getApprovedModel(identity) || getApprovedModel(upstreamModelId(identity));
+    const vendor = approved?.vendor || inferVendorId(upstreamModelId(identity)) || 'other';
+    let group = groups.get(vendor);
+    if (!group) {
+      group = {
+        vendor,
+        label: approved ? vendorLabel(approved.vendor) : getVendorDisplayName(vendor),
+        models: [],
+      };
+      groups.set(vendor, group);
+    }
+    group.models.push(model);
+  }
+  return [...groups.values()].sort((a, b) => {
+    const aRank = VENDOR_PRIORITY.indexOf(a.vendor);
+    const bRank = VENDOR_PRIORITY.indexOf(b.vendor);
+    const effectiveARank = aRank >= 0 ? aRank : 999;
+    const effectiveBRank = bRank >= 0 ? bRank : 999;
+    return effectiveARank - effectiveBRank;
+  });
 }

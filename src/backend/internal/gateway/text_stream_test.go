@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -202,8 +203,15 @@ func TestTextStreamsRejectTruncationAndErrors(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%s-%d", tc.protocol, len(tc.body)), func(t *testing.T) {
 			result, err := readTextStream(strings.NewReader(tc.body), tc.protocol, "test", nil)
-			if err == nil || result != nil {
+			if err == nil || result["submissionUnknown"] != true {
 				t.Fatalf("unsafe stream accepted result=%v err=%v body=%s", result, err, tc.body)
+			}
+			for field := range result {
+				switch field {
+				case "submissionUnknown", "id", "model", "created", "system_fingerprint", "requestId", "usage":
+				default:
+					t.Fatalf("failed stream exposed completion field %q: %v", field, result)
+				}
 			}
 		})
 	}
@@ -212,5 +220,140 @@ func TestTextStreamsRejectTruncationAndErrors(t *testing.T) {
 func TestTextSSESizeLimit(t *testing.T) {
 	if err := readTextSSE(strings.NewReader("data: "+strings.Repeat("x", textSSEEventLimit+1)+"\n\n"), func(string, []byte) (bool, error) { return false, nil }); err == nil {
 		t.Fatal("oversized event accepted")
+	}
+}
+
+func TestResponsesMultimodalAdapterPreservesRolesAndRejectsIncomplete(t *testing.T) {
+	incomplete := false
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.URL.Path != "/v1/responses" || r.Header.Get("Authorization") != "Bearer test-key" {
+			t.Fatal("wrong provider route")
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		input := body["input"].([]any)
+		parts := input[0].(map[string]any)["content"].([]any)
+		if body["store"] != false || len(parts) != 2 || parts[0].(map[string]any)["type"] != "input_text" || parts[1].(map[string]any)["image_url"] != "https://example.com/source" {
+			t.Fatal("lost original image or role label")
+		}
+		reasoning, _ := body["reasoning"].(map[string]any)
+		tools, _ := body["tools"].([]any)
+		if reasoning["effort"] != "high" || len(tools) != 1 || textMap(tools[0])["type"] != "web_search" {
+			t.Error("lost configured reasoning or web search")
+		}
+		if incomplete {
+			_, _ = w.Write([]byte(`{"status":"incomplete","output_text":"truncated"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"complete rules"}]}],"usage":{"input_tokens":10,"output_tokens":20}}`))
+	}))
+	defer server.Close()
+	request := TextRequest{BaseURL: server.URL + "/v1", APIKey: "test-key", Client: server.Client(), Payload: map[string]any{"model": "vision", "messages": []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": "text", "text": "actual reference"}, map[string]any{"type": "image_url", "image_url": map[string]any{"url": "https://example.com/source"}}}}}}}
+	request.Payload["reasoning_effort"] = "high"
+	request.Payload["canvasWebSearch"] = true
+	status, data, err := CompleteResponses(context.Background(), request)
+	if err != nil || status != 200 || !strings.Contains(textString(textMap(textMap(data["choices"].([]any)[0])["message"])["content"]), "complete rules") {
+		t.Fatalf("status=%d err=%v", status, err)
+	}
+	incomplete = true
+	if _, _, err := CompleteResponses(context.Background(), request); err == nil {
+		t.Fatal("truncated output accepted")
+	}
+	if calls != 2 {
+		t.Fatal("unexpected provider replay")
+	}
+}
+
+func TestResponsesPreservesStringPromptsAndMultimodalOrderWithoutAddedInstructions(t *testing.T) {
+	system := "  保存的系统规则：只使用当前资料。\n保留引号\"、占位符{{商品}}和末尾空格。  "
+	user := "\n原样用户文本：不要省略。\n  "
+	want := []any{
+		map[string]any{"role": "system", "content": []any{map[string]any{"type": "input_text", "text": system}}},
+		map[string]any{"role": "user", "content": []any{map[string]any{"type": "input_text", "text": user}}},
+		map[string]any{"role": "user", "content": []any{map[string]any{"type": "input_text", "text": "图片前的事实标签"}, map[string]any{"type": "input_image", "image_url": "https://example.com/source"}, map[string]any{"type": "input_text", "text": "图片后的事实标签"}}},
+	}
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if !reflect.DeepEqual(body["input"], want) {
+			t.Errorf("saved prompts or ordered media changed: %#v", body["input"])
+		}
+		_, _ = w.Write([]byte(`{"status":"completed","output_text":"{\"ok\":true}"}`))
+	}))
+	defer server.Close()
+	_, _, err := CompleteResponses(context.Background(), TextRequest{BaseURL: server.URL, Client: server.Client(), Payload: map[string]any{
+		"model": "openai-responses:vision", "response_format": map[string]any{"type": "json_object"},
+		"messages": []any{
+			map[string]any{"role": "system", "content": system},
+			map[string]any{"role": "user", "content": user},
+			map[string]any{"role": "user", "content": []any{map[string]any{"type": "text", "text": "图片前的事实标签"}, map[string]any{"type": "image_url", "image_url": map[string]any{"url": "https://example.com/source"}}, map[string]any{"type": "text", "text": "图片后的事实标签"}}},
+		},
+	}})
+	if err != nil || calls != 1 {
+		t.Fatalf("Responses failed or replayed: calls=%d err=%v", calls, err)
+	}
+}
+
+func TestResponsesRejectsUnsupportedContentWithoutSilentlyDiscardingIt(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++ }))
+	defer server.Close()
+	for _, content := range []any{42, []any{map[string]any{"type": "unsupported", "text": "不能悄悄丢弃"}}} {
+		_, _, err := CompleteResponses(context.Background(), TextRequest{BaseURL: server.URL, Client: server.Client(), Payload: map[string]any{"model": "vision", "messages": []any{map[string]any{"role": "system", "content": content}}}})
+		if err == nil {
+			t.Fatal("unsupported content was silently accepted")
+		}
+	}
+	if calls != 0 {
+		t.Fatalf("invalid content reached the provider: %d calls", calls)
+	}
+}
+
+func TestS09StreamFailuresRetainUsageAndIdentityWithoutPartialContent(t *testing.T) {
+	cases := []struct {
+		protocol, body, id string
+		total              float64
+	}{
+		{"openai", `data: {"id":"openai-id","choices":[{"delta":{"content":"private partial"},"finish_reason":"stop"}],"usage":{"total_tokens":7}}` + "\n\n", "openai-id", 7},
+		{"anthropic", textClaudeEvent("message_start", map[string]any{"message": map[string]any{"id": "claude-id", "usage": map[string]any{"input_tokens": 5, "output_tokens": 0}}}) + textClaudeEvent("message_delta", map[string]any{"delta": map[string]any{"stop_reason": "end_turn"}, "usage": map[string]any{"output_tokens": 3}}), "claude-id", 8},
+		{"gemini", `data: {"responseId":"gemini-id","usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2,"totalTokenCount":7},"candidates":[{"content":{"parts":[{"text":"private partial"}]}}]}` + "\n\n", "gemini-id", 7},
+		{"openai", `event: error` + "\n" + `data: {"id":"error-id","error":{"message":"overloaded"},"usage":{"total_tokens":4}}` + "\n\n", "error-id", 4},
+	}
+	for _, tc := range cases {
+		t.Run(tc.protocol+tc.id, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				w.Header().Set("x-request-id", "provider-request")
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer server.Close()
+			status, result, err := StreamText(context.Background(), TextRequest{BaseURL: server.URL, APIKey: "fake", Protocol: tc.protocol, Client: server.Client(), Payload: map[string]any{"model": "test", "messages": []any{map[string]any{"role": "user", "content": "hello"}}}}, nil)
+			if status != 200 || err == nil || result["submissionUnknown"] != true || result["id"] != tc.id || result["requestId"] != "provider-request" {
+				t.Fatalf("receipt status=%d data=%v err=%v", status, result, err)
+			}
+			if textNumber(textMap(result["usage"])["total_tokens"]) != tc.total {
+				t.Fatalf("usage changed %v", result)
+			}
+			for _, field := range []string{"choices", "content", "candidates", "native_content", "tool_calls"} {
+				if result[field] != nil {
+					t.Fatalf("partial completion leaked: %s %v", field, result)
+				}
+			}
+		})
+	}
+}
+
+func TestS09StreamFailureDoesNotInventUsage(t *testing.T) {
+	result, err := readOpenAIStream(strings.NewReader("data: not JSON\n\n"), "test", func(string, string) {})
+	if err == nil || result["usage"] != nil || result["submissionUnknown"] != true {
+		t.Fatal(result, err)
 	}
 }

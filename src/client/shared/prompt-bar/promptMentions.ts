@@ -11,7 +11,10 @@ export function resolveSubjectByMention(
 ): SubjectItem | null {
   if (!mention) return null;
   const selected = parseSubjectMention(mention);
-  if (selected) {
+  if (selected?.id.startsWith('canvas-node:')) {
+    return allSubjects.find(subject => subject.id === selected.id) || null;
+  }
+  if (selected && selected.id) {
     const url = resolveRefMediaIdentity(selected.id);
     return allSubjects.find(subject => subject.url === url) ||
       (url && quickRefImages.includes(url) ? { id: selected.id, name: selected.name, url } : null);
@@ -20,13 +23,21 @@ export function resolveSubjectByMention(
   if (!clean) return null;
 
   const cleanLower = clean.toLowerCase();
+  const cleanCompact = clean.replace(/\s+/g, '');
   const cleanNoExt = clean.replace(/\.[^/.]+$/, '').toLowerCase();
   const cleanNormalized = clean.replace(/[\s_\-.]+/g, '').toLowerCase();
 
-  if (/^(图片|视频)\d+$/.test(clean) && quickRefImages.length > 0) {
-    const media = mediaReferenceSlots(quickRefImages).find(item => item.name === clean);
-    if (media) return allSubjects.find(subject => subject.url === media.url) || { id: `ref-${clean}`, ...media };
+  if (/^(图片|视频)\d+$/.test(cleanCompact) && quickRefImages.length > 0) {
+    const canvasReference = allSubjects.find(subject => subject.id.startsWith('canvas-node:') && subject.name === cleanCompact);
+    if (canvasReference) return canvasReference;
+    const media = mediaReferenceSlots(quickRefImages).find(item => item.name === cleanCompact);
+    if (media) return allSubjects.find(subject => subject.url === media.url) || { id: `ref-${cleanCompact}`, ...media };
     return null;
+  }
+
+  if (/^文本\d+$/.test(cleanCompact)) {
+    const matchedText = allSubjects.find(subject => subject.name.replace(/\s+/g, '') === cleanCompact);
+    if (matchedText) return matchedText;
   }
 
   // 1. 特殊全局关键词：@主体 / @模特 / @参考图 / @主图 / @商品图 -> 默认对应第 1 个主体
@@ -58,12 +69,16 @@ export function resolveSubjectByMention(
 
   // 3. 精准匹配名称或 ID (支持原名、带文件后缀或去除后缀)
   for (const s of allSubjects) {
+    const sIdLower = s.id.toLowerCase();
+    const sIdNoExt = s.id.replace(/\.[^/.]+$/, '').toLowerCase();
     const sNameLower = s.name.toLowerCase();
     const sNameNoExt = s.name.replace(/\.[^/.]+$/, '').toLowerCase();
     const sNameNormalized = s.name.replace(/[\s_\-.]+/g, '').toLowerCase();
 
     if (
       s.id === clean ||
+      sIdLower === cleanLower ||
+      sIdNoExt === cleanNoExt ||
       sNameLower === cleanLower ||
       sNameNoExt === cleanNoExt ||
       sNameNoExt === cleanLower ||

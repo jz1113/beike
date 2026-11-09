@@ -6,8 +6,10 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -176,5 +178,224 @@ func TestConcurrentScriptEditsRetainLatestVersion(t *testing.T) {
 	current, err := readReferenceScriptByID(t.Context(), db, "local", saved.ID)
 	if err != nil || current.Version != 2 || current.Title != "已确认新版本" {
 		t.Fatal(current.Title, current.Version, err)
+	}
+}
+
+func TestScriptCompletionRejectsPerformanceDataThatWouldBeLost(t *testing.T) {
+	for _, field := range []string{"expression", "transition"} {
+		for _, value := range []any{map[string]any{"eyes": "先抬眼再垂眼"}, []string{"浅笑", "回落"}, true, 42, strings.Repeat("字", 601)} {
+			var script map[string]any
+			if err := json.Unmarshal([]byte(validScript), &script); err != nil {
+				t.Fatal(err)
+			}
+			beat := script["shots"].([]any)[0].(map[string]any)["beats"].([]any)[0].(map[string]any)
+			beat[field] = value
+			raw, _ := json.Marshal(script)
+			if _, err := parseScriptCompletion(scriptCompletion(string(raw), "stop")); err == nil {
+				t.Fatalf("accepted malformed %s: %T", field, value)
+			}
+		}
+	}
+	var script map[string]any
+	_ = json.Unmarshal([]byte(validScript), &script)
+	beat := script["shots"].([]any)[0].(map[string]any)["beats"].([]any)[0].(map[string]any)
+	beat["expression"], beat["transition"] = strings.Repeat("表", 600), strings.Repeat("接", 400)
+	raw, _ := json.Marshal(script)
+	parsed, err := parseScriptCompletion(scriptCompletion(string(raw), "stop"))
+	if err != nil {
+		t.Fatal("valid performance data rejected", err)
+	}
+	actual := parsed["shots"].([]any)[0].(map[string]any)["beats"].([]any)[0].(map[string]any)
+	if actual["expression"] != beat["expression"] || actual["transition"] != beat["transition"] {
+		t.Fatal("performance data was truncated")
+	}
+}
+
+func TestInvalidCachedPerformanceIsReplacedWithoutOverwritingHistory(t *testing.T) {
+	cfg := setupSalesTestConfig(t)
+	var script map[string]any
+	_ = json.Unmarshal([]byte(validScript), &script)
+	first, err := persistAnalyzedScript(cfg, "local", "", "hash", "model", "prompt", "route", script, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	// Reproduce a historical response previously accepted as the current-version cache.
+	broken := strings.Replace(validScript, `"action":"坐姿看镜头"`, `"action":"坐姿看镜头","expression":{"eyes":"抬眼"}`, 1)
+	if _, err := db.Exec(`UPDATE "SalesReferenceScript" SET "scriptJson"=?,"status"='verified' WHERE "id"=?`, broken, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	if cached := lookupCachedScriptAnalysis(context.Background(), cfg.SQLiteFile(), "local", "hash", "prompt", "route"); cached != nil {
+		t.Fatal("invalid performance cache was reused")
+	}
+	second, err := persistAnalyzedScript(cfg, "local", "", "hash", "model", "prompt", "route", script, false)
+	if err != nil || second.ID == first.ID {
+		t.Fatal("replacement did not get its own saved row", second.ID, err)
+	}
+	if _, err := validateScriptObject(second.Script); err != nil {
+		t.Fatal("replacement content is invalid", err)
+	}
+	if cached := lookupCachedScriptAnalysis(context.Background(), cfg.SQLiteFile(), "local", "hash", "prompt", "route"); cached == nil || cached.ID != second.ID {
+		t.Fatal("historical invalid cache hid the valid replacement", cached)
+	}
+	var preserved, status string
+	if err := db.QueryRow(`SELECT "scriptJson","status" FROM "SalesReferenceScript" WHERE "id"=?`, first.ID).Scan(&preserved, &status); err != nil || preserved != broken || status != "verified" {
+		t.Fatal("historical confirmed script was overwritten", err)
+	}
+}
+
+func TestScriptSavePreservesLinkedVideo(t *testing.T) {
+	cfg := setupSalesTestConfig(t)
+	cache := t.TempDir()
+	t.Setenv("AZHUO_CACHE_DIR", cache)
+	rel := "local/azhuo/refs/sales-script/test/source.mp4"
+	file := filepath.Join(cache, rel)
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte("reference fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TRIGGER reject_script BEFORE INSERT ON "SalesReferenceScript" BEGIN SELECT RAISE(ABORT,'test write failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	requestBody := `{"videoUrl":"/storage/` + rel + `","script":` + validScript + `}`
+	rec := httptest.NewRecorder()
+	Scripts(cfg).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/sales/scripts", strings.NewReader(requestBody)))
+	if rec.Code != 500 {
+		t.Fatalf("expected failure: %d %s", rec.Code, rec.Body.String())
+	}
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("failed save removed retry source: %v", err)
+	}
+	if _, err := db.Exec(`DROP TRIGGER reject_script`); err != nil {
+		t.Fatal(err)
+	}
+	rec = httptest.NewRecorder()
+	Scripts(cfg).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/sales/scripts", strings.NewReader(requestBody)))
+	if rec.Code != 200 {
+		t.Fatalf("retry failed: %d %s", rec.Code, rec.Body.String())
+	}
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("successful save must retain the linked source: %v", err)
+	}
+}
+
+// Delay the request body until another operation has changed the record that
+// PATCH already read, so the interleaving is deterministic without goroutine sleeps.
+type interleavedScriptBody struct {
+	reader io.Reader
+	before func()
+}
+
+func (body *interleavedScriptBody) Read(data []byte) (int, error) {
+	if body.before != nil {
+		before := body.before
+		body.before = nil
+		before()
+	}
+	return body.reader.Read(data)
+}
+
+func TestScriptUsagePreservesConcurrentEdits(t *testing.T) {
+	cfg := setupSalesTestConfig(t)
+	db, err := sql.Open("sqlite", cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	create := httptest.NewRecorder()
+	Scripts(cfg).ServeHTTP(create, httptest.NewRequest(http.MethodPost, "/api/sales/scripts", strings.NewReader(`{"id":"concurrent","title":"原脚本","script":`+validScript+`}`)))
+	if create.Code != 200 {
+		t.Fatal(create.Body.String())
+	}
+	updatedScript := strings.Replace(validScript, "起身转身", "展示袖口", 1)
+	body := &interleavedScriptBody{reader: strings.NewReader(`{"recordUse":true}`), before: func() {
+		_, err := db.Exec(`UPDATE "SalesReferenceScript" SET "title"='已重新归类',"status"='verified',"scriptJson"=?,"version"=2,"useCount"=3 WHERE "id"='concurrent'`, updatedScript)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}}
+	rec := httptest.NewRecorder()
+	patchReferenceScript(rec, httptest.NewRequest(http.MethodPatch, "/api/sales/scripts/concurrent", body), db, "local", "concurrent")
+	var response struct {
+		Item storedReferenceScript `json:"item"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &response)
+	raw, _ := json.Marshal(response.Item.Script)
+	if rec.Code != 200 || response.Item.Title != "已重新归类" || response.Item.Status != "verified" || response.Item.Version != 2 || response.Item.UseCount != 4 || !strings.Contains(string(raw), "展示袖口") {
+		t.Fatalf("recording use overwrote a concurrent edit: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestScriptEditsPreserveConcurrentUsage(t *testing.T) {
+	for _, recordUse := range []bool{false, true} {
+		t.Run(map[bool]string{false: "edit", true: "edit-and-use"}[recordUse], func(t *testing.T) {
+			cfg := setupSalesTestConfig(t)
+			db, err := sql.Open("sqlite", cfg.SQLiteFile())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			create := httptest.NewRecorder()
+			Scripts(cfg).ServeHTTP(create, httptest.NewRequest(http.MethodPost, "/api/sales/scripts", strings.NewReader(`{"id":"concurrent","script":`+validScript+`}`)))
+			if create.Code != 200 {
+				t.Fatal(create.Body.String())
+			}
+			var script map[string]any
+			_ = json.Unmarshal([]byte(validScript), &script)
+			raw, _ := json.Marshal(map[string]any{"script": script, "recordUse": recordUse})
+			body := &interleavedScriptBody{reader: strings.NewReader(string(raw)), before: func() {
+				if _, err := db.Exec(`UPDATE "SalesReferenceScript" SET "useCount"=3,"lastUsedAt"='concurrent-use' WHERE "id"='concurrent'`); err != nil {
+					t.Fatal(err)
+				}
+			}}
+			rec := httptest.NewRecorder()
+			patchReferenceScript(rec, httptest.NewRequest(http.MethodPatch, "/api/sales/scripts/concurrent", body), db, "local", "concurrent")
+			var response struct {
+				Item storedReferenceScript `json:"item"`
+			}
+			_ = json.Unmarshal(rec.Body.Bytes(), &response)
+			wantCount := 3
+			if recordUse {
+				wantCount++
+			}
+			if rec.Code != 200 || response.Item.UseCount != wantCount || response.Item.Version != 2 || (!recordUse && response.Item.LastUsedAt != "concurrent-use") {
+				t.Fatalf("editing reset concurrent use statistics: %d %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestScriptUsageReportsConcurrentDeletion(t *testing.T) {
+	cfg := setupSalesTestConfig(t)
+	db, err := sql.Open("sqlite", cfg.SQLiteFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	create := httptest.NewRecorder()
+	Scripts(cfg).ServeHTTP(create, httptest.NewRequest(http.MethodPost, "/api/sales/scripts", strings.NewReader(`{"id":"concurrent","script":`+validScript+`}`)))
+	if create.Code != 200 {
+		t.Fatal(create.Body.String())
+	}
+	body := &interleavedScriptBody{reader: strings.NewReader(`{"recordUse":true}`), before: func() {
+		if _, err := db.Exec(`DELETE FROM "SalesReferenceScript" WHERE "id"='concurrent'`); err != nil {
+			t.Fatal(err)
+		}
+	}}
+	rec := httptest.NewRecorder()
+	patchReferenceScript(rec, httptest.NewRequest(http.MethodPatch, "/api/sales/scripts/concurrent", body), db, "local", "concurrent")
+	if rec.Code != 404 {
+		t.Fatalf("concurrent deletion must not return an empty successful record: %d %s", rec.Code, rec.Body.String())
 	}
 }

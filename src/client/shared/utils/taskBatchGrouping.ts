@@ -25,7 +25,7 @@ const asTaskFields = (value: unknown): BatchTaskFields => (value ?? {}) as Batch
 const rawTaskMeta = (task: BatchTaskFields): { sessionId?: string; sessionTitle?: string } | undefined =>
   task.rawTask as { sessionId?: string; sessionTitle?: string } | undefined;
 
-export interface TaskBatch<T = any> {
+export interface TaskBatch<T = BatchTaskFields> {
   batchId: string;
   title?: string;
   prompt: string;

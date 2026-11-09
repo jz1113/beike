@@ -34,12 +34,24 @@ export function resolveRefMediaIdentity(id: string): string | undefined {
   return undefined;
 }
 
+const MAX_REF_MEDIA_ENTRIES = 128;
+
 export function registerRefMedia(url: string, file: File, origName?: string): void {
+  if (files.has(url)) {
+    files.delete(url);
+  }
   files.set(url, file);
   kinds.set(url, isVideoFile(file) ? 'video' : 'image');
   const cleanName = (origName || file.name || '').replace(/\.[^/.]+$/, '').trim();
   if (cleanName) {
     names.set(url, cleanName);
+  }
+  while (files.size > MAX_REF_MEDIA_ENTRIES) {
+    const oldest = files.keys().next().value;
+    if (!oldest) break;
+    files.delete(oldest);
+    kinds.delete(oldest);
+    names.delete(oldest);
   }
 }
 
@@ -58,6 +70,7 @@ export function unregisterRefMedia(url: string): void {
   files.delete(url);
   kinds.delete(url);
   names.delete(url);
+  identities.delete(url);
 }
 
 export function resolveRefMediaFile(url: string): File | undefined {

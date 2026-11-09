@@ -3,14 +3,14 @@ import { apiRequest } from '@client/shared/api/apiRequest';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { readAssistantReasoningEffort } from '@client/shared/hooks/useAssistantReasoning';
 import {
-  analyzeReferenceVideo, fetchSalesScript, fetchScriptAnalysisPrompt, listSalesScripts,
+  analyzeReferenceVideo, fetchSalesScript, listSalesScripts,
   patchSalesScript, saveSalesScript, uploadScriptVideo,
 } from './salesScripts';
 
 vi.mock('@client/shared/api/apiRequest', () => ({ apiRequest: vi.fn() }));
 vi.mock('@client/shared/api/gatewayClient', () => ({ getMultimodalClientOverrides: vi.fn() }));
 vi.mock('@client/shared/hooks/useAssistantReasoning', () => ({ readAssistantReasoningEffort: vi.fn(() => 'medium') }));
-vi.mock('@shared/domain/models/textModelRoute', () => ({ selectedTextModel: () => ({ modelId: 'gemini-2.5-pro' }) }));
+vi.mock('@shared/domain/models/workflowModelStorage', async importOriginal => ({ ...await importOriginal<typeof import('@shared/domain/models/workflowModelStorage')>(), selectedTextModel: () => ({ modelId: 'gemini-2.5-pro' }) }));
 
 afterEach(() => vi.resetAllMocks());
 
@@ -38,12 +38,6 @@ describe('sales reference script API', () => {
     await expect(fetchSalesScript('saved')).rejects.toThrow('重新启动贝壳服务');
     vi.mocked(apiRequest).mockResolvedValueOnce(new Response(JSON.stringify({ error: '暂不可用' }), { status: 500 }));
     await expect(fetchSalesScript('saved')).rejects.toThrow('暂不可用');
-  });
-  it('bypasses browser cache when reading the active analysis prompt', async () => {
-    vi.mocked(apiRequest).mockResolvedValue(new Response(JSON.stringify({ success: true, prompt: '保存后的规则', promptVersion: 'reference-script:latest' })));
-    const signal = new AbortController().signal;
-    await expect(fetchScriptAnalysisPrompt(signal)).resolves.toMatchObject({ promptVersion: 'reference-script:latest' });
-    expect(apiRequest).toHaveBeenCalledWith('GET', '/api/sales/script-analysis/prompt', { signal, cache: 'no-store' });
   });
   it('uploads reference videos and returns measured probe metadata', async () => {
     vi.mocked(apiRequest).mockResolvedValue(new Response(JSON.stringify({

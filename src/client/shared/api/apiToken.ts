@@ -85,6 +85,8 @@ export function getClientAccessToken(): string {
 
   const meta = readMeta();
   if (meta && meta.expiresAt > 0 && Date.now() > meta.expiresAt) {
+    try { localStorage.removeItem(`${TOKEN_META_PREFIX}expires_at`); } catch { /* ignore */ }
+    writeCookie(TOKEN_COOKIE_NAME, '', 0);
     return '';
   }
 
@@ -118,9 +120,15 @@ export function setClientAccessToken(_token: string): void {
 
 export function syncAppTokenCookie(): void {
   if (typeof window === 'undefined') return;
-  writeMeta();
   const token = getClientAccessToken();
-  if (token && token !== DEFAULT_DEV_TOKEN) {
+  if (!token) {
+    writeCookie(TOKEN_COOKIE_NAME, '', 0);
+    return;
+  }
+  if (!readMeta()) {
+    writeMeta();
+  }
+  if (token !== DEFAULT_DEV_TOKEN) {
     writeCookie(TOKEN_COOKIE_NAME, token, TOKEN_TTL_SECONDS);
   }
 }

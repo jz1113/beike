@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { TextRequestRoutingFields } from './textRouting';
+
+/** Independent of apiFormat: Responses remains a separate transport selection. */
+export const TextProtocolSchema = z.enum(['auto', 'openai', 'gemini', 'anthropic']);
+export const TextRequestRoutingFields = { textProtocol: TextProtocolSchema.optional() };
+export type TextProtocol = z.infer<typeof TextProtocolSchema>;
+
+export const ReasoningEffortSchema = z.enum(['auto', 'low', 'medium', 'high', 'xhigh', 'max']);
+export const TextReasoningRoutingFields = { reasoningEffort: ReasoningEffortSchema.optional() };
 
 export const ImageTaskStatusSchema = z.enum([
   'PENDING',
@@ -68,6 +75,7 @@ export const GenerationTaskSchema = z.object({
   referenceImageUrl: z.string().optional(),
   referenceImages: z.array(z.string()).optional(),
   referenceVideoUrls: z.array(z.string()).optional(),
+  referenceAudioUrls: z.array(z.string()).optional(),
   images: z.array(z.string()).optional(),
   useReferenceImage: z.boolean(),
   taskType: z.enum(['multi_angle', 'smart_edit', 'outpaint', 'generation']).optional(),
@@ -95,6 +103,7 @@ export const DepthVideoSubmitBodySchema = z.object({
   videoUrl: z.string().min(1).optional(),
   style: DepthVideoStyleSchema.optional().default('mocap'),
   colormap: DepthVideoColormapSchema.optional(),
+  resolution: z.enum(['480p', '720p']).optional(),
   quality: DepthQualitySchema.optional().default('standard'),
 }).refine((body) => Boolean(body.videoDataUrl?.trim() || body.videoUrl?.trim()), {
   message: '请提供 videoDataUrl 或 videoUrl',
@@ -176,3 +185,37 @@ export const HeadlineTitleRequestSchema = z.object({
 
 export type HeadlineDesignRequest = z.infer<typeof HeadlineDesignRequestSchema>;
 export type HeadlineTitleRequest = z.infer<typeof HeadlineTitleRequestSchema>;
+
+export const SystemConfigResponseSchema = z.object({
+  success: z.boolean().optional(),
+  config: z.record(z.unknown()).optional(),
+});
+
+export type SystemConfigResponse = z.infer<typeof SystemConfigResponseSchema>;
+
+export const ImageTemplateCallSchema = z.object({
+  method: z.string().optional(),
+  url: z.string().min(1),
+  headers: z.record(z.string(), z.string()).optional(),
+  body: z.string().optional(),
+});
+
+export const ImageTemplatePollSchema = z.object({
+  url: z.string().min(1),
+  statusPath: z.string().optional(),
+  imageUrlPath: z.string().optional(),
+  successValues: z.array(z.string()).optional(),
+  failureValues: z.array(z.string()).optional(),
+  errorPath: z.string().optional(),
+});
+
+export const ImageRequestTemplateSchema = z.object({
+  submit: ImageTemplateCallSchema,
+  result: z.object({
+    imageUrlPath: z.string().optional(),
+    taskIdPath: z.string().optional(),
+  }),
+  poll: ImageTemplatePollSchema.optional(),
+});
+
+export type ImageRequestTemplate = z.infer<typeof ImageRequestTemplateSchema>;

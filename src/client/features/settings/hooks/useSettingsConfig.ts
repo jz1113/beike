@@ -1,19 +1,51 @@
 import { apiFetch } from '@client/shared/api/apiClient';
 import { storageConfigError, type StorageProvider, normalizeStorageUrl, QINIU_ZONES } from '../model/storageValidation';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  persistAiGatewayConfig,
-  persistDeepSeekConfig,
-  persistStorageConfig,
-  persistWanbangConfig,
-} from '@client/shared/api/persistCredentials';
+import { persistAiGatewayConfig, persistDeepSeekConfig, persistStorageConfig, persistWanbangConfig, waitForCredentialSaves } from '@client/shared/api/persistCredentials';
 import { setClientGatewayApiKey, setClientGatewayBaseUrl } from '@client/shared/api/gatewayClient';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import { useIndependentModelProviders } from './useIndependentModelProviders';
-import { useConnectionChecks } from './useConnectionChecks';
-import { testModelConnection, testWanbangConnection } from '../model/settingsConnectionChecks';
-import { readSettingsConfig, settingsConfigFingerprint, type SettingsConfigSnapshot } from './readSettingsConfig';
-import { useConfigSaveState } from './useConfigSaveState';
+import { useConnectionChecks, useConfigSaveState } from './useApiProviders';
+import { testModelConnection, testWanbangConnection } from '../model/apiProviderTypes';
+import { credentialGet } from '@client/shared/api/credentialClient';
+
+const providers: readonly string[] = ['oss', 'qiniu', 'cloudinary'];
+
+async function readSettingsConfig() {
+  await waitForCredentialSaves();
+  const read = (key: string, fallback = '') => localStorage.getItem(key) || fallback;
+  const rawProvider = read('storage_provider');
+  const metadata = {
+    baseUrl: read('ai_base_url', 'https://ai.comfly.org'),
+    isWanbangEnabled: read('wanbang_enabled') !== 'false',
+    appAccessToken: read('app_access_token', 'azhuo-local-dev'),
+    storageEnabled: read('storage_enabled') === 'true',
+    storageProvider: (providers.includes(rawProvider) ? rawProvider : 'oss') as StorageProvider,
+    storageAccountId: read('storage_account_id'),
+    storageEndpoint: read('storage_endpoint'),
+    storageAccessKeyId: read('storage_access_key_id'),
+    storageBucketName: read('storage_bucket_name'),
+    storagePublicDomain: read('storage_public_domain'),
+    storageApiPrefix: read('storage_api_prefix', 'seedance/'),
+    storageMaterialsPrefix: read('storage_materials_prefix', 'canvas-materials/'),
+    storageCloudName: read('storage_cloud_name'),
+    storageZone: read('storage_zone', 'z2'),
+  };
+  const [apiKey, deepSeekApiKey, wanbangKey, wanbangSecret, storageSecretAccessKey] = await Promise.all([
+    credentialGet('ai_api_key', true), credentialGet('deepseek_api_key', true),
+    credentialGet('wanbang_api_key', true), credentialGet('wanbang_api_secret', true),
+    credentialGet('storage_secret_access_key', true),
+  ]);
+  return { ...metadata, apiKey, deepSeekApiKey, wanbangKey, wanbangSecret, storageSecretAccessKey };
+}
+
+type SettingsConfigSnapshot = Awaited<ReturnType<typeof readSettingsConfig>>;
+
+function settingsConfigFingerprint(config: SettingsConfigSnapshot): string {
+  return JSON.stringify(Object.entries(config).filter(([key]) => key !== 'appAccessToken')
+    .sort(([first], [second]) => first.localeCompare(second))
+    .map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value]));
+}
 
 interface UseSettingsConfigOptions {
   isOpen: boolean;

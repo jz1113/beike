@@ -6,7 +6,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,7 +17,9 @@ import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/httpx"
+	"beike.local/cloud/src/backend/internal/platform/collect"
 	"beike.local/cloud/src/backend/internal/platform/database"
+	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
 func startAssistantTurn(cfg config.Config, w http.ResponseWriter, r *http.Request, payload map[string]json.RawMessage) {
@@ -37,7 +41,7 @@ func startAssistantTurn(cfg config.Config, w http.ResponseWriter, r *http.Reques
 	}
 	model := optionalString(payload, "model")
 	if model == "" {
-		model = "gemini-3.7-flash"
+		model = "gpt-6-luna"
 	}
 	creds, err := resolveTurnCreds(r, model, optionalString(payload, "customBaseUrl"), optionalString(payload, "customApiKey"), cfg.Production())
 	if err != nil {
@@ -97,7 +101,7 @@ func replayTurn(cfg config.Config, w http.ResponseWriter, r *http.Request, works
 		httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "turnId": turnID, "error": "原任务快照暂时无法读取，本轮未重新执行", "retryable": false})
 		return
 	}
-	events := []map[string]any{{"type": "turn/snapshot", "turnId": turnID, "threadId": threadID, "snapshot": snapshot}}
+	events := []map[string]any{{"type": "meta", "modelUsed": snapshot["modelUsed"], "productWidget": snapshot["productWidget"]}, {"type": "turn/snapshot", "turnId": turnID, "threadId": threadID, "snapshot": snapshot}}
 	if snapshot["status"] == "completed" {
 		events = append(events, map[string]any{"type": "turn/completed", "turnId": turnID})
 	} else if snapshot["status"] == "interrupted" {
@@ -130,6 +134,12 @@ func streamTurn(ctx context.Context, cfg config.Config, w http.ResponseWriter, r
 	messages, documents := turnMessages(r, threadID, payload)
 	started := time.Now()
 	noteTurnEvent(workspace, "turn/started", turnID, threadID, model, "", "", started)
+	userText := strings.TrimSpace(lastUserText(messages))
+	refresh := strings.HasPrefix(userText, "重新采集")
+	if id, platform, ok := directProductID(strings.TrimSpace(strings.TrimPrefix(userText, "重新采集"))); ok {
+		finishProductCollection(ctx, cfg, send, persist, workspace, turnID, threadID, id, platform, refresh)
+		return
+	}
 	intent := detectSocialIntent(lastUserText(messages))
 	if len(intent.urls) > 0 {
 		finishCollection(ctx, cfg, w, flusher, send, persist, workspace, turnID, threadID, r, intent.urls)
@@ -335,13 +345,14 @@ func errorsDeadline(err error) bool {
 }
 
 func finishCollection(ctx context.Context, cfg config.Config, w http.ResponseWriter, flusher http.Flusher, send func(map[string]any), persist func(map[string]any), workspace, turnID, threadID string, r *http.Request, urls []string) {
+	send(map[string]any{"type": "status", "message": "正在查询采集缓存；未命中时将调用外部采集服务，可能产生采集费用。本次只提取素材链接，不进行 AI 分析。"})
 	images, summaries, raws, widget := collectSocialImages(r, cfg, urls)
 	items := []any{}
 	for index, raw := range raws {
-		item := map[string]any{"id": newRuntimeID("tool"), "kind": "toolCall", "name": "parse_product_or_social_url", "displayName": "采集小红书图片", "args": urls[index], "status": "done", "summary": raw, "createdAt": time.Now().UnixMilli()}
+		item := map[string]any{"id": newRuntimeID("tool"), "kind": "toolCall", "name": "parse_product_or_social_url", "displayName": "采集社媒素材", "args": urls[index], "status": "done", "summary": raw, "createdAt": time.Now().UnixMilli()}
 		items = append(items, item)
-		send(map[string]any{"type": "tool_call", "name": "parse_product_or_social_url", "displayName": "采集小红书图片", "status": "running"})
-		send(map[string]any{"type": "tool_result", "name": "parse_product_or_social_url", "displayName": "采集小红书图片", "status": "done", "detail": summaries[index]})
+		send(map[string]any{"type": "tool_call", "name": "parse_product_or_social_url", "displayName": "采集社媒素材", "status": "running"})
+		send(map[string]any{"type": "tool_result", "name": "parse_product_or_social_url", "displayName": "采集社媒素材", "status": "done", "detail": summaries[index]})
 		persist(item)
 	}
 	text := strings.Join(summaries, "\n\n") + "\n\n采集阶段未调用 AI 模型。已获取 " + strconv.Itoa(len(images)) + " 张不重复图片的地址，尚未进行画面分析。"
@@ -360,4 +371,67 @@ func finishCollection(ctx context.Context, cfg config.Config, w http.ResponseWri
 	send(map[string]any{"type": "done"})
 	_ = w
 	_ = flusher
+}
+
+// Restrict recognition to a standalone ID or an explicit collection request, so
+// ordinary messages containing numbers never silently trigger a paid model call.
+var directProductPattern = regexp.MustCompile(`(?i)^\s*(?:(?:请|帮我|麻烦)?\s*(?:用万邦)?\s*(?:采集|收集|获取|解析)\s*)?(京东|jd|淘宝|天猫|taobao|tmall|1688|拼多多|pdd)?\s*(?:商品\s*)?(?:id|编号|号码)?\s*[:：#]?\s*(\d{7,20})\s*$`)
+
+func directProductID(text string) (string, string, bool) {
+	m := directProductPattern.FindStringSubmatch(text)
+	if m == nil {
+		return "", "", false
+	}
+	platform := "jd"
+	switch strings.ToLower(m[1]) {
+	case "淘宝", "天猫", "taobao", "tmall":
+		platform = "taobao"
+	case "1688":
+		platform = "1688"
+	case "拼多多", "pdd":
+		platform = "pinduoduo"
+	}
+	return m[2], platform, true
+}
+
+func finishProductCollection(ctx context.Context, cfg config.Config, send func(map[string]any), persist func(map[string]any), workspace, turnID, threadID, id, platform string, refresh bool) {
+	send(map[string]any{"type": "status", "message": "正在查询商品资料，缓存未命中时需要等待京东采集服务返回…"})
+	send(map[string]any{"type": "tool_call", "name": "collect_product", "displayName": "万邦商品采集", "status": "running"})
+	var body map[string]any
+	db, err := database.OpenRequired(cfg.SQLiteFile())
+	if err != nil {
+		body = map[string]any{"success": false, "error": "无法打开商品数据库"}
+	} else {
+		defer db.Close()
+		result := collect.Product(ctx, db, workspace, map[string]any{"url": id, "platform": platform, "forceRefresh": refresh}, os.Getenv("WANBANG_API_KEY"), os.Getenv("WANBANG_API_SECRET"), network.SafeClient())
+		encoded, _ := json.Marshal(result.Body)
+		_ = json.Unmarshal(encoded, &body)
+	}
+	text := "商品采集失败。"
+	var widget map[string]any
+	if body["success"] == true {
+		widget, _ = body["product"].(map[string]any)
+		if widget != nil {
+			widget["allImages"] = widget["images"]
+			widget["apiUsed"] = body["apiUsed"]
+		}
+		text = "商品采集完成，未调用 AI 模型。"
+		if body["fromCache"] == true {
+			text = "已复用商品采集结果，未重复调用采集服务或 AI 模型。"
+		}
+	} else if message, ok := body["error"].(string); ok {
+		text = "商品采集失败：" + message + "。未调用 AI 模型。"
+	}
+	item := map[string]any{"id": newRuntimeID("tool"), "kind": "toolCall", "name": "collect_product", "displayName": "万邦商品采集", "args": id, "status": "done", "summary": text, "createdAt": time.Now().UnixMilli()}
+	persist(item)
+	send(map[string]any{"type": "tool_result", "name": "collect_product", "displayName": "万邦商品采集", "status": "done", "detail": text})
+	message := map[string]any{"id": newRuntimeID("msg"), "kind": "agentMessage", "content": text, "status": "done", "productWidget": widget}
+	persist(message)
+	snapshot := map[string]any{"id": turnID, "threadId": threadID, "status": "completed", "items": []any{item, message}, "modelUsed": "direct-collection", "productWidget": widget}
+	_ = saveTurnState(ctx, cfg, workspace, turnID, "completed", "direct-collection", 0, 0, snapshot)
+	send(map[string]any{"type": "meta", "modelUsed": "direct-collection", "productWidget": widget})
+	send(map[string]any{"type": "assistant", "content": text})
+	send(map[string]any{"type": "turn/snapshot", "turnId": turnID, "threadId": threadID, "snapshot": snapshot})
+	send(map[string]any{"type": "turn/completed", "turnId": turnID})
+	send(map[string]any{"type": "done"})
 }

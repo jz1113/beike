@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Laptop, Maximize2, Minimize2, Moon, Pause, Play, RotateCcw, Sun } from 'lucide-react';
+import { AppBackgroundLayer } from '@client/shared/media/backgrounds/AppBackgroundLayer';
 import {
   BACKGROUND_CATALOG,
   getBackgroundCatalogItem,
@@ -10,12 +11,70 @@ import {
   getStudioSchema,
   isDynamicStyle,
   matchingPresetId,
+  studioAccent,
+  type StudioValues,
 } from '@client/shared/media/backgrounds/studio';
 import { CUSTOM_PRESET_LIMIT } from '@client/shared/media/backgrounds/studio/customPresets';
 import { useAppTheme, type AppTheme } from '@client/shared/hooks/useAppTheme';
-import { BackgroundLivePreview } from './BackgroundLivePreview';
+import { BackgroundPreviewArt } from './BackgroundPreviewArt';
 import { StudioFieldGrid } from './BackgroundStudioControls';
 import { PresetSection } from './BackgroundStudioPresets';
+
+export function BackgroundLivePreview({
+  style,
+  isDark,
+  studio,
+  mode = 'thumb',
+  paused = false,
+}: {
+  style: AppBackgroundStyle;
+  isDark: boolean;
+  studio?: StudioValues;
+  mode?: 'thumb' | 'stage';
+  paused?: boolean;
+}) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(mode === 'stage');
+  const item = getBackgroundCatalogItem(style);
+  const accent = studioAccent(style, studio) ?? (isDark ? item.darkAccent : item.lightAccent);
+
+  useEffect(() => {
+    if (mode === 'stage') {
+      setVisible(true);
+      return undefined;
+    }
+    const node = frameRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { rootMargin: '80px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [mode]);
+
+  return (
+    <div
+      ref={frameRef}
+      className="absolute inset-0 overflow-hidden"
+      style={{ background: isDark ? '#0D0F14' : '#F6F7FA' }}
+    >
+      {visible && (!paused || style === 'clean') ? (
+        <AppBackgroundLayer
+          style={style}
+          isDark={isDark}
+          studio={studio}
+          mode={mode}
+        />
+      ) : (
+        <BackgroundPreviewArt style={style} isDark={isDark} accent={accent} />
+      )}
+    </div>
+  );
+}
 
 const THEME_OPTIONS: Array<{ id: AppTheme; label: string; icon: typeof Sun }> = [
   { id: 'dark', label: '深色', icon: Moon },

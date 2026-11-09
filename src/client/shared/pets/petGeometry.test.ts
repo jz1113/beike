@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { clampPetPosition, LEGACY_PET_POSITION_KEY, PET_POSITION_KEY, petPanelLayout, petStackLayout, readPetPosition, writePetPosition } from './petGeometry';
+import { avoidPetObstacles, clampPetPosition, LEGACY_PET_POSITION_KEY, PET_POSITION_KEY, petPanelLayout, petStackLayout, readPetPosition, writePetPosition } from './petGeometry';
 
 const bounds = { width: 1000, height: 740, left: 16, right: 16, top: 16, bottom: 16 };
 const size = { width: 160, height: 140 };
@@ -51,5 +51,23 @@ describe('pet position rules', () => {
   it('limits long panels to the larger side and narrows panels on mobile', () => {
     const panel = petPanelLayout({ x: 180, y: 250 }, size, { ...bounds, width: 360, height: 600 }, 1000);
     expect(panel).toEqual({ left: 16, top: 16, width: 328, maxHeight: 222, side: 'above' });
+  });
+});
+
+describe('pet composer avoidance', () => {
+  it('moves a restored lower-right pet above the composer and preserves the stored point', () => {
+    const point = { x: 824, y: 584 };
+    const composer = { x: 280, y: 550, width: 704, height: 174 };
+    const placed = avoidPetObstacles(point, size, bounds, [composer]);
+    expect(placed.y + size.height).toBeLessThanOrEqual(composer.y - 12);
+    expect(point).toEqual({ x: 824, y: 584 });
+    expect(avoidPetObstacles(point, size, bounds, [])).toEqual(point);
+  });
+  it('keeps a non-overlapping custom position and fits narrow screens', () => {
+    expect(avoidPetObstacles({ x: 20, y: 20 }, size, bounds, [{ x: 280, y: 550, width: 704, height: 174 }])).toEqual({ x: 20, y: 20 });
+    const mobile = { ...bounds, width: 360, height: 640 };
+    const placed = avoidPetObstacles({ x: 184, y: 484 }, size, mobile, [{ x: 16, y: 420, width: 328, height: 204 }]);
+    expect(placed.y + size.height).toBeLessThanOrEqual(408);
+    expect(placed.x + size.width).toBeLessThanOrEqual(344);
   });
 });

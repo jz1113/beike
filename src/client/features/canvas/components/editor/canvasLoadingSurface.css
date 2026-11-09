@@ -55,3 +55,128 @@
   .canvas-loading-indicator { animation-duration: 0s; }
   .canvas-loading-indicator::before { animation: none; }
 }
+
+.canvas-boot {
+  --boot-dot: #52577e47;
+  --boot-wave: #7b76ff94;
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #dfdfdf;
+  color: #18181b8c;
+  transition: opacity 300ms ease;
+}
+
+.dark .canvas-boot {
+  --boot-dot: #ecefff1f;
+  --boot-wave: #ffffff73;
+  background: #09090b;
+  color: #ffffff8c;
+}
+
+.canvas-boot[data-phase="leaving"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.canvas-boot-brand {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  font-size: 14px;
+  letter-spacing: 0.28em;
+}
+
+.canvas-boot-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  padding-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.canvas-boot-mark::after {
+  content: '';
+  position: absolute;
+  inset: auto 8px 0;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff8c, transparent 72%);
+  filter: blur(3px);
+  animation: canvas-boot-shadow 2.8s cubic-bezier(.34, 1.2, .64, 1) infinite;
+}
+
+.canvas-boot-logo {
+  z-index: 1;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: white;
+}
+
+.canvas-boot-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: 50% 88%;
+  animation: canvas-boot-bounce 2.8s cubic-bezier(.34, 1.35, .64, 1) infinite;
+}
+
+.canvas-boot-dots {
+  position: absolute;
+  width: min(560px, 72vmin);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  mask-image: radial-gradient(circle, transparent 8%, #000000fa 21%, #000c 56%, #00000052 76%, transparent);
+}
+
+.canvas-boot-dots::before,
+.canvas-boot-dots::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.canvas-boot-dots::before {
+  background: radial-gradient(circle, var(--boot-dot) 1.15px, transparent 1.65px) center / 18px 18px;
+  opacity: .34;
+}
+
+.canvas-boot-dots::after {
+  background: radial-gradient(circle, var(--boot-wave) 1.25px, transparent 1.8px) center / 18px 18px;
+  mask: radial-gradient(circle, transparent 54%, black 60%, transparent 66%) center / 18% 18% no-repeat;
+  animation: canvas-boot-ripple 3.6s ease-out infinite;
+}
+
+@keyframes canvas-boot-bounce {
+  0%, 100% { transform: translateY(0) rotate(0) scale(1); }
+  14% { transform: translateY(-7px) rotate(-8deg) scale(1.06, .94); }
+  28% { transform: translateY(1px) rotate(7deg) scale(.94, 1.08); }
+  42% { transform: translateY(-4px) rotate(-4deg) scale(1.03, .98); }
+  58% { transform: translateY(0) rotate(3deg) scale(1); }
+  72% { transform: translateY(-2px) rotate(-2deg) scale(1.02, .99); }
+}
+
+@keyframes canvas-boot-shadow {
+  0%, 58%, 100% { opacity: .42; transform: scale(1); }
+  14% { opacity: .16; transform: scale(.72, .86); }
+  28% { opacity: .5; transform: scale(1.12, 1); }
+  42% { opacity: .22; transform: scale(.84, .92); }
+}
+
+@keyframes canvas-boot-ripple {
+  0% { mask-size: 18% 18%; opacity: 0; }
+  20% { opacity: .56; }
+  64% { opacity: .16; }
+  100% { mask-size: 128% 128%; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-boot { display: none; }
+}

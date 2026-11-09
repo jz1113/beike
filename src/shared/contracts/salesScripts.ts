@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TextReasoningRoutingFields, TextRequestRoutingFields } from './textRouting';
+import { TextReasoningRoutingFields, TextRequestRoutingFields } from './generate';
 
 export const salesProductViewSchema = z.enum(['front', 'back', 'detail', 'worn', 'flat']);
 export const salesBeatRequiredViewSchema = z.enum(['front', 'back', 'detail', 'worn', 'flat', 'any']);
@@ -171,55 +171,6 @@ export const salesScriptAnalysisBodySchema = z.object({
   allowInsecureHttp: z.boolean().optional(),
 });
 
-export const salesScriptAnalysisResponseSchema = z.object({
-  success: z.literal(true),
-  script: salesScriptTemplateSchema,
-  model: z.string().default(''),
-  promptVersion: z.string().default(''),
-  videoHash: z.string().default(''),
-  existingId: z.string().optional(),
-  saveWarning: z.string().optional(),
-  cached: z.boolean().optional(),
-});
-
-export const salesScriptPromptResponseSchema = z.object({
-  success: z.literal(true),
-  prompt: z.string().min(1),
-  promptVersion: z.string().min(1),
-});
-
-export const storedSalesScriptSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  videoUrl: z.string().default(''),
-  videoHash: z.string().default(''),
-  depthVideoUrl: z.string().default(''),
-  depthTaskId: z.string().default(''),
-  depthOperationId: z.string().default(''),
-  durationSec: z.number().gt(0),
-  format: salesScriptFormatSchema.catch('presenter'),
-  voiceMode: salesScriptVoiceModeSchema.catch('speech'),
-  status: salesScriptStatusSchema.catch('draft'),
-  script: salesScriptTemplateSchema,
-  model: z.string().default(''),
-  promptVersion: z.string().default(''),
-  version: z.number().int().min(1).default(1),
-  useCount: z.number().int().min(0).default(0),
-  lastUsedAt: z.string().default(''),
-  createdAt: z.string().default(''),
-  updatedAt: z.string().default(''),
-});
-
-export const salesScriptListResponseSchema = z.object({
-  success: z.literal(true),
-  items: z.array(storedSalesScriptSchema),
-});
-
-export const salesScriptItemResponseSchema = z.object({
-  success: z.literal(true),
-  item: storedSalesScriptSchema,
-});
-
 export const saveSalesScriptBodySchema = z.object({
   id: z.string().max(120).optional(),
   title: z.string().trim().min(1).max(120),
@@ -247,6 +198,3 @@ export const patchSalesScriptBodySchema = z.object({
 });
 
 export type SalesScriptTemplateContract = z.infer<typeof salesScriptTemplateSchema>;
-export type StoredSalesScriptContract = z.infer<typeof storedSalesScriptSchema>;
-export type SaveSalesScriptBody = z.infer<typeof saveSalesScriptBodySchema>;
-export type PatchSalesScriptBody = z.infer<typeof patchSalesScriptBodySchema>;

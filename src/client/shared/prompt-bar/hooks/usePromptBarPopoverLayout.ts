@@ -23,6 +23,7 @@ export function usePromptBarPopoverLayout(
   panelMaxHeight = PANEL_MAX_HEIGHT,
   shrinkToContent = false,
   portal = false,
+  options?: { alignEnd?: boolean; minimumAbove?: number; offsetX?: number },
 ) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<PopoverLayout | null>(null);
@@ -74,12 +75,12 @@ export function usePromptBarPopoverLayout(
       // A requested dropdown can scroll below its trigger if at least a few rows fit.
       const requiredBelow = preferUp === 'below' ? Math.min(120, desiredHeight) : desiredHeight;
       const isUp = preferUp === true
-        ? above >= desiredHeight || above >= below
+        ? above >= Math.min(desiredHeight, options?.minimumAbove ?? desiredHeight) || above >= below
         : below < requiredBelow && above > below;
       const next = {
         isUp,
         width,
-        left: Math.max(bounds.left + EDGE_PADDING, Math.min(rect.left, bounds.right - EDGE_PADDING - width)) - (portal ? 0 : rect.left),
+        left: Math.max(bounds.left + EDGE_PADDING, Math.min((options?.alignEnd ? rect.right - width : rect.left) + (options?.offsetX ?? 0), bounds.right - EDGE_PADDING - width)) - (portal ? 0 : rect.left),
         top: portal && !isUp ? rect.bottom + PANEL_GAP : undefined,
         bottom: portal && isUp ? window.innerHeight - rect.top + PANEL_GAP : undefined,
         maxHeight: Math.min(panelMaxHeight, isUp ? above : below),
@@ -102,7 +103,7 @@ export function usePromptBarPopoverLayout(
       viewport?.removeEventListener('resize', update);
       viewport?.removeEventListener('scroll', update);
     };
-  }, [isOpen, preferUp, anchorRef, panelWidth, panelMaxHeight, shrinkToContent, portal]);
+  }, [isOpen, preferUp, anchorRef, panelWidth, panelMaxHeight, shrinkToContent, portal, options?.alignEnd, options?.minimumAbove, options?.offsetX]);
 
   return {
     panelRef,

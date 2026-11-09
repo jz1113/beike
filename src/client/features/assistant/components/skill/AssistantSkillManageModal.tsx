@@ -1,15 +1,15 @@
-import { useAssistantDialog } from '../../hooks/useAssistantDialog';
+import { useAssistantDialog } from '../../model/assistantConstants';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, X } from 'lucide-react';
 import { useAppStore } from '@client/store';
-import { resolveSkillKind } from '@shared/domain/assistant/skills/skillPurpose';
 import { CreationSkillDetailModal } from '@client/shared/skills/components/CreationSkillDetailModal';
 import { SkillCard } from '@client/shared/skills/components/SkillCard';
 import { librarySkillItem } from '@client/shared/skills/model/libraryView';
 import { CodexAgentSkillSection } from '@client/shared/skills/components/CodexAgentSkillSection';
 import { CodexSkillDetailModal, assistantSkillTitle } from '@client/shared/skills/components/CodexSkillDetailModal';
-import type { AssistantSkill } from '@shared/domain/assistant/skills/types';
+import { resolveSkillKind, type AssistantSkill } from '@shared/domain/assistant/skills/types';
+import { skillDisplayDescription } from '@shared/domain/assistant/skills/skillDisplay';
 
 interface Props {
   isOpen: boolean;
@@ -33,7 +33,7 @@ export default function AssistantSkillManageModal({
   showToast,
 }: Props) {
   const dialogRef = useAssistantDialog(isOpen, onClose);
-  const [purpose, setPurpose] = useState<'agent' | 'creation'>('creation');
+  const [purpose, setPurpose] = useState<'agent' | 'creation'>('agent');
   const [keyword, setKeyword] = useState('');
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
 
@@ -44,12 +44,7 @@ export default function AssistantSkillManageModal({
     : null;
 
   const sortedSkills = skills
-    .filter((skill) => resolveSkillKind(skill) === purpose)
-    .sort((a, b) => {
-      if (a.id === 'prompt-reverse-engineer' || a.name === '提示词反推专家') return -1;
-      if (b.id === 'prompt-reverse-engineer' || b.name === '提示词反推专家') return 1;
-      return 0;
-    });
+    .filter((skill) => resolveSkillKind(skill) === purpose);
 
   const q = keyword.trim().toLowerCase();
   const filtered = sortedSkills.filter((s) => {
@@ -58,6 +53,7 @@ export default function AssistantSkillManageModal({
       s.name.toLowerCase().includes(q) ||
       (s.displayName && s.displayName.toLowerCase().includes(q)) ||
       (s.category && s.category.toLowerCase().includes(q)) ||
+      skillDisplayDescription(s).toLowerCase().includes(q) ||
       s.description.toLowerCase().includes(q) ||
       s.id.toLowerCase().includes(q)
     );

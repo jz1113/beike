@@ -1,13 +1,28 @@
 import { useCallback, useRef } from 'react';
-import { useAppStore, type GenerationTask } from '@client/store';
+import { useAppStore, type AppState, type GenerationTask } from '@client/store';
 import { cleanPromptText, getAspectRatioFromSize, stripWorkshopPromptGuards } from '@shared/domain/media/drawing';
+import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
+import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
 import { peekDepthSubmit } from '@client/shared/api/generation/depthGeneration';
 import { registerRefMedia, registerRefMediaKind } from '@client/shared/media/refMediaRegistry';
-import { createGenerationAttemptId, prepareGenerationAttempt } from '@client/shared/media/generationAttempt';
-import { isDepthImageTask, isDepthVideoTask } from '@client/shared/media/generationTaskMedia';
+import { createGenerationAttemptId, isDepthImageTask, isDepthVideoTask, prepareGenerationAttempt } from '@client/shared/media/generationAttempt';
+import { queryOriginalGenerationBeforeRetry } from '@client/shared/media/generationRetryReceipt';
+import { isImageTaskFailed } from '@shared/domain/core/taskStatus';
 import { restoreImagePromptOptions } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 import { isGenerateVideoTask } from '../model/generateWorkspaceLayout';
-import { restoreVideoTaskSettings } from '../model/videoTaskSettings';
+
+type VideoSettingsStore = Pick<AppState, 'setQuickVideoModel' | 'setQuickVideoAspectId' | 'setQuickVideoDuration' | 'setQuickVideoResolution' | 'setQuickVideoContextIrEnabled'>;
+
+/** Reuse the saved channel and explicit false values from restored tasks. */
+export function restoreVideoTaskSettings(store: VideoSettingsStore, task: GenerationTask) {
+  const selection = task.modelRouteKey || task.model;
+  if (selection) store.setQuickVideoModel(selection);
+  store.setQuickVideoAspectId(getAspectRatioFromSize(task.size));
+  store.setQuickVideoDuration(task.videoDuration || 5);
+  store.setQuickVideoContextIrEnabled(task.videoContextIrEnabled ?? true);
+  const resolution = task.videoResolution || task.quality;
+  store.setQuickVideoResolution(resolveVideoResolution(resolution, getVideoModelById(task.model, getGatewayClientBaseUrl(selection))?.supportedResolutions));
+}
 
 function getLiveTask(task: GenerationTask): GenerationTask {
   const store = useAppStore.getState();
@@ -28,6 +43,10 @@ export function useGenerateTaskActions(onShowToast: (message: string) => void) {
     const depthVideo = isDepthVideoTask(task);
     const depthImage = isDepthImageTask(task);
     const video = isGenerateVideoTask(task);
+    if (video && task.referenceAudioUrls?.length) {
+      onShowToast('此任务包含参考音频，请回原画布编辑，或重试原任务以保留音频');
+      return;
+    }
     let references = task.referenceImages?.length ? task.referenceImages : task.images?.length ? task.images :
       [task.referenceImageUrl || task.sourceImageUrl || task.productImageUrl].filter((url): url is string => Boolean(url));
     if (task.referenceVideoUrls) {
@@ -89,6 +108,16 @@ export function useGenerateTaskActions(onShowToast: (message: string) => void) {
     pendingAttemptsRef.current.add(operationKey);
     const sessionId = useAppStore.getState().currentSessionId;
     try {
+      for (const task of liveTasks) {
+        if (!(task.canvasProjectId || task.id.startsWith('studio-')) || !isImageTaskFailed(task.status) || task.resultUrl) continue;
+        const resultUrl = await queryOriginalGenerationBeforeRetry(task);
+        if (getLiveTask(task) !== task) throw new Error('原任务状态已更新，请重新检查后重试');
+        if (resultUrl) {
+          useAppStore.getState().updateGenerationTask(task.id,{status:'SUCCESS',progress:'100%',resultUrl,failReason:undefined,submissionRecoveryRequired:false});
+          onShowToast('已恢复原任务结果，没有重新提交');
+          return false;
+        }
+      }
       const batchId = createGenerationAttemptId('batch');
       const attempts = await Promise.all(liveTasks.map((task) => prepareGenerationAttempt(task, batchId, file)));
       if (attempts.some((task) => !task)) {
@@ -108,8 +137,8 @@ export function useGenerateTaskActions(onShowToast: (message: string) => void) {
       if (ready.length === 1) store.addGenerationTask(ready[0], false);
       else store.addBatchGenerationTasks(ready, undefined, false);
       return true;
-    } catch {
-      onShowToast('无法准备生成任务，请重新选择参考文件后再试');
+    } catch (error) {
+      onShowToast(error instanceof Error ? error.message : '无法准备生成任务，请重新选择参考文件后再试');
       return false;
     } finally {
       pendingAttemptsRef.current.delete(operationKey);

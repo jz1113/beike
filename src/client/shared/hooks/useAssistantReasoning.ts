@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { normalizeReasoningEffort, type ReasoningEffort } from '@shared/domain/assistant/reasoning';
-import { selectedTextModel } from '@shared/domain/models/textModelRoute';
+import { selectedTextModel } from '@shared/domain/models/workflowModelStorage';
 
 const key = 'beike_assistant_reasoning_by_model';
 

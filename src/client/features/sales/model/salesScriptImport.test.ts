@@ -1,10 +1,19 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeScriptTemplate } from '@shared/domain/sales';
 import { generationRecoveryError } from '@client/shared/api/generation/generationRecovery';
 import type { patchSalesScript, saveSalesScript, StoredSalesScript } from '../api/salesScripts';
-import { ScriptDepthFailed } from '../api/salesScriptDepth';
-import { runSalesScriptImportBatch } from '../api/salesScriptImport';
-import { addSalesScriptImportFiles, MAX_SCRIPT_IMPORT_FILES, type SalesScriptImportItem, type SalesScriptImportVideo } from './salesScriptImport';
+import { runSalesScriptImportBatch, ScriptDepthFailed } from '../api/salesScriptImport';
+import {
+  addSalesScriptImportFiles,
+  MAX_SCRIPT_IMPORT_FILES,
+  readSalesScriptImport,
+  saveSalesScriptImport,
+  type SalesScriptImportItem,
+  type SalesScriptImportVideo,
+} from './salesScriptImport';
+
+const context = vi.hoisted(() => ({ workspace: 'workspace-a' }));
+vi.mock('@client/shared/api/workspaceClient', () => ({ getWorkspaceSecret: () => context.workspace }));
 
 const file = (name = '转身.mp4') => new File(['video'], name, { type: 'video/mp4', lastModified: 123 });
 const script = normalizeScriptTemplate({ title: '模型分析名称', durationSec: 3, shots: [{ start: 0, end: 3, beats: [{ start: 0, end: 3, action: '转身' }] }] })!;
@@ -252,5 +261,58 @@ describe('optional depth in action reference batch import', () => {
     expect(h.services.analyze).not.toHaveBeenCalled(); expect(h.services.submitDepth).not.toHaveBeenCalled();
     expect(h.services.waitDepth).not.toHaveBeenCalled();
     expect(h.items[0]).toMatchObject({ status: 'done', depthVideoUrl: current.depthVideoUrl });
+  });
+});
+
+describe('batch script import checkpoints', () => {
+  const storage = new Map<string, string>();
+  const item: SalesScriptImportItem = { key: 'one', name: '动作.mp4', file: new File(['video'], '动作.mp4'), size: 5, lastModified: 12, saveId: 'script_one', status: 'saving', error: '',
+    video: { success: true, videoUrl: '/one.mp4', videoHash: 'hash', durationSec: 3, aspectRatio: '9:16', hasAudio: false, sizeBytes: 5 },
+    result: { script, model: 'vision', promptVersion: 'v1', videoHash: 'hash' },
+    includeDepth: true, depthOperationId: 'operation-one', depthState: 'submitted', depthTaskId: 'accepted-task' };
+
+  beforeEach(() => {
+    storage.clear(); context.workspace = 'workspace-a';
+    vi.stubGlobal('localStorage', { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('retains completed analysis and accepted depth receipts across reloads without serializing local files', () => {
+    saveSalesScriptImport([item]);
+    const [restored] = readSalesScriptImport();
+    expect(restored).toMatchObject({ status: 'queued', saveId: 'script_one', result: item.result, video: item.video,
+      includeDepth: true, depthOperationId: 'operation-one', depthState: 'submitted', depthTaskId: 'accepted-task' });
+    expect(restored.file).toBeUndefined();
+    expect([...storage.values()][0]).not.toContain('"file"');
+  });
+  it('isolates each workspace’s recovery queue and clears only the active workspace', () => {
+    saveSalesScriptImport([item]);
+    context.workspace = 'workspace-b';
+    expect(readSalesScriptImport()).toEqual([]);
+    saveSalesScriptImport([]);
+    saveSalesScriptImport([{ ...item, key: 'two', status: 'done', scriptId: 'script_two' }]);
+    context.workspace = 'workspace-a';
+    expect(readSalesScriptImport()).toHaveLength(1);
+    saveSalesScriptImport([]);
+    context.workspace = 'workspace-b';
+    expect(readSalesScriptImport()[0]).toMatchObject({ key: 'two', status: 'done', scriptId: 'script_two' });
+  });
+  it('ignores malformed queue records and invalid cached analysis without treating them as saved results', () => {
+    saveSalesScriptImport([item]);
+    const key = [...storage.keys()][0];
+    const saved = JSON.parse(storage.get(key)!);
+    saved.items.push({ key: 'broken', size: -1 });
+    saved.items[0].result.script = {};
+    saved.items[0].video = { videoUrl: '/broken.mp4' };
+    storage.set(key, JSON.stringify(saved));
+    expect(readSalesScriptImport()).toHaveLength(1);
+    expect(readSalesScriptImport()[0].result).toBeUndefined();
+    expect(readSalesScriptImport()[0].video).toBeUndefined();
+    storage.set(key, '{');
+    expect(readSalesScriptImport()).toEqual([]);
+  });
+  it('surfaces checkpoint failures so the caller can stop before submitting more work', () => {
+    vi.stubGlobal('localStorage', { setItem: () => { throw new Error('quota'); } });
+    expect(() => saveSalesScriptImport([item])).toThrow('quota');
   });
 });

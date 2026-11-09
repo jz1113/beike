@@ -1,3 +1,4 @@
+import { creationSkillFlow } from './creationSkillFlows';
 import type { AssistantSkill } from '@shared/domain/assistant/skills/types';
 import type { SkillItem } from './skillTypes';
 
@@ -42,6 +43,8 @@ export function resolveCreationSkillModifiableSummary(
   source: Pick<SkillItem, 'id' | 'title' | 'description' | 'prompt' | 'promptGuide' | 'assetGuide'> | AssistantSkill,
 ): CreationSkillModifiableSummary {
   const id = source.id || '';
+  const flow = creationSkillFlow(id);
+  if (flow) return { uploadSlotLabel: flow.inputLabel, composerPlaceholder: flow.placeholder, slots: [] };
   const title = 'title' in source ? source.title : (source.displayName || source.name);
   const description = source.description || '';
   const prompt = ('prompt' in source && source.prompt) || '';

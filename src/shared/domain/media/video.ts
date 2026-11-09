@@ -69,10 +69,12 @@ export interface VideoRefModeItem {
 export const VIDEO_REF_MODES: VideoRefModeItem[] = [
   { id: 'omni', name: '全能参考', desc: '参考图片或视频的主体、场景或动作，可混合使用' },
   { id: 'first_frame', name: '首帧生视频', desc: '以一张图片作为视频第一帧' },
+  { id: 'last_frame', name: '尾帧生视频', desc: '以一张图片指定视频结束画面' },
   { id: 'first_last_frame', name: '首尾帧', desc: '两张图片分别作为开始与结束画面' },
   { id: 'text', name: '文生视频', desc: '用文字描述主体、动作与镜头' },
   { id: 'edit', name: '视频编辑', desc: '描述参考视频中需要修改的内容' },
   { id: 'extend', name: '视频延长', desc: '描述原视频之后发生的内容' },
+  { id: 'motion_control', name: '动作控制', desc: '用一张人物图片复现参考视频中的动作' },
 ];
 
 export const VIDEO_RESOLUTIONS: ('480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K')[] = ['480P', '540P', '720P', '768P', '1080P', '2K', '4K'];
@@ -106,6 +108,73 @@ export function getVideoModelById(modelId?: string | null, baseUrl?: string): Vi
   if (exact) return isMetasoH3(modelId, baseUrl) ? { ...exact, supportedResolutions: ['480P', '768P', '1080P', '2K'],
     supportedDurations: Array.from({ length: 12 }, (_, index) => index + 4) } : exact;
   const m = modelId.toLowerCase().trim();
+  if (/^(metaso-h3|秘塔h3)$/i.test(m)) {
+    const base = VIDEO_GEN_MODELS.find((x) => x.id === 'MiniMax-H3');
+    return base
+      ? {
+          ...base,
+          id: modelId,
+          name: '秘塔H3',
+          shortName: '秘塔H3',
+          supportedResolutions: ['480P', '768P', '1080P', '2K'],
+          supportedDurations: Array.from({ length: 12 }, (_, index) => index + 4),
+          supportedAspectRatios: ['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+        }
+      : undefined;
+  }
+  if (/hailuo[-_.]?2/i.test(m)) {
+    return {
+      id: modelId,
+      name: 'Hailuo 2.0',
+      shortName: 'Hailuo 2.0',
+      provider: 'MiniMax',
+      description: 'MiniMax 海螺 2.0 视频生成模型',
+      supportedDurations: [6, 10],
+      supportedResolutions: ['540P', '768P', '1080P'],
+      supportedAspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+      audioSupport: 'default_off',
+    };
+  }
+  if (/wan[-_.]?2[._-]?6/i.test(m)) {
+    return {
+      id: modelId,
+      name: 'Wan 2.6',
+      shortName: 'Wan 2.6',
+      provider: 'Alibaba',
+      description: '通义万相 2.6 视频生成模型',
+      supportedDurations: [5, 10, 15],
+      supportedResolutions: ['720P', '1080P'],
+      supportedAspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+      audioSupport: 'default_off',
+    };
+  }
+  if (/seedance[-_.]?(v)?1[._-]?5/i.test(m)) {
+    return {
+      id: modelId,
+      name: 'Seedance 1.5',
+      shortName: 'Seedance 1.5',
+      provider: 'ByteDance',
+      description: '即梦 Seedance 1.5 视频生成模型',
+      supportedDurations: Array.from({ length: 9 }, (_, index) => index + 4),
+      supportedResolutions: ['480P', '720P', '1080P'],
+      supportedAspectRatios: ['adaptive', '16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+      audioSupport: 'controllable',
+    };
+  }
+  if (/seedance[-_.]?(v)?1[._-]?0/i.test(m)) {
+    const isFast = /fast/i.test(m);
+    return {
+      id: modelId,
+      name: isFast ? 'Seedance 1.0 Fast' : 'Seedance 1.0',
+      shortName: isFast ? 'Seedance 1.0 Fast' : 'Seedance 1.0',
+      provider: 'ByteDance',
+      description: isFast ? '即梦 Seedance 1.0 Fast 极速视频模型' : '即梦 Seedance 1.0 视频生成模型',
+      supportedDurations: Array.from({ length: 11 }, (_, index) => index + 2),
+      supportedResolutions: isFast ? ['480P', '720P'] : ['480P', '720P', '1080P'],
+      supportedAspectRatios: ['adaptive', '16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+      audioSupport: 'default_off',
+    };
+  }
   return (
     VIDEO_GEN_MODELS.find((x) => x.id.toLowerCase() === m) ||
     VIDEO_GEN_MODELS.find((x) => m.includes(x.id.toLowerCase()) || x.id.toLowerCase().includes(m)) ||

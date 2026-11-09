@@ -1,0 +1,39 @@
+{
+  "id": "beike-cinematic-storyboard",
+  "name": "beike-cinematic-storyboard",
+  "displayName": "电影分镜",
+  "description": "将故事创意拆成有连续性、可分别生成的电影镜头与关键帧提示词。",
+  "category": "专业影视",
+  "author": "贝壳",
+  "version": "1.0.0",
+  "icon": "sparkles",
+  "colorTheme": "cyan",
+  "isBuiltin": true,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "tools": [],
+  "outputFormat": "code_blocks",
+  "usageGuide": "### 使用方式\n描述故事、总时长和画幅；可附人物或场景参考图。\n\n输出提示词后，可在对话中的生成面板选择模型、绑定参考素材并提交。",
+  "meta": {
+    "kind": "creation",
+    "genres": [
+      "图片",
+      "视频"
+    ],
+    "tags": [
+      "电影分镜",
+      "镜头设计"
+    ],
+    "promptGuide": "描述故事、总时长和画幅；可附人物或场景参考图。",
+    "assetGuide": "描述故事、总时长和画幅；可附人物或场景参考图。"
+  },
+  "source": {
+    "kind": "local",
+    "url": "/skills",
+    "revision": "1.0.0",
+    "license": "随贝壳项目维护",
+    "files": {
+      "SKILL.md": "d175e333c7cf71cf72abd92f6619ee940042d5c1bdc62326e90fbea5e6dcaa1b"
+    }
+  }
+}

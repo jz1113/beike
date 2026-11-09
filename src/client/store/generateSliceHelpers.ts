@@ -1,6 +1,43 @@
 import type { AgentTurnTaskData, ChatSession, GenerationTask } from '@client/store/appStoreTypes';
+import { isDepthImageTask, isDepthVideoTask, isGenerationVideoTask } from '@client/shared/media/generationAttempt';
+import { sameUsageScope } from '@client/shared/utils/usageScope';
 import { isGenerationDeleted } from './persist/index';
-import { retainGenerationTasks } from './generationLimits';
+import { MAX_GENERATION_TASKS_IN_MEMORY, retainGenerationTasks, STARTUP_TASK_SUMMARY_COUNT } from './persist/generation';
+
+export { MAX_GENERATION_TASKS_IN_MEMORY, retainGenerationTasks, STARTUP_TASK_SUMMARY_COUNT };
+
+function media(task: GenerationTask): string {
+  if (task.mediaType) return task.mediaType;
+  if (task.id.startsWith('agent-task-') || task.agentTurn) return 'agent';
+  if (task.usageScope?.mediaType) return task.usageScope.mediaType;
+  if (isDepthImageTask(task)) return 'depth-image';
+  if (isDepthVideoTask(task)) return 'depth-video';
+  return isGenerationVideoTask(task) ? 'video' : 'image';
+}
+
+function compatible(a: GenerationTask, b: GenerationTask): boolean {
+  if (a.dbId && b.dbId && a.dbId !== b.dbId) return false;
+  if (media(a) !== media(b)) return false;
+  if (a.usageScope && b.usageScope && !sameUsageScope(a.usageScope, b.usageScope)) return false;
+  return true;
+}
+
+/** Record and local identities are authoritative. Provider numbers are only scoped aliases. */
+function findRecoveryTaskIndex(tasks: GenerationTask[], incoming: GenerationTask): number {
+  const candidates = tasks.map((task, index) => ({ task, index })).filter(({ task }) => compatible(task, incoming));
+  const unique = (matches: typeof candidates) => matches.length === 1 ? matches[0].index : -1;
+  const records = candidates.filter(({ task }) => Boolean(
+    task.dbId && (task.dbId === incoming.dbId || task.dbId === incoming.id)
+    || incoming.dbId && incoming.dbId === task.id,
+  ));
+  if (records.length) return unique(records);
+  const local = candidates.filter(({ task }) => task.id && task.id === incoming.id);
+  if (local.length) return unique(local);
+  const scope = incoming.usageScope;
+  if (!incoming.taskId || !scope) return -1;
+  return unique(candidates.filter(({ task }) => task.taskId === incoming.taskId && task.usageScope
+    && sameUsageScope(task.usageScope, scope)));
+}
 
 export const EMPTY_COMPOSER_MEDIA = {
   quickPrompt: '',
@@ -46,6 +83,11 @@ function mergeRestoredTask(current: GenerationTask | undefined, incoming: Genera
     ...current,
     ...incoming,
     id: current.id || incoming.id,
+    dbId: incoming.dbId || current.dbId,
+    taskId: incoming.taskId || current.taskId,
+    mediaType: incoming.mediaType || current.mediaType,
+    modelRouteKey: incoming.modelRouteKey || current.modelRouteKey,
+    usageScope: incoming.usageScope || current.usageScope,
     agentTurn: mergeAgentTurn(current.agentTurn, incoming.agentTurn),
   };
 }
@@ -56,12 +98,13 @@ export function mergeRestoredSessions(current: ChatSession[], incoming: ChatSess
     const previous = current.find((item) => item.id === session.id);
     const previousTasks = previous?.tasks || [];
     const sessionTasks = session.tasks || [];
-    const incomingIds = new Set(sessionTasks.flatMap((task) => [task.id, task.taskId].filter((id): id is string => Boolean(id))));
-    const tasks = sessionTasks.map((task) => mergeRestoredTask(
-      previousTasks.find((item) => item.id === task.id || (Boolean(item.taskId) && item.taskId === task.taskId)),
-      task,
-    ));
-    const extras = previousTasks.filter((task) => !incomingIds.has(task.id) && !(task.taskId && incomingIds.has(task.taskId)));
+    const matched = new Set<number>();
+    const tasks = sessionTasks.map((task) => {
+      const index = findRecoveryTaskIndex(previousTasks, task);
+      if (index >= 0) matched.add(index);
+      return mergeRestoredTask(index >= 0 ? previousTasks[index] : undefined, task);
+    });
+    const extras = previousTasks.filter((_, index) => !matched.has(index));
     return { ...session, tasks: [...tasks, ...extras] };
   });
   return [...merged, ...current.filter((session) => !seen.has(session.id))];
@@ -73,9 +116,6 @@ export function capGenerationTasks(tasks: GenerationTask[]): GenerationTask[] {
 
 export function mergeAndSortTasks(existing: GenerationTask[], incoming: GenerationTask[], fromDatabase = false): GenerationTask[] {
   const mergedList: GenerationTask[] = [];
-  const idMap = new Map<string, number>();
-  const taskIdMap = new Map<string, number>();
-  const dbIdMap = new Map<string, number>();
   // Older archive hydration accidentally assigned local attempt IDs as database IDs.
   const restoreIdentity = (task: GenerationTask) => !fromDatabase && task.dbId === task.id && /^(hub-gen-|agent-task-)/.test(task.id)
     ? { ...task, dbId: undefined } : task;
@@ -83,26 +123,14 @@ export function mergeAndSortTasks(existing: GenerationTask[], incoming: Generati
   existing.forEach((t) => {
     t = restoreIdentity(t);
     if (isGenerationDeleted(t.id, t.taskId, t.resultUrl, t.dbId)) return;
-    const index = mergedList.length;
     mergedList.push(t);
-    if (t.id) idMap.set(t.id, index);
-    if (t.taskId) taskIdMap.set(t.taskId, index);
-    if (t.dbId) dbIdMap.set(t.dbId, index);
   });
 
   incoming.forEach((dt) => {
     dt = fromDatabase ? { ...dt, dbId: dt.dbId || dt.id } : restoreIdentity(dt);
     if (isGenerationDeleted(dt.id, dt.taskId, dt.resultUrl, dt.dbId)) return;
 
-    // 智能多维匹配：优先匹配 id，次选 taskId，末选 dbId
-    let matchIdx = -1;
-    if (dt.id && idMap.has(dt.id)) {
-      matchIdx = idMap.get(dt.id)!;
-    } else if (dt.taskId && taskIdMap.has(dt.taskId)) {
-      matchIdx = taskIdMap.get(dt.taskId)!;
-    } else if (dt.id && dbIdMap.has(dt.id)) {
-      matchIdx = dbIdMap.get(dt.id)!;
-    }
+    const matchIdx = findRecoveryTaskIndex(mergedList, dt);
 
     if (matchIdx >= 0) {
       const prev = mergedList[matchIdx];
@@ -114,23 +142,18 @@ export function mergeAndSortTasks(existing: GenerationTask[], incoming: Generati
         id: prev.id, // 保留客户端本地关联的 id，保证当前会话组件稳定挂载
         dbId: dt.dbId || (fromDatabase ? dt.id : prev.dbId),
         taskId: dt.taskId || prev.taskId,
+        mediaType: dt.mediaType || prev.mediaType,
+        modelRouteKey: dt.modelRouteKey || prev.modelRouteKey,
         status: isIncomingSuccess ? 'SUCCESS' : dt.status || prev.status,
         resultUrl: dt.resultUrl || prev.resultUrl,
         progress: isIncomingSuccess ? '100%' : (dt.progress || prev.progress),
         failReason: isIncomingSuccess ? undefined : (dt.failReason || prev.failReason),
+        usageScope: dt.usageScope || prev.usageScope,
         agentTurn: mergeAgentTurn(prev.agentTurn, dt.agentTurn),
       };
       mergedList[matchIdx] = merged;
-      // 补充更新索引
-      if (merged.id) idMap.set(merged.id, matchIdx);
-      if (merged.taskId) taskIdMap.set(merged.taskId, matchIdx);
-      if (merged.dbId) dbIdMap.set(merged.dbId, matchIdx);
     } else {
-      const index = mergedList.length;
       mergedList.push(dt);
-      if (dt.id) idMap.set(dt.id, index);
-      if (dt.taskId) taskIdMap.set(dt.taskId, index);
-      if (dt.dbId) dbIdMap.set(dt.dbId, index);
     }
   });
 
@@ -194,7 +217,7 @@ export function resolveSessionsAfterDelete(
   }
   return {
     sessions: nextSessions,
-    currentSessionId: wasCurrent ? nextSessions[0].id : currentSessionId,
+    currentSessionId: wasCurrent ? nextSessions.find(session => !session.canvasProjectId)?.id || 'session-default' : currentSessionId,
   };
 }
 
@@ -316,21 +339,9 @@ export function syncTasksWithDatabase(
 ): { generationTasks: GenerationTask[]; sessions: ChatSession[] } {
   if (!dbTasks || dbTasks.length === 0) return { generationTasks: stateTasks, sessions };
   const allGens = mergeAndSortTasks(stateTasks, dbTasks, true);
-  const taskMapById = new Map<string, GenerationTask>();
-  const taskMapByTaskId = new Map<string, GenerationTask>();
-  const taskMapByDbId = new Map<string, GenerationTask>();
-
-  allGens.forEach((t) => {
-    if (t.id) taskMapById.set(t.id, t);
-    if (t.taskId) taskMapByTaskId.set(t.taskId, t);
-    if (t.dbId) taskMapByDbId.set(t.dbId, t);
-  });
-
-  const findUpdatedTask = (st: GenerationTask): GenerationTask | undefined => {
-    if (st.id && taskMapById.has(st.id)) return taskMapById.get(st.id);
-    if (st.taskId && taskMapByTaskId.has(st.taskId)) return taskMapByTaskId.get(st.taskId);
-    if (st.dbId && taskMapByDbId.has(st.dbId)) return taskMapByDbId.get(st.dbId);
-    return undefined;
+  const findUpdatedTask = (task: GenerationTask): GenerationTask | undefined => {
+    const index = findRecoveryTaskIndex(allGens, task);
+    return index >= 0 ? allGens[index] : undefined;
   };
 
   const updatedSessions = sessions.map((s) => {

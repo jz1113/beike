@@ -13,6 +13,7 @@ import (
 	httpapi "beike.local/cloud/src/backend/internal/app"
 	"beike.local/cloud/src/backend/internal/assets"
 	"beike.local/cloud/src/backend/internal/assistant"
+	"beike.local/cloud/src/backend/internal/assistant/sessions"
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/generate/depth"
 	"beike.local/cloud/src/backend/internal/library"
@@ -81,6 +82,7 @@ func main() {
 	<-stop
 	library.DrainDeconstructJobs(5 * time.Second)
 	depth.DrainDepthVideo(5 * time.Second)
+	sales.DrainMediaJobs(5 * time.Second)
 	assistant.FlushTelemetry()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -90,7 +92,7 @@ func main() {
 }
 
 func maintain(cfg config.Config) {
-	ticker := time.NewTicker(10 * time.Minute)
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for range ticker.C {
 		if count, err := database.FailOrphanTasks(cfg.DatabasePath); err == nil && count > 0 {
@@ -103,6 +105,9 @@ func maintain(cfg config.Config) {
 }
 
 func sweep(cfg config.Config) {
+	if _, err := sessions.ExpireSessions(context.Background(), cfg, time.Now()); err != nil {
+		log.Printf("[对话清理] %v", err)
+	}
 	if count := system.PurgeExpiredMediaReviews(cfg.MediaReviewRoot(), time.Now()); count > 0 {
 		log.Printf("→ [媒体审查] 已清理 %d 个过期待核记录", count)
 	}

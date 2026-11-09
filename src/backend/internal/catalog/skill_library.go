@@ -161,3 +161,209 @@ func validAssistantSkill(content map[string]any) bool {
 func writeSkillError(w http.ResponseWriter, status int, message string) {
 	httpx.WriteJSON(w, status, map[string]any{"success": false, "error": message})
 }
+
+func validSkillPackage(content map[string]any) bool {
+	for _, key := range []string{"description", "markdownDoc", "displayName", "author", "version", "icon", "colorTheme"} {
+		if value, exists := content[key]; exists && value != nil {
+			if _, ok := value.(string); !ok {
+				return false
+			}
+		}
+	}
+	if value, exists := content["files"]; exists && value != nil {
+		files, ok := value.([]any)
+		if !ok || len(files) > 40 {
+			return false
+		}
+		total := 0
+		seen := map[string]bool{}
+		for _, value := range files {
+			file, ok := value.(map[string]any)
+			if !ok {
+				return false
+			}
+			path, pathOK := file["path"].(string)
+			body, bodyOK := file["content"].(string)
+			if !pathOK || !bodyOK || path == "" || strings.HasPrefix(path, "/") || strings.Contains(path, "\\") || seen[path] || skillTextUnits(body) > 256*1024 {
+				return false
+			}
+			for _, part := range strings.Split(path, "/") {
+				if part == "" || part == "." || part == ".." {
+					return false
+				}
+			}
+			total += skillTextUnits(body)
+			if total > 1024*1024 {
+				return false
+			}
+			seen[path] = true
+		}
+	}
+	if value, exists := content["meta"]; exists && value != nil {
+		meta, ok := value.(map[string]any)
+		if !ok {
+			return false
+		}
+		for _, key := range []string{"genres", "tags", "showcaseUrls"} {
+			if value, exists := meta[key]; exists && value != nil {
+				if !skillStringList(value) {
+					return false
+				}
+			}
+		}
+		for _, key := range []string{"coverUrl", "promptGuide", "assetGuide", "defaultVideoModel", "defaultImageModel"} {
+			if value, exists := meta[key]; exists && value != nil {
+				if _, ok := value.(string); !ok {
+					return false
+				}
+			}
+		}
+	}
+	for _, key := range []string{"references", "steps"} {
+		if value, exists := content[key]; exists && value != nil {
+			list, ok := value.([]any)
+			if !ok {
+				return false
+			}
+			for _, value := range list {
+				item, ok := value.(map[string]any)
+				if !ok {
+					return false
+				}
+				field := "path"
+				if key == "steps" {
+					field = "label"
+				}
+				if _, ok := item[field].(string); !ok {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// Match the browser vault's UTF-16 character limits, including Chinese text.
+func skillTextUnits(text string) int {
+	units := 0
+	for _, char := range text {
+		units++
+		if char > 0xFFFF {
+			units++
+		}
+	}
+	return units
+}
+
+func skillStringList(value any) bool {
+	list, ok := value.([]any)
+	if !ok {
+		return false
+	}
+	for _, value := range list {
+		if _, ok := value.(string); !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func promptRecordsHandler(cfg config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		db, err := database.OpenRequired(cfg.SQLiteFile())
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "读取提示词记录失败"})
+			return
+		}
+		defer db.Close()
+		records, err := dbcatalog.ListRecentPromptRecords(r.Context(), db, httpx.WorkspaceFrom(r))
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": "读取提示词记录失败"})
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "records": records})
+	}
+}
+
+func promptRecordsCreateHandler(cfg config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "请求数据格式异常"})
+			return
+		}
+		var raw map[string]any
+		if err := json.Unmarshal(body, &raw); err != nil {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "请求数据格式异常"})
+			return
+		}
+		draft := dbcatalog.PromptDraft{
+			ProductID:    emptyAsNil(raw["productId"]),
+			ProductTitle: textOr(raw["productTitle"], "未命名商品"),
+			Fingerprint:  textOr(raw["productFingerprint"], ""),
+			ModelUsed:    textOr(raw["modelUsed"], "gemini-3.1-pro-preview"),
+			StyleName:    textOr(raw["styleName"], "📱 真实手机买家秀"),
+			PromptsJSON:  promptsJSON(raw["prompts"]),
+		}
+		db, err := database.OpenRequired(cfg.SQLiteFile())
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
+			return
+		}
+		defer db.Close()
+		record, err := dbcatalog.CreatePromptRecord(r.Context(), db, httpx.WorkspaceFrom(r), draft)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "record": record})
+	}
+}
+
+func promptRecordsDeleteHandler(cfg config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "缺少 id 参数"})
+			return
+		}
+		db, err := database.OpenRequired(cfg.SQLiteFile())
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
+			return
+		}
+		defer db.Close()
+		if err := dbcatalog.DeletePromptRecord(r.Context(), db, httpx.WorkspaceFrom(r), id); err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": "操作失败，请稍后重试"})
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true})
+	}
+}
+
+func emptyAsNil(value any) any {
+	text, ok := value.(string)
+	if !ok || text == "" {
+		return nil
+	}
+	return text
+}
+
+func textOr(value any, fallback string) string {
+	text, ok := value.(string)
+	if !ok || text == "" {
+		return fallback
+	}
+	return text
+}
+
+func promptsJSON(value any) string {
+	if text, ok := value.(string); ok {
+		return text
+	}
+	body, err := json.Marshal(value)
+	if err != nil || value == nil {
+		return "[]"
+	}
+	return string(body)
+}

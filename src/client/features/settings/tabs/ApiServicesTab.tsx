@@ -1,15 +1,17 @@
 import { waitForCredentialSaves } from '@client/shared/api/persistCredentials';
 import React, { useState, useEffect, useRef } from 'react';
-import { SettingsConnectionContext } from '../components/SettingsControls';
-import { ApiServicesWanbangPanel } from '../components/vendors/ApiServicesWanbangPanel';
+import { SettingsConnectionContext, SettingsServiceHeader, SettingsField, SettingsSecretField, SettingsActions } from '../components/SettingsControls';
 import { ApiServicesStoragePanel } from '../components/storage/ApiServicesStoragePanel';
 import { ApiProvidersNavList } from '../components/providers/ApiProvidersNavList';
 import { ApiProviderDetailPanel } from '../components/providers/ApiProviderDetailPanel';
 import { AddProviderModal } from '../components/providers/AddProviderModal';
-import { serviceStatuses } from '../model/serviceStatuses';
-import { SERVICE_STATUS_COLORS } from '../model/connectionStatus';
 import { useApiProviders } from '../hooks/useApiProviders';
-import { loadStoredProviders } from '../model/apiProviderTypes';
+import {
+  loadStoredProviders,
+  SERVICE_STATUS_COLORS,
+  resolveServiceStatus,
+  type ConnectionTestRecord,
+} from '../model/apiProviderTypes';
 import {
   hasModalityGlobalConfigManualOverride,
   loadStoredModalityGlobalConfig,
@@ -18,7 +20,89 @@ import {
   canonicalProviderId,
   loadSavedProviderCredentialSnapshots,
 } from '../model/providerCredentialSync';
-import type { ApiServicesTabProps } from './apiServicesTabTypes';
+import { OneBoundLogo } from '@client/shared/icons/brands/BrandIcons';
+import type { useSettingsConfig } from '../hooks/useSettingsConfig';
+import type { useCustomModels } from '../hooks/useCustomModels';
+import type { ModelChannel } from '../model/modelManagement';
+
+interface ApiServicesTabProps {
+  config: ReturnType<typeof useSettingsConfig>;
+  models: ReturnType<typeof useCustomModels>;
+  group: 'models' | 'other' | 'all' | 'storage';
+  selectedServiceId: string;
+  setSelectedServiceId: (id: string) => void;
+  serviceSearch: string;
+  setServiceSearch: (value: string) => void;
+  onAddModel: (channel: ModelChannel) => void;
+  onManageModels: () => void;
+  defaultRouteIds: string[];
+  showToast: (message: string) => void;
+}
+
+interface ServiceStatusConfig {
+  apiKey: string;
+  baseUrl: string;
+  isTesting: boolean;
+  openAIApiKey: string;
+  openAIBaseUrl: string;
+  openAIEnabled: boolean;
+  isTestingOpenAI: boolean;
+  deepSeekApiKey: string;
+  isTestingDeepSeek: boolean;
+  wanbangKey: string;
+  wanbangSecret: string;
+  isTestingWanbang: boolean;
+  storageEndpoint: string;
+  storageProvider: string;
+  storageAccountId: string;
+  storageAccessKeyId: string;
+  storageSecretAccessKey: string;
+  storageBucketName: string;
+  storageEnabled: boolean;
+  isTestingStorage: boolean;
+  connectionResults: Record<string, ConnectionTestRecord | undefined>;
+}
+
+function serviceStatuses(config: ServiceStatusConfig) {
+  const c = config;
+  return Object.fromEntries([
+    ['comfly_gateway', Boolean(c.apiKey.trim() && c.baseUrl.trim()), true, c.isTesting],
+    ['openai_official', Boolean(c.openAIApiKey.trim() && c.openAIBaseUrl.trim()), c.openAIEnabled, c.isTestingOpenAI],
+    ['deepseek_official', Boolean(c.deepSeekApiKey.trim()), true, c.isTestingDeepSeek],
+    ['wanbang_ecommerce', Boolean(c.wanbangKey.trim() && c.wanbangSecret.trim()), true, c.isTestingWanbang],
+    ['cloud_storage', Boolean((c.storageEndpoint.trim() || (c.storageProvider === 'r2' && c.storageAccountId.trim())) && c.storageAccessKeyId.trim() && c.storageSecretAccessKey.trim() && c.storageBucketName.trim()), c.storageEnabled, c.isTestingStorage],
+  ].map(([id, configured, enabled, testing]) => [String(id), resolveServiceStatus(Boolean(configured), Boolean(enabled), Boolean(testing), c.connectionResults[String(id)])]));
+}
+
+interface ApiServicesWanbangPanelProps {
+  wanbangKey: string;
+  setWanbangKey: (v: string) => void;
+  wanbangSecret: string;
+  setWanbangSecret: (v: string) => void;
+  isWanbangEnabled: boolean;
+  setIsWanbangEnabled: (v: boolean) => void;
+  handleSaveWanbangConfig: () => void;
+  handleTestWanbang: () => void;
+  isTestingWanbang: boolean;
+}
+
+function ApiServicesWanbangPanel({
+  wanbangKey,
+  setWanbangKey,
+  wanbangSecret,
+  setWanbangSecret,
+  handleSaveWanbangConfig,
+  handleTestWanbang,
+  isTestingWanbang,
+}: ApiServicesWanbangPanelProps) {
+  return <div className="settings-service-form">
+    <SettingsServiceHeader icon={<OneBoundLogo className="h-6 w-6" />} title="万邦电商采集" description="商品图片、规格与详情采集" links={[{ label: '获取凭证', href: 'https://open.onebound.cn' }]} actions={<SettingsActions onTest={handleTestWanbang} onSave={handleSaveWanbangConfig} testing={isTestingWanbang} testDisabled={!wanbangKey.trim() || !wanbangSecret.trim()} />} />
+    <div className="settings-fields-grid">
+      <SettingsField id="wanbangKey" label="API Key" value={wanbangKey} onChange={event => { setWanbangKey(event.target.value); }} placeholder="输入API Key" />
+      <SettingsSecretField id="wanbangSecret" label="API Secret" value={wanbangSecret} onChange={event => { setWanbangSecret(event.target.value); }} placeholder="输入API Secret" />
+    </div>
+  </div>;
+}
 
 function initialProviderCredentialSnapshots(): Record<string, { baseUrl: string; apiKey: string }> {
   const remembered = loadSavedProviderCredentialSnapshots();
@@ -95,9 +179,7 @@ export default function ApiServicesTab({
           ? { baseUrl: c.openAIBaseUrl, apiKey: c.openAIApiKey }
           : canonicalId === 'deepseek_official'
             ? { baseUrl: 'https://api.deepseek.com', apiKey: c.deepSeekApiKey }
-            : canonicalId === 'lianchi_images'
-              ? { baseUrl: '', apiKey: c.lianchiApiKey }
-              : savedProviderCredentialsRef.current[currentProvider.id] || { baseUrl: '', apiKey: '' };
+            : savedProviderCredentialsRef.current[currentProvider.id] || { baseUrl: '', apiKey: '' };
       const legacyGlobalConfig = loadStoredModalityGlobalConfig();
       const migrationPreviousCredentials = canonicalId === 'comfly_gateway'
         && !hasModalityGlobalConfigManualOverride()

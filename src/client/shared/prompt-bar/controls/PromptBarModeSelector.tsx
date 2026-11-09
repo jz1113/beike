@@ -33,6 +33,7 @@ export default function PromptBarModeSelector({
 
   const currentModeLabel = (() => {
     if (quickGenMode === 'agent') return t('promptBar.modes.agent');
+    if (quickGenMode === 'collect') return '商品采集';
     if (quickGenMode === 'video') return t('promptBar.modes.video');
     if (quickGenMode === 'audio') return '音频生成';
     if (isDepthMode) {
@@ -76,7 +77,7 @@ export default function PromptBarModeSelector({
             isUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'
           } w-44 rounded-2xl bg-white dark:bg-[#18191c]/95 dark:backdrop-blur-xl border border-slate-200/90 dark:border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.12)] p-1.5 z-50 animate-fade-in text-left space-y-0.5 select-none text-slate-900 dark:text-slate-100`}
         >
-          {(['agent', 'video', 'image', 'audio'] as const).map(mode => (
+          {(['collect', 'agent', 'video', 'image', 'audio'] as const).map(mode => (
             <button
               key={mode}
               type="button"
@@ -92,7 +93,7 @@ export default function PromptBarModeSelector({
               }`}
             >
               <span className="text-[13.5px] font-medium text-slate-900 dark:text-white">
-                {{agent: 'Agent模式', video: '视频生成', image: '图片生成', audio: '音频生成'}[mode]}
+                {{collect: '商品采集', agent: 'Agent模式', video: '视频生成', image: '图片生成', audio: '音频生成'}[mode]}
               </span>
               {quickGenMode === mode && <Check className="w-4 h-4 text-slate-900 dark:text-white stroke-[2.2]" />}
             </button>

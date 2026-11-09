@@ -101,7 +101,8 @@ function fileExtension(path: string): string {
 }
 
 export function isTextSkillPath(path: string): boolean {
-  return TEXT_EXTENSIONS.has(fileExtension(path));
+  const name=path.split('/').pop()?.toUpperCase();
+  return TEXT_EXTENSIONS.has(fileExtension(path)) || ['LICENSE','LICENCE','COPYING','NOTICE'].includes(name || '');
 }
 
 function cleanRelativePath(raw: string): string | null {

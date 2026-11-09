@@ -1,9 +1,21 @@
-import type { AeroState } from './aeroState';
-import type { AeroResources } from './aeroResources';
+import type { AeroCamera, AeroResources, AeroState } from './aeroResources';
 import type { AeroPaths } from './aeroPaths';
-import type { AeroCamera } from './aeroCamera';
 import { updateAeroMarkers } from './aeroMarkers';
-import { FLOATS, SAMPLES, CAMERA, MAX_BANK, DEPTHS, GROWTH, LEVELS, INTRO_SECONDS, RING_SECONDS, TAU, clamp, smoother, AeroSettings } from './aeroShardModel';
+import {
+  AeroSettings,
+  CAMERA,
+  DEPTHS,
+  FLOATS,
+  GROWTH,
+  INTRO_SECONDS,
+  LEVELS,
+  MAX_BANK,
+  RING_SECONDS,
+  SAMPLES,
+  TAU,
+  clamp,
+  smoother,
+} from './aeroShardModel';
 export function createAeroSimulation(state: AeroState, resources: AeroResources, pathState: AeroPaths, camera: AeroCamera, container: HTMLDivElement) {
   const { paths, buildPaths, markerCounts, markerStarts } = pathState;
   const { cam, ray, rayAt } = camera;

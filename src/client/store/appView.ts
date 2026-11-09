@@ -30,3 +30,11 @@ export function normalizeAppView(raw: string | null | undefined): AppView | null
 export function isAppView(value: string): value is AppView {
   return (MOUNTED_VIEWS as readonly string[]).includes(value);
 }
+
+/** App listens and opens or creates the ecommerce canvas project. */
+export const OPEN_ECOMMERCE_CANVAS_EVENT = 'beike:open-ecommerce-canvas';
+
+export function requestEcommerceCanvas() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(OPEN_ECOMMERCE_CANVAS_EVENT));
+}

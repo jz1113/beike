@@ -1,3 +1,4 @@
+import { DEFAULT_MULTIMODAL_MODEL_ID } from '@shared/domain/models/modelCatalog';
 import type { GenerationTask } from '@client/store';
 import {
   cleanPromptText,
@@ -11,14 +12,17 @@ import {
 } from '@shared/domain/media/depthVideo';
 import { normalizeVideoReferenceMentions } from '@client/shared/media/videoReferences';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
-import { normalizeSubjectReferences } from './promptSubjectReferences';
 import {
   collectEffectiveImages,
   buildOrderedMentionNames,
   validateSubmitInput,
   buildPromptBarSubjects,
+  normalizeSubjectReferences,
+  removePromptReferences,
+  serializeSubjectMention,
+  type PromptBarSubmitInput,
+  type PromptBarSubmitResult,
 } from './promptBarValidation';
-import type { PromptBarSubmitInput, PromptBarSubmitResult } from './promptBarSubmitTypes';
 import { formatAgentAttachmentNote } from './agentAttachments';
 import { loadPromptPreferences } from './promptBarPreferencesTypes';
 import { upstreamModalityModelId, type ModalityStorageKind } from '@shared/domain/models/modalityStorage';
@@ -32,8 +36,8 @@ function resolvedModel(kind: ModalityStorageKind, selection: string) {
   };
 }
 
-export type { PromptBarSubmitInput, PromptBarSubmitResult } from './promptBarSubmitTypes';
-export { buildPromptBarSubjects };
+export type { PromptBarSubmitInput, PromptBarSubmitResult };
+export { buildPromptBarSubjects, normalizeSubjectReferences, removePromptReferences, serializeSubjectMention };
 
 /** 发送按钮 / 快捷键是否与提交校验一致 */
 export function canSubmitPromptBar(
@@ -76,11 +80,11 @@ export function buildPromptBarGenerationTasks(
     quickVideoContextIrEnabled,
   } = input;
 
-  if (quickGenMode === 'agent') {
+  if (quickGenMode === 'agent' || quickGenMode === 'collect') {
     const batchTimestamp = Date.now();
     const batchId = `agent-batch-${batchTimestamp}`;
     const cleaned = quickPrompt.trim();
-    const attachmentNote = formatAgentAttachmentNote(input.quickRefImages);
+    const attachmentNote = quickGenMode === 'agent' ? formatAgentAttachmentNote(input.quickRefImages) : '';
     const prompt = attachmentNote ? `${cleaned}\n\n${attachmentNote}` : cleaned;
     const title = cleaned.slice(0, 32) || 'Agent 创作对话';
     const active = resolvedModel('chat', input.assistantModel || '');
@@ -91,12 +95,12 @@ export function buildPromptBarGenerationTasks(
       title,
       prompt,
       mediaType: 'agent',
-      model: active.model || 'gemini-3.7-flash',
-      ...(active.modelRouteKey ? { modelRouteKey: active.modelRouteKey } : {}),
+      model: quickGenMode === 'collect' ? 'direct-collection' : active.model || DEFAULT_MULTIMODAL_MODEL_ID,
+      ...(quickGenMode !== 'collect' && active.modelRouteKey ? { modelRouteKey: active.modelRouteKey } : {}),
       size: '-',
       quality: 'high',
-      useReferenceImage: effectiveImages.length > 0,
-      referenceImages: effectiveImages,
+      useReferenceImage: quickGenMode === 'agent' && effectiveImages.length > 0,
+      referenceImages: quickGenMode === 'agent' ? effectiveImages : [],
       status: 'IN_PROGRESS',
       progress: '15%',
       createdAt: batchTimestamp,
@@ -219,6 +223,7 @@ export function buildPromptBarGenerationTasks(
       referenceImageUrl: refImg,
       referenceImages: effectiveImages,
       referenceVideoUrls: effectiveImages.length ? effectiveImages.filter(isVideoMediaUrl) : undefined,
+      ...(quickGenMode === 'video' && input.quickVideoAudioRefs?.length ? {referenceAudioUrls:input.quickVideoAudioRefs} : {}),
       useReferenceImage: effectiveImages.length > 0,
       status: 'IN_PROGRESS',
       progress: '15%',

@@ -9,7 +9,46 @@ import {
   Loader2 
 } from 'lucide-react';
 import { CategoryItem } from '@shared/domain/prompts/vision';
-import { ExtractedRecipeData } from './types';
+
+export interface BaseStyleSkill {
+  id: string;
+  name: string;
+  category: string;
+  promptSnippet: string;
+}
+
+export interface ExtractedRecipeData {
+  name: string;
+  category: string;
+  tag: string;
+  desc: string;
+  has_human?: boolean;
+  subject_type?: string;
+  model_persona?: string;
+  promptSnippet: string;
+  architecture?: {
+    role_definition?: string;
+    structure_steps?: Array<{
+      step_no?: number;
+      title?: string;
+      rule?: string;
+    }>;
+    prompt_formula?: string;
+    anti_ai_rules?: string;
+    spatial?: string;
+    lighting?: string;
+    props?: string;
+    optics?: string;
+    productSlot?: string;
+  } | null;
+  storyboardTemplates?: Array<{
+    shot_no: number;
+    title: string;
+    has_human?: boolean;
+    shot_type?: string;
+    template: string;
+  }> | null;
+}
 
 interface RecipeEditorPanelProps {
   extractedRecipe: ExtractedRecipeData;
@@ -182,7 +221,7 @@ export const RecipeEditorPanel: React.FC<RecipeEditorPanelProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
             {extractedRecipe.architecture?.structure_steps && Array.isArray(extractedRecipe.architecture.structure_steps) ? (
-              extractedRecipe.architecture.structure_steps.map((step: any, sIdx: number) => (
+              extractedRecipe.architecture.structure_steps.map((step, sIdx) => (
                 <div key={sIdx} className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-0.5 shadow-2xs dark:border-white/10 dark:bg-[#18191c]">
                   <div className="flex items-center gap-1.5 font-bold text-indigo-900 text-xs">
                     <span className="w-4 h-4 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center text-[10px]">

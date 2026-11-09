@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { groupModelsByGeneration } from '@shared/domain/models/modelGrouping';
+import { listModelChannels, modelsInChannel, samePickerModel, pickerSelectionId } from './controls/PromptBarModelPickerModal';
 import { buildPromptBarGenerationTasks, canSubmitPromptBar, type PromptBarSubmitInput } from './promptBarSubmit';
 
 vi.mock('@client/shared/api/gatewayClient', () => ({
@@ -41,5 +43,40 @@ describe('prompt bar selected H3 channel', () => {
       const result = buildPromptBarGenerationTasks({ ...input(), quickVideoContextIrEnabled: enabled });
       expect(result.ok && result.tasks[0].videoContextIrEnabled).toBe(enabled ?? true);
     }
+  });
+});
+
+const models = [
+  { id: 'a-gemini', upstreamId: 'gemini-3-flash', provider: '网关甲', name: 'Gemini · 网关甲' },
+  { id: 'b-gemini', upstreamId: 'gemini-3-flash', provider: '网关乙', name: 'Gemini · 网关乙' },
+  { id: 'b-claude', upstreamId: 'claude-sonnet-4-5', provider: '网关乙', name: 'Claude' },
+  { id: 'plain', upstreamId: 'gpt-5.6-sol', name: 'GPT' },
+];
+
+describe('model picker channels', () => {
+  it('splits one upstream model across gateways and keeps generation groups inside a channel', () => {
+    expect(listModelChannels(models)).toEqual(['网关甲', '网关乙', '默认']);
+    const gateway = modelsInChannel(models, '网关乙');
+    expect(gateway.map((model) => model.id)).toEqual(['b-gemini', 'b-claude']);
+    const sections = groupModelsByGeneration(gateway.map((model) => model.upstreamId), 'chat');
+    const labels = sections.flatMap((section) => section.rows.filter((row) => !row.isArchived).map((row) => row.generationLabel));
+    expect(labels.some((label) => label.includes('Gemini'))).toBe(true);
+    expect(labels.some((label) => label.includes('Claude'))).toBe(true);
+    expect(labels.join(' ')).not.toContain('gemini-3-flash');
+  });
+});
+
+
+describe('model picker identity', () => {
+  it('keeps separately synced aliases and preview IDs individually selectable', () => {
+    const synced = [
+      { id: 'preview-route', upstreamId: 'gemini-3.1-flash-image-preview' },
+      { id: 'standard-route', upstreamId: 'gemini-3.1-flash-image' },
+      { id: 'banana-route', upstreamId: 'nano-banana-2' },
+    ];
+    expect(samePickerModel('gemini-3.1-flash-image-preview', 'gemini-3.1-flash-image')).toBe(false);
+    expect(samePickerModel('nano-banana-2', 'gemini-3.1-flash-image')).toBe(false);
+    expect(pickerSelectionId(synced, 'gemini-3.1-flash-image', 'preview-route')).toBe('standard-route');
+    expect(pickerSelectionId(synced, 'nano-banana-2', 'preview-route')).toBe('banana-route');
   });
 });

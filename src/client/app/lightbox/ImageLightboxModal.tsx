@@ -1,4 +1,10 @@
-import { extractTaskReferenceImages } from '../../shared/modals/lightbox/taskReferenceImages';
+import {
+  buildImageEditTask,
+  extractTaskReferenceImages,
+  resolveTaskPreviewQueue,
+  type ImageEditRequest,
+  type MarkerPoint,
+} from '@client/shared/modals/lightbox/smartEditTypes';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import '@client/shared/api/permanentDeleteGeneration';
 import { downloadMediaOrOpen } from '@client/shared/media/downloadMedia';
@@ -6,23 +12,119 @@ import { videoPlaybackManager } from '@client/shared/media/videoPlaybackManager'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@client/store';
-import { useToast } from '@client/shared/hooks/useToast';
+import { TOAST_DURATION_MS, useToast } from '@client/shared/hooks/useToast';
 import { useSafeTimeout } from '@client/shared/hooks/useSafeTimeout';
-import { TOAST_DURATION_MS } from '@client/shared/constants/timing';
 import { formatPromptParagraphs } from '@shared/domain/media/drawing';
 import { LightboxInfoPanel } from '../../shared/modals/lightbox/LightboxInfoPanel';
 import { LightboxToolPanel } from '../../shared/modals/lightbox/LightboxToolPanel';
 import { MultiAngleModal } from './LightboxMultiAngleModal';
 import { SmartEditModal } from '../../shared/modals/lightbox/SmartEditModal';
 import { OutpaintModal } from './OutpaintModal';
-import { useLightboxEditActions } from './useLightboxEditActions';
+import type { GenerationTask } from '@client/store/appStoreTypes';
+import { currentBatchSettings } from '@client/shared/agent/dispatchGenerationBatch';
 import { X } from 'lucide-react';
 import { useModalDialog } from '@client/shared/hooks/useModalDialog';
 import { LightboxMediaPanel } from './LightboxMediaPanel';
-import { resolveTaskPreviewQueue } from '@client/shared/modals/lightbox/taskPreviewQueue';
 import { useGenerateTaskActions } from '@client/features/generate/hooks/useGenerateTaskActions';
-import { isGenerationVideoTask } from '@client/shared/media/generationTaskMedia';
+import { isGenerationVideoTask } from '@client/shared/media/generationAttempt';
 import { replacePromptReferenceMentions } from '@shared/domain/prompts/prompt-engine/mentions';
+
+export function useLightboxEditActions(
+  previewTask: GenerationTask | null,
+  isVideo: boolean,
+  showToast: (message: string) => void,
+) {
+  const [isMultiAngleOpen, setIsMultiAngleOpen] = useState(false);
+  const [isSmartEditOpen, setIsSmartEditOpen] = useState(false);
+  const [isOutpaintOpen, setIsOutpaintOpen] = useState(false);
+  const submitting = useRef(false);
+  const handleToolAction = useCallback(
+    (actionKey: string, label: string) => {
+      void label;
+      if (isVideo) {
+        showToast('图像编辑仅支持图片结果');
+        return;
+      }
+      if (actionKey === 'multi_angle') setIsMultiAngleOpen(true);
+      else if (actionKey === 'smart_edit') setIsSmartEditOpen(true);
+      else if (actionKey === 'outpaint') setIsOutpaintOpen(true);
+    },
+    [isVideo, showToast],
+  );
+
+  const submit = useCallback(
+    (request: Omit<ImageEditRequest, 'source' | 'originalPrompt'>) => {
+      if (submitting.current) return false;
+      submitting.current = true;
+      try {
+        const state = useAppStore.getState();
+        if (!state.generationHistoryReady) throw new Error('生成历史仍在恢复，请稍后提交');
+        const task = buildImageEditTask(
+          { ...request, source: previewTask?.resultUrl || '', originalPrompt: previewTask?.prompt },
+          currentBatchSettings(),
+        );
+        state.addGenerationTask(task, false);
+        setIsMultiAngleOpen(false);
+        setIsSmartEditOpen(false);
+        setIsOutpaintOpen(false);
+        state.setPreviewTask(null);
+        state.setCurrentView('generate');
+        showToast('已加入生成任务，可在「历史」中查看进度和结果');
+        return true;
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : '提交失败，请重试');
+        submitting.current = false;
+        return false;
+      }
+    },
+    [previewTask, showToast],
+  );
+  // A new source represents a new explicit edit operation.
+  const sourceId = useRef(previewTask?.id);
+  if (sourceId.current !== previewTask?.id) {
+    sourceId.current = previewTask?.id;
+    submitting.current = false;
+  }
+
+  const handleSubmitNovelView = useCallback(
+    (params: { azimuth: number; elevation: number; angleName: string; model?: string; quality?: string; aspectRatio?: string }) => {
+      const state = useAppStore.getState();
+      return submit({ ...params, kind: 'multi_angle', model: params.model || state.quickModel, quality: params.quality || state.quickQuality });
+    },
+    [submit],
+  );
+  const handleSubmitSmartEdit = useCallback(
+    (params: { markers: MarkerPoint[]; prompt: string; model: string; quality: string; aspectRatio?: string }) => {
+      return submit({ ...params, kind: 'smart_edit' });
+    },
+    [submit],
+  );
+  const handleSubmitOutpaint = useCallback(
+    (params: { ratio: string; scale: number; prompt: string; model?: string; quality?: string }) => {
+      const state = useAppStore.getState();
+      return submit({
+        ...params,
+        kind: 'outpaint',
+        aspectRatio: params.ratio === 'original' ? 'smart' : params.ratio,
+        model: params.model || state.quickModel,
+        quality: params.quality || state.quickQuality,
+      });
+    },
+    [submit],
+  );
+  return {
+    isMultiAngleOpen,
+    setIsMultiAngleOpen,
+    isSmartEditOpen,
+    setIsSmartEditOpen,
+    isOutpaintOpen,
+    setIsOutpaintOpen,
+    handleToolAction,
+    handleSubmitNovelView,
+    handleSubmitSmartEdit,
+    handleSubmitOutpaint,
+  };
+}
 
 export function ImageLightboxModal() {
   const {
@@ -167,7 +269,7 @@ export function ImageLightboxModal() {
   const batchReferenceImages = useMemo(() => {
     if (!previewTask) return [];
     const list: string[] = [];
-    const pushIfValid = (val: any) => {
+    const pushIfValid = (val: unknown) => {
       if (typeof val === 'string' && val.trim().length > 0) {
         list.push(val.trim());
       } else if (Array.isArray(val)) {

@@ -1,4 +1,4 @@
-import { extractTaskReferenceImages } from './taskReferenceImages';
+import { extractTaskReferenceImages } from './smartEditTypes';
 import React, { useMemo, useState } from 'react';
 import {
   Download,
@@ -96,14 +96,14 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
       : 'GPT Image 2';
 
   const aspectRatio =
-    (previewTask as any)?.aspectRatio ||
+    previewTask?.aspectRatio ||
     getAspectRatioFromSize(previewTask?.size) ||
     '3:4';
 
   const rawQuality =
     previewTask?.quality ||
-    (previewTask as any)?.params?.quality ||
-    (previewTask as any)?.options?.quality;
+    previewTask?.params?.quality ||
+    previewTask?.options?.quality;
 
   const qualityLabel = useMemo(() => {
     if (isVideo) {
@@ -150,7 +150,7 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
   const referenceImagesList = useMemo(() => {
     if (!previewTask) return [];
     const list: string[] = [];
-    const pushIfValid = (val: any) => {
+    const pushIfValid = (val: unknown) => {
       if (typeof val === 'string' && val.trim().length > 0) {
         list.push(val.trim());
       } else if (Array.isArray(val)) {
@@ -177,7 +177,7 @@ export const LightboxInfoPanel = React.memo(function LightboxInfoPanel({
   const durationLabel = useMemo(() => {
     if (!isVideo) return null;
     const candidates = [actualVideoDuration, previewTask?.videoDuration,
-      (previewTask as any)?.params?.duration, (previewTask as any)?.options?.duration];
+      previewTask?.params?.duration, previewTask?.options?.duration];
     for (const value of candidates) {
       const seconds = typeof value === 'string' ? Number(value.trim().replace(/s$/i, '')) : value;
       if (typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0) {

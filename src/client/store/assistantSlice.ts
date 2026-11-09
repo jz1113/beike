@@ -1,9 +1,11 @@
+import { DEFAULT_MULTIMODAL_MODEL_ID } from '@shared/domain/models/modelCatalog';
 import type { StateCreator } from 'zustand';
 import type { AssistantSession, MediaAttachment } from '@client/store/appStoreTypes';
-import { deleteAssistantSessionRemote, fetchAssistantSessionsRemote } from '@client/shared/api/assistantSessions';
 import {
   assistantDeletedIds,
   clearAssistantPersistTimer,
+  deleteAssistantSessionRemote,
+  fetchAssistantSessionsRemote,
   getStoredAssistantState,
   loadAssistantTombstones,
   markAssistantSessionDeleted,
@@ -58,7 +60,7 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
   let hydrationSignal: AbortSignal | undefined;
 
   const getInitialAssistantModel = (): string => {
-    if (typeof window === 'undefined') return 'gemini-3.7-flash';
+    if (typeof window === 'undefined') return DEFAULT_MULTIMODAL_MODEL_ID;
     try {
       const saved = localStorage.getItem('beike_assistant_selected_model') || localStorage.getItem('ai_assistant_model');
       if (saved) return saved;
@@ -70,7 +72,7 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
     } catch {
       // ignore
     }
-    return 'gemini-3.7-flash';
+    return DEFAULT_MULTIMODAL_MODEL_ID;
   };
 
   return {
@@ -207,6 +209,9 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
       const now = Date.now();
       const dueByTime = now - lastStreamPersistAt >= 2000;
       const streamMessageId = `${sessionId}:${messageId}`;
+      if (contentLen < lastStreamPersistLen) {
+        lastStreamPersistLen = contentLen;
+      }
       const dueByLen = contentLen - lastStreamPersistLen >= 800;
       if (dueByTime || dueByLen || streamMessageId !== lastStreamMessageId) {
         lastStreamPersistAt = now;

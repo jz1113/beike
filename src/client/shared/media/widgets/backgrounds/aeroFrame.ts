@@ -1,8 +1,6 @@
 import { frame, type init } from 'vgpu';
-import type { AeroState } from './aeroState';
-import type { AeroResources } from './aeroResources';
+import type { AeroCamera, AeroResources, AeroState } from './aeroResources';
 import type { AeroPaths } from './aeroPaths';
-import type { AeroCamera } from './aeroCamera';
 import { createAeroSimulation } from './aeroSimulation';
 import { MATERIALS, FLOATS, FOCUS, SHARD_FOCUS, DEPTHS, FADE, LEVELS, MARKER_FLOATS, AeroSettings } from './aeroShardModel';
 export function createAeroFrame(instance: Awaited<ReturnType<typeof init>>, state: AeroState, resources: AeroResources, pathState: AeroPaths, camera: AeroCamera, container: HTMLDivElement) {

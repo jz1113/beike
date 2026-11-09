@@ -32,6 +32,16 @@ func videoInputError(payload map[string]json.RawMessage, model string, bases ...
 	images := videoFrameList(payload)
 	videos := rawStringList(payload["videos"])
 	mode := resolveVideoMode(model, videoRefMode(payload), len(images), len(videos))
+	if veoModel(model) {
+		if veoNativeBase(base) {
+			if _, err := veoNativeURL(base, model); err != nil {
+				return err.Error()
+			}
+		}
+		if mode == "extend" && (len(videos) != 1 || len(images) > 0 || len(rawStringList(payload["audios"])) > 0) {
+			return "Veo 延长需要且仅接受一段视频，不混用参考图片或音频"
+		}
+	}
 	if message := grokOfficialModeError(base, model, mode); message != "" {
 		return message
 	}
@@ -41,7 +51,9 @@ func videoInputError(payload map[string]json.RawMessage, model string, bases ...
 	if message := videoAudioInputError(payload, model, mode, len(images)+len(videos)); message != "" {
 		return message
 	}
-	if !videoModeAllowed(model, mode) {
+	nativeTail := mode == "last_frame" && minimaxH3(model) && (minimaxOfficialHost(base) || minimaxMetasoHost(base))
+	nativeMotion := mode == "motion_control" && (nativeVideoProvider(base) == "kling" || minimaxComflyHost(base)) && (model == "kling-video-v3" || model == "kling-video-v2-6")
+	if !videoModeAllowed(model, mode) && !nativeTail && !nativeMotion {
 		return "当前模型尚未接入这种生成方式，请切换模式"
 	}
 	if mode == "text" && (len(images) > 0 || len(videos) > 0) {
@@ -50,6 +62,9 @@ func videoInputError(payload map[string]json.RawMessage, model string, bases ...
 	if mode == "first_frame" && (len(images) != 1 || len(videos) > 0) {
 		return "首帧模式需要一张图片"
 	}
+	if mode == "last_frame" && (len(images) != 1 || len(videos) > 0) {
+		return "尾帧模式需要一张图片作为结束画面"
+	}
 	if mode == "first_last_frame" && (len(images) != 2 || len(videos) > 0) {
 		return "首尾帧模式需要两张图片，分别作为首帧和尾帧"
 	}
@@ -57,7 +72,10 @@ func videoInputError(payload map[string]json.RawMessage, model string, bases ...
 		return "请添加需要编辑或延长的参考视频"
 	}
 	grokClip := regexp.MustCompile(`(?i)grok`).MatchString(model) && (mode == "edit" || mode == "extend")
-	if len(videos) > 0 && !referenceVideoAllowed(model) && !grokClip {
+	if mode == "motion_control" && (len(images) != 1 || len(videos) != 1) {
+		return "动作控制需要一张人物图片和一段动作参考视频"
+	}
+	if len(videos) > 0 && !referenceVideoAllowed(model) && !grokClip && !nativeMotion && !(veoModel(model) && mode == "extend") {
 		return "当前模型的参考视频尚未接入，请使用图片或文字"
 	}
 	if regexp.MustCompile(`(?i)^vidu`).MatchString(model) && (regexp.MustCompile(`(?i)^viduq3(?:-mix)?$`).MatchString(model) || viduQ4Preview(model) || mode == "omni") && len(images) == 0 {
@@ -90,8 +108,17 @@ func videoInputError(payload map[string]json.RawMessage, model string, bases ...
 	if regexp.MustCompile(`(?i)grok`).MatchString(model) && (mode == "edit" || mode == "extend") && (len(videos) != 1 || len(images) > 0) {
 		return "请添加一段需要编辑或延长的视频"
 	}
-	if regexp.MustCompile(`kling.*omni`).MatchString(model) && len(images) > 7 {
-		return "可灵 Omni 最多支持 7 张参考图片"
+	if regexp.MustCompile(`(?i)kling.*omni`).MatchString(model) {
+		if len(videos) > 1 {
+			return "可灵 Omni 最多支持 1 个参考视频"
+		}
+		maxImages := 7
+		if len(videos) > 0 {
+			maxImages = 4
+		}
+		if len(images) > maxImages {
+			return "可灵 Omni 最多支持 " + Itoa(maxImages) + " 张参考图片"
+		}
 	}
 	if regexp.MustCompile(`(?i)seedance`).MatchString(model) {
 		maxImages, maxVideos := 9, 3
@@ -114,6 +141,9 @@ func videoInputError(payload map[string]json.RawMessage, model string, bases ...
 	if value := rawStringValue(payload["aspect_ratio"]); value != "" {
 		aspect = value
 	}
+	if minimaxH3(model) && (minimaxOfficialHost(base) || metasoH3 || minimaxComflyHost(base)) && (mode == "first_frame" || mode == "last_frame" || mode == "first_last_frame") && aspect == "adaptive" {
+		aspect = "16:9"
+	}
 	duration := 5.0
 	if raw, ok := payload["duration"]; ok {
 		if json.Unmarshal(raw, &duration) != nil {
@@ -123,6 +153,22 @@ func videoInputError(payload map[string]json.RawMessage, model string, bases ...
 		duration = 10
 	} else if regexp.MustCompile(`(?i)grok`).MatchString(model) && mode == "extend" {
 		duration = 6
+	}
+	if veoModel(model) && veoNativeBase(base) && strings.Contains(strings.ToLower(model), "fast") && resolution == "4K" {
+		return "Veo Fast 官方渠道最高支持 1080P"
+	}
+	if veoModel(model) && mode == "extend" {
+		seconds := 8
+		if veoNativeBase(base) {
+			seconds = 7
+		}
+		if duration != float64(seconds) {
+			return "当前 Veo 延长方式需要新增 " + Itoa(seconds) + " 秒"
+		}
+		if strings.Contains(strings.ToLower(model), "fast") && veoNativeBase(base) && resolution == "4K" {
+			return "Veo Fast 官方渠道最高支持 1080P"
+		}
+		return videoSpecError(model, mode, resolution, aspect, float64(seconds))
 	}
 	if metasoH3 {
 		return minimaxMetasoSpecError(resolution, aspect, duration)
@@ -163,7 +209,9 @@ func videoRefMode(payload map[string]json.RawMessage) string {
 func resolveVideoMode(model, mode string, imageCount, videoCount int) string {
 	if mode == "" {
 		preferred := "text"
-		if videoCount > 0 || imageCount > 2 {
+		if videoCount > 0 && veoModel(model) {
+			preferred = "extend"
+		} else if videoCount > 0 || imageCount > 2 {
 			preferred = "omni"
 		} else if imageCount == 2 {
 			preferred = "first_last_frame"
@@ -198,7 +246,7 @@ func videoModeAllowed(model, mode string) bool {
 }
 
 func referenceVideoAllowed(model string) bool {
-	return regexp.MustCompile(`(?i)seedance`).MatchString(model) || regexp.MustCompile(`^wan3`).MatchString(model) || minimaxH3(model) || regexp.MustCompile(`(?i)omni[_-]flash|gemini-omni`).MatchString(model)
+	return regexp.MustCompile(`(?i)seedance`).MatchString(model) || regexp.MustCompile(`^wan3`).MatchString(model) || minimaxH3(model) || regexp.MustCompile(`(?i)kling.*omni|omni[_-]flash|gemini-omni`).MatchString(model)
 }
 
 func viduQ4Preview(id string) bool {
@@ -226,15 +274,17 @@ func videoModes(model string) []string {
 	case viduQ4Preview(id):
 		return []string{"omni", "first_frame"}
 	case omniFlash(id):
-		return []string{"omni", "text", "edit"}
+		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
+	case id == "veo3.1-pro":
+		return framed
 	case regexp.MustCompile(`^veo3\.1`).MatchString(id):
-		return full
+		return []string{"omni", "first_frame", "first_last_frame", "text", "extend"}
 	case regexp.MustCompile(`sora`).MatchString(id):
 		return []string{"first_frame", "text"}
 	case regexp.MustCompile(`grok`).MatchString(id):
 		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
 	case regexp.MustCompile(`kling`).MatchString(id) && strings.Contains(id, "omni"):
-		return full
+		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
 	case regexp.MustCompile(`kling`).MatchString(id):
 		return framed
 	case regexp.MustCompile(`wan`).MatchString(id):

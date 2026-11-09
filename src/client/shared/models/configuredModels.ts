@@ -1,3 +1,5 @@
+import { resolveEnabledModelId } from '@shared/domain/models/workflowModelDefaults';
+import { DEFAULT_MULTIMODAL_MODEL_ID } from '@shared/domain/models/modelCatalog';
 import { VISION_MODELS, isVisionCapableModel } from '@shared/domain/prompts/vision';
 import { IMAGE_GEN_MODELS } from '@shared/domain/media/drawing';
 import { modalityPickerSelections, readEffectiveModalityModels } from '@shared/domain/models/modalityStorage';
@@ -53,10 +55,10 @@ export function loadSystemConfiguredModels(): {
       shortName: m.shortName || (m.name || m.id).split(' ')[0],
       provider: m.provider || '多模态',
     }));
-    selectedVisionModel = getStoredMultimodalModelId(availableVisionModels[0]?.id || '');
+    selectedVisionModel = getStoredMultimodalModelId(resolveEnabledModelId(DEFAULT_MULTIMODAL_MODEL_ID, availableVisionModels));
   } else {
     availableVisionModels = VISION_MODELS.map((m) => ({ ...m, upstreamId: m.id }));
-    selectedVisionModel = getStoredMultimodalModelId('gemini-3.7-flash');
+    selectedVisionModel = getStoredMultimodalModelId(DEFAULT_MULTIMODAL_MODEL_ID);
   }
 
   let availableImageModels: ConfiguredModelOption[];

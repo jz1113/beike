@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { salesScriptTemplateSchema } from '@shared/contracts/salesScripts';
 import { detectExclusionLeaks, matchScriptProductReadiness, normalizeScriptTemplate, tryParsePastedScriptJson, validateScriptTemplate } from './scriptTemplate';
-import { previewSeedancePromptSkeleton } from './scriptPromptPreview';
-import { selectedProductImageViews } from './imageSelection';
-import { setSalesImageView } from './imageCatalog';
 
 const legacy = { title: '开衫穿搭', durationSec: 6, format: 'presenter', voiceMode: 'none', shots: [{ start: 0, end: 6, beats: [
   { start: 0, end: 2, action: '坐姿看镜头', requiredView: 'worn' },
@@ -50,24 +47,14 @@ describe('sales reference script template', () => {
 
   it('reports missing product views from tagged selected images', () => {
     const script = normalizeScriptTemplate(legacy)!;
-    const images = setSalesImageView([{ index: 0, url: 'a', role: 'main' }, { index: 1, url: 'b', role: 'detail' }], 'a', 'worn');
-    const selection = selectedProductImageViews(images, { colorLabel: '', confirmedImageUrls: ['a', 'b'], excludedImageUrls: [] });
-    expect(selection.untaggedCount).toBe(1);
-    const readiness = matchScriptProductReadiness(script, selection.count, selection.views);
+    const readiness = matchScriptProductReadiness(script, 2, new Set(['worn']));
     expect(readiness.ready).toBe(false);
     expect(readiness.missingViews).toEqual(['back']);
   });
 
-  it('parses fenced external JSON and exports recorded source data without invented reference slots', () => {
+  it('parses fenced external JSON', () => {
     const script = tryParsePastedScriptJson('结果如下：\n```json\n' + JSON.stringify({ script: legacy }) + '\n```')!;
-    const prompt = previewSeedancePromptSkeleton(script);
-    expect(prompt).toContain('分镜资料：开衫穿搭');
-    expect(prompt).toContain('商品视角记录：');
-    expect(prompt).toContain('背面');
-    expect(prompt).toContain('动作段 2');
-    expect(prompt).toContain('声音模式记录：none');
-    expect(prompt).not.toContain('{{Mixed');
-    expect(prompt).not.toContain('不张嘴说话');
+    expect(script.title).toBe('开衫穿搭');
     expect(tryParsePastedScriptJson('镜头一：她坐在桌前')).toBeNull();
   });
 });

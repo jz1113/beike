@@ -1,13 +1,14 @@
 package library
 
 import (
-	"beike.local/cloud/src/backend/internal/platform/database"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"sort"
 	"strings"
 	"time"
+
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 type LibraryImport struct {
@@ -314,4 +315,178 @@ func backupImportWarnings(maps *backupMaps, registries []backupRegistry, restore
 		warnings = append(warnings, itoaCount(missingScenes)+" 条动作的原场景未包含在备份中，已清空场景关联")
 	}
 	return warnings
+}
+
+var backupFieldSpecs = map[string]map[string]string{
+	"scene": {
+		"title": "string", "description": "string", "lighting": "string", "category": "string",
+		"spatialType": "string", "suitableCategories": "string", "tags": "string", "coverUrl": "string?",
+		"sourceImages": "string?", "reversePrompt": "string?", "dimensions": "string?", "sourceImageIndex": "int?",
+		"imageType": "string?", "provenance": "string", "usageCount": "int", "isFavorite": "bool",
+		"albumId": "string?", "productCategoryIds": "string", "isUniversal": "bool",
+	},
+	"outfit": {
+		"title": "string", "top": "string", "bottom": "string", "shoes": "string?", "colorPalette": "string?",
+		"category": "string", "suitableCategories": "string", "tags": "string", "coverUrl": "string?",
+		"sourceImages": "string?", "reversePrompt": "string?", "dimensions": "string?", "sourceImageIndex": "int?",
+		"imageType": "string?", "provenance": "string", "usageCount": "int", "isFavorite": "bool",
+		"albumId": "string?", "productCategoryIds": "string", "isUniversal": "bool",
+	},
+	"action": {
+		"mediaType": "string", "mediaUrl": "string", "sourceUrl": "string",
+		"title": "string", "action": "string", "shotType": "string", "spatialType": "string", "camera": "string?",
+		"suitableAnatomy": "string", "tags": "string", "coverUrl": "string?", "sourceImages": "string?",
+		"reversePrompt": "string?", "dimensions": "string?", "sourceImageIndex": "int?", "imageType": "string?",
+		"provenance": "string", "usageCount": "int", "isFavorite": "bool", "sceneId": "string?", "shotOrder": "int",
+		"albumId": "string?", "productCategoryIds": "string", "isUniversal": "bool",
+	},
+	"persona": {
+		"name": "string", "description": "string", "tags": "string", "avatarUrl": "string?", "reversePrompt": "string?",
+		"sourceImages": "string?", "dimensions": "string?", "sourceImageIndex": "int?", "imageType": "string?",
+		"provenance": "string", "usageCount": "int", "isFavorite": "bool", "albumId": "string?",
+		"productCategoryIds": "string", "isUniversal": "bool",
+	},
+	"full_prompt": {
+		"title": "string", "albumName": "string?", "reversePromptZh": "string", "reversePromptEn": "string?",
+		"dimensions": "string?", "imageType": "string?", "sourceImageIndex": "int?", "sourceImageIndices": "string?",
+		"groupIndex": "int?", "contentSummary": "string?", "architectureSummary": "string?", "replaceableSlots": "string?",
+		"shotPromptsJson": "string?", "coverUrl": "string?", "sourceImages": "string?", "hasHuman": "bool",
+		"shotFraming": "string?", "productFrameRatio": "int?", "sceneSummary": "string?", "outfitSummary": "string?",
+		"actionSummary": "string?", "personaSummary": "string?", "tags": "string", "category": "string",
+		"productSubcategory": "string?", "provenance": "string", "usageCount": "int", "isFavorite": "bool",
+		"albumId": "string?", "productCategoryIds": "string", "isUniversal": "bool",
+	},
+}
+
+func jsStringArray(values []string) string {
+	parts := make([]string, len(values))
+	for index, value := range values {
+		parts[index] = jsString(value)
+	}
+	return "[" + strings.Join(parts, ",") + "]"
+}
+
+func jsString(value string) string {
+	var builder strings.Builder
+	builder.WriteByte('"')
+	for _, char := range value {
+		switch char {
+		case '\\', '"':
+			builder.WriteByte('\\')
+			builder.WriteRune(char)
+		case '\b':
+			builder.WriteString(`\b`)
+		case '\f':
+			builder.WriteString(`\f`)
+		case '\n':
+			builder.WriteString(`\n`)
+		case '\r':
+			builder.WriteString(`\r`)
+		case '\t':
+			builder.WriteString(`\t`)
+		default:
+			if char < 0x20 {
+				builder.WriteString(`\u00`)
+				builder.WriteByte("0123456789abcdef"[char>>4])
+				builder.WriteByte("0123456789abcdef"[char&0xf])
+			} else {
+				builder.WriteRune(char)
+			}
+		}
+	}
+	builder.WriteByte('"')
+	return builder.String()
+}
+
+func prepareImportedPrompt(ctx context.Context, tx *sql.Tx, workspace string, data map[string]any) error {
+	albumInput := map[string]any{}
+	for key, value := range data {
+		albumInput[key] = value
+	}
+	if !createTruthy(albumInput["albumId"]) {
+		albumInput["albumId"] = nil
+		if text, ok := albumInput["productCategoryIds"].(string); ok {
+			ids := database.CategoryIDList(text)
+			if len(ids) > 1 {
+				albumInput["productCategoryIds"] = jsStringArray(ids[:1])
+			}
+		}
+	}
+	album, err := ensurePromptAlbum(ctx, tx, workspace, albumInput)
+	if err != nil {
+		return err
+	}
+	data["albumId"] = album.id
+	data["albumName"] = album.name
+	data["isUniversal"] = false
+	if _, ok := data["productSubcategory"]; !ok && len(promptShotMarks(data["shotPromptsJson"])) == 4 {
+		if inferred := inferCreateSubcategory(data); inferred != "" {
+			data["productSubcategory"] = inferred
+		}
+	}
+	number, err := nextPromptDisplayNumber(ctx, tx)
+	if err != nil {
+		return err
+	}
+	data["displayNumber"] = number
+	return nil
+}
+
+func overlayImportedPromptNumbers(ctx context.Context, tx *sql.Tx, workspace string, items []json.RawMessage) error {
+	needsNumbers := false
+	for _, item := range items {
+		var fields map[string]any
+		if json.Unmarshal(item, &fields) != nil {
+			continue
+		}
+		if libraryText(fields["reversePromptZh"]) != "" || libraryText(fields["albumName"]) != "" || fields["groupIndex"] != nil || libraryText(fields["provenance"]) == "manual" || libraryText(fields["provenance"]) == "deconstructed" {
+			needsNumbers = true
+			break
+		}
+	}
+	if !needsNumbers {
+		for _, item := range items {
+			var fields map[string]any
+			if json.Unmarshal(item, &fields) != nil {
+				continue
+			}
+			if _, ok := fields["displayNumber"]; ok {
+				needsNumbers = true
+				break
+			}
+		}
+	}
+	if !needsNumbers {
+		return nil
+	}
+	if err := ensureVisiblePromptNumbers(ctx, tx, workspace); err != nil {
+		return err
+	}
+	for i, item := range items {
+		var fields map[string]any
+		if err := json.Unmarshal(item, &fields); err != nil {
+			return err
+		}
+		if _, ok := fields["reversePromptZh"]; !ok && fields["groupIndex"] == nil && libraryText(fields["provenance"]) == "" {
+			continue
+		}
+		if !promptRowVisible(fields) {
+			items[i] = setDisplayNumber(item, nil)
+			continue
+		}
+		id, _ := fields["id"].(string)
+		var number int64
+		err := tx.QueryRowContext(ctx, `
+			SELECT "displayNumber" FROM "FullPromptLibraryNumber"
+			WHERE "workspaceId" = ? AND "assetId" = ?`, workspace, id).Scan(&number)
+		if err == sql.ErrNoRows {
+			items[i] = setDisplayNumber(item, nil)
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		items[i] = setDisplayNumber(item, &number)
+	}
+	return nil
 }

@@ -276,6 +276,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/canvas/drafts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取工作区的线上草稿，并投影为可编辑的 Studio 项目 */
+        get: operations["get_api_canvas_drafts_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/canvas/mcp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 使用独立 Bearer 令牌访问画布 MCP Streamable HTTP 服务 */
+        post: operations["post_api_canvas_mcp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalog/assets/{type}/{id}/create-version": {
         parameters: {
             query?: never;
@@ -446,22 +480,6 @@ export interface paths {
         get: operations["get_api_catalog_assets_reviews"];
         put?: never;
         post: operations["post_api_catalog_assets_reviews"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/catalog/assets/seed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["post_api_catalog_assets_seed"];
         delete?: never;
         options?: never;
         head?: never;
@@ -797,7 +815,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get_api_generate_analyze"];
         put?: never;
         post: operations["post_api_generate_analyze"];
         delete?: never;
@@ -822,6 +840,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/generate/canvas-specialized": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_generate_canvas_specialized"];
+        put?: never;
+        post: operations["post_api_generate_canvas_specialized"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/generate/canvas-text": {
         parameters: {
             query?: never;
@@ -829,7 +863,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get_api_generate_canvas_text"];
         put?: never;
         post: operations["post_api_generate_canvas_text"];
         delete?: never;
@@ -845,7 +879,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get_api_generate_copywriting"];
         put?: never;
         post: operations["post_api_generate_copywriting"];
         delete?: never;
@@ -1133,7 +1167,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get_api_generate_layer_decomposition"];
         put?: never;
         post: operations["post_api_generate_layer_decomposition"];
         delete?: never;
@@ -2047,6 +2081,26 @@ export interface components {
             promptModel?: string;
             imageModel?: string;
         };
+        SalesAssetUsageScope: {
+            workspaceId: string;
+            channelId: string;
+            /** @enum {string} */
+            mediaType: "vision" | "image";
+            epoch: string;
+        };
+        SalesAssetUsageReceipt: {
+            /** @enum {string} */
+            stage: "analysis" | "main" | "views";
+            modelId: string;
+            taskId?: string;
+            recordId?: string;
+            success: boolean;
+            usage?: {
+                promptTokens: number;
+                completionTokens: number;
+                totalTokens: number;
+            };
+        };
         SalesAssetViewJob: {
             id: string;
             key: string;
@@ -2062,6 +2116,10 @@ export interface components {
                 [key: string]: string;
             };
             creation?: components["schemas"]["SalesAssetCreation"];
+            usageScopes?: {
+                [key: string]: components["schemas"]["SalesAssetUsageScope"];
+            };
+            usageReceipts?: components["schemas"]["SalesAssetUsageReceipt"][];
             createdAt: string;
             updatedAt: string;
         };
@@ -2653,6 +2711,91 @@ export interface operations {
             };
         };
     };
+    get_api_canvas_drafts_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前版本的 Studio 项目 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        project: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description 登录或工作区身份无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 当前工作区没有此草稿 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_canvas_mcp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description MCP JSON-RPC 响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 已接受 MCP 通知 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description MCP 令牌缺失或无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description MCP 未启用 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     post_api_catalog_assets_type_id_create_version: {
         parameters: {
             query?: never;
@@ -2924,24 +3067,6 @@ export interface operations {
         };
     };
     post_api_catalog_assets_reviews: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    post_api_catalog_assets_seed: {
         parameters: {
             query?: never;
             header?: never;
@@ -3709,6 +3834,24 @@ export interface operations {
             };
         };
     };
+    get_api_generate_analyze: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     post_api_generate_analyze: {
         parameters: {
             query?: never;
@@ -3729,7 +3872,13 @@ export interface operations {
     };
     get_api_generate_audio: {
         parameters: {
-            query?: never;
+            query?: {
+                taskId?: string;
+                /** @description 首次回执丢失时使用的原操作标识，与 taskId 二选一 */
+                taskKey?: string;
+                /** @description 使用 taskKey 恢复时原子封闭缺失操作；已有操作不变，封闭失败不得换键重试 */
+                closeMissing?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3763,7 +3912,126 @@ export interface operations {
             };
         };
     };
+    get_api_generate_canvas_specialized: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_generate_canvas_specialized: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_generate_canvas_text: {
+        parameters: {
+            query: {
+                operationKey: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 恢复原文本或05分析结果，不调用模型；最终阶段已保存时可恢复外层结算失败的回执 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 原回执尚未找到，保留原标识继续查询，不授权重新提交 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 原操作执行中或结果未知，返回已保存的观察阶段回执及阶段状态，不自动补发 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 回执暂不可读或原阶段结果未知，保留原操作 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     post_api_generate_canvas_text: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 提交前持久化的操作标识；同工作区同标识原子领取，各阶段最多执行一次 */
+                "x-idempotency-key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 文本或聊天结果及 operationKey，重复操作重放原回执 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 原操作执行中、结果未知或同标识参数冲突，不重新调用模型 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 模型或观察阶段结果未知，只查询原回执；已完成观察保留供核对 */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 领取或阶段结算未确认，不换键补发 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_generate_copywriting: {
         parameters: {
             query?: never;
             header?: never;
@@ -4143,7 +4411,15 @@ export interface operations {
     };
     get_api_generate_image: {
         parameters: {
-            query?: never;
+            query?: {
+                taskId?: string;
+                /** @description 首次回执丢失时使用的原操作标识，与 taskId 二选一 */
+                taskKey?: string;
+                /** @description 使用 taskKey 恢复时原子封闭缺失操作；已有操作不变，封闭失败不得换键重试 */
+                closeMissing?: boolean;
+                /** @description 画布查询要求可验证的原提交渠道；仍允许读取已保存的终态，不向推测渠道发起查询 */
+                requireRoute?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4152,6 +4428,13 @@ export interface operations {
         responses: {
             /** @description 沿用现有 JSON 或二进制响应 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 渠道已改变或原任务缺少可验证的渠道记录 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4195,17 +4478,82 @@ export interface operations {
             };
         };
     };
-    post_api_generate_layer_decomposition: {
+    get_api_generate_layer_decomposition: {
         parameters: {
-            query?: never;
+            query: {
+                operationKey: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 恢复当前工作区原图层分离回执，不调用模型，不依赖当前模型渠道配置 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 原回执不存在，仅允许继续查询，不授权换键重发 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 原操作进行中或结果未知，不重新调用模型 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 回执存储暂不可用，不重新调用模型 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_api_generate_layer_decomposition: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 客户端提交前持久化的操作标识；同工作区同标识只允许调用一次模型 */
+                "x-idempotency-key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 图层分离结果及 operationKey；调用后的回执包含实际 model、usageChannelId 及可用的 usage，重复提交重放原回执 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 原操作进行中、结果未知或同标识参数冲突，不重新调用模型 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 上游结果未确认；submissionUnknown 为 true 时只查询原回执 */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 原子领取或回执结算未确认，保留原操作标识 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4634,6 +4982,7 @@ export interface operations {
                     };
                     checkpoint?: {
                         taskId?: string;
+                        recordId?: string;
                         resultUrl?: string;
                     };
                 };
@@ -5717,6 +6066,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description 请求体格式无效、超出大小限制、配置缺失或连接测试失败 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_api_system_depth_env: {
@@ -5764,8 +6120,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 沿用现有 JSON 或二进制响应 */
+            /** @description 派生缓存已清理 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 访问令牌或工作区密钥缺失或无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 生产模式下需要管理员令牌 */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

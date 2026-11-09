@@ -52,8 +52,6 @@
 .sales-library-select-check { flex: none; visibility: hidden; color: var(--sales-accent); }
 .sales-library-select-option[aria-selected="true"] .sales-library-select-check { visibility: visible; }
 .sales-library-select-empty { margin: 0; padding: 18px 10px; color: var(--sales-muted); text-align: center; }
-.sales-taxonomy-field > .sales-library-select { width: 100%; }
-.sales-taxonomy-field .sales-library-select-trigger { max-width: none; }
 @media (prefers-reduced-motion: reduce) {
   .sales-library-select-trigger, .sales-library-select-trigger > svg { transition: none; }
 }

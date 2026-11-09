@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import type { HomeCanvasNode, PublishedHomeItem } from '@client/shared/home-publish/homePublish';
+import { unpublishCanvasResult, type HomeCanvasNode, type PublishedHomeItem } from '@client/shared/home-publish/homePublish';
 import { useModalDialog } from '@client/shared/hooks/useModalDialog';
-import { useScrollLock } from '@client/shared/hooks/useScrollLock';
+import { useScrollLock } from '@client/shared/hooks/useSafeTimeout';
 import { videoPlaybackManager } from '@client/shared/media/videoPlaybackManager';
-import { fitShowcaseCanvas } from '../../model/showcaseCanvas';
+import { fitShowcaseCanvas } from '../../model/inspirationItem';
 
 interface Props {
   item: PublishedHomeItem;
@@ -80,7 +80,7 @@ function ReadonlyCanvas({ nodes, onClose }: { nodes: HomeCanvasNode[]; onClose: 
           </svg>
           {nodes.map(node => (
             <div key={node.id} className="absolute overflow-hidden rounded-xl border border-white/10 bg-[#2a2a2e]" style={{ left: node.x, top: node.y, width: node.width, height: node.height }}>
-              {node.videoUrl ? <video src={node.videoUrl} className="h-full w-full object-cover" muted /> : node.imageUrl ? <img src={node.imageUrl} alt="" className="h-full w-full object-cover" /> : <div className="p-3 text-xs text-white/70">{node.title || node.content || node.type}</div>}
+              {node.videoUrl ? <video src={node.videoUrl} className="h-full w-full object-cover" muted /> : node.imageUrl ? <img src={node.imageUrl} alt="" className="h-full w-full object-cover" /> : <div className="h-full overflow-hidden p-3 text-xs text-white/70"><div className="font-semibold text-white">{node.title || node.type}</div>{node.content && <p className="mt-2 whitespace-pre-wrap break-words">{node.content}</p>}</div>}
             </div>
           ))}
         </div>
@@ -92,6 +92,7 @@ function ReadonlyCanvas({ nodes, onClose }: { nodes: HomeCanvasNode[]; onClose: 
 
 export function CanvasShowcase({ item, onClose }: Props) {
   const [openCanvas, setOpenCanvas] = useState(false);
+  const [error, setError] = useState('');
   const dialogRef = useModalDialog(true, openCanvas ? () => setOpenCanvas(false) : onClose);
   useScrollLock(true, '[data-hub-scroll]');
   useEffect(() => videoPlaybackManager.suspend(), []);
@@ -106,14 +107,25 @@ export function CanvasShowcase({ item, onClose }: Props) {
       <button type="button" aria-label="关闭" onClick={onClose} className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 hover:bg-black/60">
         <X className="h-4 w-4" />
       </button>
-      {item.mediaType === 'video' && item.video ? <video src={item.video} className="absolute inset-0 h-full w-full object-cover" autoPlay muted loop playsInline /> : <img src={item.image} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
-      <div className="relative flex h-full max-w-xl flex-col justify-end p-8 sm:p-12">
-        <h2 className="text-3xl font-semibold tracking-tight sm:text-5xl">{item.title}</h2>
-        {synopsis && <p className="mt-4 max-h-40 overflow-auto text-sm leading-6 text-white/80">{synopsis}</p>}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button type="button" onClick={() => void share()} className="rounded-full bg-white/15 px-4 py-2 text-sm hover:bg-white/25 dark:bg-[#18191c]/95">分享</button>
-          <button type="button" onClick={() => setOpenCanvas(true)} disabled={!item.canvasNodes?.length} className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-50 dark:text-slate-100 dark:bg-[#18191c]">查看画布</button>
+      <div className="flex h-full flex-col overflow-y-auto lg:flex-row">
+        <div className="flex min-h-[45vh] flex-1 items-center justify-center bg-black p-4 pt-16 lg:min-h-0 lg:p-8">
+          {item.mediaType === 'video' && item.video
+            ? <video src={item.video} poster={item.poster} aria-label="成片视频" className="max-h-[75vh] max-w-full object-contain" controls playsInline />
+            : <img src={item.image} alt="" className="max-h-[75vh] max-w-full object-contain" />}
+        </div>
+        <div className="flex w-full shrink-0 flex-col justify-center gap-4 bg-[#16171a] p-6 lg:w-[380px] lg:p-8">
+          <span className="text-xs text-stone-400">画布作品 · 流程快照</span>
+          <h2 className="break-words text-2xl font-semibold">{item.title}</h2>
+          {synopsis && <p className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-sm leading-6 text-white/80">{synopsis}</p>}
+          {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={() => setOpenCanvas(true)} disabled={!item.canvasNodes?.length} className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-50">查看制作流程</button>
+            <button type="button" onClick={() => void share()} className="rounded-full bg-white/15 px-4 py-2 text-sm hover:bg-white/25">复制简介</button>
+            {item.projectId && <button type="button" onClick={() => {
+              try { unpublishCanvasResult(item.projectId!); onClose(); }
+              catch (cause) { setError(cause instanceof Error ? cause.message : '移除失败'); }
+            }} className="rounded-full px-4 py-2 text-sm text-stone-400 hover:bg-white/10 hover:text-white">从作品流移除</button>}
+          </div>
         </div>
       </div>
       </>}

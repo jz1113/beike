@@ -95,6 +95,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // The builtin skill catalog changes independently of the application shell.
+          if (id.endsWith('/assistant/skills/compiledSkillPackages.json')) return 'builtin-skills';
+          if (id.includes('node_modules/motion/') || id.includes('node_modules/framer-motion/') ||
+              id.includes('node_modules/motion-dom/') || id.includes('node_modules/motion-utils/')) {
+            return 'vendor-motion';
+          }
+          if (id.includes('node_modules/zod/')) return 'vendor-validation';
           if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/zustand/')) {
             return 'vendor-react';
           }

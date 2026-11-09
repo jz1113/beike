@@ -1,5 +1,5 @@
-import type { UsageLogItem } from './usageLog';
 import { recordModelUsage, resolveModelVendor } from './usageTracker';
+import type { UsageLogItem, UsageScope } from './usageScope';
 
 export type ReportedUsage = {
   promptTokens: number;
@@ -29,27 +29,36 @@ export function recordChatTokens(input: {
   type?: UsageLogItem['type'];
   usage: unknown;
   mediaCount?: number;
+  operationId?: string;
+  scope?: UsageScope;
+  success?: boolean;
 }): void {
   const tokens = readReportedUsage(input.usage);
   if (!tokens || !input.modelId) return;
   recordModelUsage({
+    ...(input.operationId ? { taskId: `text:${input.operationId}` } : {}),
+    scope: input.scope,
     modelId: input.modelId,
     modelName: input.modelName || input.modelId,
     provider: resolveModelVendor(input.modelId),
     type: input.type || 'chat',
     ...tokens,
     mediaCount: input.mediaCount,
-    success: true,
+    success: input.success ?? true,
   });
 }
 
 export function recordMediaTaskUsage(input: {
   taskId?: string;
   localTaskId?: string;
+  recordId?: string;
+  scope?: UsageScope;
   modelId: string;
   modelName?: string;
   type: UsageLogItem['type'];
   mediaCount?: number;
+  billableCount?: number;
+  success?: boolean;
   duration?: number;
   resolution?: string;
   usage?: unknown;
@@ -58,16 +67,19 @@ export function recordMediaTaskUsage(input: {
   recordModelUsage({
     taskId: input.taskId,
     localTaskId: input.localTaskId,
+    recordId: input.recordId,
+    scope: input.scope,
     modelId: input.modelId,
     modelName: input.modelName || input.modelId,
     provider: resolveModelVendor(input.modelId),
     type: input.type,
     mediaCount: input.mediaCount,
+    billableCount: input.billableCount,
     duration: input.duration,
     resolution: input.resolution,
     promptTokens: tokens?.promptTokens,
     completionTokens: tokens?.completionTokens,
     totalTokens: tokens?.totalTokens,
-    success: true,
+    success: input.success ?? true,
   });
 }

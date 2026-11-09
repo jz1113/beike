@@ -71,10 +71,13 @@ describe('buildPromptBarGenerationTasks session', () => {
     if (!result.ok) return;
     const task = result.tasks[0];
     expect(task.prompt).toBe(prompt);
-    const retry = await prepareGenerationAttempt({ ...task, status }, 'retry');
+    const original = { ...task, status, usageScope: { workspaceId: 'previous-workspace', channelId: 'previous-channel', mediaType: 'image' } };
+    const retry = await prepareGenerationAttempt(original, 'retry');
     expect(retry?.id).not.toBe(task.id);
     expect(retry?.prompt).toBe(prompt);
     expect(retry?.referenceImages).toEqual(refs);
+    expect(retry?.usageScope).toBeUndefined();
+    expect(original.usageScope.channelId).toBe('previous-channel');
   });
 
   it('correctly creates audio task when mode is audio', () => {
@@ -145,4 +148,13 @@ describe('buildPromptBarSubjects', () => {
       { id: 'ref-1', url: 'data:image/png;base64,AAA', name: '1' },
     ]);
   });
+});
+
+
+it('builds a direct collection task without a configured model', () => {
+  const request = { ...input('home'), quickGenMode: 'collect' as const, quickPrompt: '10231557417974', hasImageModels: false };
+  expect(canSubmitPromptBar(request)).toBe(true);
+  const result = buildPromptBarGenerationTasks(request);
+  expect(result.ok && result.tasks[0]).toMatchObject({ model: 'direct-collection', mediaType: 'agent', prompt: '10231557417974' });
+  expect(canSubmitPromptBar({ ...request, quickPrompt: ' ' })).toBe(false);
 });

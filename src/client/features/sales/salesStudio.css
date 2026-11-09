@@ -1,3 +1,6 @@
+.sales-card-hint { color: var(--sales-muted); font-size: 11px; line-height: 1.6; }
+.sales-beat-field-label { display: block; color: var(--sales-muted); font-size: 11px; font-weight: 500; }
+
 .sales-studio {
   --sales-canvas: #f4f4f3;
   --sales-surface: #ffffff;
@@ -389,35 +392,6 @@
   border-radius: 6px;
   background: var(--sales-subtle);
   color: var(--sales-muted);
-}
-
-.sales-script-card,
-.sales-material-card {
-  background: var(--sales-surface);
-  border-radius: 6px;
-  box-shadow: none;
-  transition: border-color 140ms ease;
-}
-
-.sales-script-card:hover,
-.sales-material-card:hover {
-  border-color: var(--sales-ink);
-  box-shadow: none;
-}
-
-.sales-material-grid {
-  grid-template-columns: repeat(auto-fill, minmax(min(188px, 100%), 1fr));
-  gap: 14px;
-}
-
-.sales-material-grid.density-sm {
-  grid-template-columns: repeat(auto-fill, minmax(min(148px, 100%), 1fr));
-  gap: 10px;
-}
-
-.sales-material-grid.density-lg {
-  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
-  gap: 18px;
 }
 
 @media (max-width: 960px) {

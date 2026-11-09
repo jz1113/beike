@@ -5,11 +5,36 @@ import {
   X,
 } from 'lucide-react';
 import { useI18n } from '@client/shared/i18n';
-import MaterialFilterDropdown from './MaterialFilterDropdown';
+import GlideSelect from '@client/shared/ui/GlideSelect';
+
+interface DropdownOption<T extends string> {
+  id: T;
+  label: string;
+}
+
+interface MaterialFilterDropdownProps<T extends string> {
+  label: string;
+  value: T;
+  options: DropdownOption<T>[];
+  onChange: (val: T) => void;
+  align?: 'left' | 'right';
+}
+
+function MaterialFilterDropdown<T extends string>({
+  label, value, options, onChange, align = 'right',
+}: MaterialFilterDropdownProps<T>) {
+  return (
+    <GlideSelect ariaLabel={label} value={value} align={align} size="sm" menuWidth={140}
+      options={options.map(option => ({ value: option.id, label: option.label }))}
+      onChange={next => {
+        const selected = options.find(option => option.id === next);
+        if (selected) onChange(selected.id);
+      }}
+    />
+  );
+}
 
 export interface MaterialLibraryToolbarProps {
-  viewMode: 'flat' | 'project';
-  onViewModeChange: (mode: 'flat' | 'project') => void;
   mediaCategory: 'all' | 'image' | 'video' | 'audio' | 'document';
   onMediaCategoryChange: (cat: 'all' | 'image' | 'video' | 'audio' | 'document') => void;
   searchInput: string;
@@ -25,8 +50,6 @@ export interface MaterialLibraryToolbarProps {
 }
 
 export function MaterialLibraryToolbar({
-  viewMode,
-  onViewModeChange,
   mediaCategory,
   onMediaCategoryChange,
   searchInput,
@@ -54,49 +77,33 @@ export function MaterialLibraryToolbar({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 pt-1 pb-5 border-b border-slate-200/60 dark:border-white/10 mb-3">
-      {/* 左侧区域：【全部 / 图片 / 视频 / 音频 / 文档】胶囊容器 + 视图切换下拉 */}
-      <div className="flex flex-wrap items-center gap-3 min-w-0 max-w-full flex-wrap">
-        {viewMode === 'flat' && (
-          <div className="inline-flex max-w-full flex-wrap items-center gap-1 p-1 rounded-full bg-slate-100/90 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 shadow-2xs">
-            {(
-              [
-                { id: 'all', label: t('assets.all') },
-                { id: 'image', label: t('assets.image') },
-                { id: 'video', label: t('assets.video') },
-                { id: 'audio', label: t('assets.audio') },
-                { id: 'document', label: t('assets.document') },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                aria-pressed={mediaCategory === tab.id}
-                onClick={() => onMediaCategoryChange(tab.id)}
-                className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                  mediaCategory === tab.id
-                    ? 'bg-white dark:bg-[#20252F] text-slate-900 dark:text-white font-semibold shadow-2xs'
-                    : 'text-slate-500 dark:text-[#8E8E93] hover:text-slate-800 dark:hover:text-white'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* 细分割竖线 */}
-        {viewMode === 'flat' && (
-          <div className="h-4 w-px bg-slate-200 dark:bg-white/10 shrink-0 mx-0.5 hidden sm:block" />
-        )}
-
-        {/* 平铺视图 ˅ / 项目视图 ˅ 下拉 */}
-        <MaterialFilterDropdown
-          label={t('assets.historyView')}
-          value={viewMode}
-          options={[{ id: 'flat', label: t('assets.flatView') }, { id: 'project', label: t('assets.projectView') }]}
-          onChange={onViewModeChange}
-          align="left"
-        />
+      {/* 左侧区域：【全部 / 图片 / 视频 / 音频 / 文档】胶囊容器 */}
+      <div className="flex flex-wrap items-center gap-3 min-w-0 max-w-full">
+        <div className="inline-flex max-w-full flex-wrap items-center gap-1 p-1 rounded-full bg-slate-100/90 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 shadow-2xs">
+          {(
+            [
+              { id: 'all', label: t('assets.all') },
+              { id: 'image', label: t('assets.image') },
+              { id: 'video', label: t('assets.video') },
+              { id: 'audio', label: t('assets.audio') },
+              { id: 'document', label: t('assets.document') },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              aria-pressed={mediaCategory === tab.id}
+              onClick={() => onMediaCategoryChange(tab.id)}
+              className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                mediaCategory === tab.id
+                  ? 'bg-white dark:bg-[#20252F] text-slate-900 dark:text-white font-semibold shadow-2xs'
+                  : 'text-slate-500 dark:text-[#8E8E93] hover:text-slate-800 dark:hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 右侧区域：批量模式展示控制条；普通模式展示搜索+排序+批量操作入口 */}
@@ -158,7 +165,7 @@ export function MaterialLibraryToolbar({
             onChange={(val) => onSortOrderChange(val)}
           />
 
-          {/* 批量操作按钮（平铺视图与项目视图均支持） */}
+          {/* 批量操作按钮 */}
           <button
             type="button"
             ref={batchButton}

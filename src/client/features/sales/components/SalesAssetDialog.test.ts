@@ -1,10 +1,17 @@
-import { Children, isValidElement, type ComponentProps, type ReactElement } from 'react';
+import { Children, isValidElement, type ComponentProps, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { ConfiguredModelPicker } from '@client/shared/models/ConfiguredModelPicker';
+import { loadSystemConfiguredModels } from '@client/shared/models/configuredModels';
 import { confirmAction } from '@client/shared/utils/confirmAction';
-import { createSalesMaterial, deleteSalesMaterial, updateSalesMaterial } from '../api/salesMaterials';
+import { createSalesMaterial, deleteSalesMaterial, fetchSalesStudioAssets, importSalesImageAsset, updateSalesMaterial } from '../api/salesMaterials';
+import { uploadSalesViewImage } from '../api/salesAssetViews';
+import type { useSalesAssetViews } from '../hooks/useSalesAssetViews';
+import { PERSONA_VIEWS, type SupplementView } from '../model/salesActionViews';
+import { SalesAssetViewGallery, SalesPersonaSheet, SalesScriptCopyButton } from './SalesAssetViewGallery';
+import { SalesImageImportDialog } from './SalesImageImportDialog';
 import { SalesPersonaDialog } from './SalesPersonaDialog';
 import { SalesSceneDialog } from './SalesSceneDialog';
-import { SalesAssetDraftStatus } from './SalesAssetDraftStatus';
+import { SalesAssetDraftStatus } from './salesChrome';
 
 const draft = vi.hoisted(() => ({ clear: vi.fn(), flush: vi.fn(), status: 'saved' as const, fields: { name: '待保存', group: 'female', voiceId: '', space: 'indoor', tags: '' }, setField: vi.fn(), upload: vi.fn(), savedAssetId: undefined as string | undefined, unconfirmedBackground: false, background: true, active: [] as string[], stage: '' as '' | 'uploading' | 'generating' }));
 const hooks = vi.hoisted(() => ({ index: 0, slots: [] as unknown[], cleanup: undefined as (() => void) | undefined }));
@@ -19,18 +26,31 @@ vi.mock('react', async (original) => ({
   useState: <T>(initial: T | (() => T)) => {
     const index = hooks.index++;
     if (!(index in hooks.slots)) hooks.slots[index] = typeof initial === 'function' ? (initial as () => T)() : initial;
-    return [hooks.slots[index], (next: T) => { hooks.slots[index] = next; }];
+    return [hooks.slots[index], (next: T | ((previous: T) => T)) => {
+      hooks.slots[index] = typeof next === 'function' ? (next as (previous: T) => T)(hooks.slots[index] as T) : next;
+    }];
   },
 }));
 vi.mock('@client/shared/utils/confirmAction', () => ({ confirmAction: vi.fn() }));
-vi.mock('../api/salesMaterials', () => ({ createSalesMaterial: vi.fn(), updateSalesMaterial: vi.fn(), deleteSalesMaterial: vi.fn() }));
-vi.mock('../hooks/useSalesAssetDraft', () => ({ useSalesAssetDraft: () => ({
-  fields: draft.fields, setField: draft.setField, clear: draft.clear, status: draft.status, flush: draft.flush, error: '',
-}) }));
+vi.mock('@client/shared/models/configuredModels', () => ({ loadSystemConfiguredModels: vi.fn() }));
+vi.mock('../model/salesAssetDraft', async (original) => ({ ...await original<typeof import('../model/salesAssetDraft')>(), supportsSalesAssetReferences: (id: string) => id !== 'no-references' }));
+vi.mock('../api/salesMaterials', () => ({
+  createSalesMaterial: vi.fn(),
+  updateSalesMaterial: vi.fn(),
+  deleteSalesMaterial: vi.fn(),
+  importSalesImageAsset: vi.fn(),
+  fetchSalesStudioAssets: vi.fn(),
+}));
+vi.mock('../api/salesAssetViews', () => ({ uploadSalesViewImage: vi.fn() }));
 const dimensions = (base?: string) => JSON.stringify({ ...JSON.parse(base || '{}'), assetCreation: { referenceImageUrl: '/reference.jpg', prompt: '自然光下的全新形象', imageUrl: '/main.jpg' } });
-vi.mock('../hooks/useSalesPersonaViews', () => ({ useSalesPersonaViews: () => ({ views: { main: '/main.jpg' }, extraImages: [], active: draft.active, background: draft.background, stage: draft.stage, upload: draft.upload, savedAssetId: draft.savedAssetId, unconfirmedBackground: draft.unconfirmedBackground, withCreationDimensions: dimensions }) }));
-vi.mock('../hooks/useSalesSceneViews', () => ({ useSalesSceneViews: () => ({ views: { main: '/main.jpg' }, extraImages: [], active: draft.active, background: draft.background, stage: draft.stage, savedAssetId: draft.savedAssetId, unconfirmedBackground: draft.unconfirmedBackground, withCreationDimensions: dimensions }) }));
-const onSaved = vi.fn(); const onClose = vi.fn();
+vi.mock('../hooks/useSalesAssetViews', () => ({
+  useSalesAssetDraft: () => ({
+    fields: draft.fields, setField: draft.setField, clear: draft.clear, status: draft.status, flush: draft.flush, error: '',
+  }),
+  useSalesAssetViews: () => ({ views: { main: '/main.jpg' }, extraImages: [], active: draft.active, background: draft.background, stage: draft.stage, upload: draft.upload, savedAssetId: draft.savedAssetId, unconfirmedBackground: draft.unconfirmedBackground, withCreationDimensions: dimensions }),
+}));
+
+const onSaved = vi.fn(); const onClose = vi.fn(); const onImported = vi.fn();
 type Node = ReactElement<Record<string, unknown>>;
 function Render(kind: 'persona' | 'scene', scene?: ComponentProps<typeof SalesSceneDialog>['scene']) {
   hooks.index = 0;
@@ -51,7 +71,17 @@ function submit(kind: 'persona' | 'scene') {
   (find(Render(kind), (node) => node.type === 'form').props.onSubmit as (event: { preventDefault: () => void }) => void)({ preventDefault: vi.fn() });
 }
 function pending(kind: 'persona' | 'scene') { return find(Render(kind), (node) => node.type === 'button' && node.props.type === 'submit').props.disabled; }
-beforeEach(() => { hooks.cleanup?.(); hooks.cleanup = undefined; hooks.slots = []; vi.clearAllMocks(); draft.clear.mockReturnValue(true); draft.flush.mockReturnValue(true); draft.fields.name = '待保存'; draft.fields.group = 'female'; draft.savedAssetId = undefined; draft.unconfirmedBackground = false; draft.background = true; draft.active = []; draft.stage = ''; });
+
+beforeEach(() => {
+  hooks.cleanup?.(); hooks.cleanup = undefined; hooks.index = 0; hooks.slots = []; vi.clearAllMocks();
+  draft.clear.mockReturnValue(true); draft.flush.mockReturnValue(true);
+  draft.fields.name = '待保存'; draft.fields.group = 'female';
+  draft.savedAssetId = undefined; draft.unconfirmedBackground = false; draft.background = true; draft.active = []; draft.stage = '';
+  vi.mocked(loadSystemConfiguredModels).mockReturnValue({ selectedImageGenModel: 'no-references', availableImageModels: [{ id: 'no-references' }, { id: 'ref-model' }, { id: 'other-ref-model' }] } as ReturnType<typeof loadSystemConfiguredModels>);
+  vi.mocked(fetchSalesStudioAssets).mockResolvedValue({ personas: [], scenes: [], actions: [], voices: [], bgms: [] });
+  vi.mocked(uploadSalesViewImage).mockResolvedValue('/main.jpg');
+  vi.mocked(importSalesImageAsset).mockResolvedValue(undefined);
+});
 
 it.each(['persona', 'scene'] as const)('unlocks an interrupted %s save after effect replay and ignores its late completion', async (kind) => {
   let finishFirst!: () => void; let finishSecond!: () => void;
@@ -75,7 +105,6 @@ it.each(['persona', 'scene'] as const)('unlocks an interrupted %s save after eff
   await vi.waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
   expect(onClose).toHaveBeenCalledOnce();
 });
-
 
 it('removes the scene tag input while retaining existing user tags and the selected space on save', async () => {
   const scene: NonNullable<ComponentProps<typeof SalesSceneDialog>['scene']> = {
@@ -117,7 +146,6 @@ it.each([
   const root = SalesAssetDraftStatus({ status, existing, busy: false, pending: false, onDiscard: vi.fn() });
   expect(find(root, (node) => node.props.role === 'status').props.children).toBe(label);
 });
-
 
 it('reports a successful library save with its draft cleanup warning instead of asking users to save again', async () => {
   draft.clear.mockReturnValueOnce(false); vi.mocked(createSalesMaterial).mockResolvedValueOnce();
@@ -187,4 +215,94 @@ it.each(['persona', 'scene'] as const)('keeps a %s dialog open during upload or 
   }
   expect(onClose).not.toHaveBeenCalled();
   expect(draft.flush).not.toHaveBeenCalled();
+});
+
+type Photos = ReturnType<typeof useSalesAssetViews<SupplementView>>;
+function galleryNodes(root: Node): Node[] {
+  const result = [root];
+  for (let index = 0; index < result.length; index += 1) Children.forEach(result[index].props.children as ReactElement, (child) => {
+    if (isValidElement<Record<string, unknown>>(child)) result.push(child);
+  });
+  return result;
+}
+function renderGallery(imageUrl = '') {
+  const uploadReference = vi.fn();
+  const photos = {
+    views: Object.fromEntries(PERSONA_VIEWS.map(({ id }) => [id, id === 'main' ? imageUrl : ''])),
+    extraImages: [], models: [], model: '', stage: '', active: [], missing: ['face'],
+    creationMode: true, referenceUrl: '/reference.jpg', creation: { referenceImageUrl: '/reference.jpg', prompt: '自然光下的全新人物形象', imageUrl },
+    uploadReference, removeReference: vi.fn(), setModel: vi.fn(), generate: vi.fn(), remove: vi.fn(), upload: vi.fn(),
+  } as unknown as Photos;
+  return { elements: galleryNodes(SalesAssetViewGallery({ subject: '人物', definitions: PERSONA_VIEWS, photos, busy: false })), uploadReference };
+}
+
+it('keeps the reference separate from the generated asset and its copyable prompt', () => {
+  const { elements } = renderGallery('/generated.jpg');
+  expect(elements.filter((node) => node.type === SalesPersonaSheet)).toHaveLength(1);
+  expect(elements.some((node) => node.type === 'img')).toBe(false);
+  expect(elements.find((node) => node.type === SalesScriptCopyButton)?.props.text).toBe('自然光下的全新人物形象');
+  expect(elements.some((node) => node.type === 'input' && node.props['aria-label'] === '上传主图参考图')).toBe(false);
+});
+
+it('uploads a new reference without treating it as an asset main image', () => {
+  const { elements, uploadReference } = renderGallery();
+  const input = elements.find((node) => node.type === 'input' && node.props['aria-label'] === '上传人物参考图');
+  const file = new File(['reference'], 'reference.jpg', { type: 'image/jpeg' });
+  (input?.props.onChange as (event: { target: { files: File[]; value: string } }) => void)({ target: { files: [file], value: 'reference.jpg' } });
+  expect(uploadReference).toHaveBeenCalledWith(file);
+  expect(elements.some((node) => node.type === 'img' && node.props.alt === '人物主图')).toBe(false);
+  expect(elements.some((node) => node.type === 'a' && node.props.download === '人物主图.jpg')).toBe(false);
+  expect(elements.filter((node) => node.type === 'input' && node.props.type === 'file')).toHaveLength(1);
+  expect(elements.some((node) => node.type === SalesPersonaSheet)).toBe(true);
+});
+
+it('offers one reference upload and a single preview after generation', () => {
+  const { elements } = renderGallery('/generated.jpg');
+  expect(elements.filter((node) => node.type === 'input' && node.props.type === 'file')).toHaveLength(1);
+});
+
+function RenderImageImport() {
+  hooks.index = 0;
+  return SalesImageImportDialog({ kind: 'scene', existingNames: [], personaGroup: 'female', sceneSpace: 'outdoor', onClose: vi.fn(), onImported });
+}
+function findImport(predicate: (node: Node) => boolean): Node | undefined {
+  const queue = [RenderImageImport() as Node];
+  while (queue.length) {
+    const node = queue.shift()!;
+    if (predicate(node)) return node;
+    Children.forEach(node.props.children as ReactNode, (child) => { if (isValidElement<Record<string, unknown>>(child)) queue.push(child); });
+  }
+}
+function checkbox() { return findImport((node) => node.type === 'input' && node.props.type === 'checkbox')!; }
+function addImage() {
+  (findImport((node) => node.type === 'input' && node.props.type === 'file')!.props.onChange as (event: unknown) => void)({ target: { files: [new File(['image'], 'a.jpg', { type: 'image/jpeg' })], value: '' } });
+}
+function submitImport() { (findImport((node) => node.type === 'form')!.props.onSubmit as (event: unknown) => void)({ preventDefault: vi.fn() }); }
+
+it('defaults to importing only the original image without a generation model', async () => {
+  expect(checkbox().props.checked).toBe(false);
+  expect(findImport((node) => node.type === ConfiguredModelPicker)).toBeUndefined();
+  addImage(); submitImport();
+  await vi.waitFor(() => expect(onImported).toHaveBeenCalledWith(1));
+  expect(importSalesImageAsset).toHaveBeenCalledWith('scene', expect.objectContaining({ title: '场景1' }), undefined, expect.any(AbortSignal));
+});
+
+it('filters unsupported models and uses the selected model for the whole background batch', async () => {
+  (checkbox().props.onChange as (event: unknown) => void)({ target: { checked: true } });
+  const picker = findImport((node) => node.type === ConfiguredModelPicker)!;
+  expect(picker.props.options).toEqual([{ id: 'ref-model' }, { id: 'other-ref-model' }]);
+  expect(picker.props.value).toBe('ref-model');
+  (picker.props.onChange as (id: string) => void)('other-ref-model');
+  addImage();
+  expect(Children.toArray(findImport((node) => node.type === 'button' && node.props.type === 'submit')!.props.children as ReactNode)).toContain('导入并后台生成 1 项');
+  submitImport(); await vi.waitFor(() => expect(onImported).toHaveBeenCalledWith(1));
+  expect(importSalesImageAsset).toHaveBeenCalledWith('scene', expect.any(Object), { model: 'other-ref-model' }, expect.any(AbortSignal));
+});
+
+it('requires a supported model when background generation is enabled', () => {
+  vi.mocked(loadSystemConfiguredModels).mockReturnValue({ selectedImageGenModel: '', availableImageModels: [] } as unknown as ReturnType<typeof loadSystemConfiguredModels>);
+  (checkbox().props.onChange as (event: unknown) => void)({ target: { checked: true } });
+  addImage();
+  expect(findImport((node) => node.type === 'button' && node.props.type === 'submit')!.props.disabled).toBe(true);
+  submitImport(); expect(importSalesImageAsset).not.toHaveBeenCalled(); expect(fetchSalesStudioAssets).not.toHaveBeenCalled();
 });

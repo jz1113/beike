@@ -4,6 +4,8 @@ import type { MediaAttachment } from '@client/store/appStoreTypes';
 export type CanvasWorkspaceSelection = {
   activeNodeId: string | null;
   activeProject: {
+    id: string;
+    workflow: string;
     title: string;
     nodes: Array<{ id: string; title?: string; content?: string }>;
   } | undefined;
@@ -49,4 +51,27 @@ export function getCanvasWorkspaceSnapshot(): Record<string, unknown> {
 
 export function getCanvasWorkspaceAttachments(): MediaAttachment[] {
   return bridge.getAttachments();
+}
+
+export const canvasLibraryDragType = 'application/x-beike-library-media';
+
+export function openCanvasMediaLibrary(nodeId?: string) {
+  window.postMessage({ kind: 'canvas:library-open', nodeId }, window.location.origin);
+}
+
+export function canvasLibraryMedia(data: unknown) {
+  if (!data || typeof data !== 'object') return undefined;
+  const item = data as Record<string, unknown>;
+  const validUrl = (value: unknown, kind: 'image' | 'video' | 'audio'): value is string =>
+    typeof value === 'string' && (/^(https?:\/\/|\/(?!\/))[^\\\s]+$/i.test(value)
+      || value.toLowerCase().startsWith(`data:${kind}/`));
+  if ((item.kind !== 'image' && item.kind !== 'video' && item.kind !== 'audio') || !validUrl(item.url, item.kind)) return undefined;
+  const type: 'image' | 'video' | 'audio' = item.kind;
+  return {
+    type, title: typeof item.name === 'string' ? item.name : '素材',
+    imageUrl: item.kind === 'image' ? item.url : item.kind === 'video' && validUrl(item.cover, 'image') ? item.cover : undefined,
+    videoUrl: item.kind === 'video' ? item.url : undefined,
+    audioUrl: item.kind === 'audio' ? item.url : undefined,
+    missingMedia: false,
+  };
 }

@@ -1,5 +1,4 @@
-import { STUDIO_STYLES, normalizeStudio, type DynamicBackgroundStyle } from './index';
-import type { StudioValues } from './types';
+import { STUDIO_STYLES, normalizeStudio, type DynamicBackgroundStyle, type StudioValues } from './index';
 
 export type CustomStudioPreset = {
   id: string;

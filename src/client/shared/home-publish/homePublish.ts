@@ -29,6 +29,10 @@ export interface PublishedHomeItem {
   mediaType?: 'image' | 'video';
   publishedKind: 'media' | 'canvas';
   synopsis?: string;
+  projectId?: string;
+  selectedVideoKey?: string;
+  publishedAt?: number;
+  aspectRatio?: string;
   canvasNodes?: HomeCanvasNode[];
 }
 
@@ -48,12 +52,12 @@ function mediaIdentity(url: string): string {
 
 export function isMediaPublishedOnHome(url: string) {
   const key = mediaIdentity(url);
-  return readPublishedHomeItems().some(item => mediaIdentity(item.image) === key || (item.video ? mediaIdentity(item.video) === key : false));
+  return readPublishedHomeItems().some(item => item.publishedKind === 'media' && (mediaIdentity(item.image) === key || (item.video ? mediaIdentity(item.video) === key : false)));
 }
 
 export function unpublishMediaFromHome(url: string) {
   const key = mediaIdentity(url);
-  writeItems(readPublishedHomeItems().filter(item => mediaIdentity(item.image) !== key && (!item.video || mediaIdentity(item.video) !== key)));
+  writeItems(readPublishedHomeItems().filter(item => item.publishedKind === 'canvas' || (mediaIdentity(item.image) !== key && (!item.video || mediaIdentity(item.video) !== key))));
 }
 
 export function readPublishedHomeItems(): PublishedHomeItem[] {
@@ -87,6 +91,10 @@ function normalizePublishedItem(value: unknown): PublishedHomeItem | null {
     category: typeof item.category === 'string' ? item.category : mediaType === 'video' ? 'video' : 'photo',
     tag: typeof item.tag === 'string' ? item.tag : '我的生成',
     poster: typeof item.poster === 'string' ? item.poster : undefined,
+    projectId: typeof item.projectId === 'string' ? item.projectId : undefined,
+    selectedVideoKey: typeof item.selectedVideoKey === 'string' ? item.selectedVideoKey : undefined,
+    publishedAt: typeof item.publishedAt === 'number' && Number.isFinite(item.publishedAt) ? item.publishedAt : undefined,
+    aspectRatio: typeof item.aspectRatio === 'string' ? item.aspectRatio : undefined,
     synopsis: typeof item.synopsis === 'string' ? item.synopsis : undefined,
     canvasNodes: Array.isArray(item.canvasNodes) ? item.canvasNodes.filter(isCanvasNode) : undefined,
   };
@@ -103,7 +111,7 @@ function isCanvasNode(value: unknown): value is HomeCanvasNode {
 
 function writeItems(items: PublishedHomeItem[]) {
   try {
-    localStorage.setItem(HOME_PUBLISHED_STORAGE_KEY, JSON.stringify(items.slice(0, 80)));
+    localStorage.setItem(HOME_PUBLISHED_STORAGE_KEY, JSON.stringify(items));
   } catch {
     throw new Error('首页展示保存失败，请检查浏览器存储空间或权限');
   }
@@ -126,4 +134,16 @@ export function publishMediaResult(input: { id: string; prompt: string; url: str
   };
   const items = readPublishedHomeItems().filter(item => item.id !== next.id);
   writeItems([next, ...items]);
+}
+
+/** One explicit snapshot per project; failed writes leave the previous item intact. */
+export function publishCanvasResult(item: PublishedHomeItem & { projectId: string; video: string; canvasNodes: HomeCanvasNode[] }) {
+  if (!item.projectId || !item.video || !item.canvasNodes.length) throw new Error('请选择成片并确保画布包含节点');
+  const id = `published-canvas-${item.projectId}`;
+  const next: PublishedHomeItem = { ...item, id, image: item.video, publishedKind: 'canvas', mediaType: 'video', publishedAt: Date.now() };
+  writeItems([next, ...readPublishedHomeItems().filter(existing => existing.id !== id)]);
+}
+
+export function unpublishCanvasResult(projectId: string) {
+  writeItems(readPublishedHomeItems().filter(item => !(item.publishedKind === 'canvas' && item.projectId === projectId)));
 }

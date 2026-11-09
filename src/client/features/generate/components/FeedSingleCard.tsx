@@ -5,7 +5,7 @@ import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import LazyVideoCover from '@client/shared/media/widgets/LazyVideoCover';
 import AIGeneratingCard from '@client/shared/ui/AIGeneratingCard';
 import { peekDepthSubmit } from '@client/shared/api/generation/depthGeneration';
-import { isDepthImageTask, isDepthVideoTask } from '@client/shared/media/generationTaskMedia';
+import { isDepthImageTask, isDepthVideoTask } from '@client/shared/media/generationAttempt';
 import {
   AlertCircle,
   Upload,
@@ -201,11 +201,6 @@ export default function FeedSingleCard({
           <div className="absolute inset-0 z-10">
             <AIGeneratingCard
               task={primaryTask}
-              progressNumber={
-                primaryTask.progress && primaryTask.progress.includes('%')
-                  ? parseInt(primaryTask.progress, 10)
-                  : 35
-              }
               showProgressBadge={true}
               isVideo={Boolean(isBatchVideo)}
               variant={primaryTask.id === premiumGeneratingTaskId ? 'premium' : 'lite'}

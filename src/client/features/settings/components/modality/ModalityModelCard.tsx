@@ -1,9 +1,9 @@
-import { configuredTextProtocol, type TextProtocol } from '@shared/domain/models/textProtocol';
+import { configuredTextProtocol, type TextProtocol } from '@shared/domain/models/deepseek';
 import React, { useEffect, useState, useMemo } from 'react';
 import type {
   ModalityKind,
   ModalityModelItem,
-} from '../../model/modalityModelTypes';
+} from '../../model/modalityModelStorage';
 import { inferVendorFromModelId, isModelMatchModality } from '../../model/modalityMeta';
 import { ModelIcon } from '@client/shared/ui/ModelIcons';
 import {

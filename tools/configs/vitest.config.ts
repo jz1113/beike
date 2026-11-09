@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 const root = path.resolve(import.meta.dirname, '../..');
 
@@ -13,6 +13,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'tools/scripts/**/*.test.ts'],
+    exclude: [...configDefaults.exclude, '**/*.browser.test.ts'],
     passWithNoTests: true,
   },
 });

@@ -1,14 +1,16 @@
-import { Plus, ArrowUp } from 'lucide-react';
+import { useEffect } from 'react';
+import { creationSkillFlow } from '@client/shared/skills/model/creationSkillFlows';
+import { Plus, ArrowUp, FileAudio, FileText, Presentation, X } from 'lucide-react';
 import { useAppStore } from '@client/store';
-import { resolveSkillKind } from '@shared/domain/assistant/skills/skillPurpose';
+import { resolveSkillKind } from '@shared/domain/assistant/skills/types';
 import { resolveCreationSkillModifiableSummary } from '@client/shared/skills/model/creationSkillModifiers';
 import { densityComposerPad, composerContainer, densityComposerRadius } from '@client/shared/ui/layoutClasses';
+import { TrueFocus } from '@client/shared/ui/TrueFocus';
 import { RichPromptInput } from './RichPromptInput';
+import { agentFileLabel, isAgentAttachmentUrl, readAgentAttachment, type AgentFileKind } from './agentAttachments';
 import { PromptBarAtMenu } from './controls/PromptBarAtMenu';
-import PromptBarBrandHero from './PromptBarBrandHero';
 import PromptBarRefMediaPanel from './media/PromptBarRefMediaPanel';
 import { PromptBarControlsRow } from './controls/PromptBarControlsRow';
-import { PromptBarAgentFileChips } from './controls/PromptBarAgentFileChips';
 import {
   PromptBarSkillAssetSlot,
   PromptBarSkillCustomizeBar,
@@ -74,12 +76,14 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
     s.activeAssistantSkillId ? s.getActiveAssistantSkill() : null,
   );
   const isActiveCreationSkill = Boolean(quickGenMode === 'agent' && activeSkill && resolveSkillKind(activeSkill) === 'creation');
+  const flow = isActiveCreationSkill ? creationSkillFlow(activeSkill?.id) : undefined;
+  useEffect(() => { if (isActiveCreationSkill) richInputRef.current?.focus(); }, [activeSkill?.id, isActiveCreationSkill, richInputRef]);
   const visualRefImages = quickRefImages.filter((url) => !url.startsWith('agent-file:'));
   const hasVisualRefImages = visualRefImages.length > 0;
   const effectivePlaceholder =
     isActiveCreationSkill && activeSkill
       ? resolveCreationSkillModifiableSummary(activeSkill).composerPlaceholder
-      : placeholder;
+      : quickGenMode === 'collect' ? placeholder : props.inputPlaceholder ?? placeholder;
 
   const handleClearActiveSkill = () => {
     useAppStore.getState().setActiveAssistantSkillId(null);
@@ -114,7 +118,9 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
         className={`w-full transition-[background-color,border-color,box-shadow,border-radius] duration-200 ease-out relative ${
           anyDropdownOpen ? 'z-40' : 'z-20'
         } group/composer ${
-          isExpanded
+          isGenerateDock && quickGenMode === 'agent'
+            ? 'bg-white dark:bg-[#202024] border border-slate-200/80 dark:border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[22px] pt-3 px-4 pb-2 flex flex-col gap-2'
+            : isExpanded
             ? `bg-white dark:bg-[#18191c]/90 dark:backdrop-blur-xl border border-slate-200/80 dark:border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] ${densityComposerRadius} ${
                 isFloatingDock ? 'pt-3.5 px-3.5 sm:px-4 pb-2.5 flex flex-col gap-2.5 sm:gap-3' : `${densityComposerPad} flex flex-col gap-2.5 sm:gap-3`
               }`
@@ -122,7 +128,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
         }`}
       >
         {isExpanded ? (
-          <div className="flex flex-col gap-2.5 sm:gap-3 h-full animate-fade-in">
+          <div className={`flex flex-col ${isGenerateDock && quickGenMode === 'agent' ? 'gap-2' : 'gap-2.5 sm:gap-3'} h-full animate-fade-in`}>
             {quickGenMode === 'agent' && (
               <PromptBarAgentFileChips urls={quickRefImages} onRemove={media.handleRemoveRefImage} />
             )}
@@ -216,7 +222,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
               <div className="flex-1 min-w-0 relative z-10 overflow-x-hidden scrollbar-none no-scrollbar">
                 <RichPromptInput
                   ref={richInputRef}
-                  variant={isGenerateDock ? 'default' : 'composer'}
+                  variant={isGenerateDock ? (quickGenMode === 'agent' ? 'compact' : 'default') : 'composer'}
                   expanded={!isGenerateDock && isComposerExpanded}
                   value={quickPrompt}
                   onChange={handlePromptChange}
@@ -379,7 +385,7 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
         )}
       </div>
 
-      <input ref={media.fileInputRef} type="file" accept={fileAccept} multiple={!isDepthMode} className="hidden" onChange={media.handleFileUpload} />
+      <input ref={media.fileInputRef} type="file" accept={flow?.accept || fileAccept} multiple={!isDepthMode} className="hidden" onChange={media.handleFileUpload} />
       <input ref={media.createSubjectInputRef} type="file" accept="image/*" className="hidden" onChange={media.handleCreateSubject} />
       <input ref={videoFrames.firstFrameInputRef} type="file" accept="image/*" className="hidden" onChange={videoFrames.handleUploadFirstFrame} />
       <input ref={videoFrames.lastFrameInputRef} type="file" accept="image/*" className="hidden" onChange={videoFrames.handleUploadLastFrame} />
@@ -391,6 +397,77 @@ export default function PromptActionBar(props: PromptActionBarOptions) {
           {toastMsg}
         </div>
       )}
+    </div>
+  );
+}
+
+function PromptBarBrandHero() {
+  return (
+    <div
+      className="flex flex-col items-center justify-center pt-1 pb-4 sm:pt-2 sm:pb-5 lg:pt-3 lg:pb-5 xl:pt-4 xl:pb-6 select-none animate-fade-in text-center relative cursor-default"
+    >
+      <div className="flex items-center justify-center gap-2.5 sm:gap-3.5 relative z-10">
+        <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-15 md:h-15 lg:w-16 lg:h-16 xl:w-18 xl:h-18 flex items-center justify-center flex-shrink-0">
+          <img
+            src="/app_logo.png"
+            alt="贝壳云图 Logo"
+            draggable={false}
+            className="w-full h-full object-contain filter drop-shadow-[0_4px_16px_rgba(239,68,68,0.25)] hover:scale-105 transition-transform duration-300"
+          />
+        </div>
+
+        {/* 🌟 首页主标题 TrueFocus 动画 (严格对齐图 3 设置与高颜值现代艺术字体) */}
+        <h1 className="flex items-center">
+          <TrueFocus
+            sentence="贝壳 云图"
+            separator=" "
+            manualMode={false}
+            blurAmount={4.5}
+            borderColor="#ff4627"
+            glowColor="rgba(255, 70, 39, 0.6)"
+            animationDuration={0.5}
+            pauseBetweenAnimations={1}
+            style={{
+              fontSize: 'clamp(28px, calc(3.9vw * var(--ui-density, 1)), 48px)',
+              fontFamily: '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+              letterSpacing: '-0.02em',
+            }}
+          />
+        </h1>
+      </div>
+    </div>
+  );
+}
+
+function AgentFileIcon({ kind }: { kind: AgentFileKind }) {
+  if (kind === 'audio') return <FileAudio className="h-3.5 w-3.5" />;
+  if (kind === 'ppt') return <Presentation className="h-3.5 w-3.5" />;
+  return <FileText className="h-3.5 w-3.5" />;
+}
+
+function PromptBarAgentFileChips({
+  urls,
+  onRemove,
+}: {
+  urls: string[];
+  onRemove: (index: number) => void;
+}) {
+  const chips = urls
+    .map((url, index) => ({ url, index, meta: readAgentAttachment(url) }))
+    .filter((item) => isAgentAttachmentUrl(item.url));
+  if (chips.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 px-0.5">
+      {chips.map((item) => (
+        <span key={item.url} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 dark:text-slate-200 dark:bg-white/5 dark:border-white/10">
+          <AgentFileIcon kind={item.meta?.kind || 'file'} />
+          <span className="truncate">{item.meta?.name || '附件'}</span>
+          <span className="text-slate-400">{agentFileLabel(item.meta?.kind || 'file')}</span>
+          <button type="button" aria-label="移除附件" onClick={() => onRemove(item.index)} className="text-slate-400 hover:text-slate-700">
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
     </div>
   );
 }

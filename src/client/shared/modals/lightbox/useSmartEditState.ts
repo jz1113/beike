@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type MouseEvent } from 'react';
-import { useLightboxImageModels } from './useLightboxImageModels';
+import { useLightboxImageModels } from './LightboxGenConfigToolbar';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import type { MarkerPoint, DragBox, SmartEditModalProps } from './smartEditTypes';
 
@@ -298,14 +298,14 @@ export function useSmartEditState(props: SmartEditModalProps) {
     const normalizedQuality =
       selectedQuality === '1K' ? 'low' : selectedQuality === '4K' ? 'high' : 'medium';
 
-    onSubmitSmartEdit({
+    const submitted = onSubmitSmartEdit({
       markers,
       prompt: prompt.trim(),
       model: selectedModelId,
       quality: normalizedQuality,
       aspectRatio: selectedAspectId,
     });
-    onClose();
+    if (submitted !== false) onClose();
   }, [
     markers,
     prompt,

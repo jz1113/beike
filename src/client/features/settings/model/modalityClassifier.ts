@@ -1,8 +1,49 @@
-import { isAvatarDriverModel } from '@shared/domain/models/avatarDrivers';
 import { isLegacyOrDiscontinuedModel } from '@shared/domain/models/modelParsing';
-import type { ModalityKind } from './modalityModelTypes';
 
-export type ModelClass = ModalityKind | 'asr' | 'embedding' | 'realtime' | 'code' | 'unknown';
+export type ModalityKind = 'chat' | 'image' | 'video' | 'voice';
+
+export interface ModalityModelItem {
+  id: string;
+  name: string;
+  modality: ModalityKind;
+  vendor: string;
+  modelId: string;
+  textProtocol?: import('@shared/domain/models/deepseek').TextProtocol;
+  apiTemplate?: string;
+  apiKey?: string;
+  baseUrl?: string;
+  isInfrequent?: boolean;
+  isCustom?: boolean;
+  isDefault?: boolean;
+  /** 用户改过显示名后，模型 ID 不再自动改写名称。 */
+  namePinned?: boolean;
+  /** 同步来源渠道。空值表示全局默认地址，对应服务商配置里的 ApiProvider.id。 */
+  channelId?: string;
+}
+
+export interface ModalityChannelOption {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  hasKey: boolean;
+}
+
+export interface ModalityGlobalConfig {
+  baseUrl: string;
+  apiKey: string;
+  baseUrlHistory: string[];
+  apiKeyHistory: string[];
+}
+
+export interface ModalityVendorOption {
+  id: string;
+  name: string;
+  logoKey: string;
+  keywords: string[];
+}
+
+export type ModelClass = ModalityKind | 'asr' | 'embedding' | 'realtime' | 'code' | 'three_d' | 'music' | 'avatar' | 'unknown';
 
 const GATEWAY_PREFIX = /^(?:fal-ai\/|openai\/|net-|aws-|bedrock-|vertex-|azure-)/i;
 
@@ -48,7 +89,7 @@ const RULES: ClassRule[] = [
   },
   {
     cls: 'avatar',
-    test: (id) => isAvatarDriverModel(id),
+    test: (id) => /(omnihuman|omni-human|kling.*(lip|avatar|ident)|(lip|avatar|ident).*kling|wanx-avatar|videoretalk|wan2\.2-s2v|emo-v|emo-detect|hedra|latentsync|musetalk|lip-?sync|digital-human|口型|数字人)/.test(id),
   },
   {
     cls: 'video',

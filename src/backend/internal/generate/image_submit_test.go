@@ -36,15 +36,10 @@ func TestImageGatewayMismatchAndMissingKey(t *testing.T) {
 	t.Setenv("AI_DRAWING_API_KEY", "")
 	t.Setenv("AI_API_KEY", "")
 	handler := Image(config.Config{NodeEnv: "development"})
-	gapnet := httptest.NewRecorder()
-	handler.ServeHTTP(gapnet, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2","customBaseUrl":"https://api.gapnet.ai/endpoint","customApiKey":"secret"}`)))
-	if gapnet.Code != http.StatusBadRequest || !strings.Contains(gapnet.Body.String(), "gpt-image-2 请使用 Comfly") {
-		t.Fatalf("gapnet %d %s", gapnet.Code, gapnet.Body.String())
-	}
-	lianchi := httptest.NewRecorder()
-	handler.ServeHTTP(lianchi, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"openai/gpt-image-2"}`)))
-	if lianchi.Code != http.StatusBadRequest || !strings.Contains(lianchi.Body.String(), "未配置联池 API Key") {
-		t.Fatalf("lianchi %d %s", lianchi.Code, lianchi.Body.String())
+	missingKey := httptest.NewRecorder()
+	handler.ServeHTTP(missingKey, httptest.NewRequest(http.MethodPost, "/api/generate/image", strings.NewReader(`{"prompt":"一只猫","model":"gpt-image-2"}`)))
+	if missingKey.Code != http.StatusBadRequest || !strings.Contains(missingKey.Body.String(), "未配置 AI 绘图接口密钥") {
+		t.Fatalf("missingKey %d %s", missingKey.Code, missingKey.Body.String())
 	}
 }
 
@@ -159,7 +154,7 @@ func TestImageSubmitAndPollUseGateway(t *testing.T) {
 	_, err = db.Exec(`CREATE TABLE "ImageTask" (
 		"id" TEXT, "workspaceId" TEXT, "productId" TEXT, "prompt" TEXT, "taskId" TEXT, "status" TEXT,
 		"resultUrl" TEXT, "failReason" TEXT, "model" TEXT, "mediaType" TEXT, "size" TEXT, "quality" TEXT,
-		"idempotencyKey" TEXT, "createdAt" TEXT, "updatedAt" TEXT
+		"idempotencyKey" TEXT, "createdAt" TEXT, "updatedAt" TEXT, "routeFingerprint" TEXT NOT NULL DEFAULT ''
 	)`)
 	if err != nil {
 		t.Fatal(err)
@@ -290,9 +285,12 @@ func imageTaskDatabase(t *testing.T) string {
 	_, err = db.Exec(`CREATE TABLE "ImageTask" (
 		"id" TEXT, "workspaceId" TEXT, "productId" TEXT, "prompt" TEXT, "taskId" TEXT, "status" TEXT,
 		"resultUrl" TEXT, "failReason" TEXT, "model" TEXT, "mediaType" TEXT, "size" TEXT, "quality" TEXT,
-		"idempotencyKey" TEXT, "createdAt" TEXT, "updatedAt" TEXT
+		"idempotencyKey" TEXT, "createdAt" TEXT, "updatedAt" TEXT, "routeFingerprint" TEXT NOT NULL DEFAULT ''
 	)`)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(submissionSchemaForTest(t)); err != nil {
 		t.Fatal(err)
 	}
 	_ = db.Close()
@@ -327,28 +325,7 @@ func TestGptImageSizeStaysInsidePixelBudget(t *testing.T) {
 	}
 }
 
-func TestLianchiEditUsesImageArrayField(t *testing.T) {
-	body, contentType, err := buildImageEditBody(t.Context(), map[string]any{
-		"model": "openai/gpt-image-2", "prompt": "改封面", "size": "1024x1024", "quality": "high",
-		"image": []string{"data:image/png;base64," + tinyPNG},
-	}, "", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw, err := io.ReadAll(body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	form, err := multipart.NewReader(bytes.NewReader(raw), boundaryOf(contentType)).ReadForm(8 << 20)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := form.File["image"]; ok {
-		t.Fatal("lianchi field must be image[]")
-	}
-	if len(form.File["image[]"]) != 1 || form.File["image[]"][0].Header.Get("Content-Type") != "image/png" {
-		t.Fatalf("files %#v", form.File)
-	}
+func TestGptImageMultipleRefsUsesImageArrayField(t *testing.T) {
 	multiple, contentType, err := buildImageEditBody(t.Context(), map[string]any{
 		"model": "gpt-image-2", "prompt": "细节", "size": "1024x1024", "quality": "high",
 		"image": []string{"data:image/png;base64," + tinyPNG, "data:image/png;base64," + tinyPNG},
@@ -356,7 +333,7 @@ func TestLianchiEditUsesImageArrayField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err = io.ReadAll(multiple)
+	raw, err := io.ReadAll(multiple)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,14 +346,6 @@ func TestLianchiEditUsesImageArrayField(t *testing.T) {
 	}
 	if normalizeImageRef("//cdn.example.com/hoodie.jpg") != "https://cdn.example.com/hoodie.jpg" {
 		t.Fatal("protocol-relative reference was not normalized")
-	}
-	urls := imageSubmitURLs("https://api.gapnet.ai/endpoint", true, "openai-dalle", "openai/gpt-image-2")
-	if len(urls) != 1 || urls[0] != "https://api.gapnet.ai/endpoint/v1/images/edits" {
-		t.Fatalf("urls %v", urls)
-	}
-	generations := imageSubmitURLs("https://api.gapnet.ai/endpoint", false, "openai-dalle", "openai/gpt-image-2")
-	if len(generations) != 1 || strings.Contains(generations[0], "async=true") || !strings.HasSuffix(generations[0], "/v1/images/generations") {
-		t.Fatalf("generations %v", generations)
 	}
 }
 

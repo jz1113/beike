@@ -1,8 +1,60 @@
-import { describe, expect, it } from 'vitest';
-import { isPureAgentDialogue } from './agentAssetFilter';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { isPureAgentDialogue, getAssetMediaKind, agentHistoryTasks, collectProtectedAssetMedia } from './agentAssetFilter';
+import { buildCanvasAssets, type AssetCanvasProject } from './canvasAssets';
 import { mergeAssetTasks } from './mergeAssetTasks';
-import { getAssetMediaKind } from './assetMedia';
+import type { CustomAssetItem } from '@client/shared/media/customAssetStorage';
 import type { GenerationTask } from '@client/store/appStoreTypes';
+
+vi.mock('@client/store/persist/generation', () => ({ isGenerationDeleted: () => false }));
+
+afterEach(() => vi.unstubAllGlobals());
+
+const canvas: AssetCanvasProject = { id: 'canvas-1', title: '画布', createdAt: 1, updatedAt: 2, nodes: [
+  { id: 'image', type: 'image', imageUrl: '/image.png' },
+  { id: 'video', type: 'video', videoUrl: '/video.mp4', imageUrl: '/video-cover.png' },
+  { id: 'note', type: 'text', content: '备注不计入素材' },
+] };
+function merged(canvases = [canvas]) {
+  return mergeAssetTasks({ dbTasks: [], generationTasks: [], sessions: [], canvasTasks: buildCanvasAssets(canvases).canvasTasks, mediaCategory: 'all', searchKeyword: '', timeFilter: 'all' });
+}
+
+describe('material projects and canvas assets', () => {
+  it('includes canvas media in all mode, retaining the video URL and cover separately', () => {
+    const tasks = merged();
+    expect(tasks).toHaveLength(2);
+    expect(tasks.find((task) => task.nodeId === 'video')).toMatchObject({ canvasProjectId: canvas.id, resultUrl: '/video.mp4', coverUrl: '/video-cover.png' });
+  });
+
+  it('does not expose an empty canvas cover as a deletable media item', () => {
+    const empty = { ...canvas, nodes: [], thumbnail: '/project-cover.png' };
+    expect(merged([empty])).toEqual([]);
+  });
+});
+
+describe('Agent history ownership and protected media', () => {
+  it('excludes explicit, legacy and session-linked canvas records including remote aliases', () => {
+    const sessions = [{ id: 'linked', canvasProjectId: 'c', title: '画布', createdAt: 1, tasks: [{ id: 'local', taskId: 'remote', title: '素材', prompt: '', model: 'gpt-image-2', size: '1024x1024', quality: 'standard', progress: '100%', useReferenceImage: false, status: 'SUCCESS' as const, createdAt: 1 }] }];
+    const tasks = [{ id: 'agent', sessionId: 'a' }, { id: 'direct', canvasProjectId: 'c' }, { id: 'legacy', batchId: 'canvas-project-c' }, { id: 'session', sessionId: 'canvas-session:c' }, { id: 'linked-task', sessionId: 'linked' }, { id: 'db', taskId: 'remote' }];
+    expect(agentHistoryTasks(tasks, sessions).map(task => task.id)).toEqual(['agent']);
+    expect(tasks).toHaveLength(6);
+  });
+
+  it('protects collected files, canvas references and old generated versions when deleting history', () => {
+    vi.stubGlobal('window', { location: { origin: 'https://app.example' } });
+    const project = { id:'canvas', title:'项目', createdAt:1, updatedAt:1,
+      nodes:[{id:'node', type:'image', imageUrl:'/storage/result.png', drawing:{references:['/storage/ref.png']}}],
+      studioScene:{nodes:[{content:'https://app.example/storage/current.mp4', settings:{generationVersions:[
+        {content:'/storage/first.mp4', generatedImages:[{fullUrl:'/storage/old.png'}]},
+      ]}}]},
+    };
+    const assets = [{mediaUrl:'/storage/import.mp4', coverUrl:'/storage/cover.png'},
+      {mediaUrl:'/storage/result.png'}, {mediaUrl:'blob:temporary', coverUrl:'data:image/png;base64,AA=='}] as CustomAssetItem[];
+    expect(collectProtectedAssetMedia([project], assets)).toEqual([
+      '/storage/result.png','/storage/ref.png','/storage/current.mp4','/storage/first.mp4','/storage/old.png',
+      '/storage/import.mp4','/storage/cover.png',
+    ]);
+  });
+});
 
 describe('agentAssetFilter', () => {
   it('identifies pure greeting chat turns as non-assets', () => {

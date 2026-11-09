@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { getVideoModelById } from '@shared/domain/media/video';
+import { imageQualityLabel, promptRewriteStrengthLabel } from './PromptBarImageTab';
 import { PromptBarVideoTab } from './PromptBarVideoTab';
 
 function render(baseUrl: string, resolution: string, duration: number, contextIrEnabled?: boolean) {
@@ -40,5 +41,19 @@ describe('H3 video parameter controls', () => {
     expect(disabled.match(/<input[^>]+type="checkbox"[^>]*>/)?.[0]).not.toContain('checked');
     expect(disabled).toContain('本次不收取该项费用');
     expect(render('https://ai.comfly.org', '1080P', 15)).not.toContain('type="checkbox"');
+  });
+});
+
+describe('image tier labels', () => {
+  it('labels gpt quality and qwen prompt rewriting', () => {
+    expect(imageQualityLabel('low')).toBe('Low');
+    expect(imageQualityLabel('medium')).toBe('Medium');
+    expect(imageQualityLabel('high')).toBe('High');
+    expect(imageQualityLabel('')).toBe('High');
+    expect(promptRewriteStrengthLabel('low')).toBe('不改写');
+    expect(promptRewriteStrengthLabel('medium')).toBe('改写');
+    expect(promptRewriteStrengthLabel('high')).toBe('改写+思考');
+    expect(promptRewriteStrengthLabel('xhigh')).toBe('改写+思考');
+    expect(promptRewriteStrengthLabel('max')).toBe('改写+思考');
   });
 });

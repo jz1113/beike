@@ -1,6 +1,5 @@
-import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo, useId, type CSSProperties } from 'react';
 import { getPerformanceMode } from '@client/shared/utils/performancePreference';
-import { CanvasDotGridStatic } from './DotGridCanvasStatic';
 
 export interface CanvasDotGridProps {
   /** 画布视口当前的平移量 (px) */
@@ -9,6 +8,7 @@ export interface CanvasDotGridProps {
   zoom: number;
   /** 是否正在拖拽视口 */
   isPanning?: boolean;
+  animated?: boolean;
   /** 点的基础直径 (px, zoom=1 时) */
   dotSize?: number;
   /** 点之间的间距 (px, zoom=1 时) */
@@ -23,6 +23,43 @@ export interface CanvasDotGridProps {
   className?: string;
   /** 自定义内联样式 */
   style?: React.CSSProperties;
+}
+
+function CanvasDotGridStatic({
+  pan,
+  zoom,
+  dotSize = 3,
+  gap = 28,
+  baseColor = '#CBD5E1',
+  className = '',
+  style,
+}: {
+  pan: { x: number; y: number };
+  zoom: number;
+  dotSize?: number;
+  gap?: number;
+  baseColor?: string;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  const id = useId();
+  const step = (dotSize + gap) * zoom;
+  const radius = dotSize * zoom / 2;
+  return (
+    <svg
+      className={`absolute inset-0 h-full w-full pointer-events-none overflow-hidden select-none ${className}`}
+      style={style}
+      aria-hidden="true"
+      data-canvas-world-grid
+    >
+      <defs>
+        <pattern id={id} patternUnits="userSpaceOnUse" x={pan.x % step} y={pan.y % step} width={step} height={step}>
+          <circle cx={radius} cy={radius} r={radius} fill={baseColor} />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill={`url(#${id})`} />
+    </svg>
+  );
 }
 
 /**
@@ -48,7 +85,7 @@ function hexToRgb(hex: string) {
  * 4. 鼠标靠近变色与弹性微推 (Interactive Proximity)：光标滑过产生流体般的变色与微弹动排斥。
  */
 export const CanvasDotGrid: React.FC<CanvasDotGridProps> = (props) => {
-  if (getPerformanceMode() !== 'fidelity') {
+  if (props.animated === false || getPerformanceMode() !== 'fidelity') {
     return <CanvasDotGridStatic {...props} />;
   }
   return <CanvasDotGridAnimated {...props} />;
