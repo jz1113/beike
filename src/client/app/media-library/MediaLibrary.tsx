@@ -27,6 +27,7 @@ import { indexMediaFolders, personaFolder } from './mediaFolders';
 import './mediaLibrary.css';
 
 const BUILTIN_ROOTS = new Set(['场景', '人物', '声音', '动作']);
+const assetNameOrder = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
 
 export function MediaFolderSidebar({ id, expanded, folder, folders, onSelect, onRoleResources }: {
   id: string; expanded: boolean; folder: string; folders: ReturnType<typeof indexMediaFolders>;
@@ -191,7 +192,7 @@ export default function MediaLibrary({ title, onInsert, onUseReference, onClose,
     && (root !== '动作' || !actionDepth || (item.kind === 'script' && classifyActionScript(item.record).depth === actionDepth))
     && (root !== '动作' || !actionStyle || (item.kind === 'script' && classifyActionScript(item.record).style === actionStyle))
     && (!term || [item.name, ...item.keywords, ...item.folders].join(' ').toLocaleLowerCase().includes(term))
-  ), [items, selectedKind, folder, root, personaAge, voiceGender, voiceAge, actionDepth, actionStyle, voiceDemographics, term]);
+  ).sort((a, b) => assetNameOrder.compare(a.name, b.name)), [items, selectedKind, folder, root, personaAge, voiceGender, voiceAge, actionDepth, actionStyle, voiceDemographics, term]);
   const filterOptions = useMemo((): FilterDropdownOption[] => {
     if (root === '动作') return [];
     if (root === '人物') {
