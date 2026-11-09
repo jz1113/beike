@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
-import { getClientAccessToken, proxyMediaUrl, readClientStorageConfig, setClientAccessToken, storageConfigHeaders, syncAppTokenCookie } from './apiClient';
+import { apiHeaders, getClientAccessToken, proxyMediaUrl, readClientStorageConfig, setClientAccessToken, storageConfigHeaders, syncAppTokenCookie } from './apiClient';
 
 const { apiFetch, saveToDownloadDir } = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -22,6 +22,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe('global asset library cache', () => {
@@ -116,6 +117,22 @@ describe('apiClient storage headers, token lifecycle and media proxy', () => {
     }
     vi.stubGlobal('localStorage', { getItem: () => 'unknown-provider' });
     expect(readClientStorageConfig().provider).toBe('oss');
+  });
+
+  it('leaves production authentication to the browser cookie and preserves explicit headers', () => {
+    vi.stubEnv('PROD', true);
+    const writeCookie = vi.fn();
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('localStorage', { getItem: () => null });
+    vi.stubGlobal('document', {
+      get cookie() { return 'app_token=stale-readable-cookie'; },
+      set cookie(value: string) { writeCookie(value); },
+    });
+
+    syncAppTokenCookie();
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(apiHeaders().has('x-app-token')).toBe(false);
+    expect(apiHeaders({ 'x-app-token': 'explicit-token' }).get('x-app-token')).toBe('explicit-token');
   });
 
   it('does not overwrite expired token metadata when syncAppTokenCookie runs before getClientAccessToken', () => {

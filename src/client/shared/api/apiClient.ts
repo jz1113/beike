@@ -183,8 +183,9 @@ export function proxyMediaUrl(
 
 export function apiHeaders(extra?: HeadersInit): Headers {
   const headers = new Headers(extra || {});
-  if (!headers.has('x-app-token')) {
-    headers.set('x-app-token', getClientAccessToken());
+  if (!import.meta.env.PROD && !headers.has('x-app-token')) {
+    const token = getClientAccessToken();
+    if (token) headers.set('x-app-token', token);
   }
   if (!headers.has('x-workspace-token')) {
     const workspace = getWorkspaceSecret();

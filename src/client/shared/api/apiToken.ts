@@ -4,8 +4,8 @@
  * 安全约定：
  * - localStorage 仅保存 **过期时间元数据**（key 前缀 `app_token_meta_`）；
  *   不再保存真实 token 明文。
- * - 当前 app_token 由后端 Set-Cookie 或客户端 document.cookie 写入，
- *   可被同源脚本读取，并非 HttpOnly 会话；客户端据此构造 API 请求头。
+ * - 生产 app_token 由后端签发为 HttpOnly Cookie，浏览器随同源请求发送。
+ * - 开发环境从 Vite 注入或客户端 Cookie 取得令牌，并构造 API 请求头。
  * - 托管入口依赖 HTTPS、Nginx 网页认证和 Go 端口隔离，应用 token 不单独充当登录边界。
  * - 兼容旧部署：读取时若发现 localStorage 中存在旧 token，会在读取后立即清除并仅保留过期元数据。
  */
@@ -119,7 +119,7 @@ export function setClientAccessToken(_token: string): void {
 }
 
 export function syncAppTokenCookie(): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || import.meta.env.PROD) return;
   const token = getClientAccessToken();
   if (!token) {
     writeCookie(TOKEN_COOKIE_NAME, '', 0);
