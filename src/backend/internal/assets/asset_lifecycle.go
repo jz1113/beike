@@ -7,6 +7,9 @@ import (
 	dblibrary "beike.local/cloud/src/backend/internal/platform/database/library"
 	dbworkshop "beike.local/cloud/src/backend/internal/platform/database/workshop"
 	"beike.local/cloud/src/backend/internal/platform/storage"
+	"context"
+	"io/fs"
+
 	"encoding/json"
 	"errors"
 	"io"
@@ -310,4 +313,89 @@ func stringList(value any) []string {
 		}
 	}
 	return values
+}
+
+// ExpireImages applies the production retention window to runtime image files and
+// image-only records. Preview rolls back the database changes and counts files.
+func ExpireImages(ctx context.Context, cfg config.Config, now time.Time, preview bool) (files, records int64, err error) {
+	cutoff := now.Add(-24 * time.Hour)
+	db, err := database.OpenRequired(cfg.SQLiteFile())
+	if err != nil {
+		return 0, 0, err
+	}
+	defer db.Close()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback()
+
+	queries := []string{
+		`DELETE FROM "ImageTask" WHERE COALESCE("mediaType", 'image') = 'image' AND "status" IN ('SUCCESS', 'FAILURE') AND julianday("updatedAt") <= julianday(?)`,
+		`DELETE FROM "SceneAsset" WHERE julianday("createdAt") <= julianday(?) AND (COALESCE("coverUrl",'') <> '' OR COALESCE("sourceImages",'') NOT IN ('','[]'))`,
+		`DELETE FROM "PersonaAsset" WHERE julianday("createdAt") <= julianday(?) AND (COALESCE("avatarUrl",'') <> '' OR COALESCE("sourceImages",'') NOT IN ('','[]'))`,
+		`DELETE FROM "OutfitAsset" WHERE julianday("createdAt") <= julianday(?) AND (COALESCE("coverUrl",'') <> '' OR COALESCE("sourceImages",'') NOT IN ('','[]'))`,
+		`DELETE FROM "ActionAsset" WHERE "mediaType" = 'image' AND julianday("createdAt") <= julianday(?) AND (COALESCE("mediaUrl",'') <> '' OR COALESCE("coverUrl",'') <> '' OR COALESCE("sourceImages",'') NOT IN ('','[]'))`,
+		`DELETE FROM "FullPromptAsset" WHERE "workspaceId" <> 'official' AND julianday("createdAt") <= julianday(?) AND (COALESCE("coverUrl",'') <> '' OR COALESCE("sourceImages",'') NOT IN ('','[]'))`,
+	}
+	for _, query := range queries {
+		result, err := tx.ExecContext(ctx, query, cutoff.UTC().Format(time.RFC3339Nano))
+		if err != nil {
+			return 0, 0, err
+		}
+		count, err := result.RowsAffected()
+		if err != nil {
+			return 0, 0, err
+		}
+		records += count
+	}
+
+	files, err = expireStoredImages(ctx, cutoff, preview)
+	if err != nil || preview {
+		return files, records, err
+	}
+	return files, records, tx.Commit()
+}
+
+func expireStoredImages(ctx context.Context, cutoff time.Time, preview bool) (int64, error) {
+	root, err := os.OpenRoot(storage.ResolveRoot())
+	if errors.Is(err, os.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	defer root.Close()
+	var count int64
+	err = fs.WalkDir(root.FS(), ".", func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if !entry.Type().IsRegular() {
+			return nil
+		}
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".bmp", ".tif", ".tiff", ".heic", ".heif", ".svg", ".ico", ".jxl":
+		default:
+			return nil
+		}
+		info, err := entry.Info()
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if err != nil || info.ModTime().After(cutoff) {
+			return err
+		}
+		if !preview {
+			if err := root.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		}
+		count++
+		return nil
+	})
+	return count, err
 }
