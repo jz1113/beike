@@ -16,13 +16,13 @@ Nginx 默认请求体上限为 `64m`；仅九宫格裁切接口 `/api/sales/asse
 
 ## 浏览器凭据与入口边界
 
-当前应用不是独立账号登录系统。生产模式由 Go 在受信任入口签发 `app_token` Cookie，设置 `HttpOnly`、`Secure` 和 `SameSite=Lax`；浏览器通过 HTTPS 同源请求自动携带，前端脚本不能读取其值。开发模式保留 Vite 注入令牌及客户端可读 Cookie 的请求头兼容路径，不能用开发行为推断生产 Cookie 标志。工作区密钥用于数据作用域，不替代入口身份认证。生产必须保留 Nginx 网页认证、HTTPS 与仅监听回环地址的 Go 端口，不能只依赖应用令牌对公网提供保护。
+HTTPS 公共入口设置 `BEIKE_PUBLIC_WEB=1`，打开页面即由 Go 签发 Secure、HttpOnly 的签名会话 Cookie。服务器令牌只用于签名与已有运维调用。浏览器继续使用原有工作区密钥访问自己的历史和素材。启用公共入口前，运行进程须移除共享的第三方服务凭据，万邦等接口由浏览器随请求发送个人配置。Go 端口仅监听回环地址，初装 HTTP 入口仅供配置 HTTPS 前使用。
 
-网页设置中的第三方渠道凭据仍保存在浏览器 localStorage，属于明文、同源脚本可读的持久数据，不是系统钥匙串或加密保险箱。应用访问令牌的 HttpOnly Cookie 不会加密这些渠道凭据，也不替代工作区密钥、媒体签名与入口认证。本机数据、浏览器配置和同源脚本应按此边界保护。
+网页设置中的第三方凭据保存在浏览器 localStorage，属于明文、同源脚本可读的持久数据，不是系统钥匙串或加密保险箱。本机数据、浏览器配置和同源脚本应按此边界保护。生产应用 Cookie 与网页设置中的第三方凭据分别保存。
 
-生产模式下，服务级派生磁盘缓存清理需要管理员令牌和工作区密钥；普通应用令牌返回 `403`。本机开发模式可用本机访问令牌执行。
+生产模式下，服务级派生磁盘缓存清理需要管理员令牌和工作区密钥。
 
-生产 Nginx 的网页入口必须启用 `auth_basic`，并在代理位置使用 `proxy_set_header X-Beike-Web-User $remote_user;`，由 Nginx 覆盖客户端同名请求头。独立认证的 MCP 入口必须清空该头。升级已有部署时，将对应设置同步到实际启用的站点配置，确认入口认证正常后执行 `sudo nginx -t` 和 `sudo systemctl reload nginx`。新浏览器完成 HTTPS 网页认证后重新加载首页，应收到带 `HttpOnly`、`Secure` 的 `app_token` Cookie；仅核对标志，不复制或公开 Cookie 值。只访问 HTTP 首页无法完成生产 Cookie 的正常使用。
+使用私有 HTTPS 入口时，关闭 `BEIKE_PUBLIC_WEB`，在 Nginx 启用 `auth_basic`，并用 `proxy_set_header X-Beike-Web-User $remote_user;` 覆盖客户端同名请求头。独立认证的 MCP 入口应清空该头。
 
 ## OSS 参考视频存储
 
@@ -90,15 +90,7 @@ sudo bash /opt/beike/tools/deploy/enable-https.sh example.com ops@example.com
 
 随后将 `PUBLIC_WEB_ORIGIN` 改为实际 HTTPS 来源并重启服务。首次安装无需预先准备证书；不要直接启用依赖尚不存在证书文件的配置。
 
-开放业务访问前验收实际域名：HTTP 首页应跳转 HTTPS，HTTPS 证书校验应通过，未认证首页应返回 `401`。以下命令不输出 Cookie 或密码；最后一条会交互式询问网页密码：
-
-```bash
-curl --silent --show-error --head http://example.com/
-curl --silent --show-error --output /dev/null --write-out '%{http_code}\n' https://example.com/
-curl --fail --silent --show-error --user beike --output /dev/null https://example.com/
-```
-
-随后在浏览器通过 HTTPS 网页认证，检查首页、工作区和已有素材；无需触发收费生成。确认旧的 HTTP/IP 入口已关闭或限制为管理员来源，不能绕过域名的 HTTPS 入口。
+开放业务访问前确认 HTTP 首页跳转到 HTTPS。使用公共入口时，HTTPS 首页应可直接打开，浏览器应收到 Secure、HttpOnly 的 `beike_public_session` Cookie。使用私有入口时，未认证首页应返回 `401`，登录后应收到 Secure、HttpOnly 的 `app_token` Cookie。随后检查工作区和已有素材。
 
 需要从 WorkBuddy 或 Codex 创建画布草稿时，按[画布远程 MCP](canvas-mcp.md)单独启用连接器。
 

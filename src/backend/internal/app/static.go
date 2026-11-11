@@ -131,7 +131,11 @@ func staticHandler(cfg config.Config) http.Handler {
 }
 
 func writeIndex(w http.ResponseWriter, r *http.Request, cfg config.Config, index []byte) {
-	if shouldIssueIndexCookie(r, cfg) {
+	if cfg.Production() && cfg.PublicWeb {
+		if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+			httpx.IssuePublicSession(w, r, cfg)
+		}
+	} else if shouldIssueIndexCookie(r, cfg) {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "app_token",
 			Value:    url.QueryEscape(cfg.AccessToken),

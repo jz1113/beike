@@ -16,6 +16,8 @@ type toolBox struct {
 	db                *sql.DB
 	cfg               config.Config
 	workspace         string
+	wanbangKey        string
+	wanbangSecret     string
 	documents         []attachedDoc
 	client            map[string]any
 	plan              *taskPlan
@@ -111,7 +113,7 @@ func (box *toolBox) run(name string, args map[string]any) string {
 	case "get_prompt_asset_detail":
 		return assetDetail(box.ctx, box.db, box.workspace, argText(args, "asset_id", "id"))
 	case "parse_product_or_social_url":
-		return parseProductTool(box.ctx, box.db, box.cfg, box.workspace, textArg(args, "url"))
+		return parseProductTool(box.ctx, box.db, box.workspace, textArg(args, "url"), box.wanbangKey, box.wanbangSecret)
 	case "get_workshop_state":
 		return workshopState(box.client)
 	case "get_view_capabilities":

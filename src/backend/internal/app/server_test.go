@@ -202,7 +202,6 @@ func TestProductionIndexCookieRequiresTrustedEntryAndSetsHttpOnlySecure(t *testi
 	proxiedBasicAuth.RemoteAddr = "127.0.0.1:43210"
 	proxiedBasicAuth.Header.Set("X-Forwarded-For", "203.0.113.10")
 	proxiedBasicAuth.Header.Set("X-Forwarded-Proto", "https")
-	proxiedBasicAuth.Header.Set("Authorization", "Basic YmVpa2U6c2VjcmV0")
 	proxiedBasicAuth.Header.Set("X-Beike-Web-User", "beike")
 	recTrusted := httptest.NewRecorder()
 	handler.ServeHTTP(recTrusted, proxiedBasicAuth)
@@ -212,29 +211,38 @@ func TestProductionIndexCookieRequiresTrustedEntryAndSetsHttpOnlySecure(t *testi
 	}
 }
 
-func TestPublicCatalogKeepsPrivateReadsAndWritesProtected(t *testing.T) {
-	handler := New(config.Config{AccessToken: "secret", NodeEnv: "production"})
-	for _, test := range []struct {
-		method, path string
-		status       int
+func TestPublicWebSessionKeepsWorkspaceProtection(t *testing.T) {
+	dist := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dist, "index.html"), []byte("<html>ok</html>"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	handler := New(config.Config{AccessToken: "prod-secret", NodeEnv: "production", WebDistDir: dist, PublicWeb: true})
+	index := httptest.NewRecorder()
+	handler.ServeHTTP(index, httptest.NewRequest(http.MethodGet, "https://example.test/", nil))
+	cookies := index.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != "beike_public_session" || cookies[0].Value == "prod-secret" || !cookies[0].Secure || !cookies[0].HttpOnly {
+		t.Fatalf("expected a signed Secure HttpOnly public session, got %+v", cookies)
+	}
+
+	for _, tc := range []struct {
+		name, cookie, workspace string
+		want                    int
 	}{
-		{"GET", "/api/catalog/skills", 200},
-		{"GET", "/api/sales/scripts", 200},
-		{"GET", "/api/sales/asset-view-jobs", 200},
-		{"GET", "/api/library/preferences", 200},
-		{"GET", "/api/catalog/assets/library?type=all&export=1", 401},
-		{"GET", "/api/assistant/sessions", 401},
-		{"POST", "/api/catalog/skills", 401},
-		{"POST", "/api/catalog/assets/library", 401},
-		{"PATCH", "/api/library/preferences", 401},
+		{"no session", "", strings.Repeat("w", 32), http.StatusUnauthorized},
+		{"tampered session", cookies[0].Value + "x", strings.Repeat("w", 32), http.StatusUnauthorized},
+		{"no workspace", cookies[0].Value, "", http.StatusUnauthorized},
+		{"valid session and workspace", cookies[0].Value, strings.Repeat("w", 32), http.StatusOK},
 	} {
-		req := httptest.NewRequest(test.method, test.path, nil)
-		req.Header.Set("X-Workspace-Token", "anonymous-cannot-select-a-private-workspace")
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
-		if rec.Code != test.status {
-			t.Errorf("%s %s: got %d, want %d", test.method, test.path, rec.Code, test.status)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/system/models/pricing", nil)
+			req.AddCookie(&http.Cookie{Name: cookies[0].Name, Value: tc.cookie})
+			req.Header.Set("x-workspace-token", tc.workspace)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Fatalf("got HTTP %d, want %d", rec.Code, tc.want)
+			}
+		})
 	}
 }
 
@@ -389,4 +397,30 @@ func TestProductionWorkspaceIsolationAtHTTPBoundary(t *testing.T) {
 		t.Fatal(got)
 	}
 	send(http.MethodGet, draft, workspaceB, "", http.StatusNotFound)
+}
+
+func TestPublicCatalogKeepsPrivateReadsAndWritesProtected(t *testing.T) {
+	handler := New(config.Config{AccessToken: "secret", NodeEnv: "production"})
+	for _, test := range []struct {
+		method, path string
+		status       int
+	}{
+		{"GET", "/api/catalog/skills", 200},
+		{"GET", "/api/sales/scripts", 200},
+		{"GET", "/api/sales/asset-view-jobs", 200},
+		{"GET", "/api/library/preferences", 200},
+		{"GET", "/api/catalog/assets/library?type=all&export=1", 401},
+		{"GET", "/api/assistant/sessions", 401},
+		{"POST", "/api/catalog/skills", 401},
+		{"POST", "/api/catalog/assets/library", 401},
+		{"PATCH", "/api/library/preferences", 401},
+	} {
+		req := httptest.NewRequest(test.method, test.path, nil)
+		req.Header.Set("X-Workspace-Token", "anonymous-cannot-select-a-private-workspace")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != test.status {
+			t.Errorf("%s %s: got %d, want %d", test.method, test.path, rec.Code, test.status)
+		}
+	}
 }

@@ -232,7 +232,9 @@ func New(cfg config.Config) http.Handler {
 		handler := route.handler
 		if route.protected {
 			handler = protect(cfg, handler)
-			handler = withPublicCatalog(cfg, route.pattern, route.handler, handler)
+			if !cfg.PublicWeb {
+				handler = withPublicCatalog(cfg, route.pattern, route.handler, handler)
+			}
 		}
 		mux.Handle(route.pattern, handler)
 	}
