@@ -118,6 +118,14 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createAssistantSkillSlice(...a),
 }));
 
+// Invalidate even if navigation returns to the same draft before an old read completes.
+useAppStore.subscribe((state, previous) => {
+  if (state.currentView !== previous.currentView || state.currentSessionId !== previous.currentSessionId
+    || state.quickGenMode !== previous.quickGenMode || state.quickVideoRefMode !== previous.quickVideoRefMode) {
+    state.invalidatePromptAttachments();
+  }
+});
+
 export type { AppView } from './appView';
 export { normalizeAppView, isAppView } from './appView';
 

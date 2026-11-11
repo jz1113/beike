@@ -436,10 +436,10 @@ export default function AIAssistantDrawer({ onOpenSettings }: Props) {
     if (!activeCanvasProject) return { label: '画布上下文', detail: '当前未打开画布' };
     const selected = activeCanvasProject.nodes.find((node) => node.id === activeCanvasNodeId);
     return {
-      label: selected ? '已引用画布选中节点' : '已读取当前画布',
+      label: selected ? '已引用画布选中节点' : '当前画布',
       detail: selected
         ? (selected.title || selected.content || '未命名节点').replace(/\s+/g, ' ').trim().slice(0, 36)
-        : `${activeCanvasProject.title} · ${activeCanvasProject.nodes.length} 个节点`,
+        : `${activeCanvasProject.title} · ${activeCanvasProject.nodes.length} 个可见节点`,
     };
   }, [activeCanvasNodeId, activeCanvasProject, currentView]);
 

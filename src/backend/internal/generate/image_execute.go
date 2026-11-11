@@ -54,6 +54,9 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 		if model == "seedream-v5-pro" {
 			size = "2048x2048"
 		}
+		if isFalQwenImage3(model) || (imageFamily(model) == "seedream" && nativeVideoProvider(base) == "seedance") {
+			size = "2048x2048"
+		}
 	}
 	quality := rawString(payload, "quality")
 	if quality == "" {
@@ -65,6 +68,9 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 	}
 	imageQuality := normalizeImageQuality(rawString(payload, "imageQuality"))
 	protocol := resolveImageProtocol(base, imageProtocolName(payload, r.Header.Get("x-custom-protocol")))
+	if isFalQwenImage3(model) && protocol.ID() != "fal" {
+		return http.StatusBadRequest, map[string]any{"success": false, "submissionRejected": true, "error": "请在设置中将 Qwen Image 3 绑定到 fal 服务商"}
+	}
 	if protocol.ID() == "openai" && nativeDashscopeImageModel(model) {
 		return http.StatusBadRequest, map[string]any{
 			"success": false, "submissionRejected": true,
@@ -148,6 +154,9 @@ func executeImageSubmission(cfg config.Config, r *http.Request, payload map[stri
 	receivedUsage := gateway.NormalizeUsage(data)
 	if receivedUsage != nil {
 		rememberTaskUsage(r.Context(), cfg, taskScope{workspace: workspaceOf(r), media: "image", recordID: claim.recordID}, taskID, receivedUsage)
+	}
+	if adapted.size != "" {
+		size = adapted.size
 	}
 	if err := finishImageSubmission(cfg, r, claim.recordID, adapted, taskID, direct, size); err != nil {
 		return http.StatusInternalServerError, map[string]any{"success": false, "error": "任务持久化失败: " + err.Error(), "taskId": taskID, "recordId": claim.recordID, "usage": receivedUsage}

@@ -62,10 +62,11 @@ export function findPortTarget(
 }
 
 export function CanvasConnections({
-  nodes, projectId, zoom, selectedNodeIds, visibleBounds, onSelectCreatedNode,
+  nodes, projectId, coverWorkflow, zoom, selectedNodeIds, visibleBounds, onSelectCreatedNode,
 }: {
   nodes: CanvasNode[];
   projectId: string;
+  coverWorkflow: boolean;
   zoom: number;
   selectedNodeIds: string[];
   visibleBounds: { left: number; top: number; right: number; bottom: number };
@@ -356,7 +357,7 @@ export function CanvasConnections({
             const active = (selected?.from === id && selected.to === target.id) || isHovered || highlightedRefNodeId === id;
             const isEndpointSelected = selectedNodeIds.includes(id) || selectedNodeIds.includes(target.id);
             const isTargetGenerating = target.status === 'generating';
-            const showPulse = active || isEndpointSelected || isTargetGenerating;
+            const showPulse = active || isEndpointSelected;
             const output = getNodeOutputPorts(from)[0] || { id: 'out', label: '出', type: 'any', position: 'right' } as const;
             const inputs = getNodeInputPorts(target);
             const input = target.studioSubType === 'motion-control' ? inputs.find(port => port.type === output.type) ?? inputs[0] : inputs[0];
@@ -367,7 +368,12 @@ export function CanvasConnections({
               Math.min(a.x, b.x) - margin > visibleBounds.right || Math.max(a.y, b.y) < visibleBounds.top ||
               Math.min(a.y, b.y) > visibleBounds.bottom)) return null;
             const path = curve(a, b);
-            const color = active ? '#e4e4e7' : isTargetGenerating ? 'url(#flow-line-grad)' : isTextSource(from) ? '#b4b4bb' : '#a1a1aa';
+            const coverPrompt = coverWorkflow && id === projectId + '-design' && target.id === projectId + '-image';
+            const coverDelivery = coverWorkflow && id === projectId + '-image' &&
+              (target.id === projectId + '-preview' || target.id === projectId + '-save');
+            const coverReference = coverWorkflow && id === projectId + '-reference' && target.id === projectId + '-design';
+            const color = active ? '#e4e4e7' : isTargetGenerating ? 'url(#flow-line-grad)'
+              : coverPrompt ? '#a78bfa' : coverDelivery ? '#6dc9ab' : isTextSource(from) ? '#b4b4bb' : '#a1a1aa';
             return (
               <g
                 key={`${id}-${target.id}`}
@@ -376,9 +382,9 @@ export function CanvasConnections({
               >
                 <path
                   d={path} fill="none" stroke={color}
-                  strokeOpacity={active ? 0.92 : isTargetGenerating ? 0.95 : isEndpointSelected ? 0.72 : 0.48}
+                  strokeOpacity={active ? 0.92 : isTargetGenerating ? 0.95 : isEndpointSelected || coverPrompt || coverDelivery ? 0.72 : 0.48}
                   strokeWidth={active ? 2 : isTargetGenerating ? 2 : 1.5}
-                  strokeDasharray={isTargetGenerating ? '6 4' : undefined}
+                  strokeDasharray={isTargetGenerating ? '6 4' : coverReference ? '4 5' : undefined}
                   className={isTargetGenerating ? 'animate-pulse' : undefined}
                   vectorEffect="non-scaling-stroke"
                 />

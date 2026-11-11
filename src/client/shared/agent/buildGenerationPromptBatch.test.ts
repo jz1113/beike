@@ -7,7 +7,10 @@ vi.mock('@shared/domain/models/modalityStorage', async (importOriginal) => ({
   ...await importOriginal<typeof import('@shared/domain/models/modalityStorage')>(),
   upstreamModalityModelId: (_kind: string, id: string) => id === 'image-channel' ? 'gpt-image-2' : id,
   modalityPickerSelections: (kind: string) => kind === 'image'
-    ? [{ id: 'image-channel', name: '图片渠道', modelId: 'gpt-image-2' }]
+    ? [
+        { id: 'image-channel', name: '图片渠道', modelId: 'gpt-image-2' },
+        { id: 'nano-banana-2', name: 'Nano Banana 2', modelId: 'nano-banana-2' },
+      ]
     : [{ id: 'doubao-seedance-2.0-mini', name: '视频渠道', modelId: 'doubao-seedance-2.0-mini' }],
 }));
 
@@ -36,6 +39,20 @@ describe('batch generation task preparation', () => {
     const tasks = buildGenerationPromptBatch([image, { id: 'video', title: '视频', prompt: '镜头缓慢向前', mediaType: 'video', duration: 5 }], [], settings);
     expect(tasks.map(task => task.mediaType)).toEqual(['image', 'video']);
     expect(tasks[1]).toMatchObject({ videoDuration: 5, videoRefMode: 'text', videoResolution: '480P' });
+  });
+  it('changes GPT generation quality independently of pixel dimensions and preserves the Gemini 512px choice', () => {
+    const [standard] = buildGenerationPromptBatch([image], [], { ...settings, imageQuality: 'medium', imageQualityTier: 'high' });
+    const [draft] = buildGenerationPromptBatch([image], [], { ...settings, imageQuality: 'medium', imageQualityTier: 'low' });
+    expect(draft).toMatchObject({ size: standard.size, quality: 'medium', imageQuality: 'low' });
+    const [gemini] = buildGenerationPromptBatch([image], [], { ...settings, imageModel: 'nano-banana-2', imageQuality: '512px' });
+    expect(gemini).toMatchObject({ quality: '512px', size: '448x600' });
+    expect(gemini.imageQuality).toBeUndefined();
+  });
+  it('uses valid output parameters for older Seedance Mini drafts and preserves mute', () => {
+    const [task] = buildGenerationPromptBatch([
+      { ...image, id: 'video', mediaType: 'video', aspect: '9:16', duration: 30 },
+    ], [], { ...settings, videoResolution: '1080P', videoGenerateAudio: false });
+    expect(task).toMatchObject({ size: '9:16', videoDuration: 15, videoResolution: '480P', generateAudio: false });
   });
   it('validates every item and never returns a partial batch', () => {
     expect(() => buildGenerationPromptBatch([image, { ...image, id: 'missing', prompt: '参考 @图片3' }], [], settings)).toThrow('@图片3');

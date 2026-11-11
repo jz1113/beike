@@ -279,6 +279,7 @@ export function CanvasTableEditorNode({ node, nodes, projectId, selected = false
         <div
           role="toolbar"
           aria-label="表格编辑操作栏"
+          data-tapnow-float-toolbar=""
           data-canvas-pin-toolbar=""
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}

@@ -30,6 +30,7 @@ func TestTurnExecutesToolsAndPersists(t *testing.T) {
 		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"已完成\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":2}}\n\ndata: [DONE]\n\n"))
 	}))
 	defer upstream.Close()
+	useAssistantTestClient(t, upstream.Client())
 	dbPath := filepath.Join(t.TempDir(), "assistant.db")
 	db, err := database.OpenWrite(dbPath)
 	if err != nil {
@@ -209,6 +210,7 @@ func TestVideoTurnAnalyzesNativeMediaWithoutLoadingSkills(t *testing.T) {
 		fmt.Fprint(w, "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"直接视频分析结果\"}]},\"finishReason\":\"STOP\"}]}\n\n")
 	}))
 	defer upstream.Close()
+	useAssistantTestClient(t, upstream.Client())
 	dbPath := filepath.Join(t.TempDir(), "video.db")
 	db, err := database.OpenWrite(dbPath)
 	if err != nil {
@@ -254,6 +256,7 @@ func TestProductIDTurnReturnsCachedProductWithoutModel(t *testing.T) {
 	calls := 0
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; http.Error(w, "unexpected model call", 500) }))
 	defer upstream.Close()
+	useAssistantTestClient(t, upstream.Client())
 	dbPath := filepath.Join(t.TempDir(), "assistant-product.db")
 	db, err := database.OpenWrite(dbPath)
 	if err != nil {

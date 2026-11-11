@@ -4,11 +4,11 @@ const activeDialogs: HTMLElement[] = [];
 const FOCUSABLE = 'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], summary, [tabindex]:not([tabindex="-1"])';
 
 /** Keep keyboard focus inside the topmost dialog, and return it to its trigger on close. */
-export function useModalDialog(isOpen: boolean, onClose?: () => void, options: { trapFocus?: boolean; initialFocusSelector?: string } = {}) {
+export function useModalDialog(isOpen: boolean, onClose?: () => void, options: { trapFocus?: boolean; initialFocusSelector?: string; escapeCapture?: boolean } = {}) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
-  const { trapFocus = true, initialFocusSelector } = options;
+  const { trapFocus = true, initialFocusSelector, escapeCapture = true } = options;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -19,15 +19,16 @@ export function useModalDialog(isOpen: boolean, onClose?: () => void, options: {
     activeDialogs.push(dialog);
     (initialFocusSelector ? dialog.querySelector<HTMLElement>(initialFocusSelector) : null)?.focus();
     if (!dialog.contains(document.activeElement)) (focusable()[0] || dialog).focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (activeDialogs[activeDialogs.length - 1] !== dialog || event.isComposing) return;
-      // Native modal dialogs occupy the browser's top layer and own their keyboard handling.
-      if (document.querySelector('dialog[open]')) return;
-      if (event.key === 'Escape' && closeRef.current) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        closeRef.current();
-      } else if (event.key === 'Tab' && trapFocus) {
+    const isTopDialog = (event: KeyboardEvent) =>
+      activeDialogs[activeDialogs.length - 1] === dialog && !event.isComposing && !document.querySelector('dialog[open]');
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || !isTopDialog(event) || !closeRef.current) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeRef.current();
+    };
+    const onTab = (event: KeyboardEvent) => {
+      if (event.key === 'Tab' && trapFocus && isTopDialog(event)) {
         const elements = focusable();
         const first = elements[0];
         const last = elements[elements.length - 1];
@@ -43,11 +44,13 @@ export function useModalDialog(isOpen: boolean, onClose?: () => void, options: {
         }
       }
     };
-    document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('keydown', onTab, true);
+    document.addEventListener('keydown', onEscape, escapeCapture);
     return () => {
       const index = activeDialogs.indexOf(dialog);
       if (index >= 0) activeDialogs.splice(index, 1);
-      document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener('keydown', onTab, true);
+      document.removeEventListener('keydown', onEscape, escapeCapture);
       if (dialog.contains(document.activeElement) || document.activeElement === document.body) {
         if (previousFocus?.isConnected && previousFocus !== document.body && !previousFocus.closest('[aria-hidden="true"]')) {
           previousFocus.focus();
@@ -56,7 +59,7 @@ export function useModalDialog(isOpen: boolean, onClose?: () => void, options: {
         }
       }
     };
-  }, [isOpen, trapFocus, initialFocusSelector]);
+  }, [isOpen, trapFocus, initialFocusSelector, escapeCapture]);
 
   return dialogRef;
 }

@@ -1,3 +1,4 @@
+import type { ImageOutputTier } from '@shared/domain/media/imageCapabilities';
 import React, { useEffect, useRef, useState, type RefObject } from 'react';
 import { ArrowUp, ChevronDown, ChevronUp, Loader2, Plus, Wrench } from 'lucide-react';
 import PromptBarModeSelector from './PromptBarModeSelector';
@@ -69,15 +70,15 @@ export interface PromptBarControlsRowProps {
   quickVideoResolution: string;
   quickVideoCount: number;
   activeImageRatioObj: (typeof IMAGE_RATIO_ITEMS)[number];
-  quickQuality: string;
+  quickQuality: ImageOutputTier;
   quickCount: number;
   quickVideoAspectId: string;
   setQuickVideoAspectId: (id: string) => void;
-  setQuickVideoResolution: (res: '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K') => void;
+  setQuickVideoResolution: (res: '360P' | '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K') => void;
   setQuickVideoCount: (c: number) => void;
   quickAspectId: string;
   setQuickAspectId: (id: string) => void;
-  setQuickQuality: (q: 'high' | 'medium' | 'low') => void;
+  setQuickQuality: (q: ImageOutputTier) => void;
   setQuickCount: (c: number) => void;
   currentW: number;
   currentH: number;

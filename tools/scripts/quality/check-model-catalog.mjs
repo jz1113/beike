@@ -57,6 +57,21 @@ for (const match of blocks) {
   }
 }
 
+const selectionRules = JSON.parse(fs.readFileSync(path.join(catalogDir, 'selectionRules.json'), 'utf8'));
+const selectableProfiles = new Map();
+for (const { profile, pattern } of selectionRules) {
+  if (profile !== 'voice' && !seen.has(profile)) errors.push(`模型筛选规则缺少能力档案：${profile}`);
+  if (!pattern) {
+    errors.push(`模型筛选规则缺少匹配表达式：${profile}`);
+    continue;
+  }
+  const matcher = new RegExp(`^(?:${pattern})$`, 'i');
+  if (profile !== 'voice') selectableProfiles.set(profile, selectableProfiles.get(profile) || matcher.test(profile));
+}
+for (const [profile, matched] of selectableProfiles) {
+  if (!matched) errors.push(`模型筛选规则无法匹配自身档案：${profile}`);
+}
+
 if (errors.length > 0) {
   for (const msg of errors) console.error('[check:model-catalog] ' + msg);
   process.exit(1);

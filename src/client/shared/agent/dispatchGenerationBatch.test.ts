@@ -23,7 +23,8 @@ vi.mock('./buildGenerationPromptBatch', async importOriginal => {
   const actual = await importOriginal<typeof import('./buildGenerationPromptBatch')>();
   return { ...actual, buildGenerationPromptBatch: vi.fn(actual.buildGenerationPromptBatch) };
 });
-vi.mock('@shared/domain/models/modalityStorage', () => ({
+vi.mock('@shared/domain/models/modalityStorage', async importOriginal => ({
+  ...await importOriginal<typeof import('@shared/domain/models/modalityStorage')>(),
   upstreamModalityModelId: (_kind: string, id: string) => id === 'image-channel' ? 'gpt-image-2' : id,
   modalityPickerSelections: (kind: string) => kind === 'image'
     ? [{ id: 'image-channel', name: '图片渠道', modelId: 'gpt-image-2' }]
@@ -279,7 +280,7 @@ describe('shared button and followup batch submission', () => {
   });
 
   it('reads current live controls only as a fallback', () => {
-    expect(currentBatchSettings()).toEqual({ ...settings, videoContextIrEnabled: true });
+    expect(currentBatchSettings()).toMatchObject({ ...settings, imageQualityTier: 'high', imageInferenceStrength: 'low', videoContextIrEnabled: true });
     Object.assign(state, { quickVideoContextIrEnabled: false });
     expect(currentBatchSettings().videoContextIrEnabled).toBe(false);
     state.quickQuality = 'medium';

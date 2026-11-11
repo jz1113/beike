@@ -28,7 +28,7 @@ func modelFetchHandler(cfg config.Config) http.HandlerFunc {
 			payload = map[string]any{}
 		}
 		if payload["provider"] == "deepseek" {
-			status, body := fetchDeepSeek(r.Context(), network.SafeClient(), firstTextValue(payload["apiKey"]))
+			status, body := fetchDeepSeek(r.Context(), cfg.Root, network.SafeClient(), firstTextValue(payload["apiKey"]))
 			httpx.WriteJSON(w, status, body)
 			return
 		}
@@ -38,7 +38,7 @@ func modelFetchHandler(cfg config.Config) http.HandlerFunc {
 }
 
 func fetchModelCatalog(ctx context.Context, cfg config.Config, r *http.Request, payload map[string]any, client *http.Client) (int, map[string]any) {
-	fallback := loadApprovedModels(cfg.Root)
+	fallback := selectableCatalogModels(cfg.Root)
 	provider, _ := payload["provider"].(string)
 	openAI := provider == "openai"
 	_, independent := payload["apiKey"]
@@ -78,6 +78,9 @@ func fetchModelCatalog(ctx context.Context, cfg config.Config, r *http.Request, 
 			body["error"] = "请先填写 API Key"
 		}
 		return http.StatusOK, body
+	}
+	if payload["providerType"] == "fal" {
+		return fetchFalVideoCatalog(ctx, cfg.Root, client)
 	}
 	var list []any
 	var gatewayStatus int
@@ -130,11 +133,62 @@ func fetchModelCatalog(ctx context.Context, cfg config.Config, r *http.Request, 
 	return http.StatusOK, map[string]any{"success": true, "gatewayStatus": gatewayStatus, "count": len(fallback), "models": fallback, "isFallback": true, "warning": warning}
 }
 
+type falVideoRelease struct {
+	model, path string
+	endpoints   []string
+}
+
+const falOmniPrefix = "google/gemini-omni-flash"
+
+var falVideoReleases = []falVideoRelease{
+	{"gemini-omni-1.0-flash", falOmniPrefix, []string{"", "/image-to-video", "/reference-to-video", "/edit"}},
+	{"gemini-omni-1.2-flash", falOmniPrefix + "/v1.2", []string{"/text-to-video", "/image-to-video", "/reference-to-video", "/edit", "/extend"}},
+}
+
+func (release falVideoRelease) available(endpoints map[string]bool) bool {
+	for _, suffix := range release.endpoints {
+		if !endpoints[release.path+suffix] {
+			return false
+		}
+	}
+	return true
+}
+
+func fetchFalVideoCatalog(ctx context.Context, root string, client *http.Client) (int, map[string]any) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	// The directory is public. The queue credential is used only for submissions and polling.
+	data, status, err := gatewayGET(ctx, client, "https://api.fal.ai/v1/models?q=google%2Fgemini-omni-flash", "", "")
+	endpoints := map[string]bool{}
+	if entries, ok := data["models"].([]any); ok {
+		for _, entry := range entries {
+			if item, ok := entry.(map[string]any); ok {
+				endpoints[firstTextValue(item["endpoint_id"])] = true
+			}
+		}
+	}
+	models := []catalogModel{}
+	if err == nil && status == http.StatusOK {
+		for _, release := range falVideoReleases {
+			model, ready := selectableCatalogModel(root, release.model)
+			if ready && release.available(endpoints) {
+				models = append(models, model)
+			}
+		}
+	}
+	if len(models) == 0 {
+		return http.StatusBadGateway, map[string]any{"success": false, "models": []any{}, "error": "fal 目录暂未返回完整的 Gemini Omni Flash 端点"}
+	}
+	return http.StatusOK, map[string]any{"success": true, "count": len(models), "models": models, "provider": "fal", "warning": "fal 公开模型目录已验证，实际生成权限由队列 API Key 决定"}
+}
+
 func readGatewayModels(ctx context.Context, client *http.Client, base, key string, openAI bool) ([]any, int, string) {
 	endpoints := []string{gateway.ModelsURL(base)}
 	if openAI && !gateway.IsDashScopeGateway(base) {
 		root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
-		endpoints = []string{root + "/v1/models", root + "/models"}
+		if endpoint := root + "/models"; endpoint != endpoints[0] {
+			endpoints = append(endpoints, endpoint)
+		}
 	}
 	status := 0
 	message := ""
@@ -173,7 +227,7 @@ func readGatewayModels(ctx context.Context, client *http.Client, base, key strin
 	return nil, status, message
 }
 
-func fetchDeepSeek(ctx context.Context, client *http.Client, apiKey string) (int, map[string]any) {
+func fetchDeepSeek(ctx context.Context, root string, client *http.Client, apiKey string) (int, map[string]any) {
 	if strings.TrimSpace(apiKey) == "" {
 		return http.StatusBadRequest, map[string]any{"success": false, "provider": "deepseek", "models": []any{}, "error": "请填写 DeepSeek 独立 API Key"}
 	}
@@ -191,22 +245,8 @@ func fetchDeepSeek(ctx context.Context, client *http.Client, apiKey string) (int
 		}
 		return code, map[string]any{"success": false, "provider": "deepseek", "models": []any{}, "error": "DeepSeek 模型目录获取失败（HTTP " + strconv.Itoa(status) + "）"}
 	}
-	seen := map[string]struct{}{}
-	models := []map[string]any{}
-	for _, item := range list {
-		object, _ := item.(map[string]any)
-		id := strings.TrimSpace(firstTextValue(object["id"]))
-		if id == "" {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		name := firstTextValue(object["name"], id)
-		models = append(models, map[string]any{"id": id, "name": name})
-	}
-	return http.StatusOK, map[string]any{"success": true, "provider": "deepseek", "models": models}
+	models := discoveredModels(root, list)
+	return http.StatusOK, map[string]any{"success": true, "provider": "deepseek", "count": len(models), "models": models}
 }
 
 func modelList(data map[string]any) []any {
@@ -231,50 +271,25 @@ func discoveredModels(root string, list []any) []catalogModel {
 			continue
 		}
 		seen[strings.ToLower(id)] = struct{}{}
-		approved, ok := approvedModel(root, id)
-		if !ok {
-			approved = catalogModel{
-				ID:         id,
-				Name:       id,
-				ShortName:  id,
-				Category:   "text",
-				Capability: "custom",
-			}
-		} else {
-			approved.ID = id
-			if approved.Name == "" {
-				approved.Name = id
-			}
-			if approved.ShortName == "" {
-				approved.ShortName = id
-			}
+		approved, ok := selectableCatalogModel(root, id)
+		if !ok || falOnlyCatalogModel(approved.ID) {
+			continue
 		}
+		approved.ID = id
 		models = append(models, approved)
 	}
+	sortCatalogModels(models)
 	return models
 }
 
 func openAIModels(root string, list []any) []map[string]any {
-	seen := map[string]struct{}{}
 	models := []map[string]any{}
-	for _, item := range list {
-		id := strings.TrimSpace(modelID(item))
-		if id == "" {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		approved, ok := approvedModel(root, id)
-		supported := true
-		name := id
-		short := id
-		if ok {
-			name = approved.Name
-			short = approved.ShortName
-		}
-		models = append(models, map[string]any{"id": id, "name": name, "shortName": short, "supported": supported, "owned_by": "openai", "isCustom": !ok})
+	for _, model := range discoveredModels(root, list) {
+		models = append(models, map[string]any{
+			"id": model.ID, "name": model.Name, "shortName": model.ShortName, "supported": true,
+			"category": model.Category, "isVision": model.IsVision, "isMultimodal": model.IsMulti,
+			"isThinking": model.IsThinking, "isImage": model.IsImage, "isVideo": model.IsVideo, "owned_by": model.OwnedBy,
+		})
 	}
 	return models
 }

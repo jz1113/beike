@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 import JSZip from 'jszip';
+import { utils as workbookUtils, write as writeWorkbook } from 'xlsx';
 import type { CanvasQuickNodeType } from '../../../src/client/features/canvas/model/types';
 
 test('canvas home shares the searchable inspiration feed and opens a published canvas workflow', async ({ page }) => {
@@ -91,7 +92,8 @@ test('protects the built-in canvases and permanently removes a user canvas', asy
   ] });
   await page.goto('/?view=assets&tab=canvas');
 
-  const titles = ['封面生成', '电商视频', '电商视频 · 新版', '电商图文'];
+  const titles = ['封面生成', '电商视频 · 新版', '电商图文'];
+  await expect(page.getByRole('button', { name: '电商视频的更多选项', exact: true })).toHaveCount(0);
   for (const title of titles) {
     const trigger = page.getByRole('button', { name: `${title}的更多选项`, exact: true });
     await trigger.click();
@@ -159,10 +161,59 @@ test('old video link opens the canvas home and creates an empty canvas', async (
 
 });
 
+test('shows media-specific tools when the same canvas upload node switches between video and image', async ({ page }) => {
+  const id = 'media-tools-test';
+  await page.addInitScript(id => {
+    localStorage.setItem('beike_canvas_projects_store', JSON.stringify({ version: 0, state: { projects: [{
+      id, title: '素材工具测试', createdAt: 1, updatedAt: 1,
+      nodes: [{ id: 'upload', type: 'file', title: '上传素材', x: 0, y: 0, width: 260, height: 200, createdAt: 1 }],
+    }] } }));
+  }, id);
+  await page.route('**/api/assets/storage/upload', route => route.continue());
+  await page.goto('/?view=canvas&project=' + id);
+  const node = page.getByTestId('canvas-viewport').locator('[data-canvas-node-id="upload"]');
+  const input = node.getByLabel('选择素材文件');
+  const toolbar = node.getByRole('toolbar', { name: '素材操作' });
+  const menu = node.locator('[data-input-image-tools-menu]');
+
+  const videoPath = join(process.env.BEIKE_BROWSER_DATA_DIR!, 'storage/local/browser-test/timeline.mp4');
+  await input.setInputFiles(videoPath);
+  await expect(node).toHaveAttribute('data-node-kind', 'video');
+  await node.locator('video').click();
+  for (const name of ['高清放大', '角度调整', '框选裁剪区域', '智能改图']) {
+    await expect(toolbar.getByRole('button', { name, exact: true })).toHaveCount(0);
+  }
+  await toolbar.getByRole('button', { name: '视频工具' }).click();
+  await expect(menu.getByRole('button')).toHaveText([
+    '深度视频 · 480p', '深度视频 · 720p', '提取首帧', '提取当前帧', '提取分镜图',
+  ]);
+  await toolbar.getByRole('button', { name: '高亮显示' }).click();
+  await expect(node).toHaveAttribute('data-highlighted', 'true');
+
+  await input.setInputFiles('src/client/public/app_logo.png');
+  await expect(node).toHaveAttribute('data-node-kind', 'image');
+  await node.locator('.canvas-media-surface').click();
+  for (const name of ['高清放大', '角度调整', '框选裁剪区域', '智能改图']) {
+    await expect(toolbar.getByRole('button', { name, exact: true })).toBeVisible();
+  }
+  await toolbar.getByRole('button', { name: '图片工具' }).click();
+  await expect(menu.getByRole('button', { name: '深度提取', exact: true })).toBeVisible();
+  await expect(menu.getByRole('button', { name: /深度视频|提取首帧|提取当前帧|提取分镜图|高亮显示/ })).toHaveCount(0);
+  await expect(toolbar.getByRole('button', { name: '高亮显示' })).toHaveAttribute('aria-pressed', 'true');
+  await toolbar.getByRole('button', { name: '框选裁剪区域' }).click();
+  await expect(node.locator('[data-inline-crop-overlay]')).toBeVisible();
+  await input.setInputFiles(videoPath);
+  await expect(node).toHaveAttribute('data-node-kind', 'video');
+  await expect(node.locator('[data-inline-crop-overlay], [data-upload-inline-tool-panel]')).toHaveCount(0);
+  await expect(toolbar.getByRole('button', { name: '视频工具' })).toBeVisible();
+});
+
 test('the built-in video copy canvas extracts local storyboards and generates from the approved prompt', async ({ page }) => {
   await page.setViewportSize({ width: 1700, height: 900 });
   let uploads = 0;
   let maskedSheetPath = '';
+  let analysisOperationKey = '';
+  let analysisReceiptQueries = 0;
   const steps: string[] = [];
   const brief = '保留蓝色衣领，成片全程静音。';
   const script = '【全片一致性】同一人物与服装。【声音模式：静音】【全片一致性结束】\n【参考图制作要求】按原片0秒分镜绘制开场。【参考图制作要求结束】\n【视频片段 01｜时长 15 秒】\n开场画面：人物在窗前站立。\n本地时间轴：\n0–5秒：后退。\n5–10秒：转身。\n10–15秒：走近后停稳。\n结束状态：站稳。\n【视频片段结束】';
@@ -180,7 +231,16 @@ test('the built-in video copy canvas extracts local storyboards and generates fr
     if (url === openingImageUrl && !openingImageAvailable) return route.fulfill({ status: 403 });
     return route.fulfill({ path: 'src/client/public/app_logo.png' });
   });
-  await page.route('**/api/generate/canvas-text', async route => {
+  await page.route(/\/api\/generate\/canvas-text(?:\?|$)/, async route => {
+    if (route.request().method() === 'GET') {
+      const operationKey = new URL(route.request().url()).searchParams.get('operationKey');
+      expect(operationKey).toBe(analysisOperationKey);
+      analysisReceiptQueries++;
+      if (analysisReceiptQueries === 1) {
+        return route.fulfill({ status: 409, json: { operationKey, submissionUnknown: true, stage: 'result' } });
+      }
+      return route.fulfill({ json: { success: true, operationKey, text: script } });
+    }
     const body = route.request().postDataJSON();
     const analysis = body.beikeStoryboardAnalysis === true;
     steps.push(analysis ? 'analysis' : 'optimize');
@@ -193,6 +253,8 @@ test('the built-in video copy canvas extracts local storyboards and generates fr
       expect(analysisPrompt).toContain(brief);
       expect(analysisPrompt).toContain('@图片3');
       expect(analysisPrompt).not.toContain('canvas-node:');
+      analysisOperationKey = body.clientTaskId;
+      return route.abort('connectionreset');
     }
     await route.fulfill({ json: { success: true, operationKey: body.clientTaskId, text: script,
       choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: script } }] } });
@@ -221,7 +283,6 @@ test('the built-in video copy canvas extracts local storyboards and generates fr
   await page.goto('/?view=assets&tab=canvas');
   await page.getByRole('button', { name: '打开画布：电商视频 · 新版', exact: true }).click();
   const viewport = page.getByTestId('canvas-viewport');
-  const prepare = page.getByRole('button', { name: '一键准备深度复刻' });
   const source = viewport.locator('[data-canvas-node-id$="-source"]');
   const videoPath = join(process.env.BEIKE_BROWSER_DATA_DIR!, 'storage/local/browser-test/source.mp4');
   await source.getByLabel('选择素材文件').setInputFiles(videoPath);
@@ -255,8 +316,7 @@ test('the built-in video copy canvas extracts local storyboards and generates fr
   for (const index of [1, 2]) {
     await expect(viewport.getByRole('button', { name: `选择连线 source · 分镜图${index}（人脸已处理） → 05 分析原片分镜` })).toHaveCount(1);
   }
-  await prepare.click();
-  await expect(page.getByRole('alert').filter({ hasText: '商品' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: '深度复刻准备' })).toHaveCount(0);
   expect(uploads).toBe(2);
   expect(steps).toEqual([]);
   await page.mouse.move(1400, 650);
@@ -264,7 +324,7 @@ test('the built-in video copy canvas extracts local storyboards and generates fr
   await page.mouse.move(1400, 770, { steps: 6 });
   await page.mouse.up({ button: 'middle' });
   await originalVideo.click({ timeout: 5_000 });
-  await source.getByRole('button', { name: '工具', exact: true }).click({ timeout: 5_000 });
+  await source.getByRole('button', { name: '视频工具', exact: true }).click({ timeout: 5_000 });
   const videoTools = source.locator('[data-input-image-tools-menu]');
   for (const name of ['提取首帧', '提取当前帧', '提取分镜图']) {
     await expect(videoTools.getByRole('button', { name, exact: true })).toBeVisible();
@@ -281,7 +341,7 @@ test('the built-in video copy canvas extracts local storyboards and generates fr
   await sheetImage.locator('xpath=ancestor::div[contains(@class,"canvas-media-surface")][1]').click({ timeout: 5_000 });
   const sheet = sheetImage.locator('xpath=ancestor::*[@data-canvas-node-id][1]');
   const previousSheet = await sheetImage.getAttribute('src');
-  await sheet.getByRole('button', { name: '工具', exact: true }).click({ timeout: 5_000 });
+  await sheet.getByRole('button', { name: '图片工具', exact: true }).click({ timeout: 5_000 });
   const imageTools = sheet.locator('[data-input-image-tools-menu]');
   const typography = await imageTools.getByRole('button').evaluateAll(buttons => buttons.map(button => {
     const { fontSize, fontWeight, lineHeight } = getComputedStyle(button);
@@ -331,14 +391,23 @@ test('the built-in video copy canvas extracts local storyboards and generates fr
   await expect.poll(() => sourceThumbnail.evaluate(video => video.videoWidth)).toBeGreaterThan(0);
   await page.getByRole('button', { name: '引用图片3' }).click();
 
-  await prepare.click();
+  await page.getByRole('button', { name: '生成文本', exact: true }).click();
+  const analysis = viewport.locator('[data-canvas-node-id$="-analysis"]');
+  await page.getByRole('button', { name: '查询回执', exact: true }).click();
+  await expect(page.getByRole('button', { name: '查询回执中…', exact: true })).toBeDisabled();
+  await expect(analysis.getByRole('textbox', { name: '文本内容' })).toContainText('同一人物与服装');
+  expect(analysisReceiptQueries).toBe(2);
+  const opening = viewport.locator('[data-canvas-node-id$="-keyframe"]');
+  await opening.getByTestId('drawing-preview').click();
+  await page.getByRole('button', { name: '开始绘图', exact: true }).click();
+  await expect(opening.getByText('结果图片无法加载')).toBeVisible();
+  await viewport.locator('[data-canvas-node-id$="-prompt"]').dispatchEvent('click');
+  await page.getByRole('button', { name: '运行提示词 Skill 优化' }).click();
   const approval = page.getByRole('dialog', { name: '确认视频提示词' });
   await expect(approval).toBeVisible({ timeout: 20_000 });
   await approval.getByRole('button', { name: '确认保存07提示词' }).click();
-  await expect(page.getByText('提示词已确认，可到 08 手动生成视频。')).toBeVisible();
+  await expect(approval).toBeHidden();
   expect(steps).toEqual(['analysis', 'image', 'optimize']);
-  const opening = viewport.locator('[data-canvas-node-id$="-keyframe"]');
-  await expect(opening.getByText('结果图片无法加载')).toBeVisible();
   await expect(opening.getByRole('img', { name: '绘图结果' })).toHaveCount(0);
   await expect(opening.locator('[data-input-image-toolbar]')).toBeHidden();
   openingImageAvailable = true;
@@ -387,7 +456,7 @@ test('the built-in video copy canvas extracts local storyboards and generates fr
   });
   for (const resolution of ['480p', '720p']) {
     await originalVideo.click({ timeout: 5_000 });
-    await source.getByRole('button', { name: '工具', exact: true }).click({ timeout: 5_000 });
+    await source.getByRole('button', { name: '视频工具', exact: true }).click({ timeout: 5_000 });
     await videoTools.getByRole('button', { name: `深度视频 · ${resolution}`, exact: true }).click({ timeout: 5_000 });
     const depthNode = viewport.locator('[data-canvas-node-id]').filter({ hasText: `深度视频 · ${resolution}` });
     await expect(depthNode.locator('video')).toHaveAttribute('src', new RegExp(resultUrl), { timeout: 15_000 });
@@ -532,6 +601,202 @@ test('native canvas boots, zooms at the pointer, and opens the node palette', as
   await page.mouse.move(map.x + map.width / 2 + 12, map.y + map.height / 2, { steps: 3 });
   await page.mouse.up();
   await expect(pattern).not.toHaveAttribute('x', oldOffset!);
+});
+
+test('canvas minimap keeps nodes visible when the main viewport is far away', async ({ page }) => {
+  const project = {
+    id: 'minimap-fixture', title: '小地图测试', createdAt: 1, updatedAt: 1,
+    viewport: { x: -50000, y: -50000, zoom: 1 },
+    nodes: [100, 480, 100000].map((x, index) => ({
+      id: 'minimap-' + index, type: 'note', title: '节点 ' + index,
+      x, y: 220, width: 200, height: 140, createdAt: 1, layerHidden: index === 2,
+    })),
+  };
+  await page.addInitScript(value => {
+    localStorage.setItem('beike_canvas_projects_store', JSON.stringify({ state: { projects: [value] }, version: 0 }));
+  }, project);
+  await page.goto('/?view=canvas&project=' + project.id);
+  const viewport = page.getByTestId('canvas-viewport');
+  const minimap = page.getByRole('img', { name: '点击缩略图定位画布' });
+  await expect(page.getByText('当前视野在内容外')).toBeVisible();
+  const dots = minimap.locator('[data-minimap-node-id]');
+  await expect(dots).toHaveCount(2);
+  const dot = dots.first();
+  const initialWidth = Number(await dot.getAttribute('width'));
+  expect(initialWidth).toBeGreaterThan(30);
+  await dot.click();
+  await expect(viewport.locator('[data-canvas-node-id="minimap-0"]')).toBeInViewport();
+  await expect(page.getByRole('button', { name: '缩放 100%' })).toBeVisible();
+  await dot.hover();
+  await page.mouse.wheel(0, -100);
+  await expect(page.getByRole('button', { name: '缩放 105%' })).toBeVisible();
+  await expect(dot).toHaveAttribute('width', String(initialWidth));
+  await page.getByRole('button', { name: '画布小地图' }).click();
+  await page.getByRole('button', { name: '定位节点' }).click();
+  await expect(viewport.locator('[data-canvas-node-id="minimap-0"]')).toBeInViewport();
+  await expect(viewport.locator('[data-canvas-node-id="minimap-1"]')).toBeInViewport();
+});
+
+test('cover candidate follows a replaced prompt node and releases export after review', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const id = 'studio-cover-flow';
+  const writerId = 'replaced-cover-prompt';
+  const productUrl = '/storage/local/browser-test/cover-product.png';
+  const resultUrl = '/storage/local/browser-test/cover-result.png';
+  const sampleUrl = '/cover-layouts/v0.2.0/phone-04.webp';
+  const skills: Array<{ id: string; version: string }> = JSON.parse(await readFile(
+    'src/shared/domain/assistant/skills/compiledSkillPackages.json', 'utf8',
+  ));
+  const skillVersion = skills.find(skill => skill.id === 'cover-prompt-writer')!.version.replace(/\./g, '-');
+  const text = [
+    '画幅与构图：PHONE-04｜主体略斜', '背景：浅室内散景', '商品外观：按 @图片1',
+    '标题与排版：', '第1行：“新品上手”｜字号：大｜位置：左上｜样式：粗白',
+    '字体与视觉风格：粗细对比', '光线和画质：左侧窗光', '保真约束：保留镜头数量',
+  ].join('\n');
+  const view = { x: 20, y: 50, zoom: 0.55 };
+  const project = {
+    id, title: '封面节点测试', createdAt: 1, updatedAt: 1, nodes: [], viewport: view,
+    nativeCommerce: { kind: 'poster', version: 1 },
+    studioScene: {
+      view, groups: [], strokes: [], textBoxes: [],
+      nodes: [
+        { id: id + '-product', type: 'input-image', x: 85, y: 105, imageUrl: productUrl, nodeName: '商品参考图' },
+        { id: writerId, type: 'text-node', x: 510, y: 100, nodeName: '封面提示词',
+          settings: { beikeCoverPromptWriter: true, textNodeDisplayText: text, beikeCoverSourceUrl: productUrl,
+            beikeCoverPromptOperationId: `cover-${skillVersion}-browser-fixture` } },
+        { id: id + '-image', type: 'gen-image', x: 925, y: 100, nodeName: '封面生成', settings: { ratio: '3:4', model: 'beike:image:gpt-image-2' } },
+        { id: id + '-save', type: 'local-save', x: 2000, y: 100, nodeName: '下载封面' },
+      ],
+      connections: [['product', 'design'], ['product', 'image'], ['design', 'image'], ['image', 'save']]
+        .map(([from, to]) => ({ id: from + '-' + to, from: from === 'design' ? writerId : id + '-' + from,
+          to: to === 'design' ? writerId : id + '-' + to })),
+    },
+  };
+  await page.addInitScript(value => {
+    localStorage.setItem('beike_canvas_projects_store', JSON.stringify({ state: { projects: [value] }, version: 0 }));
+    localStorage.setItem('ai_base_url', 'https://ai.comfly.org');
+    localStorage.setItem('ai_api_key', 'fixture-only');
+    localStorage.setItem('beike_modality_models_v1_image', JSON.stringify([
+      { id: 'gpt-image-2', name: '测试图片模型', modelId: 'gpt-image-2', modality: 'image' },
+      { id: 'gpt-image-2.5', name: '共用图片模型', modelId: 'gpt-image-2.5', modality: 'image' },
+    ]));
+  }, project);
+  await page.route('**/storage/local/browser-test/cover-*.png', route => route.fulfill({ path: 'src/client/public/app_logo.png' }));
+  await page.route('**/api/generate/image', async route => {
+    expect(route.request().postDataJSON().images).toHaveLength(2);
+    await route.fulfill({ json: { success: true, status: 'SUCCESS', resultUrl } });
+  });
+  await page.goto('/?view=canvas&project=' + id);
+  const canvasNode = (suffix: string) => page.locator(`[data-canvas-node-id="${id}-${suffix}"]`);
+  const candidate = canvasNode('cover-layout');
+  await expect(candidate.getByRole('img', { name: '版式参考样张' })).toHaveAttribute('src', sampleUrl);
+  await expect(canvasNode('product')).toHaveCSS('left', '85px');
+  await expect(canvasNode('brief').getByRole('textbox', { name: '文本内容' })).toBeVisible();
+  const product = canvasNode('product');
+  await expect(canvasNode('cover-check')).toHaveCount(0);
+  await expect(product).toHaveAttribute('data-node-kind', 'image');
+  await expect(product.locator('[data-upload-node]')).toBeVisible();
+  await expect(product.getByRole('button', { name: '上传 Excel' })).toBeVisible();
+  const workbook = workbookUtils.book_new();
+  workbookUtils.book_append_sheet(workbook, workbookUtils.aoa_to_sheet([
+    ['标题', '图片链接', '画幅'],
+    ['新品上手', 'https://example.com/phone.jpg', '竖'],
+    ['新品亮相', 'https://example.com/phone-2.jpg', '横'],
+  ]), 'Sheet1');
+  await product.locator('input[aria-label="选择 Excel 文件"]').setInputFiles({
+    name: '批量封面.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: writeWorkbook(workbook, { type: 'buffer', bookType: 'xlsx' }),
+  });
+  await expect(product.getByRole('button', { name: '更换 Excel：批量封面.xlsx，2 条数据' })).toBeVisible();
+  await expect(product.locator(`img[src="${productUrl}"]`)).toBeVisible();
+  const batch = page.getByRole('button', { name: '批量封面 2' });
+  await batch.click();
+  const model = page.getByRole('button', { name: '绘图模型', exact: true });
+  await expect(model).toContainText('测试图片模型');
+  await expect(page.getByRole('button', { name: '开始批量执行' })).toBeEnabled();
+  await model.click();
+  await page.getByRole('dialog', { name: '选择绘图模型' }).getByRole('button', { name: '共用图片模型' }).click();
+  await expect(model).toContainText('共用图片模型');
+  await batch.click();
+  await expect(canvasNode('cover-compare').getByRole('img', { name: '原始图片' })).toHaveCount(0);
+  await canvasNode('image').getByTestId('drawing-preview').click();
+  await expect(page.getByRole('button', { name: '绘图模型', exact: true })).toContainText('共用图片模型');
+  await page.getByRole('button', { name: '开始绘图', exact: true }).click();
+  await expect(candidate.getByRole('img', { name: 'AI 生成图' })).toHaveAttribute('src', resultUrl);
+  await expect(candidate.getByRole('img', { name: '版式参考样张' })).toHaveCount(0);
+  await expect(canvasNode('cover-compare').getByRole('img', { name: '原始图片' })).toHaveAttribute('src', productUrl);
+  await expect(canvasNode('cover-compare').getByRole('img', { name: '生成图片' })).toHaveAttribute('src', resultUrl);
+  const save = canvasNode('save');
+  await expect(save.getByText('请先完成成图质检')).toBeVisible();
+  await canvasNode('cover-review').getByRole('button', { name: '成图质检', exact: true }).click();
+  const review = page.getByRole('dialog', { name: '成图质检' });
+  await expect(review.getByRole('img', { name: '封面成品' })).toHaveAttribute('src', resultUrl);
+  for (const box of await review.getByRole('checkbox').all()) await box.check();
+  await review.getByRole('button', { name: '通过质检' }).click();
+  await expect(review).toHaveCount(0);
+  await expect(save.getByRole('button', { name: '一键导出全部素材 (1)' })).toBeEnabled();
+  await page.reload();
+  await expect(candidate.getByRole('img', { name: 'AI 生成图' })).toHaveAttribute('src', resultUrl);
+  await expect(save.getByRole('button', { name: '一键导出全部素材 (1)' })).toBeEnabled();
+});
+
+test('cover batch leaves only the main workflow on the board and keeps its results accessible', async ({ page }) => {
+  const id = 'cover-map-browser';
+  const source = id + '-product';
+  const prefix = 'cover-11111111-2222-4333-8444-555555555555';
+  const render = prefix + '-2-render';
+  const archived = 'cover-99999999-2222-4333-8444-555555555555-2-render';
+  const view = { x: 30, y: -9900, zoom: 0.5 };
+  const imageUrl = '/app_logo.png';
+  const project = {
+    id, title: '封面生成测试', createdAt: 1, updatedAt: 1, nodes: [], viewport: view,
+    nativeCommerce: { kind: 'poster', version: 1 },
+    studioScene: {
+      view, groups: [], strokes: [], textBoxes: [], connections: [],
+      nodes: [
+        { id: source, type: 'input-image', x: 80, y: 100, width: 300, height: 250, nodeName: '商品参考图',
+          settings: { beikeCoverBatch: { name: '当前批次.xlsx', ids: [render], runId: 'current-run' } } },
+        { id: id + '-design', type: 'text-node', x: 500, y: 100, width: 250, height: 250, nodeName: '单张提示词' },
+        { id: render, type: 'gen-image', x: 500, y: 20000, width: 340, height: 453, nodeName: '表格中的原始标题',
+          content: imageUrl, imageUrl, settings: { beikeCoverTitle: '表格中的原始标题', beikeSizedCoverUrl: imageUrl,
+            beikeCoverExportRatio: '3:4', beikeCoverExportRunId: 'current-run', beikeSubmittedCoverLayout: 'PHONE-08',
+            beikeCoverSubmittedPrompt: '第1行：“封面文案”｜字号：粗体｜位置：上方｜样式：白字' } },
+        { id: archived, type: 'gen-image', x: 500, y: 40000, width: 340, height: 453, nodeName: '旧批次标题', content: imageUrl, imageUrl },
+      ],
+    },
+  };
+  await page.addInitScript(value => {
+    localStorage.setItem('beike_canvas_projects_store', JSON.stringify({ state: { projects: [value] }, version: 0 }));
+  }, project);
+  await page.goto('/?view=canvas&project=' + id);
+  const minimap = page.getByRole('img', { name: '点击缩略图定位画布' });
+  await expect(minimap.locator('[data-minimap-node-id]')).toHaveCount(2);
+  await expect(minimap.locator(`[data-minimap-node-id="${render}"]`)).toHaveCount(0);
+  await expect(page.locator(`[data-canvas-node-id="${source}"]`)).toBeInViewport();
+
+  const batch = page.getByRole('button', { name: '批量封面 1' });
+  await batch.click();
+  await expect(page.getByRole('button', { name: '下载当前批次 ZIP（1/1）' })).toBeEnabled();
+  await expect(page.getByText('封面文案 · 封面文案')).toBeHidden();
+  await page.getByText('任务明细（1 条）').click();
+  await expect(page.getByText('已成图 · 竖屏 · 720×960 · PHONE-08')).toBeVisible();
+  await expect(page.getByText('封面文案 · 封面文案')).toBeVisible();
+  await expect(page.getByText('旧批次标题')).toHaveCount(0);
+  await page.getByRole('button', { name: '预览封面 · 表格中的原始标题' }).click();
+  const preview = page.getByRole('dialog', { name: '批量封面预览' });
+  await expect(preview.getByRole('img', { name: '表格中的原始标题' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(preview).toHaveCount(0);
+  await expect(page.locator(`[data-canvas-node-id="${render}"]`)).toHaveCount(0);
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: '下载当前批次 ZIP（1/1）' }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe('当前批次.zip');
+  const zip = await JSZip.loadAsync(await readFile(await download.path()));
+  expect(Object.keys(zip.files).sort()).toEqual(['封面明细.xlsx', '表格中的原始标题.png'].sort());
 });
 
 test('native canvas connects a selection and supports reverse port dragging', async ({ page }) => {
@@ -750,7 +1015,7 @@ test('native canvas runs the five priority nodes with shared media and controlle
   };
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.addInitScript(value => {
-    localStorage.setItem('custom_models',JSON.stringify([{id:'gemini-2.5-flash',name:'测试视觉模型',isMultimodal:true,isAssistant:true,enabled:true}]));
+    localStorage.setItem('custom_models',JSON.stringify([{id:'gemini-3.8-flash',name:'测试视觉模型',isMultimodal:true,isAssistant:true,enabled:true}]));
     if (sessionStorage.getItem('priority-tools-seeded')) return;
     localStorage.setItem('beike_canvas_projects_store',JSON.stringify({state:{projects:[value]},version:0}));
     sessionStorage.setItem('priority-tools-seeded','1');
@@ -864,15 +1129,18 @@ test('native canvas runs panorama, Jimeng, motion transfer and script parsing on
       {id:'panorama',type:'note',studioSubType:'global-perspective',title:'全局视角',x:310,y:70,width:440,height:400,referenceNodeIds:['image'],createdAt:1},
       {id:'upscale',type:'note',studioSubType:'jimeng-super-resolution',title:'智能超清',x:830,y:75,width:250,height:250,referenceNodeIds:['image'],createdAt:1},
       {id:'motion',type:'drawing',generationKind:'video',studioSubType:'motion-control',title:'动作迁移',x:1200,y:75,width:250,height:250,referenceNodeIds:['image','video'],createdAt:1,
-        drawing:{model:'kling-video-v3',quality:'720P',aspect:'1:1',count:1,references:[],refMode:'motion_control',audio:true,optimizePrompt:false}},
+        drawing:{model:'configured-motion-route',quality:'720P',aspect:'1:1',count:1,references:[],refMode:'motion_control',audio:true,optimizePrompt:false}},
       {id:'script',type:'prompt',studioSubType:'script-parse',title:'脚本解析',x:340,y:500,width:400,height:400,referenceNodeIds:['text'],createdAt:1},
     ],
   };
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.addInitScript(value => {
     localStorage.setItem('custom_models',JSON.stringify([
-      {id:'gemini-2.5-flash',name:'测试解析模型',isMultimodal:true,isAssistant:true,enabled:true},
-      {id:'kling-video-v3',name:'Kling 3.0',isVideo:true,enabled:true},
+      {id:'gemini-3.8-flash',name:'测试解析模型',isMultimodal:true,isAssistant:true,enabled:true},
+    ]));
+    // Motion Control uses an explicitly configured legacy route, separate from the general video picker.
+    localStorage.setItem('beike_modality_models_v1_video', JSON.stringify([
+      { id: 'configured-motion-route', name: 'Kling 动作控制', modelId: 'kling-video-v3', modality: 'video' },
     ]));
     localStorage.setItem('ai_base_url','https://api.klingai.com');
     if (sessionStorage.getItem('next-tools-seeded')) return;
@@ -982,7 +1250,7 @@ test('native canvas renders every implemented creation type with the shared card
       const nodes = tools.map((kind,index)=>buildQuickCanvasNode(kind,{
         x:620+(index%7)*850,y:575+Math.floor(index/7)*900,
       },{id:kind}));
-      return {id:'native-node-gallery',title:'原生节点验收',createdAt:1,updatedAt:1,viewport:{x:0,y:0,zoom:0.14},nodes};
+      return {id:'native-node-gallery',title:'原生节点验收',createdAt:1,updatedAt:1,viewport:{x:0,y:0,zoom:0.15},nodes};
     } finally {
       await vite.close();
     }
@@ -998,7 +1266,7 @@ test('native canvas renders every implemented creation type with the shared card
   for (const node of project.nodes) {
     const card = viewport.locator(`[data-canvas-node-id="${node.id}"]`);
     await expect(card).toHaveAttribute('data-node-kind',node.type);
-    expect((await card.boundingBox())?.width).toBeCloseTo(node.width*0.14,0);
+    expect((await card.boundingBox())?.width).toBeCloseTo(node.width*0.15,0);
   }
   await expect(page.getByTestId('canvas-download-entry')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'返回首页',exact:true})).toHaveCount(0);
@@ -1131,11 +1399,15 @@ for (const side of ['right', 'left'] as const) {
 }
 
 test('stale canvas tabs preserve other projects and can export conflicting edits', async ({ page, context }) => {
-  const storedNodeCount = (id: string) => page.evaluate(projectId => new Promise(resolve => {
+  const storedNodeCount = (id: string) => page.evaluate(projectId => new Promise<number>((resolve, reject) => {
     const open = indexedDB.open('beike-canvas-projects');
+    open.onerror = () => reject(open.error);
     open.onsuccess = () => {
       const db = open.result;
-      const read = db.transaction('projects').objectStore('projects').get(projectId);
+      const transaction = db.transaction('projects');
+      transaction.onabort = () => { db.close(); reject(transaction.error); };
+      const read = transaction.objectStore('projects').get(projectId);
+      read.onerror = () => { db.close(); reject(read.error); };
       read.onsuccess = () => { resolve(read.result?.nodes?.length ?? 0); db.close(); };
     };
   }), id);
@@ -1145,7 +1417,12 @@ test('stale canvas tabs preserve other projects and can export conflicting edits
     const viewport = page.getByTestId('canvas-viewport');
     await viewport.dblclick({ position: { x: 155, y: 180 } });
     await page.getByRole('menuitem', { name: '文本', exact: true }).click();
-    const id = new URL(page.url()).searchParams.get('project')!;
+    const readProjectId = () => page.evaluate(() => new URLSearchParams(
+      location.search || history.state?.beikeRoute || '',
+    ).get('project'));
+    await expect.poll(readProjectId).toBeTruthy();
+    const id = await readProjectId();
+    if (!id) throw new Error('新画布未写入项目路由');
     await expect.poll(() => storedNodeCount(id)).toBe(1);
     return id;
   };
@@ -1221,11 +1498,15 @@ test('copy, redo and link undo survive opening the canvas again', async ({ page 
   await page.keyboard.press('Control+y');
   await expect(nodes).toHaveCount(4);
   await page.keyboard.press('Control+s');
-  await expect.poll(() => page.evaluate(() => new Promise(resolve => {
+  await expect.poll(() => page.evaluate(() => new Promise<number>((resolve, reject) => {
     const open = indexedDB.open('beike-canvas-projects');
+    open.onerror = () => reject(open.error);
     open.onsuccess = () => {
       const db = open.result;
-      const read = db.transaction('projects').objectStore('projects').get('durable-graph');
+      const transaction = db.transaction('projects');
+      transaction.onabort = () => { db.close(); reject(transaction.error); };
+      const read = transaction.objectStore('projects').get('durable-graph');
+      read.onerror = () => { db.close(); reject(read.error); };
       read.onsuccess = () => { resolve(read.result?.studioScene?.connections?.length ?? 0); db.close(); };
     };
   }))).toBe(2);

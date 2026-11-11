@@ -44,6 +44,7 @@ export interface TranslationSchema {
       chat: string;
       image: string;
       video: string;
+      fal: string;
       voice: string;
       storage: string;
       appearance: string;

@@ -384,7 +384,7 @@ describe('multimodal sync catalog', () => {
     ['gemini-3.8-flash', 'gemini-3.8-flash-thinking-low'],
     ['gemini-3.8-flash', 'gemini-3.8-flash-thinking-medium'],
     ['gemini-3.8-flash', 'gemini-3.8-flash-thinking-high'],
-    ['gemini-4-pro', 'gemini-2.5-pro'],
+    ['gemini-4-argon', 'gemini-2.5-pro'],
     ['gemini-4-argon', 'gemini-4-argon-thinking-low'],
     ['gemini-4-argon', 'net-gemini-4-argon-thinking-medium'],
     ['gemini-4-argon', 'google/gemini-4-argon-thinking-high'],
@@ -395,16 +395,17 @@ describe('multimodal sync catalog', () => {
     ['claude-sonnet-5-5', 'net-claude-sonnet-5-5-thinking'],
     ['claude-haiku-5-5', 'anthropic/claude-haiku-5-5-thinking'],
     ['claude-opus-4-8', 'claude-opus-4-8-20261001-thinking'],
-    ['grok-4.6', 'grok-4.20'],
+    ['grok-4.7', 'grok-4.6'],
     ['deepseek-v4.1-flash', 'deepseek-v4-flash'],
-    ['kimi-k3', 'kimi-k2.5'],
-    ['qwen3.8-max', 'qwen-turbo-0919'],
+    ['kimi-k3.1-pro', 'kimi-k3'],
+    ['claude-fable-5-1', 'qwen3.8-max'],
     ['doubao-seed-2-0-pro-261001', 'doubao-seed-1-8'],
-    ['MiniMax-M2.7-highspeed', 'MiniMax-M2.5'],
-    ['glm-5.2', 'glm-5.1'],
+    ['glm-5.3-flash', 'MiniMax-M2.7-highspeed'],
+    ['glm-5.3', 'glm-5.2'],
     ['mimo-v2.6', 'mistral-medium'],
-    ['hunyuan-t1', 'mixtral-8x7b'],
-    ['llama-3.2-vision', 'qwq-32b'],
+    ['mimo-v2.6-pro-ultraspeed', 'mimo-v2.5-tts'],
+    ['xiaomi-mimo-pro', 'hunyuan-t1'],
+    ['gpt-6.1-terra', 'llama-3.2-vision'],
     ['gpt-6-sol', 'gemini-3.8-image-preview'],
   ])('includes %s and excludes %s', (included, excluded) => {
     expect(isModalitySyncCandidate(included, 'chat')).toBe(true);
@@ -416,7 +417,7 @@ describe('multimodal sync catalog', () => {
 describe('image sync catalog', () => {
   it.each([
     ['gemini-3.1-flash-image', 'gemini-3.1-pro-image'],
-    ['gemini-3.1-flash-image', 'gemini-3.1-flash-image-preview'],
+    ['gemini-3.1-flash-image-preview', 'gemini-3.1-flash-lite-image'],
     ['nano-banana-2', 'nano-banana-pro'],
     ['nano-banana-2', 'nano-banana-2-2k'],
     ['nano-banana-2', 'nano-banana-2-4k'],
@@ -430,9 +431,9 @@ describe('image sync catalog', () => {
     ['doubao-seedream-4-5-251128', 'doubao-seedream-4-0-250828'],
     ['doubao-seedream-5-0-260128', 'seedream-5.1'],
     ['seedream-v5-pro', 'seedream-v5-pro-layer-decomposition'],
-    ['seedream-5-flash', 'seedream-5-lite'],
-    ['kling-image-v3-omni', 'kling-video-v3-omni'],
-    ['kling-image-v3', 'kling-image-v2'],
+    ['seedream-5-flash', 'seedream-4.0'],
+    ['gpt-image-2.6-sunburst', 'kling-image-v3-omni'],
+    ['gpt-image-2-4k', 'kling-image-v3'],
   ])('includes %s and excludes %s', (included, excluded) => {
     expect(isModalitySyncCandidate(included, 'image')).toBe(true);
     expect(isModalitySyncCandidate(excluded, 'image')).toBe(false);
@@ -453,9 +454,9 @@ describe('video sync catalog', () => {
     ['wan3.0-video', 'wan3.0-video-prime'],
     ['veo3.1', 'veo3.1-fast', 'veo3.1-pro'],
     ['doubao-seedance-2-0-260128', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-2.0-mini'],
-    ['kling-video-v3', 'kling-video-v3-omni'],
+    ['kling-4.0', 'kling-4.0-flash'],
     ['sora-2', 'sora-2-pro'],
-    ['viduq3', 'viduq3-mix', 'viduq3-pro', 'viduq3-turbo', 'viduq4-preview'],
+    ['gemini-omni-1.0-flash', 'gemini-omni-1.2-flash', 'viduq4-preview'],
   ].map((ids) => [ids]))('keeps distinct video specs %j', (ids) => {
     expect(ids.every((id) => isModalitySyncCandidate(id, 'video'))).toBe(true);
     expect(new Set(ids.map(videoSyncCandidateKey)).size).toBe(ids.length);
@@ -468,14 +469,15 @@ describe('video sync catalog', () => {
   });
 
   it.each([
-    ['kling-video-v3-omni', 'kling-video-v2-6'],
+    ['kling-4.0-flash', 'kling-video-v3-omni'],
     ['doubao-seedance-2-0-260128', 'doubao-seedance-1.5'],
     ['veo3.1-fast', 'veo-2'],
     ['veo3.1-pro', 'veo3.1-pro-4k'],
     ['veo3.1-pro', 'veo3.1-components'],
     ['wan3.0-video-prime', 'wan2.7-video'],
-    ['viduq3-pro', 'viduq2'],
-    ['google/gemini-omni-1.1-flash', 'gemini-3.8-flash'],
+    ['viduq4-preview', 'viduq3-pro'],
+    ['gemini-omni-1.0-flash', 'omni_flash-10s'],
+    ['gemini-omni-1.2-flash', 'google/gemini-omni-1.1-flash'],
     ['net-vidu-q4-preview', 'flux-pro'],
   ])('includes %s and excludes %s', (included, excluded) => {
     expect(isModalitySyncCandidate(included, 'video')).toBe(true);

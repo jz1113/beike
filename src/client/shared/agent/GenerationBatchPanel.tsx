@@ -14,18 +14,14 @@ import {
   saveGenerationBatchDraft,
   type GenerationBatchReceipt,
 } from './dispatchGenerationBatch';
-import type { BatchGenerationSettings, BatchPromptDraft } from './buildGenerationPromptBatch';
+import { batchImageParameters, batchVideoParameters, type BatchGenerationSettings, type BatchPromptDraft } from './buildGenerationPromptBatch';
+import { prepareBatchVideoPrompt } from './batchReferences';
+import { videoDurationFollowsSource, videoDurationOptions, videoRatioOptions, videoResolutionLabel } from '@shared/domain/media/videoCapabilities';
 import GenerationBatchSettings, {
   resolveBatchModelSummary,
   resolvePreferredBatchModel,
   syncBatchSettingsStore,
 } from './GenerationBatchSettings';
-
-const ITEM_ASPECT_OPTIONS = [
-  { id: '', label: '沿用默认' }, { id: 'smart', label: '智能' }, { id: '1:1', label: '1:1' },
-  { id: '3:4', label: '3:4' }, { id: '4:3', label: '4:3' }, { id: '9:16', label: '9:16' },
-  { id: '16:9', label: '16:9' }, { id: '2:3', label: '2:3' }, { id: '3:2', label: '3:2' }, { id: '21:9', label: '21:9' },
-];
 
 export function initialBatchDraft(source: GenerationPromptSource) {
   try {
@@ -133,6 +129,10 @@ export default function GenerationBatchPanel({
 
   const imageSummary = resolveBatchModelSummary('image', settings.imageModel, imageModels);
   const videoSummary = resolveBatchModelSummary('video', settings.videoModel, videoModels);
+  const imageParams = batchImageParameters(settings);
+  const videoParams = batchVideoParameters(settings);
+  const videoResolution = videoResolutionLabel(videoParams.model, videoParams.resolution, videoParams.baseUrl);
+  const imageResolution = imageParams.caps.resolutions.length ? imageResolutionLabel(imageParams.tier) : '';
 
   const patch = (id: string, change: Partial<BatchPromptDraft>) => {
     setDrafts(old => {
@@ -201,7 +201,7 @@ export default function GenerationBatchPanel({
             >
               <ModelIcon modelId={imageSummary.upstreamId} className="h-3.5 w-3.5 shrink-0" />
               <span>{imageSummary.label}</span>
-              <span className="text-slate-400 dark:text-slate-400">· {formatAspectLabel(settings.imageAspect)} · {imageResolutionLabel(settings.imageQuality)}</span>
+              <span className="text-slate-400 dark:text-slate-400">· {formatAspectLabel(imageParams.aspect)}{imageResolution && ` · ${imageResolution}`}</span>
             </button>
           )}
           {videoCount > 0 && (
@@ -213,7 +213,7 @@ export default function GenerationBatchPanel({
             >
               <ModelIcon modelId={videoSummary.upstreamId} className="h-3.5 w-3.5 shrink-0" />
               <span>{videoSummary.label}</span>
-              <span className="text-slate-400 dark:text-slate-400">· {formatAspectLabel(settings.videoAspect)} · {settings.videoResolution} · {settings.videoDuration}秒</span>
+              <span className="text-slate-400 dark:text-slate-400">· {formatAspectLabel(videoParams.aspect)} · {videoResolution} · {videoDurationFollowsSource(videoParams.model, videoParams.mode) ? '跟随原视频' : `${videoParams.duration}秒`}</span>
             </button>
           )}
           {disabled && (
@@ -250,11 +250,22 @@ export default function GenerationBatchPanel({
               const taskId = receipt?.taskIds[receipt.entryIds.indexOf(entry.id)];
               const task = sessions.find(session => session.id === receipt?.sessionId)?.tasks.find(item => item.id === taskId);
               const sent = submitted.has(entry.id) || Boolean(source.legacySessionId);
-              const effectiveAspect = formatAspectLabel(entry.aspect || (entry.mediaType === 'video' ? settings.videoAspect : settings.imageAspect));
-              const modelLabel = entry.mediaType === 'video' ? videoSummary.label : imageSummary.label;
-              const specSummary = entry.mediaType === 'video'
-                ? `${modelLabel} · ${effectiveAspect} · ${settings.videoResolution} · ${entry.duration ?? settings.videoDuration} 秒`
-                : `${modelLabel} · ${effectiveAspect} · ${imageResolutionLabel(settings.imageQuality)}`;
+              const isVideo = entry.mediaType === 'video';
+              let prepared: ReturnType<typeof prepareBatchVideoPrompt> | undefined;
+              if (isVideo && !sent) {
+                try { prepared = prepareBatchVideoPrompt(entry.prompt, source.media, entry.referenceIndexes); }
+                catch { /* Submission reports the missing reference on this entry. */ }
+              }
+              const videoSpec = isVideo ? batchVideoParameters(settings, entry, prepared) : undefined;
+              const imageSpec = isVideo ? undefined : batchImageParameters(settings, entry.aspect, entry.imageResolution);
+              const ratios = videoSpec
+                ? videoRatioOptions(videoSpec.model, videoSpec.mode, videoSpec.baseUrl)
+                : imageSpec?.ratios ?? [];
+              const seconds = videoSpec ? videoDurationOptions(videoSpec.model, videoSpec.resolution, videoSpec.mode, videoSpec.baseUrl) : [];
+              const effectiveAspect = videoSpec?.aspect ?? imageSpec?.aspect ?? '';
+              const specSummary = videoSpec
+                ? `${videoSummary.label} · ${formatAspectLabel(effectiveAspect)} · ${videoResolutionLabel(videoSpec.model, videoSpec.resolution, videoSpec.baseUrl)} · ${videoDurationFollowsSource(videoSpec.model, videoSpec.mode) ? '跟随原视频' : `${videoSpec.duration} 秒`}`
+                : [imageSummary.label, formatAspectLabel(effectiveAspect), imageSpec?.caps.resolutions.length ? imageResolutionLabel(imageSpec.tier) : ''].filter(Boolean).join(' · ');
 
               return (
                 <article key={entry.id} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
@@ -278,15 +289,18 @@ export default function GenerationBatchPanel({
                         </label>
                         <label className="flex items-center gap-1.5">
                           <span className="text-slate-500 dark:text-slate-400">比例</span>
-                          <select aria-label={`${entry.title}比例`} value={entry.aspect || ''} disabled={disabled} onChange={event => patch(entry.id, { aspect: event.target.value || undefined })} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs dark:border-white/15 dark:bg-[#1B1C20]">
-                            {ITEM_ASPECT_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.label}</option>)}
-                            {entry.aspect && !ITEM_ASPECT_OPTIONS.some(opt => opt.id === entry.aspect) && <option value={entry.aspect}>{entry.aspect}</option>}
+                          <select aria-label={`${entry.title}比例`} value={entry.aspect ? effectiveAspect : ''} disabled={disabled} onChange={event => patch(entry.id, { aspect: event.target.value || undefined })} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs dark:border-white/15 dark:bg-[#1B1C20]">
+                            <option value="">沿用默认</option>
+                            {(ratios.length ? ratios : [effectiveAspect]).map(ratio => <option key={ratio} value={ratio}>{formatAspectLabel(ratio)}</option>)}
                           </select>
                         </label>
-                        {entry.mediaType === 'video' && (
+                        {videoSpec && !videoDurationFollowsSource(videoSpec.model, videoSpec.mode) && (
                           <label className="flex items-center gap-1.5">
-                            <span className="text-slate-500 dark:text-slate-400">秒数</span>
-                            <input aria-label={`${entry.title}时长`} type="number" min={1} max={120} value={entry.duration ?? ''} disabled={disabled} onChange={event => patch(entry.id, { duration: event.target.value ? Number(event.target.value) : undefined })} className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs dark:border-white/15 dark:bg-[#1B1C20]" />
+                            <span className="text-slate-500 dark:text-slate-400">时长</span>
+                            <select aria-label={`${entry.title}时长`} value={entry.duration === undefined ? '' : videoSpec.duration} disabled={disabled} onChange={event => patch(entry.id, { duration: event.target.value ? Number(event.target.value) : undefined })} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs dark:border-white/15 dark:bg-[#1B1C20]">
+                              <option value="">沿用默认</option>
+                              {seconds.map(duration => <option key={duration} value={duration}>{duration} 秒</option>)}
+                            </select>
                           </label>
                         )}
                       </div>

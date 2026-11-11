@@ -79,6 +79,7 @@ export type CanvasQuickNodeType =
   | CanvasLocalTool
   | 'prompt'
   | 'video-prompt-optimizer'
+  | 'cover-prompt-writer'
   | 'file'
   | 'image-generation'
   | 'video-generation'
@@ -175,7 +176,10 @@ export interface CanvasNode {
   type: 'image' | 'video' | 'audio' | 'file' | 'drawing' | 'prompt' | 'note' | 'group' | 'frame' | 'compare' | 'save' | 'preview';
   specialized?: CanvasSpecializedSettings;
   modelUrl?: string;
-  studioSubType?: CanvasLocalTool | CanvasPriorityTool | 'video-prompt-optimizer' | 'storyboard-node' | 'storyboard-chart-node' | 'video-timeline' | 'doodle-canvas';
+  originalFileName?: string;
+  coverSourceUrl?: string;
+  coverPromptOperationId?: string;
+  studioSubType?: CanvasLocalTool | CanvasPriorityTool | 'video-prompt-optimizer' | 'cover-prompt-writer' | 'storyboard-node' | 'storyboard-chart-node' | 'video-timeline' | 'doodle-canvas';
   inpaintMaskUrl?: string;
   timelineSnap?: boolean;
   timelineClips?: CanvasTimelineClip[];
@@ -218,7 +222,6 @@ export interface CanvasNode {
   textColor?: string;
   textHtml?: string;
   textBackground?: string;
-  textAutoHeight?: boolean;
   textWebSearch?: boolean;
   textBase64Image?: boolean;
   textApiFormat?: 'openai-compatible' | 'gemini-official';
@@ -228,6 +231,7 @@ export interface CanvasNode {
   videoUrl?: string;
   referenceImageUrl?: string;
   status?: 'idle' | 'generating' | 'success' | 'error';
+  errorMessage?: string;
   progress?: number;
   x: number;
   y: number;
@@ -248,7 +252,7 @@ export interface StudioScene {
 }
 
 export interface CanvasProject {
-  nativeCommerce?: { kind: 'sales' | 'workshop' | 'poster'; version: 1; legacyScene?: StudioScene; productKey?: string; legacyRecoveryComplete?: boolean };
+  nativeCommerce?: { kind: 'sales' | 'workshop' | 'poster'; version: 1; legacyScene?: StudioScene; productKey?: string; legacyRecoveryComplete?: boolean; coverFlowNodes?: true };
   poster?: { version: 1 | 2; hiddenOutputIds?: string[] };
   sales?: { draftId?: string; draft?: unknown; hiddenOutputIds?: string[] };
   workshop?: { batchId?: string; sourceBatchId?: string; hiddenOutputIds?: string[] };

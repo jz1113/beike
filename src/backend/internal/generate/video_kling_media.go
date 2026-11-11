@@ -3,8 +3,56 @@ package generate
 import (
 	"beike.local/cloud/src/backend/internal/platform/storage"
 	"context"
+	"regexp"
 	"strings"
 )
+
+func kling4Model(model string) bool {
+	return model == "kling-4.0" || model == "kling-4.0-flash"
+}
+
+var kling4ReferenceMention = regexp.MustCompile(`@(?:图片|图|视频)[ \t]*(\d+)`)
+
+func kling4Payload(prompt, mode, ratio, resolution string, duration int, images, videos []string, watermark bool) map[string]any {
+	settings := map[string]any{"resolution": resolution, "duration": duration}
+	body := map[string]any{"settings": settings, "options": map[string]any{"watermark_info": map[string]bool{"enabled": watermark}}}
+	if mode == "text" {
+		settings["aspect_ratio"] = ratio
+		body["prompt"] = prompt
+		return body
+	}
+	frames := mode == "first_frame" || mode == "first_last_frame"
+	if !frames {
+		settings["aspect_ratio"] = ratio
+	}
+	prompt = kling4ReferenceMention.ReplaceAllStringFunc(prompt, func(mention string) string {
+		number := kling4ReferenceMention.FindStringSubmatch(mention)[1]
+		if strings.HasPrefix(mention, "@视频") {
+			return "@video_" + number
+		}
+		return "@image_" + number
+	})
+	contents := []map[string]string{{"type": "prompt", "text": prompt}}
+	for index, image := range images {
+		role := "refer_image"
+		if frames {
+			role = "first_frame"
+			if index > 0 {
+				role = "last_frame"
+			}
+		}
+		contents = append(contents, map[string]string{"type": role, "url": image, "id": "image_" + Itoa(index+1)})
+	}
+	for index, video := range videos {
+		role := "feature_video"
+		if mode == "edit" && index == 0 {
+			role = "base_video"
+		}
+		contents = append(contents, map[string]string{"type": role, "url": video, "id": "video_" + Itoa(index+1)})
+	}
+	body["contents"] = contents
+	return body
+}
 
 func attachKlingVideos(body map[string]any, mode string, videos []string, audio, audioSet bool) {
 	if len(videos) == 0 {
@@ -33,25 +81,21 @@ func attachKlingVideos(body map[string]any, mode string, videos []string, audio,
 
 func prepareKlingMedia(ctx context.Context, root string, body map[string]any, workspace string, production bool, storeCfg *storage.ObjectConfig) error {
 	if contents, ok := body["contents"].([]map[string]string); ok {
-		refs := map[string]any{}
 		for _, entry := range contents {
-			if entry["type"] == "image" {
-				refs["image_list"] = []map[string]string{{"image_url": entry["url"]}}
+			var list, field string
+			switch entry["type"] {
+			case "image", "first_frame", "middle_frame", "last_frame", "refer_image":
+				list, field = "image_list", "image_url"
+			case "video", "base_video", "feature_video":
+				list, field = "video_list", "video_url"
+			default:
+				continue
 			}
-			if entry["type"] == "video" {
-				refs["video_list"] = []map[string]string{{"video_url": entry["url"]}}
+			ref := map[string]string{field: entry["url"]}
+			if err := prepareKlingMedia(ctx, root, map[string]any{list: []map[string]string{ref}}, workspace, production, storeCfg); err != nil {
+				return err
 			}
-		}
-		if err := prepareKlingMedia(ctx, root, refs, workspace, production, storeCfg); err != nil {
-			return err
-		}
-		for _, entry := range contents {
-			if entry["type"] == "image" {
-				entry["url"] = refs["image_list"].([]map[string]string)[0]["image_url"]
-			}
-			if entry["type"] == "video" {
-				entry["url"] = refs["video_list"].([]map[string]string)[0]["video_url"]
-			}
+			entry["url"] = ref[field]
 		}
 		return nil
 	}
@@ -125,7 +169,7 @@ func klingMotionPayload(prompt, resolution string, images, videos []string, audi
 
 // Comfly continues to expose the documented legacy motion-control shape.
 func applyKlingMotionChannel(base string, a *videoAdapted) {
-	if a.family != "kling" || !minimaxComflyHost(base) {
+	if a.family != "kling" || kling4Model(a.modelID) || !minimaxComflyHost(base) {
 		return
 	}
 	contents, ok := a.payload["contents"].([]map[string]string)

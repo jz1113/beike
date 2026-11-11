@@ -7,9 +7,8 @@ import {
   VIDEO_ASPECT_RATIOS, 
   VIDEO_REF_MODES,
   getVideoModelById,
-  resolveVideoResolution,
 } from '@shared/domain/media/video';
-import { resolveVideoMode, videoDurationOptions, videoModes, videoRatioLocked, videoResolutionOptions } from '@shared/domain/media/videoCapabilities';
+import { resolveVideoParameters, videoDurationOptions } from '@shared/domain/media/videoCapabilities';
 import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { readFileAsDataUrl } from '@client/shared/api/mediaUpload';
@@ -155,8 +154,6 @@ import { usePromptBarSubmit } from './usePromptBarSubmit';
 export interface PromptActionBarOptions {
   dropdownPlacement?: 'up' | 'down' | 'auto';
   collapsible?: boolean;
-  /** 首页外层已有欢迎区时，避免重复渲染品牌 Hero。 */
-  showBrandHero?: boolean;
   /** Optional surface copy without changing mode-specific placeholders elsewhere. */
   inputPlaceholder?: string;
   onExpandChange?: (expanded: boolean) => void;
@@ -168,7 +165,6 @@ export interface PromptActionBarOptions {
 export function usePromptActionBar({ 
   dropdownPlacement = 'auto',
   collapsible,
-  showBrandHero,
   onExpandChange,
   onSubmitSuccess,
   extraSubjects,
@@ -435,9 +431,6 @@ export function usePromptActionBar({
 
   const isFloatingDock = isGenerateDock || currentView === 'canvas';
 
-  // 🌟 首页品牌标题仅在首页展示（生成页与画布页均不展示）
-  const shouldShowBrandHero = showBrandHero ?? currentView === 'home';
-
   return {
     store,
     containerRef,
@@ -446,7 +439,6 @@ export function usePromptActionBar({
     anyDropdownOpen,
     setControlsDropdownOpen,
     isFloatingDock,
-    shouldShowBrandHero,
     isExpanded,
     useTopStrip,
     media,
@@ -534,9 +526,9 @@ function usePromptBarVideoFrames({
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
     if (!files.length) return;
-    void useAppStore.getState().readPromptAttachments(async () => {
+    void useAppStore.getState().readPromptAttachments(async (isCurrent) => {
       const urls = await Promise.all(files.map(readFileAsDataUrl));
-      urls.forEach(apply);
+      if (isCurrent()) urls.forEach(apply);
     }).catch(() => showToast('无法读取参考帧，请重新选择图片'));
   };
 
@@ -564,13 +556,9 @@ function useVideoParameterConstraints() {
     const profile = getVideoModelById(modelId, baseUrl);
     if (!profile) return;
     const store = useAppStore.getState();
-    const resolved = resolveVideoMode(modelId, state.refMode, state.references.filter(url => !isVideoMediaUrl(url)).length, state.references.filter(isVideoMediaUrl).length);
-    const modes = videoModes(modelId, baseUrl);
-    const mode = modes.some(item => item.id === resolved) ? resolved : modes[0].id;
-    const resolution = resolveVideoResolution(state.resolution, videoResolutionOptions(modelId, mode, baseUrl));
-    const aspect = videoRatioLocked(modelId, mode, baseUrl) ? 'adaptive' : profile.supportedAspectRatios.includes(state.aspect) ? state.aspect : profile.supportedAspectRatios[0];
-    const durations = videoDurationOptions(modelId, resolution, mode, baseUrl);
-    const duration = durations.includes(state.duration) ? state.duration : durations.reduce((best, value) => Math.abs(value - state.duration) < Math.abs(best - state.duration) ? value : best);
+    const { mode, resolution, aspect, duration } = resolveVideoParameters(modelId, { ...state, mode: state.refMode }, baseUrl, {
+      images: state.references.filter(url => !isVideoMediaUrl(url)).length, videos: state.references.filter(isVideoMediaUrl).length,
+    });
     if (state.refMode !== mode) store.setQuickVideoRefMode(mode);
     if (state.resolution !== resolution) store.setQuickVideoResolution(resolution);
     if (state.aspect !== aspect) store.setQuickVideoAspectId(aspect);

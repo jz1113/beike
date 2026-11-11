@@ -143,6 +143,7 @@ export function usePromptBarMedia({
   }, [customSubjects, quickRefImages, refImageNames, images, extraSubjects]);
 
   const clearComposerMedia = useCallback(() => {
+    useAppStore.getState().invalidatePromptAttachments();
     bumpRefMediaVersion();
     setQuickPrompt('');
     setQuickRefImages([]);
@@ -231,8 +232,9 @@ export function usePromptBarMedia({
     const file = e.target.files?.[0];
     if (!file) return;
     const origName = file.name.replace(/\.[^/.]+$/, '').trim() || file.name;
-    void useAppStore.getState().readPromptAttachments(async () => {
+    void useAppStore.getState().readPromptAttachments(async (isCurrent) => {
       const url = await readFileAsDataUrl(file);
+      if (!isCurrent()) return;
       registerRefMedia(url, file, origName);
       bumpRefMediaVersion();
       const newSub: SubjectItem = { id: `custom-${Date.now()}`, name: origName, url };
@@ -313,11 +315,12 @@ export function usePromptBarMedia({
         return;
       }
       const selected = isDepthMode ? [filtered[0]] : filtered;
-      void useAppStore.getState().readPromptAttachments(async () => {
-        const { media, agentUrls } = await loadPromptBarUploads(selected, quickGenMode === 'agent');
+      void useAppStore.getState().readPromptAttachments(async (isCurrent, signal) => {
+        const { media, agentUrls } = await loadPromptBarUploads(selected, quickGenMode === 'agent', signal);
+        if (!isCurrent()) return;
         if (media.length) addMultipleRefMedia(media);
         agentUrls.forEach(addQuickRefImage);
-      }).catch(() => showToast('无法读取参考素材，请重新选择文件'));
+      }).catch(error => showToast(error instanceof Error ? error.message : '无法读取参考素材，请重新选择文件'));
     },
     [acceptDropFile, addMultipleRefMedia, addQuickRefImage, isDepthMode, quickGenMode, rejectDrop, showToast],
   );
@@ -357,6 +360,7 @@ export function usePromptBarMedia({
   );
 
   const handleClearAllRefImages = useCallback(() => {
+    useAppStore.getState().invalidatePromptAttachments();
     setQuickPrompt(removePromptReferences(quickPrompt, quickRefImages, new Set(quickRefImages), allSubjects));
 
     setQuickRefImages([]);

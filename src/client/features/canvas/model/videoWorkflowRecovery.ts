@@ -1,3 +1,4 @@
+import { coverLayoutId, formatCoverSkillReply, isCurrentCoverTextOperation, validateCoverPromptFormat } from './coverBatch';
 import { readCanvasTextOperation, requestCanvasText, type CanvasTextContext } from './canvasTextRequest';
 import { canvasChatRequest } from './studioGeneration';
 import { studioNodeTaskId, type StudioTaskCommands } from './studioTaskState';
@@ -36,7 +37,7 @@ export function canvasMemoryWorkflow(project: CanvasProject) {
 const copyUploadSlots = {
  source: { kind: 'video', label: '01 原片视频' },
  product: { kind: 'image', label: '02 商品 / 服装参考图' },
- person: { kind: 'image', label: '03 目标人物图' },
+ person: { kind: 'image', label: '03 目标人物图', hideRoleLabel: true },
  background: { kind: 'image', label: '04 场景 / 背景图' },
 } as const;
 
@@ -44,7 +45,7 @@ export function canvasWorkflowUploadSlot(project: CanvasProject | undefined, nod
  if (!project) return;
  const role = nodeId.slice(nodeId.lastIndexOf('-') + 1);
  if (project.nativeCommerce) {
-  if (role === 'product') return { kind: 'image', label: '商品参考图' } as const;
+  if (role === 'product') return { kind: 'image', label: project.nativeCommerce.kind === 'poster' ? '商品素材' : '商品参考图' } as const;
   if (role === 'reference' && project.nativeCommerce.kind === 'poster') return { kind: 'image', label: '封面风格参考（可选）' } as const;
  }
  const workflow = videoWorkflowKind(project.studioScene);
@@ -169,7 +170,7 @@ export function recoverStudioTextNode(projectId:string,node:StudioScene['nodes']
     const unknown=saved?.status==='pending' || node.beikeTextRecoveryRequired || nodeSettings.textNodeIsAnalyzing;
     if(!unknown)return node;
     return {...node,beikeTextOperationId:saved?.id || node.beikeTextOperationId,beikeTextRecoveryRequired:true,
-      settings:{...nodeSettings,textNodeIsAnalyzing:false,beikeTextRunError:'上次文本或05分析结果待核对，再次运行将查询原回执，不会重新调用模型'}};
+      settings:{...nodeSettings,textNodeIsAnalyzing:false,beikeTextRunError:nodeSettings.beikeCoverPromptWriter === true ? '封面提示词结果待核对，可查询原请求回执' : '上次文本或05分析结果待核对，再次运行将查询原回执，不会重新调用模型'}};
   } catch {
     return {...node,beikeTextRecoveryRequired:true,settings:{...nodeSettings,textNodeIsAnalyzing:false,beikeTextRunError:'原文本记录暂不可读，请恢复存储后查询，不会重新提交'}};
   }
@@ -183,6 +184,7 @@ export async function studioTextRequest(projectId:string,payload:Record<string,u
   if(!node)throw new Error('原文本节点已不存在，未提交模型请求');
   const context:CanvasTextContext={projectId,nodeId:node.id,runId:supplied.runId,
     previousOperationId:typeof supplied.previousOperationId==='string'?supplied.previousOperationId:undefined,recoveryOnly:supplied.recoveryOnly===true,
+    acceptSettledIncomplete: supplied.acceptSettledIncomplete === true,
     onOperation:async id=>{
       const current=commands.read().nodes.find(row=>row.id===node.id);
       if(!current)throw new Error('原文本节点已不存在');
@@ -191,7 +193,7 @@ export async function studioTextRequest(projectId:string,payload:Record<string,u
     }};
   try {return await canvasChatRequest(payload,signal,context);}
   catch(error) {
-    if(error instanceof Error && 'submissionRejected' in error) {
+    if(error instanceof Error && ('submissionRejected' in error || 'submissionSettled' in error)) {
       const current=commands.read().nodes.find(row=>row.id===node.id);
       if(current){commands.update(node.id,studioNodeTaskId(current),{beikeTextRecoveryRequired:false});await save(commands.read());}
     }
@@ -200,19 +202,26 @@ export async function studioTextRequest(projectId:string,payload:Record<string,u
 }
 
 /** Query before loading references or validating today's models; an old receipt owns its inputs. */
-export async function recoverStudioTextRun(projectId:string,nodeId:string,commands:StudioTaskCommands,save:(scene:StudioScene)=>Promise<void>):Promise<boolean> {
+export async function recoverStudioTextRun(
+  projectId: string, nodeId: string, commands: StudioTaskCommands, save: (scene: StudioScene) => Promise<void>,
+  signal = new AbortController().signal, recoveryOnly = false,
+): Promise<boolean> {
   const node=commands.read().nodes.find(node=>node.id===nodeId && node.type==='text-node');
   if(!node)return false;
   const saved=readCanvasTextOperation({projectId,nodeId});
-  if(saved?.status!=='pending' && !node.beikeTextRecoveryRequired)return false;
+  if(!recoveryOnly && saved?.status!=='pending' && !node.beikeTextRecoveryRequired)return false;
   const originalText=(node.settings as Record<string,unknown>|undefined)?.text;
   const operationId=saved?.id || (typeof node.beikeTextOperationId==='string'?node.beikeTextOperationId:undefined);
   const data=await requestCanvasText(()=>{throw new Error('恢复不提交新请求')},{projectId,nodeId,runId:crypto.randomUUID(),
-    previousOperationId:operationId,recoveryOnly:true},new AbortController().signal).catch(async error=>{
-    if(error instanceof Error && 'submissionRejected' in error) {
+    previousOperationId:operationId,recoveryOnly:true,
+    acceptSettledIncomplete: (node.settings as Record<string, unknown> | undefined)?.beikeBatchCoverWriter === true},signal).catch(async error=>{
+    if(error instanceof Error && ('submissionRejected' in error || 'submissionSettled' in error)) {
       const current=commands.read().nodes.find(row=>row.id===nodeId);
       if(current && current.beikeTextOperationId===node.beikeTextOperationId){
-        commands.update(nodeId,studioNodeTaskId(current),{beikeTextOperationId:operationId,beikeTextRecoveryRequired:false});
+        commands.update(nodeId,studioNodeTaskId(current),{
+          beikeTextOperationId:operationId,beikeTextRecoveryRequired:false,errorMsg:error.message,
+          settings:{textNodeIsAnalyzing:false,beikeTextRunError:error.message},
+        });
         await save(commands.read());
       }
     }
@@ -223,7 +232,43 @@ export async function recoverStudioTextRun(projectId:string,nodeId:string,comman
   if(typeof text!=='string'||!text.trim())throw new Error('原回执没有可恢复的文本，请核对原操作');
   const current=commands.read().nodes.find(node=>node.id===nodeId);
   if(!current || (current.settings as Record<string,unknown>|undefined)?.text!==originalText)throw new Error('文本已修改，原回执未覆盖新内容');
-  commands.update(nodeId,studioNodeTaskId(current),{prompt:text,content:text,beikeTextOperationId:saved?.id || node.beikeTextOperationId,beikeTextRecoveryRequired:false,
-    settings:{text,aiGenerated:true,_chatCompletedAt:Date.now(),textNodeIsAnalyzing:false,beikeTextRunError:undefined}});
+  const writer = current.settings as Record<string, unknown> | undefined;
+  if (writer?.beikeLayerLocked === true) throw new Error('节点已锁定，原回执仍可查询');
+  const coverWriter = writer?.beikeBatchCoverWriter === true;
+  const draft = writer?.beikeCoverDraftRequest as { offset?: number; title?: unknown; sourceUrl?: string; used?: string[] } | undefined;
+  if (coverWriter && !isCurrentCoverTextOperation(operationId)) {
+    commands.update(nodeId, studioNodeTaskId(current), {
+      beikeTextOperationId: operationId,
+      beikeTextRecoveryRequired: false,
+      settings: { textNodeIsAnalyzing: false },
+    });
+    await save(commands.read());
+    throw new Error('旧版提示词回执已核对，请重新执行以使用新版素材');
+  }
+  let recovered = text;
+  if (coverWriter) {
+    try {
+      if (!draft?.sourceUrl || typeof draft.offset !== 'number') throw new Error('原回执缺少商品图或轮换信息，请重新撰写');
+      recovered = formatCoverSkillReply(text, undefined, { offset: draft.offset, used: draft.used });
+      validateCoverPromptFormat(recovered, undefined, true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '原提示词回执不符合版式要求';
+      commands.update(nodeId, studioNodeTaskId(current), {
+        beikeTextRecoveryRequired: false,
+        errorMsg: message,
+        settings: { textNodeIsAnalyzing: false, beikeTextRunError: message },
+      });
+      await save(commands.read());
+      throw error;
+    }
+  }
+  commands.update(nodeId,studioNodeTaskId(current),{
+    errorMsg: undefined, isGenerating: false,
+    content: recovered, beikeTextOperationId: operationId, beikeTextRecoveryRequired: false,
+    settings:{text: recovered, textNodeDisplayText: recovered, beikeTextHtml: undefined, error: undefined, isGenerating: false, ...(coverWriter ? {
+      beikeCoverSourceUrl: draft?.sourceUrl,
+      beikeBatchCoverLayout: coverLayoutId(recovered),
+    } : {}),
+      aiGenerated:true,_chatCompletedAt:Date.now(),textNodeIsAnalyzing:false,beikeTextRunError:undefined}});
   await save(commands.read());return true;
 }

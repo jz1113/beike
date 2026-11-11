@@ -6,7 +6,6 @@ import {
   ArrowUp,
   HelpCircle,
   Loader2,
-  Zap,
 } from 'lucide-react';
 import type { CanvasNode } from '../../store/useCanvasStore';
 import { LightboxGenConfigToolbar } from '@client/shared/modals/lightbox/LightboxGenConfigToolbar';
@@ -512,10 +511,6 @@ export const CanvasLightingModal: React.FC<CanvasLightingModalProps> = ({
 
         {inline ? (
           <div className="flex items-center gap-2.5">
-            <span className="inline-flex items-center gap-0.5 text-xs font-medium text-zinc-400 tabular-nums">
-              <Zap className="w-3 h-3 fill-current" />
-              14
-            </span>
             <button
               type="button"
               onClick={handleSubmit}

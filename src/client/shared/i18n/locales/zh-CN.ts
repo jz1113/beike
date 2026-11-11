@@ -31,6 +31,7 @@ export const zhCN: TranslationSchema = {
       chat: '多模态',
       image: '绘画',
       video: '视频',
+      fal: 'fal 模型',
       voice: '语音',
       storage: '存储',
       appearance: '外观与主题',

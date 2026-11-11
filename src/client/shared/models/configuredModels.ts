@@ -1,5 +1,5 @@
 import { resolveEnabledModelId } from '@shared/domain/models/workflowModelDefaults';
-import { DEFAULT_MULTIMODAL_MODEL_ID } from '@shared/domain/models/modelCatalog';
+import { compareModelDisplayOrder, DEFAULT_MULTIMODAL_MODEL_ID } from '@shared/domain/models/modelCatalog';
 import { VISION_MODELS, isVisionCapableModel } from '@shared/domain/prompts/vision';
 import { IMAGE_GEN_MODELS } from '@shared/domain/media/drawing';
 import { modalityPickerSelections, readEffectiveModalityModels } from '@shared/domain/models/modalityStorage';
@@ -112,10 +112,12 @@ export function loadSystemConfiguredModels(): {
       || '';
   }
 
+  const byCatalog = (a: ConfiguredModelOption, b: ConfiguredModelOption) =>
+    compareModelDisplayOrder(a.upstreamId || a.id, b.upstreamId || b.id);
   return {
-    availableVisionModels,
+    availableVisionModels: availableVisionModels.sort(byCatalog),
     selectedVisionModel,
-    availableImageModels,
+    availableImageModels: availableImageModels.sort(byCatalog),
     selectedImageGenModel,
   };
 }

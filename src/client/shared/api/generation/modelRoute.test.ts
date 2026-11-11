@@ -67,7 +67,7 @@ describe('text model request routing', () => {
     expect(request.model).toBe('gemini-custom');
     expect(request.customBaseUrl).toBeUndefined();
     expect(request.customApiKey).toBeUndefined();
-    expect(request.textProtocol).toBe('openai'); // Built-in default gateway.
+    expect(request.textProtocol).toBe('gemini');
     expect(routed('/api/assistant/turn/start', { model: 'relay' })).toMatchObject({
       model: 'gemini-custom', customBaseUrl: 'https://relay.test', customApiKey: 'relay-key',
     });

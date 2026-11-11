@@ -39,16 +39,18 @@ func TestTextProtocolResolution(t *testing.T) {
 	if got := TextProtocol(WithTextProtocol(ctx, "auto"), "claude-5.5-haiku"); got != "anthropic" {
 		t.Fatal(got)
 	}
-	if got := TextProtocolForBase(WithTextProtocol(ctx, "auto"), "gemini-2.5-flash", "https://api.openai.com"); got != "openai" {
+	if got := TextProtocolForBase(WithTextProtocol(ctx, "auto"), "gemini-2.5-flash", "https://api.openai.com"); got != "gemini" {
 		t.Fatal(got)
 	}
 }
 
-func TestTextProtocolResolutionPrefersKnownBaseEndpoints(t *testing.T) {
+func TestTextProtocolResolutionPrefersExplicitAndNativeModelProtocols(t *testing.T) {
 	for _, tc := range []struct {
 		model, explicit, base, want string
 	}{
-		{"gemini-2.5-flash", "auto", "https://api.openai.com", "openai"},
+		{"gemini-2.5-flash", "auto", "https://api.openai.com", "gemini"},
+		{"claude-sonnet-5", "auto", "https://ai.comfly.org", "anthropic"},
+		{"deepseek-v4-flash", "auto", "https://ai.comfly.org", "openai"},
 		{"claude-3-7-sonnet", "auto", "https://api.anthropic.com", "anthropic"},
 		{"gemini-2.5-flash", "auto", "https://generativelanguage.googleapis.com", "gemini"},
 		{"gemini-2.5-flash", "openai", "https://api.anthropic.com", "openai"},
@@ -140,6 +142,8 @@ func TestTextEndpointPreservesCustomPrefix(t *testing.T) {
 		{"https://example.test/proxy/v1/chat/completions", "anthropic", "https://example.test/proxy/v1/messages", false},
 		{"https://example.test/proxy/v1beta/messages", "anthropic", "https://example.test/proxy/v1/messages", false},
 		{"https://example.test/a", "openai", "https://example.test/a/v1/chat/completions", false},
+		{"https://ark.cn-beijing.volces.com/api/v3", "openai", "https://ark.cn-beijing.volces.com/api/v3/chat/completions", false},
+		{"https://open.bigmodel.cn/api/paas/v4", "openai", "https://open.bigmodel.cn/api/paas/v4/chat/completions", false},
 		{"https://maas.qianwenaiapi.com", "openai", "https://maas.qianwenaiapi.com/compatible-mode/v1/chat/completions", false},
 		{"https://dashscope.aliyuncs.com/api/v1", "openai", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", false},
 		{"https://maas.qianwenaiapi.com/compatible-mode/v1", "openai", "https://maas.qianwenaiapi.com/compatible-mode/v1/chat/completions", false},

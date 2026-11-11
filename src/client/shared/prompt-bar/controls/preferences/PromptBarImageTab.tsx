@@ -1,6 +1,7 @@
 import { EXTENDED_IMAGE_RATIO_ITEMS, IMAGE_RATIO_ITEMS } from '../../promptBarConstants';
 import type { ImageInferenceStrength, ImageQualityTier, ImageResolutionOption } from '../../promptBarPreferencesTypes';
 import { AspectRatioCardGroup } from './AspectRatioCardGroup';
+export { imageOutputResolution as imageResolutionLabel, imageOutputTier as qualityForResolution } from '@shared/domain/media/imageCapabilities';
 
 const ASPECT_OPTIONS = IMAGE_RATIO_ITEMS.map((item) => ({ id: item.id, label: item.label }));
 
@@ -76,14 +77,11 @@ export function PromptBarImageTab({
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{strengthMode === 'prompt-extend' ? '输出尺寸' : '图片分辨率'}</div>
       <div className="flex gap-1 p-1 bg-slate-100/80 dark:bg-white/5 rounded-2xl">
-        {RESOLUTIONS.map((item) => {
-          const disabled = Boolean(allowedResolutions && !allowedResolutions.includes(item));
-          return (
-            <button key={item} type="button" disabled={disabled} onClick={() => onResolution(item)} className={`${choiceClass(resolution === item)} ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}>
+        {(allowedResolutions ?? RESOLUTIONS).map((item) => (
+            <button key={item} type="button" onClick={() => onResolution(item)} className={choiceClass(resolution === item)}>
               {item}
             </button>
-          );
-        })}
+        ))}
       </div>
     </div>
   ) : null;
@@ -120,7 +118,7 @@ export function PromptBarImageTab({
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
       <div className="space-y-1.5">
         <div className="text-xs font-medium text-slate-500 dark:text-slate-400">画面比例</div>
-        <AspectRatioCardGroup value={aspect} onChange={onAspect} options={ASPECT_OPTIONS} />
+        <AspectRatioCardGroup value={aspect} onChange={onAspect} options={ASPECT_OPTIONS.filter((item) => !allowedAspectRatios || allowedAspectRatios.includes(item.id))} />
         {extraAspectOptions.length > 0 && (
           <div className="flex gap-1 p-1 bg-slate-100/80 dark:bg-white/5 rounded-2xl">
             {extraAspectOptions.map((item) => (
@@ -152,18 +150,6 @@ export function PromptBarImageTab({
       )}
     </div>
   );
-}
-
-export function imageResolutionLabel(quality: string): ImageResolutionOption {
-  if (quality === 'low') return '1K';
-  if (quality === 'medium') return '2K';
-  return '4K';
-}
-
-export function qualityForResolution(resolution: ImageResolutionOption): 'low' | 'medium' | 'high' {
-  if (resolution === '1K') return 'low';
-  if (resolution === '2K') return 'medium';
-  return 'high';
 }
 
 export function imageQualityLabel(quality: string): string {

@@ -16,7 +16,7 @@ export interface StudioTaskCommands {
   update:(nodeId:string,expectedTaskId:string|undefined,updates:Partial<Node>)=>void;
   run:(nodeId:string,signal?:AbortSignal)=>Promise<unknown>;
   runCompiler?:(nodeId:string)=>Promise<boolean>;
-  runText?:(nodeId:string,signal:AbortSignal)=>Promise<void>;
+  runText?:(nodeId:string,signal:AbortSignal,recoveryOnly?:boolean)=>Promise<void>;
   focus?:(nodeId:string)=>void;
   stop:(nodeId:string,taskId:string)=>void;
 }
@@ -89,6 +89,32 @@ export function studioMediaRunBlock(taskId: unknown, hasReceipt = false): string
   const task=typeof taskId==='string'?findStudioTask(taskId):undefined;
   if(task ? task.submissionRecoveryRequired || isImageTaskActive(task.status) : hasReceipt)
     return '原任务仍在执行或核对中，请在生成任务面板继续等待';
+}
+
+/** Wait for the previous attempt to settle before starting a new batch render. */
+export async function waitForStudioMediaRetry(readNode: () => Node | undefined, signal: AbortSignal): Promise<Node> {
+  const deadline = Date.now() + 180_000;
+  for (;;) {
+    signal.throwIfAborted();
+    const node = readNode();
+    if (!node) throw new Error('图片节点缺失，请重新导入工作簿以恢复该行');
+    const blocked = studioMediaRunBlock(studioNodeTaskId(node), Boolean(node.beikeTaskStopped && node.beikeTaskRecord));
+    if (!(node.isGenerating && node.beikeTaskId) && !blocked) return node;
+    if (Date.now() >= deadline) {
+      throw new Error(blocked || '原图片任务尚未结束，请在生成任务面板核对后重试');
+    }
+    await new Promise<void>((resolve, reject) => {
+      const abort = () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', abort);
+        resolve();
+      }, 1000);
+      signal.addEventListener('abort', abort, { once: true });
+    });
+  }
 }
 
 /** A dispatched request must keep its receipt and recovery path; only an unsubmitted job can be cancelled. */

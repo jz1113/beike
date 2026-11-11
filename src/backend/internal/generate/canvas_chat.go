@@ -30,7 +30,7 @@ func writeCanvasChat(cfg config.Config, w http.ResponseWriter, r *http.Request, 
 	model, _ := p["model"].(string)
 	base, key, upstream, status, message := canvasCredentials(cfg, r, p, model)
 	if message != "" {
-		httpx.WriteJSON(w, status, map[string]any{"error": message})
+		httpx.WriteJSON(w, status, map[string]any{"error": message, "submissionRejected": true})
 		return
 	}
 	wire := map[string]any{"model": upstream}
@@ -40,9 +40,13 @@ func writeCanvasChat(cfg config.Config, w http.ResponseWriter, r *http.Request, 
 		}
 	}
 	req := gateway.TextRequest{BaseURL: base, APIKey: key, Protocol: gateway.TextProtocolForBase(r.Context(), upstream, base), Payload: wire, Client: canvasHTTP(), Timeout: 3 * time.Minute}
-	if req.Protocol == "gemini" {
-		if err := inlineCanvasChatVideos(r.Context(), wire); err != nil {
-			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+	if err := inlineCanvasStorageImages(r.Context(), wire, httpx.WorkspaceFrom(r), cfg.Production()); err != nil {
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error(), "submissionRejected": true})
+		return
+	}
+	if req.Protocol == "gemini" && p["beikeStoryboardAnalysis"] != true {
+		if err := inlineCanvasChatVideos(r.Context(), wire, httpx.WorkspaceFrom(r), cfg.Production()); err != nil {
+			httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error(), "submissionRejected": true})
 			return
 		}
 	}
@@ -58,9 +62,9 @@ func writeCanvasChat(cfg config.Config, w http.ResponseWriter, r *http.Request, 
 	var observation string
 	if p["beikeStoryboardAnalysis"] == true {
 		var err error
-		evidence, err = prepareCanvasStoryboard(r.Context(), cfg, wire)
+		evidence, err = prepareCanvasStoryboard(r.Context(), cfg, wire, httpx.WorkspaceFrom(r))
 		if err != nil {
-			httpx.WriteJSON(w, 422, map[string]any{"error": err.Error()})
+			httpx.WriteJSON(w, 422, map[string]any{"error": err.Error(), "submissionRejected": true})
 			return
 		}
 		log.Printf("[canvas-analysis] measured %.3fs, content %.3fs, %d candidate shots", evidence.Duration, evidence.ContentEnd, len(evidence.Shots))
@@ -100,7 +104,7 @@ func writeCanvasChat(cfg config.Config, w http.ResponseWriter, r *http.Request, 
 			detail = string([]rune(detail)[:1000])
 		}
 		failure := map[string]any{"success": false, "stage": "result", "observation": observation, "storyboardEvidence": evidence, "error": fmt.Sprintf("文本模型 %s 调用失败（协议 %s，HTTP %d）：%s", upstream, req.Protocol, status, detail)}
-		if evidence != nil && status == http.StatusBadRequest && canvasStoryboardImageRejected(detail) {
+		if status == http.StatusUnauthorized || (evidence != nil && status == http.StatusBadRequest && canvasStoryboardImageRejected(detail)) {
 			failure["submissionRejected"] = true
 		}
 		httpx.WriteJSON(w, http.StatusBadGateway, failure)
@@ -130,7 +134,32 @@ var canvasVideoHTTP = func() *http.Client { return network.SafeClient() }
 
 var errCanvasVideoIncomplete = errors.New("参考视频下载未完成，请检查素材链接或重新上传")
 
-func inlineCanvasChatVideos(ctx context.Context, wire map[string]any) error {
+func inlineCanvasStorageImages(ctx context.Context, wire map[string]any, workspace string, production bool) error {
+	index := 0
+	for _, raw := range anySlice(wire["messages"]) {
+		message, _ := raw.(map[string]any)
+		for _, rawPart := range anySlice(message["content"]) {
+			part, _ := rawPart.(map[string]any)
+			if part["type"] != "image_url" {
+				continue
+			}
+			index++
+			image, _ := part["image_url"].(map[string]any)
+			source, _ := image["url"].(string)
+			if !strings.HasPrefix(source, "/storage/") {
+				continue
+			}
+			file, err := readStorageImage(ctx, source, workspace, production)
+			if err != nil {
+				return fmt.Errorf("第 %d 张参考图读取失败：%w", index, err)
+			}
+			image["url"] = "data:" + file.mime + ";base64," + base64.StdEncoding.EncodeToString(file.data)
+		}
+	}
+	return nil
+}
+
+func inlineCanvasChatVideos(ctx context.Context, wire map[string]any, workspace string, production bool) error {
 	messages, _ := wire["messages"].([]any)
 	for _, raw := range messages {
 		message, _ := raw.(map[string]any)
@@ -145,7 +174,7 @@ func inlineCanvasChatVideos(ctx context.Context, wire map[string]any) error {
 			if strings.HasPrefix(source, "data:video/") {
 				continue
 			}
-			data, err := downloadCanvasChatVideo(ctx, source)
+			data, err := canvasChatVideoForWorkspace(ctx, source, workspace, production)
 			if err != nil {
 				return err
 			}
@@ -153,6 +182,26 @@ func inlineCanvasChatVideos(ctx context.Context, wire map[string]any) error {
 		}
 	}
 	return nil
+}
+
+func canvasChatVideoForWorkspace(ctx context.Context, source, workspace string, production bool) (string, error) {
+	if !strings.HasPrefix(source, "/storage/") {
+		return downloadCanvasChatVideo(ctx, source)
+	}
+	path, err := resolveSeedanceLocalVideoPath(source, workspace, production)
+	if err != nil {
+		return "", err
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return "", errors.New("参考视频不可读取，请重新上传")
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, gateway.TextVideoInlineByteLimit+1))
+	if err != nil {
+		return "", errors.New("参考视频不可读取，请重新上传")
+	}
+	return encodeCanvasChatVideo(data, mime.TypeByExtension(strings.ToLower(filepath.Ext(path))))
 }
 
 func downloadCanvasChatVideo(ctx context.Context, source string) (string, error) {
@@ -190,10 +239,14 @@ func fetchCanvasChatVideo(ctx context.Context, u *url.URL) (string, error) {
 	if err != nil {
 		return "", errCanvasVideoIncomplete
 	}
+	return encodeCanvasChatVideo(data, response.Header.Get("Content-Type"))
+}
+
+func encodeCanvasChatVideo(data []byte, contentType string) (string, error) {
 	if len(data) == 0 || len(data) > gateway.TextVideoInlineByteLimit {
 		return "", errors.New("原生视频分析素材为空或超过16MB")
 	}
-	mediaType, _, _ := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	mediaType, _, _ := mime.ParseMediaType(contentType)
 	if !strings.HasPrefix(mediaType, "video/") {
 		mediaType = http.DetectContentType(data)
 	}
@@ -203,7 +256,7 @@ func fetchCanvasChatVideo(ctx context.Context, u *url.URL) (string, error) {
 	return "data:" + mediaType + ";base64," + base64.StdEncoding.EncodeToString(data), nil
 }
 
-const canvasObservationInstruction = `你只负责原片逐镜事实核对，不改编、不设计目标人物服装场景、不写最终视频提示词。程序提供实测时长、候选切点及每镜首中尾三帧。逐镜输出且保留编号【原片镜头 01】等，每镜写：源片范围、景别机位、首态、动作的接触对象与方向、视线转移、停顿、末态、光源方向与阴影证据。逐帧不能证明的连续动作明确标为无法确认，不把端点姿态猜成完整动作。相邻三帧只证明可见事实；候选切点不是事实，闪光或大动作需标为疑似切点，真正切镜不能因构图相似而漏掉。只记录可见人物和物体，不将书本、相机、猫或头发等互相替换。末尾黑场不计入内容。保留每个候选编号，即便判为同镜连续动作也注明关联，禁止只输出摘要。声音未提供可听证据时写未核实，不臆造旁白或台词。`
+const canvasObservationInstruction = `你只负责原片逐镜事实核对，不改编、不设计目标人物服装场景、不写最终视频提示词。程序提供实测时长、候选切点及每镜首中尾三帧。逐镜输出且保留编号【原片镜头 01】等，每镜写：源片范围、景别机位、首态、动作的接触对象与方向、停顿、末态、光源方向与阴影证据。对照首中尾帧记录脸部可见性、眼睛可见时的视线，以及可辨的眉眼、嘴角或下颌变化，说明与哪个动作同时可见。眼睛不可见时只记录可见的头部朝向，表情不清时注明无法确认。逐帧不能证明的连续动作明确标为无法确认，不把端点姿态猜成完整动作。相邻三帧只证明可见事实；候选切点不是事实，闪光或大动作需标为疑似切点，真正切镜不能因构图相似而漏掉。只记录可见人物和物体，不将书本、相机、猫或头发等互相替换。末尾黑场不计入内容。保留每个候选编号，即便判为同镜连续动作也注明关联，禁止只输出摘要。声音未提供可听证据时写未核实，不臆造旁白或台词。`
 
 func canvasObservationMessages(e *canvasStoryboardEvidence) []any {
 	return []any{map[string]any{"role": "system", "content": canvasObservationInstruction}, map[string]any{"role": "user", "content": e.parts}}
@@ -251,7 +304,7 @@ func canvasStoryboardAdaptation(wire map[string]any, e *canvasStoryboardEvidence
 程序实测全片%.3f秒，有效画面至%.3f秒，共%d个候选镜头。以下逐镜观察来自单独的首中尾帧核对，引用时保留源镜号；未确认的内容不能补成事实。
 %s
 【已核实的原片逐镜观察结束】
-现在只进行目标改编：先在【原片观察】原样保留上述事实与不确定项，再依据目标人物/服装/场景和创作要求逐镜改编。每个本地时间轴区间注明对应源镜号，保留重要切点、景别和动作因果，不把多个镜头概括成持续把玩相机或站立摆姿。用户要求单条15秒时输出一个15秒视频片段，内部多镜头；剔除黑尾、明确记录必要取舍，不加速塞入全部动作。输出完整参考图与三个准备交接区，07继续由官方技能整理视频提示词。`, e.Duration, e.ContentEnd, len(e.Shots), observation)})
+现在只进行目标改编：先在【原片观察】原样保留上述事实与不确定项，再依据目标人物/服装/场景和创作要求逐镜改编。每个本地时间轴区间注明对应源镜号，保留重要切点、景别和动作因果，不把多个镜头概括成持续把玩相机或站立摆姿。脸部可见时在对应区间写明视线对象、表情随动作发生的变化和收势；参考人像只约束身份，表演依照目标时间轴。用户要求单条15秒时输出一个15秒视频片段，内部多镜头；剔除黑尾、明确记录必要取舍，不加速塞入全部动作。按节点要求输出完整的参考图制作与交接文字，07继续由官方技能整理视频提示词。`, e.Duration, e.ContentEnd, len(e.Shots), observation)})
 	wire["max_tokens"] = 16384
 	wire["reasoning_effort"] = "low"
 }
@@ -292,7 +345,7 @@ type canvasStoryboardEvidence struct {
 	parts      []any
 }
 
-var canvasSceneTime = regexp.MustCompile(`pts_time:([0-9.]+)`)
+var canvasSceneTime = regexp.MustCompile(`pts_time:([0-9.]+(?:[eE][+-]?[0-9]+)?)`)
 var canvasBlackStart = regexp.MustCompile(`black_start:([0-9.]+)`)
 
 // Candidate boundaries remain observations to verify, rather than invented model timestamps.
@@ -329,7 +382,7 @@ func canvasShotBoundaries(duration float64, log string) (float64, []canvasShot, 
 	return end, shots, nil
 }
 
-func prepareCanvasStoryboard(ctx context.Context, cfg config.Config, wire map[string]any) (*canvasStoryboardEvidence, error) {
+func prepareCanvasStoryboard(ctx context.Context, cfg config.Config, wire map[string]any, workspace string) (*canvasStoryboardEvidence, error) {
 	var source string
 	for _, raw := range anySlice(wire["messages"]) {
 		m, _ := raw.(map[string]any)
@@ -350,7 +403,7 @@ func prepareCanvasStoryboard(ctx context.Context, cfg config.Config, wire map[st
 	}
 	if !strings.HasPrefix(source, "data:video/") {
 		var err error
-		source, err = downloadCanvasChatVideo(ctx, source)
+		source, err = canvasChatVideoForWorkspace(ctx, source, workspace, cfg.Production())
 		if err != nil {
 			return nil, err
 		}
@@ -385,34 +438,96 @@ func prepareCanvasStoryboard(ctx context.Context, cfg config.Config, wire map[st
 	}
 	mediaCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	args := []string{"-nostdin", "-hide_banner", "-protocol_whitelist", "file,pipe", "-format_whitelist", "mov,matroska,webm", "-i", input, "-vf", "blackdetect=d=0.08:pix_th=0.08,scale=320:-2,select='gt(scene,0.18)',showinfo", "-an", "-f", "null", "-"}
-	log, err := exec.CommandContext(mediaCtx, binary, args...).CombinedOutput()
+	inputArgs := []string{"-nostdin", "-hide_banner", "-protocol_whitelist", "file,pipe", "-format_whitelist", "mov,matroska,webm", "-i", input, "-map", "0:v:0", "-an"}
+	scan := "setpts=PTS-STARTPTS,blackdetect=d=0.08:pix_th=0.08,scale=320:-2,showinfo@canvas_frames,select='gt(scene,0.18)',showinfo"
+	args := append(append([]string{}, inputArgs...), "-vf", scan, "-f", "null", "-")
+	scanLog, err := exec.CommandContext(mediaCtx, binary, args...).CombinedOutput()
 	if err != nil {
-		return nil, errors.New("原片切点测量失败，请重试")
+		return nil, errors.New("05 无法测量原片切点，请检查原片是否能完整解码")
 	}
-	end, shots, err := canvasShotBoundaries(probe.Duration, string(log))
+	times, cutLog := canvasDecodedTimeline(string(scanLog))
+	if len(times) == 0 {
+		return nil, errors.New("05 原片没有可解码的视频帧")
+	}
+	videoEnd := probe.Duration
+	if probe.VideoDuration > 0 && probe.VideoDuration < videoEnd && probe.VideoDuration > times[len(times)-1] {
+		videoEnd = probe.VideoDuration
+	}
+	end, shots, err := canvasShotBoundaries(videoEnd, cutLog)
+	if err != nil {
+		return nil, err
+	}
+	selected := make([][3]int, len(shots))
+	unique := make(map[int]bool)
+	for i, shot := range shots {
+		first := sort.SearchFloat64s(times, shot.Start)
+		limit := sort.SearchFloat64s(times, shot.End)
+		if first >= limit {
+			return nil, fmt.Errorf("05 原片镜头 %02d 没有可用的视频帧", shot.Index)
+		}
+		middle := shot.Start + (shot.End-shot.Start)/2
+		mid := first + sort.SearchFloat64s(times[first:limit], middle)
+		selected[i] = [3]int{first, min(mid, limit-1), limit - 1}
+		for _, index := range selected[i] {
+			unique[index] = true
+		}
+	}
+	frames, err := extractCanvasEvidenceFrames(mediaCtx, binary, inputArgs, dir, unique)
 	if err != nil {
 		return nil, err
 	}
 	evidence := &canvasStoryboardEvidence{Duration: probe.Duration, ContentEnd: end, Shots: shots}
 	evidence.parts = append(evidence.parts, map[string]any{"type": "text", "text": fmt.Sprintf("程序测量：全片 %.3f秒，有效画面至 %.3f秒，%d个候选镜头；末尾黑场不作为内容。逐镜核实，不合并相似构图的真实切镜。", probe.Duration, end, len(shots))})
-	for _, shot := range shots {
+	for i, shot := range shots {
 		evidence.parts = append(evidence.parts, map[string]any{"type": "text", "text": fmt.Sprintf("【原片镜头 %02d】源片 %.3f–%.3f秒。以下依次为首态、中态、末态；核实动作、视线、接触、景别、光影及是否真实切镜。", shot.Index, shot.Start, shot.End)})
-		for j, fraction := range []float64{0.1, 0.5, 0.9} {
-			t := shot.Start + (shot.End-shot.Start)*fraction
-			output := filepath.Join(dir, fmt.Sprintf("shot-%02d-%d.jpg", shot.Index, j))
-			args = []string{"-nostdin", "-v", "error", "-y", "-protocol_whitelist", "file,pipe", "-format_whitelist", "mov,matroska,webm", "-ss", fmt.Sprintf("%.4f", t), "-i", input, "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "3", output}
-			if exec.CommandContext(mediaCtx, binary, args...).Run() != nil {
-				return nil, errors.New("逐镜首中尾帧提取失败")
-			}
-			frame, err := os.ReadFile(output)
-			if err != nil {
-				return nil, errors.New("逐镜证据帧读取失败")
-			}
-			evidence.parts = append(evidence.parts, map[string]any{"type": "text", "text": fmt.Sprintf("源片 %.3f秒", t)}, map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(frame)}})
+		for _, index := range selected[i] {
+			evidence.parts = append(evidence.parts, map[string]any{"type": "text", "text": fmt.Sprintf("源片 %.3f秒", times[index])}, map[string]any{"type": "image_url", "image_url": map[string]any{"url": frames[index]}})
 		}
 	}
 	return evidence, nil
+}
+
+func canvasDecodedTimeline(scanLog string) ([]float64, string) {
+	var times []float64
+	var cuts strings.Builder
+	for line := range strings.SplitSeq(scanLog, "\n") {
+		if strings.Contains(line, "canvas_frames @") {
+			if match := canvasSceneTime.FindStringSubmatch(line); match != nil {
+				value, _ := strconv.ParseFloat(match[1], 64)
+				times = append(times, value)
+			}
+			continue
+		}
+		cuts.WriteString(line)
+		cuts.WriteByte('\n')
+	}
+	return times, cuts.String()
+}
+
+func extractCanvasEvidenceFrames(ctx context.Context, binary string, inputArgs []string, dir string, unique map[int]bool) (map[int]string, error) {
+	indices := make([]int, 0, len(unique))
+	for index := range unique {
+		indices = append(indices, index)
+	}
+	sort.Ints(indices)
+	selectors := make([]string, 0, len(indices))
+	for _, index := range indices {
+		selectors = append(selectors, fmt.Sprintf("eq(n,%d)", index))
+	}
+	filter := "select='" + strings.Join(selectors, "+") + "',scale=480:-2"
+	args := append(append([]string{"-v", "error"}, inputArgs...), "-vf", filter, "-vsync", "0", "-frames:v", strconv.Itoa(len(indices)), "-q:v", "3", filepath.Join(dir, "evidence-%03d.jpg"))
+	if err := exec.CommandContext(ctx, binary, args...).Run(); err != nil {
+		return nil, errors.New("05 无法提取逐镜证据帧，请检查原片是否能完整解码")
+	}
+	frames := make(map[int]string, len(indices))
+	for i, index := range indices {
+		frame, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf("evidence-%03d.jpg", i+1)))
+		if err != nil || len(frame) == 0 {
+			return nil, fmt.Errorf("05 本地抽帧未生成第 %d 张证据图", i+1)
+		}
+		frames[index] = "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(frame)
+	}
+	return frames, nil
 }
 
 func anySlice(value any) []any { v, _ := value.([]any); return v }

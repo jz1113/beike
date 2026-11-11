@@ -41,13 +41,14 @@ func ResolveTextProtocol(model, explicit string) string {
 	return "openai"
 }
 
-// ResolveTextProtocolForBase keeps model-id inference for unknown endpoints,
-// while preferring the protocol that is unambiguous from an official/native
-// endpoint or an explicitly compatible path.
+// Explicit model settings take priority. Gemini and Claude then retain their native transport.
 func ResolveTextProtocolForBase(model, explicit, base string) string {
 	p := strings.ToLower(strings.TrimSpace(explicit))
 	if p != "" && p != "auto" {
 		return p
+	}
+	if inferred := ResolveTextProtocol(model, explicit); inferred != "openai" {
+		return inferred
 	}
 	if inferred := textProtocolFromBase(base); inferred != "" {
 		return inferred
@@ -286,18 +287,11 @@ func textEndpoint(base, model, protocol string, stream bool) (string, error) {
 	case "anthropic":
 		path = anthropicMessagesPath(path)
 	default:
-		if !strings.HasSuffix(path, "/chat/completions") {
-			if isTextDashScopeHost(u.Hostname()) && !strings.HasSuffix(path, "/compatible-mode/v1") {
-				path = strings.TrimSuffix(path, "/v1")
-				path = strings.TrimSuffix(path, "/compatible-mode")
-				path = strings.TrimSuffix(path, "/api")
-				path += "/compatible-mode/v1"
-			}
-			if !strings.HasSuffix(path, "/v1") && !strings.HasSuffix(path, "/v1beta") {
-				path += "/v1"
-			}
-			path += "/chat/completions"
+		u.Path, u.RawPath = path, ""
+		if strings.HasSuffix(path, "/chat/completions") {
+			return u.String(), nil
 		}
+		return ChatCompletionsURL(u.String()), nil
 	}
 	u.Path = path
 	u.RawPath = ""
@@ -321,12 +315,6 @@ func anthropicMessagesPath(path string) string {
 		path += "/v1"
 	}
 	return path + "/messages"
-}
-
-func isTextDashScopeHost(host string) bool {
-	host = strings.ToLower(host)
-	return host == "qianwenaiapi.com" || strings.HasSuffix(host, ".qianwenaiapi.com") ||
-		(strings.Contains(host, "dashscope") && strings.HasSuffix(host, ".aliyuncs.com"))
 }
 
 func readTextJSON(r io.Reader) (map[string]any, error) {

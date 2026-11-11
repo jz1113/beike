@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 func TestChecksumsMatchNodeLedger(t *testing.T) {
@@ -85,6 +87,27 @@ func TestEmptyDatabaseMigrates(t *testing.T) {
 	}
 	if _, err := os.Stat(path); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMigrationAndApplicationShareSpecialFilePaths(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", "..", "..", "..", ".."))
+	for _, name := range []string{"normal", "has#hash", "has?question", "has%23escape", "中文%23#?目录"} {
+		t.Run(name, func(t *testing.T) {
+			dbPath := filepath.Join(t.TempDir(), name, "azhuo.db")
+			if err := Run(dbPath, root, false); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(dbPath); err != nil {
+				t.Fatalf("migration did not create the requested file: %v", err)
+			}
+			if err := database.Check(dbPath); err != nil {
+				t.Fatalf("application cannot read migrated schema: %v", err)
+			}
+			if err := Run(dbPath, root, false); err != nil {
+				t.Fatalf("reopening migrations changed the target: %v", err)
+			}
+		})
 	}
 }
 

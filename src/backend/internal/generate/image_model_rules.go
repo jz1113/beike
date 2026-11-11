@@ -2,10 +2,45 @@ package generate
 
 import (
 	"encoding/json"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
 )
+
+func arkSeedreamSize(model, size string) (string, int) {
+	id := strings.ToLower(strings.TrimSpace(model))
+	var minPixels, maxPixels int64 = 3686400, 16777216
+	maxRefs := 14
+	allowed := "2K 4K"
+	switch {
+	case strings.HasPrefix(id, "doubao-seedream-5-0-pro-"), strings.HasPrefix(id, "doubao-seedream-5-0-flash-"):
+		minPixels, maxPixels, maxRefs, allowed = 921600, 4624220, 10, "1K 1.5K 2K"
+	case strings.HasPrefix(id, "doubao-seedream-5-0-"):
+		allowed = "2K 3K 4K"
+	case strings.HasPrefix(id, "doubao-seedream-4-0-"):
+		minPixels, allowed = 921600, "1K 2K 4K"
+	case !strings.HasPrefix(id, "doubao-seedream-4-5-"):
+		return "", 0
+	}
+	size = strings.ToUpper(strings.TrimSpace(size))
+	if strings.Contains(" "+allowed+" ", " "+size+" ") {
+		return size, maxRefs
+	}
+	if width, height, ok := dashscopePixelPair(strings.Replace(size, ":", "x", 1)); ok && strings.Contains(size, ":") && width > 0 && height > 0 {
+		multiple := int(math.Floor(2048 / math.Sqrt(float64(width)*float64(height))))
+		size = strconv.Itoa(width*multiple) + "X" + strconv.Itoa(height*multiple)
+	}
+	width, height, ok := dashscopePixelPair(strings.ToLower(size))
+	if !ok || width < 1 || height < 1 || int64(width) > maxPixels || int64(height) > maxPixels || width > 16*height || height > 16*width {
+		return "", 0
+	}
+	pixels := int64(width) * int64(height)
+	if pixels < minPixels || pixels > maxPixels {
+		return "", 0
+	}
+	return strings.ToLower(size), maxRefs
+}
 
 func imageModelRuleError(payload map[string]json.RawMessage, model string) string {
 	id := strings.ToLower(strings.TrimSpace(model))

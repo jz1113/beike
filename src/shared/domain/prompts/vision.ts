@@ -1,6 +1,6 @@
 import { isDeepSeekRoute, deepSeekModel } from '../models/deepseek';
 import {
-  listApprovedModels,
+  listSelectableModels,
   vendorLabel,
   getApprovedModel,
 } from '@shared/domain/models/modelCatalog';
@@ -71,7 +71,7 @@ export interface VisionModel {
   description?: string;
 }
 
-export const VISION_MODELS: VisionModel[] = listApprovedModels('multimodal').map((m) => ({
+export const VISION_MODELS: VisionModel[] = listSelectableModels('multimodal').map((m) => ({
   id: m.id,
   name: m.name,
   shortName: m.shortName,

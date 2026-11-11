@@ -96,6 +96,11 @@ func resolveImageProtocol(base, explicit string) imageProtocol {
 		return dashscopeImageProtocol{}
 	case "gemini":
 		return geminiImageProtocol{}
+	case "fal":
+		return falImageProtocol{}
+	}
+	if isFalImageBase(base) {
+		return falImageProtocol{}
 	}
 	if gateway.IsDashScopeGateway(base) {
 		return dashscopeImageProtocol{}
@@ -111,7 +116,7 @@ func nativeDashscopeImageModel(model string) bool {
 	if id == "" {
 		return false
 	}
-	if strings.Contains(id, "qwen-image-3") || strings.Contains(id, "qwen-image-2.0") || strings.Contains(id, "qwen-image-2.1") || strings.Contains(id, "qwen-image-2-0") || strings.Contains(id, "qwen-image-2-1") {
+	if strings.Contains(id, "qwen-image-3.0") || strings.Contains(id, "qwen-image-2.0") || strings.Contains(id, "qwen-image-2.1") || strings.Contains(id, "qwen-image-2-0") || strings.Contains(id, "qwen-image-2-1") {
 		return true
 	}
 	return strings.Contains(id, "wan2.7-image") || strings.Contains(id, "wan2.6-image") || strings.Contains(id, "wan2.6-t2i")
@@ -123,6 +128,8 @@ func normalizeImageProtocol(explicit string) string {
 		return "dashscope"
 	case "gemini", "google":
 		return "gemini"
+	case "fal":
+		return "fal"
 	case "template", "custom-template":
 		return "template"
 	case "openai", "openai-compatible":
@@ -326,6 +333,12 @@ func (openaiImageProtocol) ID() string { return "openai" }
 
 func (openaiImageProtocol) Submit(req imageRequest) (imageSubmitResult, error) {
 	adapted := buildImagePayloadWithAspect(req.Model, req.Prompt, req.Size, req.AspectRatio, req.Quality, req.ImageQuality, req.Refs)
+	if adapted.family == "seedream" && nativeVideoProvider(req.Base) == "seedance" {
+		return submitArkImage(req, adapted)
+	}
+	if adapted.family == "grok-image" && imageHostIs(req.Base, "api.x.ai") {
+		return submitXAIImage(req, adapted)
+	}
 	if imageHostIs(req.Base, "comfly.org") {
 		if len(req.Refs) > 0 && comflyJSONEdit(req.Model) {
 			return submitUnifiedImageEdit(req, adapted)

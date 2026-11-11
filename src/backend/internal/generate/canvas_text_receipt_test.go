@@ -212,3 +212,74 @@ func TestCanvasStoryboardLegacyImageRejectionIsTerminalOnRead(t *testing.T) {
 		}
 	}
 }
+
+func TestCanvasTextCloseMissingFencesDelayedSubmission(t *testing.T) {
+	handler := CanvasText(canvasTextTestConfig(t, "development"))
+	path := "/api/generate/canvas-text"
+	closeRequest := httptest.NewRequest("POST", path+"?operationKey=late&closeMissing=1", nil)
+	closed := httptest.NewRecorder()
+	handler.ServeHTTP(closed, closeRequest)
+	if closed.Code != 400 || !strings.Contains(closed.Body.String(), `"submissionClosed":true`) {
+		t.Fatalf("close returned %d: %s", closed.Code, closed.Body.String())
+	}
+
+	delayed := httptest.NewRequest("POST", path, strings.NewReader(`{"model":"test","prompt":"delayed","clientTaskId":"late"}`))
+	delayed.Header.Set("x-idempotency-key", "late")
+	replay := httptest.NewRecorder()
+	handler.ServeHTTP(replay, delayed)
+	if replay.Code != 400 || !strings.Contains(replay.Body.String(), `"submissionClosed":true`) {
+		t.Fatalf("delayed submission returned %d: %s", replay.Code, replay.Body.String())
+	}
+}
+
+func TestCanvasTextUnauthorizedReceiptIsTerminal(t *testing.T) {
+	for _, protocol := range []string{"openai", "gemini", "anthropic"} {
+		t.Run(protocol, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			replyCanvasTextReceipt(w, submission.Receipt{Key: "original", Status: 502, Body: map[string]any{
+				"stage": "result", "submissionUnknown": true,
+				"error": "文本模型 test 调用失败（协议 " + protocol + "，HTTP 401）：text upstream HTTP 401: invalid token",
+			}})
+			if !strings.Contains(w.Body.String(), `"submissionRejected":true`) || !strings.Contains(w.Body.String(), `"submissionUnknown":false`) {
+				t.Fatal(w.Code, w.Body.String())
+			}
+		})
+	}
+	for _, detail := range []string{
+		"文本模型 test 调用失败（协议 gemini，HTTP 0）：timeout mentioning HTTP 401",
+		"文本模型 test 调用失败（协议 gemini，HTTP 502）：text upstream HTTP 502: invalid token",
+	} {
+		w := httptest.NewRecorder()
+		replyCanvasTextReceipt(w, submission.Receipt{Key: "original", Status: 502, Body: map[string]any{"error": detail, "submissionUnknown": true}})
+		if strings.Contains(w.Body.String(), `"submissionRejected":true`) || !strings.Contains(w.Body.String(), `"submissionUnknown":true`) {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+}
+
+func TestCanvasChatUnauthorizedDoesNotStayUnknown(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":{"message":"invalid token"}}`))
+	}))
+	defer server.Close()
+	previous := canvasHTTP
+	canvasHTTP = func() *http.Client { return server.Client() }
+	defer func() { canvasHTTP = previous }()
+	handler := CanvasText(videoSubmissionTestConfig(t, server))
+	body := `{"model":"test","textProtocol":"openai","customBaseUrl":"` + server.URL + `","customApiKey":"mock","messages":[{"role":"user","content":"cover"}]}`
+	for _, method := range []string{http.MethodPost, http.MethodGet} {
+		r := httptest.NewRequest(method, "/api/generate/canvas-text?operationKey=unauthorized", strings.NewReader(body))
+		r.Header.Set("x-idempotency-key", "unauthorized")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		if w.Code != 502 || !strings.Contains(w.Body.String(), `"submissionRejected":true`) || strings.Contains(w.Body.String(), `"submissionUnknown":true`) {
+			t.Fatal(method, w.Code, w.Body.String())
+		}
+	}
+	if calls.Load() != 1 {
+		t.Fatal("recovery called upstream", calls.Load())
+	}
+}

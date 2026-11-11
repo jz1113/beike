@@ -31,6 +31,7 @@ export const enUS: TranslationSchema = {
       chat: 'Multimodal',
       image: 'Image',
       video: 'Video',
+      fal: 'fal Models',
       voice: 'Voice',
       storage: 'Storage',
       appearance: 'Appearance',

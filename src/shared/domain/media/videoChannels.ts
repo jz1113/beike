@@ -33,3 +33,17 @@ export function isComflyVideoBase(baseUrl?: string): boolean {
   try { return ['ai.comfly.org', 'comfly.org'].includes(new URL(baseUrl || '').hostname.toLowerCase()); }
   catch { return false; }
 }
+
+export function isFalVideoBase(baseUrl?: string): boolean {
+  try {
+    const url = new URL(baseUrl || '');
+    return url.protocol === 'https:' && !url.username && !url.password && !url.port
+      && ['queue.fal.run', 'fal.run'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function isFalOmniVideoModel(model: string): boolean {
+  return /^gemini-omni-1\.[02]-flash$/i.test(model.trim());
+}

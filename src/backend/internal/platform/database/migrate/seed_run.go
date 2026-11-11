@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	_ "modernc.org/sqlite"
+	"beike.local/cloud/src/backend/internal/platform/database"
 )
 
 var boolKeys = map[string]bool{"isFavorite": true, "hasHuman": true, "isUniversal": true}
@@ -164,7 +164,7 @@ func Run(databasePath, root string, adoptLocal bool) error {
 	if err := os.MkdirAll(filepath.Dir(databasePath), 0o755); err != nil {
 		return err
 	}
-	db, err := sql.Open("sqlite", "file:"+databasePath+"?_pragma=busy_timeout(10000)")
+	db, err := sql.Open("sqlite", database.SQLiteDSN(databasePath, "_pragma=busy_timeout(10000)"))
 	if err != nil {
 		return err
 	}

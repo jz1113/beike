@@ -17,8 +17,9 @@ import { PromptBarImageTab, imageQualityLabel, imageResolutionLabel, promptRewri
 import { PromptBarAudioTab } from './preferences/PromptBarAudioTab';
 import { videoParamModeLabel } from './preferences/PromptBarVideoTab';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
-import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
-import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
+import { getVideoModelById } from '@shared/domain/media/video';
+import { videoDurationFollowsSource, videoRatioOptions, videoResolutionLabel } from '@shared/domain/media/videoCapabilities';
+import { imageCapabilities, resolveImageAspect, resolveImageGenerationQuality, resolveImageOutputTier, type ImageOutputTier } from '@shared/domain/media/imageCapabilities';
 import { getGatewayClientBaseUrl, getModelCredentials } from '@client/shared/api/gatewayClient';
 import { useAppStore } from '@client/store';
 
@@ -36,12 +37,12 @@ interface PromptBarParamsPillProps {
   setQuickVideoContextIrEnabled?: (enabled: boolean) => void;
   setQuickVideoRefMode: (mode: string) => void;
   setQuickVideoAspectId: (aspect: string) => void;
-  setQuickVideoResolution: (resolution: '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K') => void;
+  setQuickVideoResolution: (resolution: '360P' | '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K') => void;
   setQuickVideoDuration: (seconds: number) => void;
   quickAspectId: string;
-  quickQuality: string;
+  quickQuality: ImageOutputTier;
   setQuickAspectId: (aspect: string) => void;
-  setQuickQuality: (quality: 'high' | 'medium' | 'low') => void;
+  setQuickQuality: (quality: ImageOutputTier) => void;
   onOpenChange?: (open: boolean) => void;
 }
 
@@ -50,18 +51,6 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
   const [prefs, setPrefs] = useState<PromptComposerPreferences>(() => loadPromptPreferences());
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { panelRef, opensUp, panelStyle } = usePromptBarPopoverLayout(open, props.isUp, buttonRef, 480, 560);
-
-  useEffect(() => {
-    const saved = loadPromptPreferences();
-    if (saved.image.aspect) props.setQuickAspectId(saved.image.aspect);
-    props.setQuickQuality(qualityForResolution(saved.image.resolution));
-    const videoAspect = saved.video.aspect === 'smart' ? 'adaptive' : saved.video.aspect;
-    if (videoAspect) props.setQuickVideoAspectId(videoAspect);
-    if (saved.video.resolution) props.setQuickVideoResolution(resolveVideoResolution(saved.video.resolution, videoProfile?.supportedResolutions || props.supportedResolutions));
-    if (saved.video.customDurationSec) props.setQuickVideoDuration(saved.video.customDurationSec);
-    // 只在输入栏挂载时把已保存的参数同步进当前创作状态。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -97,24 +86,16 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
   const allowedAspectRatios = imageCaps.aspectRatios;
 
   useEffect(() => {
-    const isExtended = EXTENDED_IMAGE_RATIO_ITEMS.some((item) => item.id === props.quickAspectId);
-    if (!isExtended) return;
-    if (allowedAspectRatios?.includes(props.quickAspectId)) return;
-    props.setQuickAspectId('3:4');
-    persist({ ...prefs, image: { ...prefs.image, aspect: '3:4' } });
+    if (props.quickGenMode !== 'image') return;
+    const aspect = !allowedAspectRatios && EXTENDED_IMAGE_RATIO_ITEMS.some((item) => item.id === props.quickAspectId)
+      ? '3:4' : resolveImageAspect(props.quickAspectId, imageCaps);
+    const tier = resolveImageOutputTier(props.quickQuality, imageCaps);
+    if (aspect === props.quickAspectId && tier === props.quickQuality) return;
+    if (aspect !== props.quickAspectId) props.setQuickAspectId(aspect);
+    if (tier !== props.quickQuality) props.setQuickQuality(tier);
+    persist({ ...prefs, image: { ...prefs.image, aspect: aspect as PromptComposerPreferences['image']['aspect'], resolution: imageResolutionLabel(tier) } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.modelId, (allowedAspectRatios || []).join(','), props.quickAspectId]);
-
-  useEffect(() => {
-    if (!allowedResolutions.length) return;
-    const current = imageResolutionLabel(props.quickQuality);
-    if (allowedResolutions.includes(current)) return;
-    const fallback = allowedResolutions[allowedResolutions.length - 1];
-    props.setQuickQuality(qualityForResolution(fallback));
-    persist({ ...prefs, image: { ...prefs.image, resolution: fallback } });
-    // 模型能力变化时把超出范围的分辨率退回该模型可用的最高档。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.modelId, allowedResolutions.join(','), props.quickQuality]);
+  }, [props.quickGenMode, props.modelId, (allowedAspectRatios || []).join(','), allowedResolutions.join(','), props.quickAspectId, props.quickQuality]);
 
   const isVideo = props.quickGenMode === 'video' || props.quickGenMode === 'depth-video';
   const isAudio = props.quickGenMode === 'audio';
@@ -123,8 +104,8 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
   const summary = isAudio
     ? `${(prefs.audio?.format || 'mp3').toUpperCase()} · ${(prefs.audio?.speed ?? 1).toFixed(1)}x`
     : isVideo
-      ? `${videoParamModeLabel(props.quickVideoRefMode)} · ${aspectLabel} · ${props.quickVideoResolution} · ${props.quickVideoDuration}秒`
-      : [imageAspectLabel, allowedResolutions.length ? imageResolutionLabel(props.quickQuality) : '', imageCaps.strength === 'prompt-extend' ? promptRewriteStrengthLabel(prefs.image.inferenceStrength) : imageCaps.strength === 'quality' ? imageQualityLabel(prefs.image.quality) : ''].filter(Boolean).join(' · ');
+      ? `${videoParamModeLabel(props.quickVideoRefMode)} · ${aspectLabel} · ${videoResolutionLabel(resolvedVideoModelId, props.quickVideoResolution, videoBaseUrl)} · ${videoDurationFollowsSource(resolvedVideoModelId, props.quickVideoRefMode) ? '跟随原视频' : `${props.quickVideoDuration}秒`}`
+      : [imageAspectLabel, allowedResolutions.length ? imageResolutionLabel(props.quickQuality) : '', imageCaps.strength === 'prompt-extend' ? promptRewriteStrengthLabel(prefs.image.inferenceStrength) : imageCaps.strength === 'quality' ? imageQualityLabel(resolveImageGenerationQuality(prefs.image.quality, imageCaps) ?? 'high') : ''].filter(Boolean).join(' · ');
 
   return (
     <div className="relative min-w-0">
@@ -157,10 +138,19 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
               updateAudioPrefs={(patch) => persist({ ...prefs, audio: { ...prefs.audio, ...patch } })}
             />
           ) : isVideo ? (
+            <>
+            {props.quickGenMode === 'video' && videoProfile?.audioSupport === 'controllable' && (
+              <label className="mb-3 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                <input type="checkbox" checked={prefs.video.generateAudio ?? false} onChange={(event) => persist({
+                  ...prefs, video: { ...prefs.video, generateAudio: event.target.checked },
+                })} />
+                生成音频
+              </label>
+            )}
             <PromptBarVideoTab
               modelId={resolvedVideoModelId}
               baseUrl={videoBaseUrl}
-              supportedAspectRatios={videoProfile?.supportedAspectRatios || props.supportedAspectRatios}
+              supportedAspectRatios={videoProfile ? videoRatioOptions(resolvedVideoModelId, props.quickVideoRefMode, videoBaseUrl) : props.supportedAspectRatios}
               supportedResolutions={videoProfile?.supportedResolutions || props.supportedResolutions}
               mode={props.quickVideoRefMode}
               aspect={props.quickVideoAspectId}
@@ -182,6 +172,7 @@ export function PromptBarParamsPill(props: PromptBarParamsPillProps) {
                 persist({ ...prefs, video: { ...prefs.video, durationMode: 'custom', customDurationSec: seconds } });
               }}
             />
+            </>
           ) : (
             <PromptBarImageTab
               aspect={props.quickAspectId}

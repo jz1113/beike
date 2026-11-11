@@ -1,4 +1,6 @@
+import { batchCoverSkill, coverBatchGenerationRatio, coverBatchPromptFormat, coverBatchTitlePrompt, coverLayoutId, coverLayoutInstructions, coverSquareSafeArea, formatCoverSkillReply, isBatchCover, isCurrentCoverTextOperation, newCoverTextOperationId, validateCoverPromptFormat } from './coverBatch';
 import { inheritStudioCompiler, studioVideoSettings } from './studioCompilerState';
+import { mediaData } from './canvasNodeFactory';
 import { resolveStudioInputs } from './studioConnections';
 import { composeStudioVideo } from './studioCompose';
 import { prepareStudioGeneration, submitStudioDepth, type StudioRequest } from './studioGeneration';
@@ -96,6 +98,10 @@ export async function executeStudioNodeGeneration(
   };
 
   try {
+    const batchRatio = settings.beikeCoverExportRatio;
+    if (node.type === 'gen-image' && (batchRatio === '3:4' || batchRatio === '4:3')) {
+      settings.ratio = coverBatchGenerationRatio(batchRatio);
+    }
     const videoSettings = studioVideoSettings({ ...node, settings }, snapshot);
     if (videoSettings) {
       Object.assign(settings, {
@@ -136,7 +142,22 @@ export async function executeStudioNodeGeneration(
 
     const inputScene = commands.read();
     const canvasInputKey = node.type === 'gen-video' && !settings.beikeOperation ? studioPromptPreparationKey(inputScene, node.id) : undefined;
-    const { prompt, refs: inputs, duration: storyboardDuration, audio: storyboardAudio } = resolveStudioInputs(inputScene, node.id);
+    const { prompt: inputPrompt, refs: inputs, duration: storyboardDuration, audio: storyboardAudio, coverReferencePath } = resolveStudioInputs(inputScene, node.id);
+    let prompt = inputPrompt;
+
+    const coverWriters = inputScene.nodes.filter(source =>
+      (source.settings as Record<string, unknown> | undefined)?.beikeCoverPromptWriter === true &&
+      inputScene.connections.some(edge => edge.to === node!.id && edge.from === source.id));
+    if (coverWriters.length) {
+      const writerSettings = coverWriters[0].settings as Record<string, unknown>;
+      if (node.type !== 'gen-image' || coverWriters.length !== 1 || inputs.length !== 1 ||
+          inputs[0].type !== 'image' || inputs[0].url !== writerSettings.beikeCoverSourceUrl) {
+        throw new Error('请连接撰写提示词时使用的同一张商品图，换图后重新撰写');
+      }
+      if (!coverReferencePath && !/@图片1(?!\d)/.test(prompt)) prompt = `以 @图片1 为商品外观基准，保留实物结构和配色。\n${prompt}`;
+      const product = inputScene.nodes.find(source => source.id === inputs[0].nodeId);
+      settings.beikeOriginalFileName = (product?.settings as Record<string, unknown> | undefined)?.beikeOriginalFileName;
+    }
 
     if (settings.beikeVideoWorkflow === 'w3-copy' || settings.beikeStoryboardKeyframe === true) {
       const upstream = new Set(inputScene.connections.filter(edge => edge.to === node!.id).map(edge => edge.from));
@@ -194,6 +215,21 @@ export async function executeStudioNodeGeneration(
     }
 
     const refs = await Promise.all(inputs.map((item) => resolveStableStudioReference(item, loadAsset)));
+    if (coverReferencePath) {
+      settings.beikeCoverReviewTaskId = isBatchCover(settings) ? undefined : taskId;
+      settings.beikeCoverReview = undefined;
+      settings.beikeCoverReviewUrl = undefined;
+      settings.beikeCoverSubmittedPrompt = prompt;
+      settings.beikeCoverSubmittedReferencePath = coverReferencePath;
+      settings.beikeCoverSubmittedSourceUrl = inputs[0]?.url;
+      commands.update(node.id, taskId, { settings });
+      const url = await mediaData(coverReferencePath, 'image', signal ?? new AbortController().signal)
+        .catch(error => {
+          signal?.throwIfAborted();
+          throw new Error('无法读取所选封面版式图，图片未提交', { cause: error });
+        });
+      refs.push({ type: 'image', url });
+    }
     if (canvasInputKey) assertStudioPromptPreparation(commands.read(), node.id, taskId, canvasInputKey);
 
     if (settings.beikeOperation === 'compose-original') {
@@ -218,6 +254,10 @@ export async function executeStudioNodeGeneration(
     const scriptOnly = settings.beikeScriptOnly === true || Boolean(compilerSource && (compilerSource.settings as Record<string, unknown>)?.beikeScriptOnly !== false);
     const explicitAudio = typeof settings.beikeVideoAudio === 'boolean' ? settings.beikeVideoAudio : undefined;
 
+    const drawingOptions = settings.beikeDrawingExtras as { generationQuality?: string; customWidth?: number; customHeight?: number } | undefined;
+    const storedImageResolution = settings.gptImageQuality;
+    const imageResolution = storedImageResolution === '512px' ? '512px'
+      : storedImageResolution === 'low' ? '1K' : storedImageResolution === 'medium' ? '2K' : storedImageResolution === 'high' ? '4K' : undefined;
     const request: StudioRequest = {
       taskId,
       canvasInputKey,
@@ -234,9 +274,12 @@ export async function executeStudioNodeGeneration(
       model: String(settings.model || ''),
       prompt,
       refs,
-      imageQuality: typeof settings.gptImageQuality === 'string' ? settings.gptImageQuality : undefined,
+      requiresCoverStyleReference: Boolean(coverReferencePath),
+      imageQuality: drawingOptions?.generationQuality,
+      imageSize: node.type === 'gen-image' && (settings.gptImageQuality === 'custom' || settings.ratio === 'custom')
+        ? `${drawingOptions?.customWidth || 1024}x${drawingOptions?.customHeight || 1024}` : undefined,
       ratio: typeof settings.ratio === 'string' ? settings.ratio : undefined,
-      resolution: typeof settings.resolution === 'string' ? settings.resolution : undefined,
+      resolution: node.type === 'gen-image' ? imageResolution : typeof settings.resolution === 'string' ? settings.resolution : undefined,
       duration: settings.beikeScriptOnly === true || settings.beikeCompilerSource ? storyboardDuration : parseFloat(String(settings.duration || '')) || undefined,
       optimizePrompt: settings.beikeOptimizePrompt !== false,
     };
@@ -313,8 +356,11 @@ export async function executeStudioTextNodeAnalysis(
   commands: StudioTaskCommands,
   saveScene: (scene: StudioScene) => Promise<void>,
   signal: AbortSignal,
+  { loadAsset, recoveryOnly = false }: Pick<StudioHostExecutionOptions, 'loadAsset'> & { recoveryOnly?: boolean } = {},
 ): Promise<void> {
-  if (await recoverStudioTextRun(projectId, nodeId, commands, saveScene)) return;
+  signal.throwIfAborted();
+  if (await recoverStudioTextRun(projectId, nodeId, commands, saveScene, signal, recoveryOnly)) return;
+  if (recoveryOnly) throw new Error('未找到原文本节点，无法查询回执');
   const scene = commands.read();
   const node = scene.nodes.find((n) => n.id === nodeId);
   if (!node) throw new Error('文本节点不存在');
@@ -323,33 +369,69 @@ export async function executeStudioTextNodeAnalysis(
   const model = selectStudioModelFor('text-node', settings.textNodeChatModel);
   if (!model) throw new Error('请先在渠道管理中启用文本模型');
 
+  const skill = settings.beikeBatchCoverWriter === true ? batchCoverSkill : undefined;
+  if (settings.beikeBatchCoverWriter === true && !skill) throw new Error('封面提示词 Skill 未加载');
+  const offset = Number(settings.beikeCoverRotationOffset) || 0;
+  const used = Array.isArray(settings.beikeCoverUsedLayouts) ? settings.beikeCoverUsedLayouts.filter((id): id is string => typeof id === 'string') : [];
+  const coverTarget = skill && scene.nodes.find(item => item.id + '-writer' === nodeId);
+  const coverSettings = coverTarget && (coverTarget.settings as Record<string, unknown> | undefined);
+  const originalTitle = coverSettings?.beikeCoverTitle;
+  const coverDraft = skill ? { offset, title: originalTitle, sourceUrl: inputs.refs[0]?.url, model, used } : undefined;
+
   commands.update(nodeId, studioNodeTaskId(node), {
     errorMsg: undefined,
-    settings: { ...settings, textNodeIsAnalyzing: true, beikeTextRunError: undefined },
+    settings: { ...settings, textNodeIsAnalyzing: true, beikeTextRunError: undefined,
+      ...(coverDraft ? { beikeCoverDraftRequest: coverDraft } : {}) },
   });
 
+  let receivedReply = false;
   try {
-    const contentParts: Array<Record<string, unknown>> = [{ type: 'text', text: inputs.prompt }];
+    const instruction = skill && typeof originalTitle === 'string' ? coverBatchTitlePrompt(originalTitle) : inputs.prompt;
+    const contentParts: Array<Record<string, unknown>> = [{ type: 'text', text: instruction }];
     for (const ref of inputs.refs) {
-      if (ref.type === 'image') contentParts.push({ type: 'image_url', image_url: { url: ref.url } });
-      else if (ref.type === 'video') contentParts.push({ type: 'video_url', video_url: { url: ref.url } });
+      if (ref.type === 'audio') continue;
+      const stable = await resolveStableStudioReference(ref, loadAsset).catch((cause: unknown) => {
+        signal.throwIfAborted();
+        const name = scene.nodes.find(source => source.id === ref.nodeId)?.nodeName;
+        throw new Error(`无法读取参考${ref.type === 'video' ? '视频' : '图'}${name ? `「${name}」` : ''}，请重新导入该素材`, { cause });
+      });
+      signal.throwIfAborted();
+      const part = ref.type === 'video' ? 'video_url' : 'image_url';
+      contentParts.push({ type: part, [part]: { url: stable.url } });
     }
     const payload: Record<string, unknown> = {
       model,
-      messages: [{ role: 'user', content: contentParts }],
+      messages: [
+        ...(skill ? [{ role: 'system', content: [skill.prompt,
+          coverBatchPromptFormat,
+          coverLayoutInstructions(offset, undefined, undefined, used),
+          '每行独立设计。以商品图为外观依据。不要用原标题推断商品结构。',
+          coverSettings?.beikeCoverExportRatio === '4:3' ? coverSquareSafeArea : '按 3:4 竖屏构图。',
+        ].filter(Boolean).join('\n\n') }] : []),
+        { role: 'user', content: contentParts },
+      ],
       beikeTextContext: {
         nodeId,
-        runId: crypto.randomUUID(),
+        runId: skill ? newCoverTextOperationId() : crypto.randomUUID(),
         previousOperationId: typeof node.beikeTextOperationId === 'string' ? node.beikeTextOperationId : undefined,
         recoveryOnly: node.beikeTextRecoveryRequired === true,
+        acceptSettledIncomplete: Boolean(skill),
       },
-      beikeStoryboardAnalysis: Boolean(settings.beikeTextResultRequired),
+      ...(skill ? { response_format: { type: 'json_object' }, max_tokens: 8192 } : {}),
+      beikeStoryboardAnalysis: !skill && Boolean(settings.beikeTextResultRequired),
     };
     const response = await studioTextRequest(projectId, payload, signal, commands, saveScene);
     const data = await response.json();
+    receivedReply = true;
     const choices = data.choices as Array<{ message?: { content?: unknown } }> | undefined;
-    const resultText = typeof data.text === 'string' ? data.text : String(choices?.[0]?.message?.content || '');
+    let resultText = typeof data.text === 'string' ? data.text : String(choices?.[0]?.message?.content || '');
     if (!resultText.trim()) throw new Error('文本模型返回内容为空');
+    if (skill) {
+      const operationId = commands.read().nodes.find(item => item.id === nodeId)?.beikeTextOperationId;
+      if (!isCurrentCoverTextOperation(operationId)) throw new Error('旧版提示词回执已核对，请重新执行以使用新版素材');
+      resultText = formatCoverSkillReply(resultText, undefined, { offset, used });
+      validateCoverPromptFormat(resultText, undefined, true);
+    }
     const latest = commands.read().nodes.find((n) => n.id === nodeId);
     const latestSettings = (latest?.settings as Record<string, unknown>) || settings;
     commands.update(nodeId, latest ? studioNodeTaskId(latest) : undefined, {
@@ -361,6 +443,12 @@ export async function executeStudioTextNodeAnalysis(
         ...latestSettings,
         text: resultText,
         textNodeDisplayText: resultText,
+        beikeTextHtml: undefined,
+        error: undefined,
+        ...(coverDraft ? {
+          beikeCoverSourceUrl: coverDraft.sourceUrl,
+          beikeBatchCoverLayout: coverLayoutId(resultText),
+        } : {}),
         aiGenerated: true,
         _chatCompletedAt: Date.now(),
         textNodeIsAnalyzing: false,
@@ -375,6 +463,7 @@ export async function executeStudioTextNodeAnalysis(
     const latestSettings = (latest?.settings as Record<string, unknown>) || settings;
     commands.update(nodeId, latest ? studioNodeTaskId(latest) : undefined, {
       errorMsg: message,
+      ...(receivedReply ? { beikeTextRecoveryRequired: false } : {}),
       isGenerating: false,
       settings: { ...latestSettings, isGenerating: false, textNodeIsAnalyzing: false, beikeTextRunError: message },
     });

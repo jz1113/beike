@@ -22,7 +22,7 @@ import { useModalDialog } from '@client/shared/hooks/useModalDialog';
 import ThoughtLine from '@client/shared/ui/ThoughtLine';
 import MarkdownBody from '@client/shared/ui/markdown/MarkdownBody';
 import { getApprovedModel } from '@shared/domain/models/modelCatalog';
-import { modalityPickerSelections } from '@shared/domain/models/modalityStorage';
+import { modalityPickerSelections, readStoredApiProviders, readStoredModalityModels } from '@shared/domain/models/modalityStorage';
 import { selectedTextModel } from '@shared/domain/models/workflowModelStorage';
 import type { ApprovalRequestItem, AssistantItem } from '@shared/domain/assistant/types';
 import { stopAgentTask } from '../engine/submitAgentTask';
@@ -35,6 +35,12 @@ export function agentModelName(task: Pick<GenerationTask, 'model' | 'modelRouteK
   const options = modalityPickerSelections('chat') || [];
   const entry = options.find(item => item.entryId === selection || item.id === selection);
   if (entry && (!reported || reported === selection || reported === entry.modelId)) return entry.name;
+  const historical = readStoredModalityModels('chat').find(item => item.id === selection);
+  if (historical && (!reported || reported === selection || reported === historical.modelId)) {
+    const provider = readStoredApiProviders().find(item => item.id === historical.channelId);
+    return provider && !historical.name.includes(`· ${provider.name}`) ? `${historical.name} · ${provider.name}` : historical.name;
+  }
+
 
   // The server reports an upstream model, which can be shared by several channels.
   const id = reported || task.model || selection;

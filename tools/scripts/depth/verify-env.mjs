@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
+import { loadAppDataEnv, resolveDepthPython } from '../web/web-shared.mjs';
 
 const require = createRequire(import.meta.url);
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
@@ -13,9 +14,10 @@ const ffprobePath = require('@ffprobe-installer/ffprobe').path;
 const execFileAsync = promisify(execFile);
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const pythonScript = path.join(workspaceRoot, 'tools/scripts/depth/infer_video_depth.py');
-const python = process.env.DEPTH_VIDEO_PYTHON?.trim() || 'python3';
 
 async function main() {
+  loadAppDataEnv();
+  const python = resolveDepthPython();
   const ffmpeg = ffmpegPath;
   const ffprobe = ffprobePath;
   console.log('[ffmpeg]', ffmpeg, fs.existsSync(ffmpeg || '') ? 'OK' : 'MISSING');

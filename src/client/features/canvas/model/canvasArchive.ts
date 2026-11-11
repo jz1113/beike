@@ -193,6 +193,7 @@ function validateProject(value: unknown): CanvasProject {
     poster: raw.poster && typeof raw.poster === 'object' && [1, 2].includes(Number((raw.poster as Record<string, unknown>).version)) ? { version: Number((raw.poster as Record<string, unknown>).version) as 1 | 2,
       hiddenOutputIds: Array.isArray((raw.poster as Record<string, unknown>).hiddenOutputIds) ? (raw.poster as { hiddenOutputIds: unknown[] }).hiddenOutputIds.filter((id): id is string => typeof id === 'string') : undefined } : undefined,
     nativeCommerce: raw.nativeCommerce && typeof raw.nativeCommerce === 'object' && ['sales','workshop','poster'].includes(String((raw.nativeCommerce as Record<string, unknown>).kind)) ? { kind: (raw.nativeCommerce as { kind: 'sales' | 'workshop' | 'poster' }).kind, version: 1,
+      ...((raw.nativeCommerce as Record<string, unknown>).coverFlowNodes === true ? { coverFlowNodes: true } : {}),
       legacyScene: (raw.nativeCommerce as Record<string, unknown>).legacyScene ? validateProject({ nodes: [], studioScene: (raw.nativeCommerce as Record<string, unknown>).legacyScene }).studioScene : undefined } : undefined,
     sales: raw.sales && typeof raw.sales === 'object' && !Array.isArray(raw.sales) ? { draft: (raw.sales as Record<string, unknown>).draft,
       hiddenOutputIds: Array.isArray((raw.sales as Record<string, unknown>).hiddenOutputIds) ? (raw.sales as { hiddenOutputIds: unknown[] }).hiddenOutputIds.filter((id): id is string => typeof id === 'string') : undefined } : undefined,

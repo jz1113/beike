@@ -72,7 +72,7 @@ pnpm dev                     # 同时启动前端和 Go API
 
 Windows 双击根目录的 [启动贝壳云图.bat](启动贝壳云图.bat)，它调用 `tools/launchers` 中的 PowerShell 实现。macOS 双击根目录的 [启动贝壳云图.command](启动贝壳云图.command)。两个平台各保留一个双击入口。首次缺依赖时按锁文件安装，然后启动服务并打开浏览器。按启动终端中的 Ctrl+C 停止本次服务。
 
-模型网关和采集配置填写在根目录 `.env`；双击启动器首次运行时从 `tools/configs/env.example` 创建，已有配置会保留。`pnpm dev` 将该文件作为 Go API 的配置默认值，同名进程环境优先，API 地址、数据库和本机访问令牌仍由启动器设置。隔离开发模式不将根 `.env` 转交给 Go API。浏览器专属凭证通过设置页保存。开发端口和进程记录统一写入 `.local`。启动器继续兼容旧根目录端口缓存，并按 PID、启动时间、项目目录和配置识别自己记录的开发服务。
+模型网关和采集配置填写在根目录 `.env`；双击启动器首次运行时从 `tools/configs/env.example` 创建，已有配置会保留。`pnpm dev` 将该文件作为 Go API 的配置默认值，同名进程环境优先，API 地址和本机访问令牌由启动器设置。数据库尊重进程显式 `DATABASE_URL`，否则使用应用数据目录，忽略根 `.env` 的历史数据库 URL；隔离开发模式不加载根 `.env`，并强制使用独立数据目录中的库。浏览器专属凭证通过设置页保存。开发端口和进程记录统一写入 `.local`。启动器继续兼容旧根目录端口缓存，并按 PID、启动时间、项目目录和配置识别自己记录的开发服务。
 
 ## 构建与检查
 
@@ -114,4 +114,4 @@ pnpm test:browser
 - [目录与分层](docs/layout.md)
 - [数据库维护](docs/database.md)
 - [部署与排障](docs/deployment.md)
-- [厂商接口与模型索引](docs/models.md)
+- [模型官方 API 接入与配置](docs/models.md)

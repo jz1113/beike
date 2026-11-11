@@ -227,6 +227,39 @@
   gap: 4px;
 }
 
+/* Shared appearance for node action bars across media, text and structured nodes. */
+[data-tapnow-float-toolbar] {
+  box-sizing: border-box;
+  border: 1px solid #e4e4e7;
+  background: #f6f6f6;
+  color: #3f3f46;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(16px);
+}
+
+.dark [data-tapnow-float-toolbar] {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #18181b;
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+[data-tapnow-float-toolbar] > button,
+[data-tapnow-float-toolbar] > a,
+[data-tapnow-float-toolbar] > div:not([role="menu"]) > button {
+  min-height: 40px;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+[data-tapnow-float-toolbar] > button:has(> svg:only-child) {
+  min-width: 40px;
+}
+
 [data-tapnow-float-toolbar] button.w-10 {
   position: relative;
   z-index: 1;
@@ -801,4 +834,25 @@ html:not(.dark) [data-tapnow-float-toolbar] button.w-10[data-toolbar-active="tru
   .canvas-media-toolbar > button:active {
     transform: none;
   }
+}
+
+/* Reference labels use the same position and treatment in every prompt editor. */
+.canvas-reference-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 10;
+  display: inline-flex;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 0 4px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
 }

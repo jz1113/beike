@@ -1,3 +1,4 @@
+import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { ArrowUp, Loader2, Maximize2, Minimize2, MoreHorizontal, SlidersHorizontal, Sparkles, UserRound, X } from 'lucide-react';
 import { CanvasImageControls, CanvasModelPicker } from '../tools/CanvasGridSplit';
@@ -5,13 +6,11 @@ import { CanvasCameraControl, CanvasPromptLibrarySection, hasActiveCinemaConfig 
 import {
   isSeedance,
   isSeedance25,
-  videoModes,
-  videoDurationOptions,
+  resolveVideoParameters,
   type resolveVideoMode,
 } from '@shared/domain/media/videoCapabilities';
 import { CanvasDrawingEditor } from '../editor/CanvasNodeMenu';
 import { CanvasDrawingReferenceBar } from './CanvasDrawingReferenceBar';
-import { resolveVideoResolution } from '@shared/domain/media/video';
 import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
 import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
 import type { CanvasNode } from '../../model/types';
@@ -29,8 +28,7 @@ import { videoPromptSkill } from '@shared/domain/assistant/skills/videoPromptSki
 import { VideoPromptOptimizationDetails } from '../video/StudioStoryboardDialog';
 import {
   CanvasUnifiedVideoControls,
-  resolveImageModelCapabilities,
-  resolveVideoModelCapabilities,
+  resolveCanvasImageConfig,
 } from '../video/CanvasVideoPlayer';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import type { loadCanvasGenerationModels } from '../../model/canvasNodeFactory';
@@ -505,46 +503,16 @@ export function CanvasDrawingPromptPanel({
             value={selectedModel}
             onChange={(model) => {
               if (!isVideo) {
-                const imgCaps = resolveImageModelCapabilities(model);
-                const nextAspect = imgCaps.ratios.includes(config.aspect) ? config.aspect : imgCaps.ratios[0] || '1:1';
-                const nextQuality =
-                  imgCaps.resolutions.length === 0
-                    ? config.quality
-                    : imgCaps.resolutions.some((r) => r.id === config.quality || r.short === config.quality)
-                      ? config.quality
-                      : imgCaps.resolutions[Math.min(1, imgCaps.resolutions.length - 1)].id;
-                const nextGenQuality =
-                  imgCaps.qualities.length === 0
-                    ? undefined
-                    : imgCaps.qualities.some((q) => q.id === config.generationQuality)
-                      ? config.generationQuality
-                      : 'high';
-                const nextBg = imgCaps.supportsBackground ? config.backgroundMode : 'auto';
-                onChangeConfig({
-                  model,
-                  aspect: nextAspect,
-                  quality: nextQuality,
-                  generationQuality: nextGenQuality,
-                  backgroundMode: nextBg,
-                });
+                const { aspect, quality, generationQuality, backgroundMode } = resolveCanvasImageConfig(config, upstreamModalityModelId('image', model), model);
+                onChangeConfig({ model, aspect, quality, generationQuality, backgroundMode });
                 return;
               }
-              const upstream = upstreamModalityModelId('video', model);
-              const baseUrl = getGatewayClientBaseUrl(model);
-              const vidCaps = resolveVideoModelCapabilities(upstream, videoMode, config.quality, baseUrl);
-              const quality = resolveVideoResolution(config.quality, vidCaps.resolutions);
-              const supportedModes = videoModes(upstream, baseUrl);
-              const refMode = vidCaps.modes.some((item) => item.id === videoMode)
-                ? videoMode
-                : vidCaps.modes[vidCaps.modes.length - 1]?.id || supportedModes[0]?.id || 'omni';
-              const nextDurations = videoDurationOptions(upstream, quality, refMode, baseUrl);
-              onChangeConfig({
-                model,
-                aspect: vidCaps.ratios.includes(config.aspect) ? config.aspect : vidCaps.ratios[0] || '16:9',
-                quality,
-                refMode,
-                duration: nextDurations.includes(duration) ? duration : nextDurations[0],
+              const next = resolveVideoParameters(upstreamModalityModelId('video', model), {
+                mode: videoMode, aspect: config.aspect, resolution: config.quality, duration,
+              }, getGatewayClientBaseUrl(model), {
+                images: refs.filter(url => !isVideoMediaUrl(url)).length, videos: refs.filter(isVideoMediaUrl).length,
               });
+              onChangeConfig({ model, aspect: next.aspect, quality: next.resolution, refMode: next.mode, duration: next.duration });
             }}
             disabled={busy}
           />
@@ -614,7 +582,7 @@ export function CanvasDrawingPromptPanel({
             )
           ) : (
             <>
-              <CanvasImageControls config={config} model={selectedModel} onChange={onChangeConfig} />
+              <CanvasImageControls config={config} model={upstreamModalityModelId('image', selectedModel)} selection={selectedModel} onChange={onChangeConfig} />
               <span className="qiaodoumayi-gen-model-size-divider" aria-hidden="true" />
               {!showPromptLibrary && (
                 <button

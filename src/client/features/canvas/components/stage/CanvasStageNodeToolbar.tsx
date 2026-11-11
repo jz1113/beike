@@ -3,9 +3,10 @@ import type React from 'react';
 import { drawingGeometry, calculateDisplayResolution } from '../../model/canvasNodeFactory';
 import '../../canvasMediaToolbar.css';
 import { downloadMediaOrOpen } from '@client/shared/media/downloadMedia';
+import { coverBatchFileName } from '../../model/coverBatch';
 import {
   Aperture, AudioLines, Ban, Check, ChevronLeft, ChevronRight, Crop,
-  Download, Film, GitCompare, Highlighter, Image as ImageIcon, Layers as LayersIcon,
+  Download, Eye, Film, GitCompare, Highlighter, Image as ImageIcon, Layers as LayersIcon,
   ImagePlus, Loader2, Maximize2,
   MoreHorizontal, Palette, PenLine,
   Upload, UserRound, Video as VideoIcon,
@@ -16,6 +17,7 @@ import { useSeedancePrecheck } from '@client/shared/api/generation/seedancePrech
 import { SeedanceComplianceBadge } from '@client/shared/ui/SeedanceComplianceBadge';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { NativeStudioCommandsContext } from '../../hooks/useNativeStudioCommands';
+import { isStudioPersonCardSlot } from '../../model/studioStoryboard';
 import { canvasWorkflowUploadAccept, canvasWorkflowUploadSlot } from '../../model/videoWorkflowRecovery';
 import {
   CanvasGridSkillsSubmenu,
@@ -105,7 +107,7 @@ const menuItemClass = (active = false) =>
   }`;
 
 export function CanvasStageNodeToolbar({
-  node, isSelected, isGenerating, editingNodeTitleId, tempNodeTitle, projectId,
+  node, nodes, isSelected, isGenerating, editingNodeTitleId, tempNodeTitle, projectId,
   fileInputRef, replacementNodeRef,
   setTempNodeTitle, setEditingNodeTitleId, handleSaveNodeTitle, handleStartEditNodeTitle,
   setMultiAngleModalNode, setPreviewMedia,
@@ -121,9 +123,21 @@ export function CanvasStageNodeToolbar({
   const addNode = useCanvasStore((s) => s.addNode);
   const switchNodeRun = useCanvasStore((s) => s.switchNodeRun);
 
-  const isVideo = node.type === 'video' || node.generationKind === 'video';
+  const isVideo = node.type === 'video' || (node.type === 'drawing' && node.generationKind === 'video');
   const videoUrl = node.videoUrl;
   const imageUrl = node.imageUrl;
+  const isImage = !isVideo && Boolean(imageUrl);
+  const imageTool = isImage ? node.activeUploadTool : null;
+  const toolsLabel = isVideo ? '视频工具' : '图片工具';
+  const project = useCanvasStore.getState().projects.find(project => project.id === projectId);
+  const settings = node.studioRaw?.settings as Record<string, unknown> | undefined;
+  const mediaSlot = node.type === 'image' || node.type === 'video' ? canvasWorkflowUploadSlot(project, node.id) : undefined;
+  const mediaRole = settings?.beikeStoryboardSourceId && settings.beikeStoryboardActive === false
+    ? '旧分镜 · 已停用'
+    : mediaSlot && !('hideRoleLabel' in mediaSlot) ? mediaSlot.label : undefined;
+  const personMaskStatus = toolsMenuOpen && isImage && isStudioPersonCardSlot(
+    project?.studioScene, node.id,
+  ) ? (settings?.beikePersonMaskedUrl === imageUrl ? '已自动打码' : '自动') : undefined;
   const hasMedia = Boolean(isVideo ? videoUrl : imageUrl);
   const mediaUrl = (isVideo ? videoUrl : imageUrl) || '';
 
@@ -305,12 +319,13 @@ export function CanvasStageNodeToolbar({
     updateNode(projectId, node.id, { colorPins: next });
   };
 
-  const totalRuns = node.runs?.length || 0;
+  const isCoverDrawing = node.type === 'drawing' && nodes.some(
+    item => item.studioSubType === 'cover-prompt-writer' && node.referenceNodeIds?.includes(item.id),
+  );
+  const totalRuns = isCoverDrawing ? 0 : (node.runs?.length ?? 0);
   const activeRun = node.activeRunIndex ?? 0;
   const activePins = node.colorPins || [];
-  const hasActiveTool = Boolean(
-    toolsMenuOpen || node.highlighted || (node.activeUploadTool && node.activeUploadTool !== 'multiAngle' && node.activeUploadTool !== 'cropSelect'),
-  );
+  const hasActiveTool = Boolean(toolsMenuOpen || imageTool);
 
   return (
     <>
@@ -321,7 +336,7 @@ export function CanvasStageNodeToolbar({
         <div
           style={node.type === 'drawing' && !node.studioSubType ? { left: '50%', right: 'auto', width: drawingGeometry(node).width, transform: 'translateX(-50%)' } : undefined}
           className={`absolute -top-6 left-0 right-0 flex items-center justify-between text-xs select-none px-0.5 transition-opacity duration-150 ${editingNodeTitleId === node.id ? 'z-30' : 'z-20'} ${
-            ['image', 'video', 'audio', 'compare'].includes(node.type) || isSelected || editingNodeTitleId === node.id
+            ['image', 'video', 'audio', 'compare', 'preview'].includes(node.type) || isSelected || editingNodeTitleId === node.id
               ? 'opacity-100 pointer-events-auto'
               : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
           }`}
@@ -353,14 +368,19 @@ export function CanvasStageNodeToolbar({
                 <AudioLines className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
               ) : node.type === 'compare' ? (
                 <GitCompare className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
+              ) : node.type === 'preview' ? (
+                <Eye className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
               ) : node.type === 'drawing' ? (
                 <Palette className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
               ) : (
                 <ImageIcon className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
               )}
+              {mediaRole && (
+                <span title={mediaRole} className="max-w-[70%] shrink-0 truncate font-medium text-zinc-700 dark:text-zinc-200">{mediaRole}</span>
+              )}
               <span
                 onClick={(e) => handleStartEditNodeTitle(node, e)}
-                title="点击重命名"
+                title={node.title ? `${node.title} · 点击重命名` : '点击重命名'}
                 className="font-medium truncate max-w-[160px] cursor-text hover:text-zinc-900 dark:hover:text-white transition-colors"
               >
                 {node.type === 'drawing' && (node.title === '图片生成' || node.title === '绘图')
@@ -393,7 +413,7 @@ export function CanvasStageNodeToolbar({
               )}
             </div>
           )}
-          <div className="ml-auto flex items-center gap-1.5 text-[9px] font-light tabular-nums text-zinc-500 dark:text-zinc-200">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[9px] font-light tabular-nums text-zinc-500 dark:text-zinc-200">
             {precheckRequested && hasMedia && (
               <SeedanceComplianceBadge entry={mediaPrecheck} mediaType={isVideo ? 'video' : 'image'} compact />
             )}
@@ -402,7 +422,8 @@ export function CanvasStageNodeToolbar({
         </div>
       )}
 
-      {!isGenerating && (['image', 'video'].includes(node.type) || (node.type === 'drawing' && hasMedia)) && !node.missingMedia && node.activeUploadTool !== 'multiAngle' && node.activeUploadTool !== 'lighting' && node.activeUploadTool !== 'cropSelect' && node.activeUploadTool !== 'smartEdit' && node.activeUploadTool !== 'depth' && (
+      {!isGenerating && (['image', 'video'].includes(node.type) || (node.type === 'drawing' && hasMedia)) && !node.missingMedia &&
+        !['multiAngle', 'lighting', 'cropSelect', 'smartEdit', 'depth'].includes(imageTool ?? '') && (
         <div
           ref={toolbarRef}
           data-input-image-toolbar="true"
@@ -423,7 +444,7 @@ export function CanvasStageNodeToolbar({
             className="inline-flex h-12 items-center gap-1 rounded-full border border-zinc-200 dark:border-zinc-800 bg-[#f6f6f6] dark:bg-zinc-900 p-1 text-zinc-700 dark:text-white/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.55)] whitespace-nowrap"
           >
             {/* 左侧功能区：图片节点（多角度调整 -> 裁剪 -> 高清 -> 智能改图 -> 其他工具） */}
-            {!isVideo && imageUrl && (
+            {isImage && (
               <>
                 <button
                   type="button"
@@ -480,20 +501,6 @@ export function CanvasStageNodeToolbar({
               </>
             )}
 
-            {isVideo && videoUrl && (
-              <>
-                <button
-                  type="button"
-                  className={floatBtnClass(false)}
-                  data-tip="高清放大"
-                  aria-label="高清放大"
-                  onClick={() => { closeAllMenus(); handleSpawnDownstream('hd'); }}
-                >
-                  <span className="text-xs font-semibold tracking-tight">HD</span>
-                </button>
-              </>
-            )}
-
             {/* 工具菜单（⋯） */}
             <div className="flex items-center gap-1">
               <div className="relative flex items-center">
@@ -501,8 +508,9 @@ export function CanvasStageNodeToolbar({
                   type="button"
                   className={floatBtnClass(hasActiveTool)}
                   data-toolbar-active={hasActiveTool ? 'true' : 'false'}
-                  data-tip="工具"
-                  aria-label="工具"
+                  data-tip={toolsLabel}
+                  aria-label={toolsLabel}
+                  aria-expanded={toolsMenuOpen}
                   onClick={(e) => {
                     e.stopPropagation();
                     setPinMenuOpen(false);
@@ -542,7 +550,21 @@ export function CanvasStageNodeToolbar({
                         </button>
                       </>
                     )}
-                    {!isVideo && imageUrl && Boolean((node.studioRaw?.settings as Record<string, unknown> | undefined)?.beikeStoryboardSourceId) && (
+                    {personMaskStatus && (
+                      <button type="button" className={menuItemClass()} disabled={node.layerLocked}
+                        aria-label="三视图人脸打码" onClick={() => {
+                          closeAllMenus();
+                          window.postMessage({ kind: 'studio:person-reference-mask', nodeId: node.id }, window.location.origin);
+                        }}>
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="shrink-0">
+                          <path d="M1 1h4v4H1zm10 0h4v4h-4zM6 6h4v4H6zm-5 5h4v4H1zm10 0h4v4h-4z" />
+                          <path opacity=".45" d="M6 1h4v4H6zM1 6h4v4H1zm10 0h4v4h-4zm-5 5h4v4H6z" />
+                        </svg>
+                        <span>三视图人脸打码</span>
+                        <span className="ml-auto text-[11px] text-zinc-500 dark:text-zinc-400">{personMaskStatus}</span>
+                      </button>
+                    )}
+                    {isImage && Boolean(settings?.beikeStoryboardSourceId) && (
                       <button type="button" className={menuItemClass()} onClick={() => {
                         closeAllMenus();
                         window.postMessage({ kind: 'studio:storyboard-mask', nodeId: node.id }, window.location.origin);
@@ -550,31 +572,17 @@ export function CanvasStageNodeToolbar({
                         <PenLine size={14} className="shrink-0 opacity-85" />人脸打码
                       </button>
                     )}
-                    {!isVideo && (
-                      <button
-                        type="button"
-                        data-tool-id="imageDepth"
-                        className={menuItemClass(node.activeUploadTool === 'depth')}
-                        onClick={() => toggleInlineTool('depth')}
-                      >
-                        <Aperture size={14} className="shrink-0 opacity-85" />
-                        <span>深度提取</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      data-tool-id="highlight"
-                      className={menuItemClass(Boolean(node.highlighted))}
-                      onClick={() => {
-                        closeAllMenus();
-                        updateNode(projectId, node.id, { highlighted: !node.highlighted });
-                      }}
-                    >
-                      <Highlighter size={14} className="shrink-0 opacity-85" />
-                      <span>高亮显示</span>
-                    </button>
-                    {!isVideo && (
+                    {isImage && (
                       <>
+                        <button
+                          type="button"
+                          data-tool-id="imageDepth"
+                          className={menuItemClass(node.activeUploadTool === 'depth')}
+                          onClick={() => toggleInlineTool('depth')}
+                        >
+                          <Aperture size={14} className="shrink-0 opacity-85" />
+                          <span>深度提取</span>
+                        </button>
                         <button
                           type="button"
                           data-tool-id="portraitTexture"
@@ -618,7 +626,23 @@ export function CanvasStageNodeToolbar({
             {/* 分割线 */}
             <div data-toolbar-divider="" className="w-px h-[18px] mx-1.5 shrink-0 self-center bg-black/10 dark:bg-white/12" />
 
-            {/* 右侧通用操作：标签选择、替换、下载、全屏 */}
+            {/* 通用素材操作 */}
+            <button
+              type="button"
+              data-tool-id="highlight"
+              className={floatBtnClass(Boolean(node.highlighted))}
+              data-toolbar-active={node.highlighted ? 'true' : 'false'}
+              data-tip="高亮显示"
+              aria-label="高亮显示"
+              aria-pressed={Boolean(node.highlighted)}
+              onClick={() => {
+                closeAllMenus();
+                updateNode(projectId, node.id, { highlighted: !node.highlighted });
+              }}
+            >
+              <Highlighter size={16} />
+            </button>
+
             <div className="relative flex items-center" data-canvas-pin-ui="root">
               <button
                 type="button"
@@ -698,7 +722,7 @@ export function CanvasStageNodeToolbar({
                 }
               }}
             >
-              <ImagePlus size={16} />
+              {isVideo ? <Upload size={16} /> : <ImagePlus size={16} />}
             </button>
 
             <button
@@ -708,7 +732,10 @@ export function CanvasStageNodeToolbar({
               aria-label="下载素材"
               onClick={() => {
                 closeAllMenus();
-                void downloadMediaOrOpen(mediaUrl, `${node.title || '画布素材'}.${isVideo ? 'mp4' : 'png'}`).catch(console.error);
+                const originalTitle = (node.studioRaw?.settings as Record<string, unknown> | undefined)?.beikeCoverTitle;
+                const name = !isVideo && typeof originalTitle === 'string'
+                  ? coverBatchFileName(originalTitle) : `${node.title || '画布素材'}.${isVideo ? 'mp4' : 'png'}`;
+                void downloadMediaOrOpen(mediaUrl, name).catch(console.error);
               }}
             >
               <Download size={16} />

@@ -60,6 +60,7 @@ func nativeRoutes(cfg config.Config) []route {
 		{"POST /api/system/config", true, system.ConfigPost(cfg)},
 		{"POST /api/system/gateway-user", true, system.GatewayUser()},
 		{"POST /api/system/models/fetch", true, system.ModelFetch(cfg)},
+		{"GET /api/system/models/fal", true, system.FalDirectory()},
 		{"POST /api/system/memory-cleanup", true, system.MemoryCleanup(cfg)},
 		{"GET /api/system/media-review", true, system.MediaReview(cfg)},
 		{"GET /api/system/proxy-image", false, system.ProxyImage(cfg)},

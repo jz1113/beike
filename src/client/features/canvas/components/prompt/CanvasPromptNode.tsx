@@ -1,15 +1,16 @@
+import { batchCoverLayouts, batchCoverSkill, coverLayoutInstructions, coverPromptFormat, formatCoverSkillReply, isCurrentCoverTextOperation, newCoverTextOperationId, validateCoverPromptFormat } from '../../model/coverBatch';
 import { sortStudioMediaReferences } from '../../model/studioConnections';
 import { mediaReferenceSlots } from '@client/shared/media/videoReferences';
 import { NativeStudioCommandsContext } from '../../hooks/useNativeStudioCommands';
 import { loadCanvasChatModels, mediaData, resolveCanvasChatModel } from '../../model/canvasNodeFactory';
-import { validateNativeCommerceInputs } from '../../model/creativeWorkflowProjects';
+import { commerceBriefPlaceholder, validateNativeCommerceInputs } from '../../model/creativeWorkflowProjects';
 import { CanvasDrawingEditor, CanvasRichTextEditor } from '../editor/CanvasNodeMenu';
 import { CanvasModelPicker } from '../tools/CanvasGridSplit';
 import { CanvasPromptInput, CanvasPromptReferenceThumbnail, uploadCanvasPromptReferences, type CanvasMentionCandidate, type CanvasPromptInputRef } from './CanvasPromptInput';
 import { useContext, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   AlignLeft, ArrowUp, Eye, EyeOff,
-  Mic, Plus, Sparkles, SlidersHorizontal, X,
+  Plus, Sparkles, SlidersHorizontal, X,
 } from 'lucide-react';
 import { requestCanvasText } from '../../model/canvasTextRequest';
 import { saveCanvasProjects, useCanvasStore } from '../../store/useCanvasStore';
@@ -18,6 +19,10 @@ import { PromptBarReasoningPill } from '@client/shared/prompt-bar/controls/Promp
 import { DEFAULT_MULTIMODAL_MODEL_ID } from '@shared/domain/models/modelCatalog';
 import { canReference, canReferenceVideo, isTextSource } from '../../model/canvasGraph';
 import type { CanvasNode } from '../../model/types';
+
+function formatCoverPrompt(text: string) {
+  return text.trim().replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n');
+}
 
 export function CanvasPromptNode({
   projectId, node, selected, nodes, onChange,
@@ -30,11 +35,10 @@ export function CanvasPromptNode({
   const latest = useRef(node);
   latest.current = node;
   const request = useRef<AbortController | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [polishing, setPolishing] = useState(false);
+  const [action, setAction] = useState<'generate' | 'recover' | null>(null);
+  const busy = action !== null;
   const [error, setError] = useState('');
   const [showUpstream, setShowUpstream] = useState(false);
-  const [dictating, setDictating] = useState(false);
   const [shotCount, setShotCount] = useState(4);
   const [shotDuration, setShotDuration] = useState(5);
 
@@ -63,14 +67,25 @@ export function CanvasPromptNode({
   const model = matchedModel?.id || node.textModel || DEFAULT_MULTIMODAL_MODEL_ID;
   const upstreamModel = matchedModel?.modelId || model;
 
+  const isCoverWriter = node.studioSubType === 'cover-prompt-writer';
   const isOptimizer = node.studioSubType === 'video-prompt-optimizer';
   const plain = !isOptimizer;
-  const upstream = textSources.map(source => source.content?.trim()).filter(Boolean).join('\n\n');
-  const mediaSources = sortStudioMediaReferences(
-    sources.filter(source => canReference(source) || canReferenceVideo(source)),
-    node.studioRaw?.settings,
-    source => source.videoUrl || source.imageUrl,
-  );
+  const generateLabel = node.textRecoveryRequired
+    ? (isCoverWriter ? '查询封面提示词回执' : '查询回执')
+    : (isCoverWriter ? '撰写封面提示词' : '生成文本');
+  const busyLabel = action === 'recover' ? '查询回执中…' : '生成中…';
+  const upstream = textSources.map(source => source.content?.trim()).filter(value => value && (!isCoverWriter || value !== commerceBriefPlaceholder)).join('\n\n');
+  const { mediaSources, styleReference } = useMemo(() => {
+    const ordered = sortStudioMediaReferences(
+      sources.filter(source => canReference(source) || canReferenceVideo(source)),
+      node.studioRaw?.settings,
+      source => source.videoUrl || source.imageUrl,
+    );
+    const style = isCoverWriter ? ordered.find(source => Boolean(source.imageUrl) && !source.videoUrl &&
+      (source.id === projectId + '-reference' || (source.id.endsWith('-reference') &&
+        sources.some(item => item.id === source.id.replace(/-reference$/, '-product'))))) : undefined;
+    return { styleReference: style, mediaSources: style ? [...ordered.filter(source => source !== style), style] : ordered };
+  }, [isCoverWriter, projectId, node.studioRaw?.settings, sources]);
   const usesResponses = model.startsWith('openai-responses:') || getMultimodalClientOverrides(model).apiFormat === 'openai-responses';
   const canRun = Boolean(node.textPrompt?.trim() || upstream || mediaSources.length);
   const dispatchHighlightRef = (nodeId: string | null) => {
@@ -138,63 +153,49 @@ export function CanvasPromptNode({
     window.dispatchEvent(new CustomEvent('canvas:open-prompt-compiler', { detail: { nodeId: node.id } }));
   };
 
-  const handleVoiceInput = () => {
-    type SpeechRecCtor = new () => {
-      lang: string;
-      onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
-      onend: () => void;
-      onerror: () => void;
-      start: () => void;
-    };
-    const win = window as unknown as { SpeechRecognition?: SpeechRecCtor; webkitSpeechRecognition?: SpeechRecCtor };
-    const SpeechRec = win.SpeechRecognition || win.webkitSpeechRecognition;
-    if (!SpeechRec) { setError('当前浏览器环境暂不支持语音听写'); return; }
-    if (dictating) return;
-    try {
-      const recognition = new SpeechRec();
-      recognition.lang = 'zh-CN';
-      setDictating(true);
-      recognition.onresult = (event) => {
-        const transcript = event.results?.[0]?.[0]?.transcript || '';
-        if (transcript) {
-          const prev = latest.current.textPrompt || '';
-          onChange({ textPrompt: prev ? `${prev} ${transcript}` : transcript });
-        }
-      };
-      recognition.onend = () => setDictating(false);
-      recognition.onerror = () => setDictating(false);
-      recognition.start();
-    } catch {
-      setDictating(false);
-    }
-  };
-
   const generate = async () => {
     if (request.current || busy || node.layerLocked) return;
     const controller = new AbortController();
     request.current = controller;
     const original = node.content;
-    setBusy(true);
+    setAction(node.textRecoveryRequired ? 'recover' : 'generate');
     setError('');
     try {
       const project = useCanvasStore.getState().projects.find(item => item.id === projectId);
       const workflow = project?.studioScene?.nodes.find(item => item.id === node.id)?.settings as Record<string, unknown> | undefined;
-      if (workflow?.beikeTextResultRequired && (workflow.beikeStoryboardSceneSourceId || node.id.endsWith('-analysis'))) {
+      if (workflow?.beikeBatchCoverWriter === true ||
+          (workflow?.beikeTextResultRequired && (workflow.beikeStoryboardSceneSourceId || node.id.endsWith('-analysis')))) {
         if (!studioCommands?.runText) throw new Error('画布运行器尚未就绪，请重新打开画布');
-        await studioCommands.runText(node.id, controller.signal);
+        await studioCommands.runText(node.id, controller.signal, node.textRecoveryRequired);
         return;
       }
       const promptPrefix = isOptimizer
         ? `[视频提示词编译器 · 目标分镜数:${shotCount} · 单镜时长:${shotDuration}s]\n`
         : '';
       const instruction = [upstream && `上游文本：\n${upstream}`, node.textPrompt || ''].filter(Boolean).join('\n\n');
+      const coverSkill = isCoverWriter ? batchCoverSkill : undefined;
+      const previousLayout = isCoverWriter && isCurrentCoverTextOperation(node.coverPromptOperationId) && (!node.coverSourceUrl || node.coverSourceUrl === mediaSources[0]?.imageUrl)
+        ? original?.match(/^画幅与构图[：:][^\n]*\b(PHONE-\d{2})\b/im)?.[1]?.toUpperCase()
+        : undefined;
+      const requestedLayout = node.textPrompt?.match(/(?:^|\n)\s*(?:版式[：:]|(?:请)?(?:使用|用|指定))\s*(PHONE-\d{2})\b/im)?.[1]?.toUpperCase();
+      if (isCoverWriter && requestedLayout && !batchCoverLayouts.some(layout => layout.id === requestedLayout)) {
+        throw new Error('没有找到这个手机版式编号');
+      }
+      const selection = { offset: 0, preferred: requestedLayout, previous: previousLayout };
+      let resolvedOperationId: string | undefined;
+      const lockedTitle = [node.textPrompt, upstream].filter(Boolean).map(source => (source || '').split(/\r?\n/)
+        .flatMap(line => /^(?:主标题|副标题)[：:]\s*(.+)$/.exec(line.trim())?.[1] ?? []).join('')).find(Boolean);
       const data = await requestCanvasText(
         async () => {
           validateNativeCommerceInputs(useCanvasStore.getState().projects.find(item => item.id === projectId), node.id);
           const overrides = getMultimodalClientOverrides(model);
-          if (!plain) return { model: upstreamModel, prompt: `${promptPrefix}${instruction}`, ...overrides };
+          if (!plain && !isCoverWriter) return { model: upstreamModel, prompt: `${promptPrefix}${instruction}`, ...overrides };
+          if (isCoverWriter && (!coverSkill || mediaSources.length !== (styleReference ? 2 : 1) ||
+              !mediaSources[0].imageUrl || mediaSources[0].videoUrl)) {
+            throw new Error('请连接一张目标商品图');
+          }
           const content: Array<Record<string, unknown>> = [
-            { type: 'text', text: `根据以下要求生成可直接使用的文字，仅返回正文。\n\n${instruction || '描述所连接的素材。'}` },
+            { type: 'text', text: `根据以下要求生成可直接使用的文字，仅返回正文。\n\n${instruction || '描述所连接的素材。'}${coverSkill && mediaSources[0].originalFileName ? `\n商品原文件名（仅作原标题线索）：${mediaSources[0].originalFileName}` : ''}` },
           ];
           for (const source of mediaSources) {
             const video = canReferenceVideo(source);
@@ -214,59 +215,68 @@ export function CanvasPromptNode({
             : undefined;
           return {
             model: upstreamModel, ...overrides, ...(usesResponses ? { apiFormat: 'openai-responses' } : {}),
-            messages: [{ role: 'user', content }],
+            messages: [
+              ...(coverSkill ? [{ role: 'system', content: [
+                coverSkill.prompt,
+                coverPromptFormat,
+                coverLayoutInstructions(selection.offset, selection.preferred, selection.previous),
+                styleReference && '第二张图片是用户提供的风格参考，只观察排版、光线和色调。商品品类、可见面和外观一律以第一张商品图为准。在正文只用 @图片1 指代商品，生成阶段将另行接入目录中选定的版式样张。',
+                '当前仅执行画布提示词撰写。按上面的 JSON 字段填写完整的绘图设计。titleLines 按实际排版逐行填写，每行只列一次。以 @图片1 指代本次商品图。优先沿用用户提供的原标题主题，其次从文件名提取主题线索。体验或售后只有被选为本次唯一主线时才可写成中性问题，不当成事实。自动改写时副标题只补充同一主题，缺少关联信息就省略。不要用构图中的拍摄方式替换原标题主题。若用户以「主标题：」或「副标题：」指定上图文字，逐字保留相应文案。自动改写时用主题短句作为主标题，型号优先放小字，不补「性能旗舰」等无依据标签。输入不足或商品有歧义时，在 JSON 的 error 字段说明原因。在 layout 字段填写实际选择的 PHONE 编号，供下次换版识别，编号不是上图文字。禁止输出文件名或代码围栏。',
+              ].filter(Boolean).join('\n\n') }] : []),
+              { role: 'user', content },
+            ],
+            ...(coverSkill ? { response_format: { type: 'json_object' }, max_tokens: 8192 } : {}),
             ...(activeEffort ? { reasoning_effort: activeEffort } : {}),
             ...((usesResponses || node.textWebSearch) && node.textWebSearch ? { canvasWebSearch: true } : {}),
           };
         },
         {
           usageModel: model,
-          projectId, nodeId: node.id, runId: crypto.randomUUID(),
+          projectId, nodeId: node.id, runId: coverSkill ? newCoverTextOperationId() : crypto.randomUUID(),
           previousOperationId: node.textOperationId, recoveryOnly: node.textRecoveryRequired,
-          onOperation: async (id) => { onChange({ textOperationId: id, textRecoveryRequired: true }); await saveCanvasProjects(); },
+          acceptSettledIncomplete: isCoverWriter,
+          closeMissingReceipt: isCoverWriter,
+          onOperation: async (id) => {
+            resolvedOperationId = id;
+            if (node.textOperationId === id && node.textRecoveryRequired) return;
+            onChange({ textOperationId: id, textRecoveryRequired: true });
+            await saveCanvasProjects();
+          },
         },
         controller.signal,
       );
+      onChange({ textRecoveryRequired: false });
       if (latest.current.content !== original || latest.current.layerLocked) {
         throw new Error('正文已修改或节点已锁定，未覆盖当前内容');
       }
       const choices = data.choices as Array<{ message?: { content?: string } }> | undefined;
       const result = typeof data.text === 'string' ? data.text : choices?.[0]?.message?.content;
       if (!result?.trim()) throw new Error('模型没有返回可显示的正文');
-      onChange({ content: result, textHtml: undefined, textRecoveryRequired: false });
+      if (isCoverWriter && result.trim().startsWith('NEED_INPUT:')) {
+        onChange({ textRecoveryRequired: false });
+        throw new Error(result.trim().slice('NEED_INPUT:'.length).trim());
+      }
+      const formatted = isCoverWriter ? formatCoverSkillReply(result, lockedTitle, selection) : result;
+      if (isCoverWriter) {
+        if (!isCurrentCoverTextOperation(resolvedOperationId)) {
+          await saveCanvasProjects();
+          throw new Error('旧版提示词回执已核对，请重新撰写以使用新版素材');
+        }
+        validateCoverPromptFormat(formatted, lockedTitle);
+      }
+      const coverPrompt = isCoverWriter && !/@图片1(?!\d)/.test(formatted)
+        ? `以 @图片1 为商品外观基准，保留实物结构和配色。\n\n${formatted}` : formatted;
+      onChange({ content: coverPrompt, status: 'success', ...(isCoverWriter ? { coverSourceUrl: mediaSources[0]?.imageUrl, coverPromptOperationId: resolvedOperationId } : {}), textHtml: undefined, textRecoveryRequired: false });
       await saveCanvasProjects();
     } catch (cause) {
-      if (cause instanceof Error && 'submissionRejected' in cause) onChange({ textRecoveryRequired: false });
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '文本生成失败');
+      if (cause instanceof Error && ('submissionRejected' in cause || 'submissionSettled' in cause)) {
+        onChange({ textRecoveryRequired: false, status: 'error', errorMessage: cause.message });
+        await saveCanvasProjects();
+      }
+      if (!controller.signal.aborted) setError(cause instanceof Error ? (isCoverWriter ? cause.message.replace('原文本或05分析结果', '封面提示词结果') : cause.message) : '文本生成失败');
     } finally {
       request.current = null;
-      setBusy(false);
-    }
-  };
-
-  const handlePolishPrompt = async () => {
-    const raw = (node.textPrompt || '').trim();
-    if (!raw || polishing || busy || node.layerLocked) return;
-    setPolishing(true);
-    try {
-      const overrides = getMultimodalClientOverrides(model);
-      const controller = new AbortController();
-      const data = await requestCanvasText(
-        async () => ({
-          model: upstreamModel,
-          ...overrides,
-          prompt: `请将以下指令润色为更加清晰、具体、结构化的中文提示词，直接输出润色后的内容，不要添加额外解释：\n\n${raw}`,
-        }),
-        { usageModel: model, projectId, nodeId: node.id, runId: crypto.randomUUID() },
-        controller.signal,
-      );
-      const choices = data.choices as Array<{ message?: { content?: string } }> | undefined;
-      const result = (typeof data.text === 'string' ? data.text : choices?.[0]?.message?.content)?.trim();
-      if (result) onChange({ textPrompt: result });
-    } catch {
-      // 静默回退
-    } finally {
-      setPolishing(false);
+      setAction(null);
     }
   };
 
@@ -276,7 +286,7 @@ export function CanvasPromptNode({
       className="relative rounded-[18px] bg-white dark:bg-[#1f1f1f]"
     >
       <div className="absolute -top-6 left-0 right-0 z-20 flex items-center gap-1.5 px-0.5 text-xs font-medium text-zinc-600 dark:text-[rgba(245,245,245,0.6)] select-none">
-        {isOptimizer ? <Sparkles size={14} className="shrink-0 text-amber-500" /> : <AlignLeft size={14} className="shrink-0 text-zinc-400" />}
+        {isOptimizer || isCoverWriter ? <Sparkles size={14} className="shrink-0 text-amber-500" /> : <AlignLeft size={14} className="shrink-0 text-zinc-400" />}
         <span className="truncate">{node.title || (isOptimizer ? '视频提示词优化' : '文本')}</span>
         {(node.colorPins?.length ?? 0) > 0 && (
           <span className="ml-0.5 inline-flex items-center gap-1">
@@ -299,6 +309,16 @@ export function CanvasPromptNode({
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
+          {isCoverWriter && node.content && formatCoverPrompt(node.content ?? "") !== node.content && (
+            <button
+              type="button"
+              disabled={busy || node.layerLocked}
+              className="mb-2 text-xs text-amber-600 hover:underline disabled:opacity-50 dark:text-amber-400"
+              onClick={() => onChange({ content: formatCoverPrompt(node.content ?? ""), textHtml: undefined })}
+            >
+              整理提示词断行
+            </button>
+          )}
           {isOptimizer && (
             <div className="beike-compiler-parameters mb-2.5 border-b border-slate-100 dark:border-white/10 pb-2 text-slate-700 dark:text-zinc-200">
               <div className="beike-compiler-parameter">
@@ -425,7 +445,7 @@ export function CanvasPromptNode({
             placeholder={
               isOptimizer
                 ? '描述分镜意图或运镜要求，结合上游参考图生成专业视频提示词…'
-                : '描述任何你想要生成的内容；输入 @ 打开我的资产库'
+                : isCoverWriter ? '可填原标题供改写，或输入「主标题：…」「副标题：…」指定上图文案' : '描述任何你想要生成的内容；输入 @ 打开我的资产库'
             }
             onChange={(nextValue) => onChange({ textPrompt: nextValue })}
             onSubmit={() => {
@@ -438,6 +458,7 @@ export function CanvasPromptNode({
           />
 
           {error && <p role="status" className="mb-2 text-xs text-rose-500 dark:text-rose-400">{error}</p>}
+          {action === 'recover' && <p role="status" className="mb-2 text-xs text-slate-500 dark:text-zinc-400">正在查询原任务，完成后会显示结果</p>}
 
           <div className="mt-1 flex flex-wrap items-center gap-1.5 pt-1">
             <CanvasModelPicker
@@ -457,34 +478,26 @@ export function CanvasPromptNode({
               />
             )}
 
+            {isCoverWriter && (
+              <span
+                title={`封面提示词 Skill v${batchCoverSkill?.version || ''}`}
+                className="inline-flex max-w-full items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-400"
+              >
+                <Sparkles size={12} className="shrink-0" />
+                <span className="truncate">封面提示词 Skill v{batchCoverSkill?.version}</span>
+              </span>
+            )}
+            {isCoverWriter && node.textRecoveryRequired && !busy && <span role="status" className="text-xs text-slate-500 dark:text-zinc-400">等待原请求回执</span>}
+
             <div className="ml-auto flex items-center gap-1">
               <button
-                type="button"
-                aria-label="AI 润色提示词"
-                title={polishing ? '正在润色…' : 'AI 润色提示词'}
-                disabled={busy || polishing || node.layerLocked || !(node.textPrompt || '').trim()}
-                onClick={() => void handlePolishPrompt()}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white disabled:opacity-40 transition-colors cursor-pointer"
-              >
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinejoin="round" className={polishing ? 'animate-spin' : ''}>
-                  <path d="M8 2.2C8.45 5.45 10.55 7.55 13.8 8C10.55 8.45 8.45 10.55 8 13.8C7.55 10.55 5.45 8.45 2.2 8C5.45 7.55 7.55 5.45 8 2.2Z" />
-                </svg>
-              </button>
-              <button
-                type="button" aria-label="语音输入" title={dictating ? '正在听写…' : '语音输入'} aria-pressed={dictating} disabled={busy || node.layerLocked} onClick={handleVoiceInput}
-                className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors cursor-pointer ${
-                  dictating ? 'bg-rose-500/20 text-rose-400' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white'
-                } disabled:opacity-40`}
-              >
-                <Mic size={15} />
-              </button>
-              <button
-                type="button" aria-label="生成文本" title={node.content ? '生成并替换正文' : '生成文本'}
+                type="button" aria-label={busy ? busyLabel : generateLabel}
+                title={busy ? busyLabel : !isCoverWriter && !node.textRecoveryRequired && node.content ? '生成并替换正文' : generateLabel}
                 disabled={busy || node.layerLocked || (!node.textRecoveryRequired && (!canRun || !model))}
                 onClick={() => void generate()}
                 className="flex h-9 min-w-9 items-center justify-center rounded-full bg-slate-900 dark:bg-white px-2 text-xs font-medium text-white dark:text-zinc-900 hover:bg-slate-800 dark:hover:bg-zinc-200 disabled:bg-slate-200 dark:disabled:bg-white/15 disabled:text-slate-400 dark:disabled:text-zinc-500 transition-colors cursor-pointer"
               >
-                {busy ? '生成中…' : node.textRecoveryRequired ? '查询回执' : <ArrowUp size={17} strokeWidth={2.4} />}
+                {busy ? busyLabel : isCoverWriter || node.textRecoveryRequired ? generateLabel : <ArrowUp size={17} strokeWidth={2.4} />}
               </button>
             </div>
           </div>

@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'zustand';
 import { configureDomainRuntime } from '@shared/domain/core/runtime';
-import type { AppState, GenerationTask } from '@client/store';
+import { useAppStore, type AppState, type GenerationTask } from '@client/store';
 import { createHomeSlice } from '@client/store/homeSlice';
 import { sanitizeTaskForStorage } from '@client/store/persist/generation';
 import { GenerationTaskSchema } from '@shared/contracts/generate';
 import { loadPromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 import { agentModelName } from '../components/AgentTurn';
-import { restoreVideoTaskSettings } from '../hooks/useGenerateTaskActions';
+import { useGenerateTaskActions, restoreVideoTaskSettings } from '../hooks/useGenerateTaskActions';
+
+vi.mock('react', async importOriginal => ({ ...await importOriginal<typeof import('react')>(),
+  useCallback: (callback: unknown) => callback, useRef: (value: unknown) => ({ current: value }),
+}));
 
 vi.mock('@client/shared/api/gatewayClient', () => ({ getGatewayClientBaseUrl: () => 'https://metaso.cn/api' }));
 
@@ -39,6 +43,7 @@ beforeEach(() => {
 afterEach(() => {
   configureDomainRuntime({ storage: null });
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('restored video Context IR preferences', () => {
@@ -79,5 +84,22 @@ describe('agentModelName', () => {
 
   it('shows a different model reported by the server', () => {
     expect(agentModelName({ model, modelRouteKey: 'relay-entry', agentTurn: { modelUsed: 'fallback-model' } })).toBe('fallback-model');
+  });
+});
+
+describe('audio history reuse', () => {
+  it('restores the audio mode, route and settings after schema and local storage round trips', () => {
+    const store = createSettingsStore();
+    vi.spyOn(useAppStore, 'getState').mockReturnValue(store.getState());
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+    const task = GenerationTaskSchema.parse({
+      id: 'audio-history', title: '历史语音', prompt: '欢迎回来', model: 'speech-2.8-hd', size: '-', quality: 'high',
+      mediaType: 'audio', audioFormat: 'wav', audioVoice: 'saved-voice', audioSpeed: 0.8,
+      useReferenceImage: false, status: 'SUCCESS', progress: '100%',
+    }) as GenerationTask;
+    const restored = GenerationTaskSchema.parse(JSON.parse(JSON.stringify(sanitizeTaskForStorage(task)))) as GenerationTask;
+    useGenerateTaskActions(vi.fn()).handleReuseTask({ ...restored, modelRouteKey: 'saved-audio-route' });
+    expect(store.getState()).toMatchObject({ quickGenMode: 'audio', quickAudioModel: 'saved-audio-route', quickPrompt: '欢迎回来' });
+    expect(loadPromptPreferences().audio).toMatchObject({ format: 'wav', voice: 'saved-voice', speed: 0.8 });
   });
 });

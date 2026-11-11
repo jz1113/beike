@@ -15,6 +15,7 @@ import {
   resolveAccessToken,
   resolveAppDataDir,
   resolveCli,
+  resolveDatabaseFile,
   startGateway,
   startViteServer,
   viteOk,
@@ -55,7 +56,9 @@ try {
   }
   const envDefaults = readDevApiDefaults(workspaceRoot, isolated);
   resolveCli(workspaceRoot, 'vite', 'vite');
-  ensureAppDatabase(workspaceRoot, appDataDir);
+  const databaseFile = resolveDatabaseFile({ workspaceRoot, appDataDir, isolated });
+  ensureAppDatabase(workspaceRoot, appDataDir, databaseFile);
+  console.log(`→ SQLite${isolated ? '（隔离开发）' : ''}：${databaseFile}`);
   const accessToken = resolveAccessToken(workspaceRoot, appDataDir, { isolated });
   const processOptions = () => webProcessOptions({ apiPort, appDataDir, accessToken });
   if (ownsWebProcess(workspaceRoot, 'gateway', {}, isolated)) {

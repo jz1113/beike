@@ -1,0 +1,36 @@
+{
+  "id": "cover-prompt-writer",
+  "name": "cover-prompt-writer",
+  "displayName": "封面提示词撰写",
+  "description": "根据商品图和标题编写数码封面绘图提示词。适用于单张与 Excel 批量组稿、提示词预检、成图质检及版式入库。",
+  "category": "图像创作",
+  "author": "贝壳",
+  "version": "0.2.1",
+  "icon": "sparkles",
+  "colorTheme": "cyan",
+  "isBuiltin": true,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "tools": [],
+  "meta": {
+    "kind": "creation",
+    "genres": [
+      "图片"
+    ],
+    "tags": [
+      "商品封面",
+      "手机"
+    ]
+  },
+  "source": {
+    "kind": "local",
+    "url": "/skills",
+    "revision": "0.2.1",
+    "license": "随贝壳项目维护",
+    "files": {
+      "SKILL.md": "5100396a332364e7d7a0d40824e183d675ecf0bebb2ca7e018b8475c0b91b29f",
+      "references/phone-layouts.md": "4142da1dbb629fea7e0091b84df7c6053180c70a98a82dabee31416ffb6897b1",
+      "references/phone-reference-prompts.md": "140413b8c0d20b84cd11d61a9be2e57f6c70db6687f9ebb15ff89323a31e7634"
+    }
+  }
+}

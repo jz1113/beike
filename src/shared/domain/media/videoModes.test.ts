@@ -103,13 +103,15 @@ describe('MiniMax H3 channel capabilities', () => {
 
 const comflyUrl = 'https://ai.comfly.org';
 for (const profile of listApprovedModels('video')) for (const mode of videoModeIds(profile.id, comflyUrl)) {
-  it(`${profile.id} / ${mode} validates its selected Comfly input`, () => {
+  it(`${profile.id} / ${mode} validates its selected channel input`, () => {
+    const baseUrl = profile.adapter === 'fal-omni' ? 'https://queue.fal.run'
+      : profile.id.startsWith('kling-4.0') ? 'https://api-singapore.klingai.com' : comflyUrl;
     const images = mode === 'text' || mode === 'extend' || mode === 'edit' ? [] : mode === 'first_last_frame' ? [first, last] : [first];
     const videos = ['edit', 'extend', 'motion_control'].includes(mode) ? [clip] : [];
-    const resolution = videoResolutionOptions(profile.id, mode, comflyUrl)?.[0] || '720P';
-    const duration = videoDurationOptions(profile.id, resolution, mode, comflyUrl)[0];
-    const aspectRatio = videoRatioLocked(profile.id, mode, comflyUrl) ? 'adaptive' : '16:9';
-    const input = { model: profile.id, baseUrl: comflyUrl, refMode: mode, prompt: '人物向前走', images, videos, resolution, duration, aspectRatio };
+    const resolution = videoResolutionOptions(profile.id, mode, baseUrl)?.[0] || '720P';
+    const duration = videoDurationOptions(profile.id, resolution, mode, baseUrl)[0];
+    const aspectRatio = videoRatioLocked(profile.id, mode, baseUrl) ? 'adaptive' : '16:9';
+    const input = { model: profile.id, baseUrl, refMode: mode, prompt: '人物向前走', images, videos, resolution, duration, aspectRatio };
     expect(videoInputError(input)).toBeNull();
   });
 }

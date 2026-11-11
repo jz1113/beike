@@ -1,0 +1,41 @@
+# 参考图索引 v0.2.0
+
+| 附件 | 版式 | 原始文件 | 版式名 |
+|---|---|---|---|
+| 1 | PHONE-01 | `1040g0k0326bdgupc58005qeaikdsqv64sebqhvo!nc_n_webp_mw_1.webp` | 黑顶黄白三行 |
+| 2 | PHONE-02 | `1040g0k03254q40mn4al049okd86ricmdm4val58!nc_n_webp_mw_1.webp` | 红墙粗细双层 |
+| 3 | PHONE-03 | `1040g2sg322tvrcrr6u705pmtu06ne22gvsfgi5o!nc_n_webp_mw_1.webp` | 户外低机位侧列 |
+| 4 | PHONE-04 | `1040g0k0325lh99434c005nt3pvd0bt1mvf2s7n8!nc_n_webp_mw_1.webp` | 浅室内圆黑手绘 |
+| 5 | PHONE-05 | `1040g2sg325uimo4f58e05oih8fvgk565o0040a8!nc_n_webp_mw_1.webp` | 银灰俯拍跨屏黑边 |
+| 6 | PHONE-06 | `1040g2sg326bl9rq8ke005p54trpn5fnvohrie38!nc_n_webp_mw_1.webp` | 红纹斜握左上字 |
+| 8 | PHONE-08 | `1040g3k0325g7ioqakq205n90er74mntg6ijbrbg!nc_n_webp_mw_1.webp` | 蓝天麦地蜡笔字 |
+| 9 | PHONE-09 | `1040g34o31ohjod43520g5ng2549g8opv9lfq860!nc_n_webp_mw_1.webp` | 暖木三格左下白字 |
+| 10 | PHONE-10 | `1040g34o326life4t46105nn9u47gbvkav0ufkq8!nc_n_webp_mw_1.webp` | 黑顶格台橙色词 |
+| 11 | PHONE-11 | `1040g34o327bf110pme1g5nv1nk00875qmafdq48!nc_n_webp_mw_1.webp` | 键盘桌暖点数字 |
+| 12 | PHONE-12 | `1040g0k0321nfjguon4005nn9u47gbvkasg29560!nc_n_webp_mw_1.webp` | 杂志台面荧光窄黑 |
+| 13 | PHONE-13 | `1040g34o3267if8mu4a0g5nd86p3g8u01dfradfo!nc_n_webp_mw_1.webp` | 草地暗框白字 |
+| 14 | PHONE-14 | `1040g34o32653pk5b4a105n4l5u943fv9v4mm1hg!nc_n_webp_mw_1.webp` | 浅绿窗光粗细右齐 |
+| 15 | PHONE-15 | `1040g0k03202m44ac54005nn9u47gbvkabdia9m8!nc_n_webp_mw_1.webp` | 灰台运动相机黄绿大字 |
+| 16 | PHONE-16 | `1040g00831tid93rsm20048r96n5vha9fjoeutb0!nc_n_webp_mw_1.webp` | 深灰荧光绿重黑 |
+| 17 | PHONE-17 | `1040g0k032116ngp8n2005nn9u47gbvka7qf6kko!nc_n_webp_mw_1.webp` | 暖帘手持相机黄绿标题 |
+| 18 | PHONE-18 | `1040g2sg31udpvfu434g05nn9u47gbvkanal9oqo!nc_n_webp_mw_1.webp` | 冷灰台面相机白色重字 |
+| 19 | PHONE-19 | `1040g008325ph6up4kq6g5otdriopgtkpcdjlttg!nc_n_webp_mw_1.webp` | 横持镜头斜黄字 |
+| 20 | PHONE-20 | `1040g2sg323d0gsn1mse05pipmadhos4a3po49lg!nc_n_webp_mw_1.webp` | 奶油织物耳机黄手写 |
+| 21 | PHONE-21 | `1040g008326uk0a0570705n90er74mntgdsh0gpg!nc_n_webp_mw_1.webp` | 蓝海浅青手写列 |
+| 22 | PHONE-22 | `1040g0083230po8q17a005n0r0nahl09i7e5jpqg!nc_n_webp_mw_1.webp` | 绿散景多行斜字 |
+| 23 | PHONE-23 | `cover_00001.jpg` | 石台横置黄青描边 |
+| 24 | PHONE-24 | `1040g2sg3271ef50970e05n90er74mntg0gdmgi8!nc_n_webp_mw_1.webp` | 深绿林地斜掌黄绿手写 |
+| 25 | PHONE-25 | `cover_00003.png` | 键盘暗顶红白错位 |
+| 26 | PHONE-26 | `cover_00004.jpg` | 木桌手持红白双行 |
+| 27 | PHONE-27 | `1040g34o322rlkr6qn2105nn9u47gbvkaq7oggho!nc_n_webp_mw_1.webp` | 蓝灰百叶横置平板 |
+| 28 | PHONE-28 | `cover_00004.png` | 暖点散景中带青白 |
+| 29 | PHONE-29 | `cover_00006.jpg` | 深毡俯拍红白错位 |
+| 30 | PHONE-30 | `1040g34o327blqhvh6g0g5nn9u47gbvkambs1tq0!nc_n_webp_mw_1.webp` | 暖帘台面米白细斜字 |
+| 31 | PHONE-31 | `cover_00006.png` | 蓝天仰拍白字下斜 |
+| 32 | PHONE-32 | `cover_00007.png` | 深室内衬线双标题 |
+| 33 | PHONE-33 | `cover_00008.png` | 灰墙墨绿刷带 |
+| 34 | PHONE-34 | `1040g008322trnooq6se05pipmadhos4a4imh0q0!nc_n_webp_mw_1.webp` | 紫灰手持蓝色手写 |
+| 35 | PHONE-35 | `cover_00012.png` | 红黑边框镜头特写 |
+| 36 | PHONE-36 | `1040g008326cjqkpal0eg5npfu990bpkc4k2kmdg!nc_n_webp_mw_1.webp` | 浅色收纳台云台黑边斜字 |
+| 37 | PHONE-37 | `cover_00015.jpg` | 青绿暗室黄字 |
+| 38 | PHONE-38 | `cover_00017.jpg` | 斜格窗影红白同排 |

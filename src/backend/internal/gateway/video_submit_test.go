@@ -31,6 +31,27 @@ func TestSubmitVideoStopsOnServerError(t *testing.T) {
 	}
 }
 
+func TestSubmitVideoRetainsBilledFailureWithoutEndpointRetry(t *testing.T) {
+	for _, status := range []int{http.StatusOK, http.StatusBadRequest, http.StatusNotFound, http.StatusRequestTimeout, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			attempts := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				attempts++
+				w.WriteHeader(status)
+				_, _ = io.WriteString(w, `{"message":"Missing required parameter 'input'","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}}`)
+			}))
+			defer server.Close()
+			result := SubmitVideo(context.Background(), SubmitCommand{
+				Endpoints: []string{server.URL + "/first", server.URL + "/fallback"}, PayloadJSON: `{}`, Client: server.Client(), RetryOnMissingInput: true,
+			})
+			usage := NormalizeUsage(result.Data)
+			if attempts != 1 || result.Outcome != Unknown || usage == nil || usage["totalTokens"] != float64(12) {
+				t.Fatalf("billed response lost or replayed: result=%+v attempts=%d", result, attempts)
+			}
+		})
+	}
+}
+
 func TestSubmitVideoSwitchesOnlyOn404(t *testing.T) {
 	seen := []string{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

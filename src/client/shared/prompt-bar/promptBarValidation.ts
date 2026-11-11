@@ -32,6 +32,7 @@ import { formatSubjectName, type SubjectItem } from './promptBarConstants';
 import { getRefMediaIdentity, resolveRefMediaFile, resolveRefMediaIdentity, resolveRefMediaName } from '@client/shared/media/refMediaRegistry';
 
 export interface PromptBarSubmitInput {
+  imageQuality?: GenerationTask['imageQuality'];
   quickGenMode: QuickGenMode;
   quickPrompt: string;
   quickRefImages: string[];

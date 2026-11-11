@@ -6,6 +6,7 @@ import { configureDomainRuntime } from '@shared/domain/core/runtime';
 import GenerationBatchPanel, { initialBatchDraft } from './GenerationBatchPanel';
 import { resolveBatchModelSummary, resolvePreferredBatchModel } from './GenerationBatchSettings';
 import type { GenerationPromptSource } from './generationBatchSources';
+import { useAppStore } from '@client/store';
 
 const data = new Map<string, string>();
 const storage = {
@@ -49,6 +50,7 @@ const imageSource: GenerationPromptSource = {
 
 describe('GenerationBatchPanel and GenerationBatchSettings', () => {
   it('defaults to collapsed bar showing active model badge and quick generate button, and renders visual controls when expanded', () => {
+    useAppStore.setState({ quickModel: 'gpt-image-2', quickQuality: 'high' });
     const collapsedHtml = renderToStaticMarkup(createElement(GenerationBatchPanel, { source: imageSource }));
     expect(collapsedHtml).toContain('共 1 项：1 张图片');
     expect(collapsedHtml).not.toContain('0 条视频');

@@ -13,7 +13,9 @@ export type ModelVendorId =
   | 'anthropic'
   | 'deepseek'
   | 'moonshot'
-  | 'vidu';
+  | 'vidu'
+  | 'zhipu'
+  | 'xiaomi';
 
 export type VideoAudioSupportType = 'controllable' | 'default_off' | 'prompt_controlled';
 
@@ -33,7 +35,7 @@ export interface ApprovedModel {
   defaultSize?: string;
   supportEdits?: boolean;
   supportedDurations?: number[];
-  supportedResolutions?: Array<'480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K'>;
+  supportedResolutions?: Array<'360P' | '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K'>;
   supportedAspectRatios?: string[];
   audioSupport?: VideoAudioSupportType;
 }

@@ -69,12 +69,13 @@ func SubmitVideo(ctx context.Context, command SubmitCommand) SubmitResult {
 		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
 		status, data, err := postJSON(attemptCtx, client, endpoint, command)
 		cancel()
+		result.Data = data
+		result.UpstreamStatus = status
 		if err != nil {
 			result.Outcome = Unknown
 			result.Error = "视频提交响应未确认"
 			return result
 		}
-		result.UpstreamStatus = status
 		taskID := ""
 		if command.ReadTaskID != nil {
 			taskID = command.ReadTaskID(data)
@@ -82,7 +83,6 @@ func SubmitVideo(ctx context.Context, command SubmitCommand) SubmitResult {
 		if status >= 200 && status < 300 && taskID != "" {
 			result.Outcome = Accepted
 			result.TaskID = taskID
-			result.Data = data
 			result.Error = ""
 			return result
 		}
@@ -94,7 +94,7 @@ func SubmitVideo(ctx context.Context, command SubmitCommand) SubmitResult {
 			rawMessage = "响应未返回任务 ID：" + rawMessage
 		}
 		result.Error = PresentVideoError(rawMessage)
-		if status >= 200 && status < 300 || status >= 500 {
+		if status >= 200 && status < 300 || status >= 500 || status == http.StatusRequestTimeout || NormalizeUsage(data) != nil {
 			result.Outcome = Unknown
 			result.TaskID = taskID
 			return result

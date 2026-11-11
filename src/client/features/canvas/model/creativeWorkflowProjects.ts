@@ -1,10 +1,21 @@
 import { copyCanvasSpecialized } from './canvasNodeFactory';
-import { compilerSettings, studioEdgeSources, studioNodeKind, studioNodeMedia } from './studioConnections';
+import { syncEdgesWithNodeReferences } from './canvasGraph';
+import { hideCoverBatchNodes } from './coverBatch';
+import { canConnectStudioNodes, compilerSettings, studioEdgeSources, studioNodeKind, studioNodeMedia } from './studioConnections';
+import { studioNodeToCanvasNode } from './studioSceneAdapter';
 import type { CanvasNode, CanvasProject, StudioScene } from './types';
 
 export type NativeCommerceKind = 'sales' | 'workshop' | 'poster';
 export const nativeCommerceTitles: Record<NativeCommerceKind,string> = { sales: '商品短片', workshop: '商品图文', poster: '商品封面' };
-const commerceBriefPlaceholder = '填写商品名称、已核实卖点、受众与画面要求。封面请填写准确标题；视频请填写时长与是否需要口播。不要虚构功效或价格。';
+export const commerceBriefPlaceholder = '填写商品名称、已核实卖点、受众与画面要求。封面请填写准确标题；视频请填写时长与是否需要口播。不要虚构功效或价格。';
+
+const oldPosterGuide = '需要参考风格时，先上传封面样张，再将「封面风格参考」连接到绘图提示词或图片生成节点；不用样张时保持断开。';
+const priorPosterGuide = '上传一张手机商品图 → 撰写封面提示词 → 生成封面 → 预览并下载。创作要求可选；下载沿用商品图原主文件名。';
+const previousPosterGuide = '上传商品图 → 撰写提示词 → 生成封面 → 成图质检 → 下载。批量可上传 Excel 并在右上角运行，质检通过后下载当前批次 ZIP。';
+const boardPosterGuide = '单张：上传商品图 → 撰写提示词 → 生成封面 → 成图质检 → 下载。批量：上传 Excel 后在右上角运行，成品保存后可直接下载当前批次 ZIP。';
+const separateInputPosterGuide = '单张：上传商品图 → 撰写提示词 → 生成封面 → 成图质检 → 下载。Excel 批量的执行、成品预览和 ZIP 下载集中在右上角。';
+const posterGuide = '在「商品素材」上传商品图或 Excel。单张沿画布生成并质检。批量从右上角执行、预览和下载 ZIP，两种方式共用画布中的文本和绘图模型。';
+const splitPosterGuide = '上传商品图 → 撰写提示词 → 生成封面 → 成图质检 → 下载。Excel 请到下方的批量制作区上传。';
 
 export function validateNativeCommerceInputs(project: CanvasProject | undefined, nodeId: string) {
   const scene = project?.studioScene;
@@ -16,15 +27,17 @@ export function validateNativeCommerceInputs(project: CanvasProject | undefined,
   const prefix = nodeId.slice(0, -stage.length - 1);
   const textStage = prefix + (kind === 'sales' ? '-script' : '-design');
   const textOnly = stage === 'spoken' || stage === 'copy';
-  const target = textOnly ? nodeId : textStage;
+  const target = textOnly || kind === 'poster' ? nodeId : textStage;
   const linked = new Set(scene.connections.filter(edge => edge.to === target && (!edge.inputType || edge.inputType === 'default'))
     .flatMap(edge => studioEdgeSources(edge, scene)));
   const brief = scene.nodes.find(node => node.id === `${prefix}-brief` && linked.has(node.id));
   const body = brief && (compilerSettings(brief).text ?? brief.content);
-  const hasBrief = typeof body === 'string' && Boolean(body.replace(/\s/g, '').replace(commerceBriefPlaceholder, ''));
-  const product = scene.nodes.find(node => node.id === `${prefix}-product` && linked.has(node.id));
+  const hasBrief = typeof body === 'string' && Boolean(body.replace(commerceBriefPlaceholder, '').trim());
+  const product = scene.nodes.find(node => linked.has(node.id) && (kind === 'poster'
+    ? node.id !== `${prefix}-reference` && studioNodeKind(node) === 'image' && !node.isGenerating && !node.missingMedia && Boolean(studioNodeMedia(node).url)
+    : node.id === `${prefix}-product`));
   const hasImage = product && studioNodeKind(product) === 'image' && !product.isGenerating && !product.missingMedia && studioNodeMedia(product).url;
-  const missing = [!textOnly && !hasImage && '上传并连接商品参考图', !hasBrief && '填写并连接商品信息与创作要求'].filter(Boolean);
+  const missing = [!textOnly && !hasImage && '上传并连接商品参考图', kind !== 'poster' && !hasBrief && '填写并连接商品信息与创作要求'].filter(Boolean);
   if (missing.length) throw new Error(`请先${missing.join('，再')}`);
 }
 
@@ -40,8 +53,9 @@ export function createNativeCommerceProject(kind: NativeCommerceKind, id: string
   };
   const link = (from:string,to:string) => connections.push({ id:`${id}-${from}-${to}`,from:`${id}-${from}`,to:`${id}-${to}` });
   const text = (key:string,title:string,x:number,y:number,prompt:string) => node(key,'text-node',title,x,y,prompt,{textNodeComposerPromptExpanded:true,beikeTextResultRequired:true});
-  node('product','input-image','商品参考图',80,100,'',{mediaType:'image'});
-  node('brief','text-node','商品信息与创作要求',80,500,'',{aiGenerated:true,text:commerceBriefPlaceholder});
+  const poster = kind === 'poster';
+  node('product','input-image',poster ? '商品素材' : '商品参考图',80,100,'',{mediaType:'image', ...(poster && { beikeCoverSharedInput: true })});
+  if (!poster) node('brief','text-node','商品信息与创作要求',80,500,'',{aiGenerated:true,text:commerceBriefPlaceholder});
   if(kind==='sales') {
     text('script','商品短片分镜',500,100,'根据商品图与上游事实制作一条短视频分镜。保持同一商品外观，明确动作、镜头、时长与声音；不编造卖点。只输出一条可直接给视频模型执行的完整中文提示词，不附分析、表格或代码围栏。默认5秒竖屏产品展示，用户要求优先。');
     link('product','script');link('brief','script');
@@ -57,31 +71,244 @@ export function createNativeCommerceProject(kind: NativeCommerceKind, id: string
     node('preview','preview','短片预览',1760,100);link('video','preview');
     node('save','local-save','下载商品短片',2180,100);link('video','save');
   } else {
-    const poster=kind==='poster';
-    if(poster) { node('reference','input-image','封面风格参考（可选）',80,900,'',{mediaType:'image'}); }
-    text('design',poster?'封面绘图提示词':'商品场景绘图提示词',500,100,poster
-      ? '根据商品参考图与准确标题设计一张中文封面。保持商品结构、颜色和标识；标题醒目且准确，布局留白清晰，不添加未核实信息。只输出一条完整中文绘图提示词，可直接给图片模型执行，不附分析或代码围栏。默认3:4竖版。'
-      : '根据商品参考图与已核实事实，设计一张自然可信的电商场景图。保持商品外观，不添加虚构配件、价格和功效。明确构图、环境、光线、材质及商品位置。只输出一条可直接执行的中文生图提示词，不附分析或代码围栏。');
-    link('product','design');link('brief','design');
+    if (poster) node('design','text-node','封面提示词撰写',500,100,'',{beikeCoverPromptWriter:true,beikeTextResultRequired:true});
+    else text('design','商品场景绘图提示词',500,100,'根据商品参考图与已核实事实，设计一张自然可信的电商场景图。保持商品外观，不添加虚构配件、价格和功效。明确构图、环境、光线、材质及商品位置。只输出一条可直接执行的中文生图提示词，不附分析或代码围栏。');
+    link('product','design');
+    if (!poster) link('brief','design');
     node('image','gen-image',poster?'商品封面生成':'商品场景图生成',920,100,poster?'按上游设计生成一张完整封面，精确呈现已确认标题，保持商品外观。':'按已确认绘图提示词生成商品场景图，保持商品参考图外观。',{ratio:poster?'3:4':'3:4',batchCount:1,beikeRequiredInputs:[`${id}-product`,`${id}-design`]});
     link('product','image');link('design','image');
-    node('preview','preview',poster?'封面预览':'场景图预览',1340,100);link('image','preview');
-    node('save','local-save',poster?'下载商品封面':'下载商品图片',1760,100);link('image','save');
-    if(poster) {
-      // An optional reference stays disconnected until the user supplies it.
-      // Connecting an empty upload would incorrectly block every generation.
-      node('guide','text-node','风格参考的用法',500,900,'',{aiGenerated:true,text:'需要参考风格时，先上传封面样张，再将「封面风格参考」连接到绘图提示词或图片生成节点；不用样张时保持断开。'});
-    } else {
+    node('save','local-save',poster?'下载商品封面':'下载商品图片',poster ? 2100 : 1760,100);link('image','save');
+    if (!poster) {
+      node('preview','preview','场景图预览',1340,100);link('image','preview');
       text('copy','商品发布文案',500,500,'根据上游商品事实写简洁的标题、正文与话题标签。不得编造价格、促销、材质或功效。仅输出可发布的文案。');link('brief','copy');
       node('copy-save','local-save','下载发布文案',920,500);link('copy','copy-save');
     }
   }
-  return { id,title:nativeCommerceTitles[kind],createdAt:now,updatedAt:now,draft:false,nodes:[],nativeCommerce:{kind,version:1},
-    studioScene:{nodes,connections,groups:[],strokes:[],textBoxes:[],view:{x:35,y:70,zoom:0.75}} };
+  const project: CanvasProject = { id,title:nativeCommerceTitles[kind],createdAt:now,updatedAt:now,draft:false,nodes:[],nativeCommerce:{kind,version:1},
+    studioScene:{nodes,connections,groups:[],strokes:[],textBoxes:[],view:poster ? {x:35,y:45,zoom:0.55} : {x:35,y:70,zoom:0.75}} };
+  return poster ? addCoverWorkflowNodes(project, true) : project;
+}
+
+function addCoverWorkflowNodes(project: CanvasProject, fresh = false): CanvasProject {
+  const { nativeCommerce, studioScene: scene } = project;
+  if (!scene || !nativeCommerce || nativeCommerce.coverFlowNodes) return project;
+  const nodes = [...scene.nodes];
+  const renderCandidates = nodes.filter(node => node.type === 'gen-image' && node.id.endsWith('-image') &&
+    nodes.some(source => source.id === node.id.replace(/-image$/, '-product')));
+  const render = renderCandidates.find(node => node.id === project.id + '-image') ??
+    (renderCandidates.length === 1 ? renderCandidates[0] : undefined);
+  if (!render) return project;
+  const id = render.id.slice(0, -'-image'.length);
+  const find = (key: string) => nodes.find(node => node.id === `${id}-${key}`);
+  const product = find('product')!;
+  const save = find('save');
+  const defaultWriter = find('design');
+  const writer = coverWorkflowWriter(scene, render) ?? (defaultWriter &&
+    compilerSettings(defaultWriter).beikeCoverPromptWriter === true ? defaultWriter : undefined);
+  if (!writer) return project;
+  const px = Number(product.x ?? 80);
+  const py = Number(product.y ?? 100);
+  const rx = Number(render.x ?? 920);
+  const ry = Number(render.y ?? 100);
+  const sx = Number(save?.x ?? rx + 785);
+  const sy = Number(save?.y ?? ry);
+  const connections = [...scene.connections];
+  const targets = new Set<string>();
+  const add = (key: string, type: string, title: string, x: number, y: number, width: number, height: number,
+    settings: Record<string, unknown> = {}): StudioScene['nodes'][number] => {
+    const existing = find(key);
+    if (existing) return existing;
+    const occupied = nodes.filter(node => !compilerSettings(node).beikeLayerHidden)
+      .map(node => ({ x: Number(node.x ?? 80), y: Number(node.y ?? 100), width: Number(node.width ?? 340), height: Number(node.height ?? 300) }))
+      .filter(rect => Object.values(rect).every(Number.isFinite) && x < rect.x + rect.width + 28 && x + width + 28 > rect.x)
+      .sort((a, b) => a.y - b.y);
+    for (const rect of occupied) {
+      if (y < rect.y + rect.height + 52 && y + height + 52 > rect.y) y = rect.y + rect.height + 52;
+    }
+    const node = { id: `${id}-${key}`, type, nodeName: title, x, y, width, height, settings };
+    nodes.push(node);
+    return node;
+  };
+  const link = (source: StudioScene['nodes'][number], target: StudioScene['nodes'][number]) => {
+    const { id: from } = source;
+    const { id: to } = target;
+    if (connections.some(edge => edge.from === from && edge.to === to)) return true;
+    if (canConnectStudioNodes(source, target, connections) === false) return false;
+    connections.push({ id: `${from}:${to}`, from, to });
+    targets.add(to);
+    return true;
+  };
+
+  const title = add('brief', 'text-node', '标题确认', px, py + 380, 300, 155);
+  const titleSettings = compilerSettings(title);
+  const stockTitle = title.nodeName === '商品信息与创作要求' &&
+    (titleSettings.text ?? title.content) === commerceBriefPlaceholder;
+  const updatedTitle = stockTitle ? {
+    ...title, nodeName: '标题确认', content: '', settings: { ...titleSettings, text: '' },
+  } : title;
+  if (stockTitle) nodes[nodes.indexOf(title)] = updatedTitle;
+  const reference = add('reference', 'input-image', '封面风格参考（可选）', px, py + 610, 280, 220, { mediaType: 'image' });
+  const layout = add('cover-layout', 'preview', '版式候选', rx, ry + 400, 250, 310, { beikeCoverStage: 'layout' });
+  const compare = add('cover-compare', 'image-compare', '成图对照', fresh ? rx + 385 : Math.min(rx + 385, sx - 380),
+    fresh ? ry : ry + 380, 340, 300, { beikeCoverStage: 'compare' });
+  const review = add('cover-review', 'preview', '成图质检', fresh ? rx + 785 : sx,
+    fresh ? ry : sy + 380, 300, 250, { beikeCoverStage: 'review' });
+  link(updatedTitle, writer);
+  link(reference, writer);
+  link(reference, layout);
+  link(writer, layout);
+  link(render, layout);
+  link(render, compare);
+  link(compare, review);
+  if (save) {
+    const direct = connections.findIndex(edge => edge.from === render.id && edge.to === save.id &&
+      !edge.fromGroupId && !(Array.isArray(edge.fromGroupNodeIds) && edge.fromGroupNodeIds.length) && (!edge.inputType || edge.inputType === 'default'));
+    if (direct >= 0 && link(review, save)) {
+      connections.splice(direct, 1);
+      targets.add(save.id);
+    }
+  }
+
+  const studioScene = { ...scene, nodes, connections };
+  const next = { ...project, nativeCommerce: { ...nativeCommerce, coverFlowNodes: true as const }, studioScene };
+  if (!project.nodes.length) return next;
+  const canvasNodes = project.nodes.map(node => {
+    if (stockTitle && node.id === title.id && (!node.content || node.content === commerceBriefPlaceholder)) {
+      return { ...node, title: '标题确认', content: '', studioRaw: updatedTitle };
+    }
+    if (!targets.has(node.id)) return node;
+    const refs = [...new Set(connections.filter(edge => edge.to === node.id).flatMap(edge => studioEdgeSources(edge, studioScene)))];
+    return { ...node, referenceNodeIds: refs };
+  });
+  canvasNodes.push(...[updatedTitle, reference, layout, compare, review].filter(raw => !canvasNodes.some(node => node.id === raw.id))
+    .map(raw => studioNodeToCanvasNode(raw, studioScene, project.createdAt)));
+  return { ...next, nodes: canvasNodes, edges: syncEdgesWithNodeReferences(canvasNodes, project.edges) };
+}
+
+export function coverWorkflowWriter(scene: StudioScene, render: StudioScene['nodes'][number]) {
+  const upstreamIds = new Set(scene.connections.filter(edge => edge.to === render.id && (!edge.inputType || edge.inputType === 'default'))
+    .flatMap(edge => studioEdgeSources(edge, scene)));
+  const writers = scene.nodes.filter(node => upstreamIds.has(node.id) && node.type === 'text-node' &&
+    compilerSettings(node).beikeCoverPromptWriter === true);
+  return writers.length === 1 ? writers[0] : undefined;
+}
+
+function unifyCoverInputs(project: CanvasProject): CanvasProject {
+  const scene = project.studioScene;
+  if (!scene) return project;
+  const product = scene.nodes.find(node => node.id === project.id + '-product') ??
+    scene.nodes.find(node => node.type === 'input-image' && node.id.endsWith('-product') &&
+      scene.nodes.some(render => render.id === node.id.replace(/-product$/, '-image') && render.type === 'gen-image'));
+  const upload = product && scene.nodes.find(node => node.id === product.id.replace(/-product$/, '-cover-check') &&
+    (compilerSettings(node).beikeCoverStage === 'check' ||
+      (node.type === 'input-image' && (node.nodeName === '商品图上传' || compilerSettings(node).beikeCoverProductUpload === true))));
+  const replacements = new Map<string, StudioScene['nodes'][number]>();
+  const affected = new Set<string>();
+  const dedicated = upload?.type === 'input-image' && compilerSettings(upload).beikeCoverStage !== 'check';
+  if (product && (compilerSettings(product).beikeCoverSharedInput !== true || upload)) {
+    const input = dedicated ? upload : product;
+    const media = studioNodeMedia(input);
+    const settings = { ...compilerSettings(product) };
+    if (dedicated) {
+      // The dedicated upload was the live single-image input. Its empty state supersedes any
+      // image left behind on the Excel card by an older version.
+      for (const key of ['_blobUrl', 'imageUrl', '_localCacheAssetId', '_contentAssetId', '_assetId', 'generatedImages', 'generationVersions']) {
+        delete settings[key];
+      }
+      settings.beikeOriginalFileName = compilerSettings(input).beikeOriginalFileName;
+    }
+    replacements.set(product.id, { ...product, nodeName: '商品素材', content: media.url || undefined,
+      imageUrl: media.url || undefined, _contentAssetId: media.assetId, assetId: undefined, missingMedia: input.missingMedia,
+      settings: { ...settings, beikeCoverSharedInput: true } });
+  }
+  for (const node of scene.nodes) {
+    const settings = compilerSettings(node);
+    const isTitle = settings.beikeCoverStage === 'title';
+    const required = settings.beikeRequiredInputs;
+    const moved = upload && product && Array.isArray(required) && required.includes(upload.id);
+    if (!isTitle && !moved) continue;
+    const next = { ...settings };
+    if (isTitle) delete next.beikeCoverStage;
+    if (moved) next.beikeRequiredInputs = [...new Set(required.map(id => id === upload.id ? product.id : id))];
+    replacements.set(node.id, { ...node, settings: next });
+  }
+  if (!replacements.size && !upload) return project;
+  let connections = scene.connections;
+  let groups = scene.groups;
+  if (upload && product) {
+    const seen = new Set<string>();
+    const replace = (id: string) => id === upload.id ? product.id : id;
+    groups = groups.map(group => {
+      const entry = group as { nodeIds?: string[] } | null;
+      return entry?.nodeIds?.includes(upload.id) ? { ...entry, nodeIds: entry.nodeIds.filter(id => id !== upload.id) } : group;
+    });
+    connections = connections.flatMap(edge => {
+      const groupIds = studioEdgeSources(edge, scene);
+      if (edge.to === upload.id) return [];
+      const from = replace(edge.from);
+      if (from === edge.to) return [];
+      if (edge.from === upload.id || groupIds.includes(upload.id)) affected.add(edge.to);
+      const grouped = Boolean(edge.fromGroupId || Array.isArray(edge.fromGroupNodeIds));
+      if (from === product.id && !grouped) {
+        const key = JSON.stringify([edge.to, edge.inputType || 'default']);
+        if (seen.has(key)) return [];
+        seen.add(key);
+      }
+      if (from === edge.from && !groupIds.includes(upload.id)) return [edge];
+      return [{ ...edge, from, ...(grouped ? { fromGroupNodeIds: [...new Set(groupIds.map(replace))] } : {}) }];
+    });
+  }
+  const studioScene = { ...scene, nodes: scene.nodes.filter(node => node.id !== upload?.id).map(node => replacements.get(node.id) ?? node),
+    connections, groups };
+  const nodes = project.nodes.filter(node => node.id !== upload?.id).map(node => {
+    const raw = replacements.get(node.id);
+    if (raw && node.id === product?.id) return studioNodeToCanvasNode(raw, studioScene, node.createdAt);
+    const next = raw ? { ...node, studioRaw: raw } : node;
+    if (!affected.has(node.id)) return next;
+    const refs = [...new Set(connections.filter(edge => edge.to === node.id).flatMap(edge => studioEdgeSources(edge, studioScene)))];
+    return { ...next, referenceNodeIds: refs };
+  });
+  return { ...project, studioScene, nodes, edges: project.nodes.length ? syncEdgesWithNodeReferences(nodes, project.edges) : project.edges };
 }
 
 /** Keep the former scene and backing business records; never cancel submitted tasks during migration. */
 export function upgradeNativeCommerceProject(project:CanvasProject):CanvasProject {
+  if (project.nativeCommerce?.kind === 'poster' && project.studioScene) {
+    project = restorePosterUploadNode(project);
+    const savedScene = project.studioScene!;
+    let scene = hideCoverBatchNodes(savedScene);
+    if (scene !== savedScene) {
+      const changed = new Map(scene.nodes.flatMap((node, index) =>
+        node === savedScene.nodes[index] ? [] : [[node.id, node] as const]));
+      const source = scene.nodes.find(node => node.id === project.id + '-product');
+      const mainBottom = Math.max(0, ...scene.nodes.filter(node => !compilerSettings(node).beikeLayerHidden && !compilerSettings(node).beikeFoldedInGroupId)
+        .map(node => (Number(node.y) || 0) + (Number(node.height) || 300)));
+      const recoverView = (view: StudioScene['view']) =>
+        source && view?.zoom > 0 && -view.y / view.zoom >= mainBottom
+          ? { x: 80 - (Number(source.x) || 0) * view.zoom, y: 100 - (Number(source.y) || 0) * view.zoom, zoom: view.zoom }
+          : view;
+      scene = { ...scene, view: recoverView(scene.view) };
+      project = { ...project, viewport: project.viewport && recoverView(project.viewport), nodes: project.nodes.map(node => {
+        const raw = changed.get(node.id);
+        return raw ? { ...node, studioRaw: raw, layerHidden: true } : node;
+      }) };
+    }
+    const referenceId = project.id + '-reference';
+    const nodes = scene.nodes.filter(node => node.id !== referenceId || studioNodeMedia(node).url ||
+      scene.connections.some(edge => edge.from === referenceId || edge.to === referenceId));
+    const guideId = project.id + '-guide';
+    const guide = nodes.find(node => node.id === guideId);
+    const previousGuides = [oldPosterGuide, priorPosterGuide, previousPosterGuide, boardPosterGuide, separateInputPosterGuide];
+    if (!guide || !previousGuides.includes(String(compilerSettings(guide).text))) {
+      return unifyCoverInputs(addCoverWorkflowNodes({ ...project, studioScene: { ...scene, nodes } }));
+    }
+    const updatedGuide = { ...guide, nodeName: '封面制作步骤', settings: { ...compilerSettings(guide), text: posterGuide } };
+    return unifyCoverInputs(addCoverWorkflowNodes({ ...project,
+      studioScene: { ...scene, nodes: nodes.map(node => node.id === guideId ? updatedGuide : node) },
+      nodes: project.nodes.map(node => node.id === guideId && previousGuides.includes(node.content || '')
+        ? { ...node, content: posterGuide, studioRaw: updatedGuide } : node),
+    }));
+  }
   if(project.nativeCommerce || !project.studioScene || !(project.sales||project.workshop||project.poster))return project;
   const scene=project.studioScene;
   const kind=project.sales?'sales':project.workshop?'workshop':'poster';
@@ -96,7 +323,41 @@ export function upgradeNativeCommerceProject(project:CanvasProject):CanvasProjec
     if(source) next.studioScene!.nodes.find(node=>node.id===`${project.id}-product`)!.content=source.url;
   }
   const outputs=scene.nodes.filter(node=>(node.settings as Record<string,unknown>)?.beikeBusinessOutput);
-  return {...project,nodes:[],edges:undefined,nativeCommerce:{kind,version:1,legacyScene:scene},studioScene:{...next.studioScene!,nodes:[...next.studioScene!.nodes,...outputs.map((node,index)=>({...node,x:80+index*380,y:1400}))]}};
+  return {...project,nodes:[],edges:undefined,nativeCommerce:{...next.nativeCommerce!,legacyScene:scene},studioScene:{...next.studioScene!,nodes:[...next.studioScene!.nodes,...outputs.map((node,index)=>({...node,x:80+index*380,y:1400}))]}};
+}
+
+/** Restore workbooks that may have already been saved while the split canvas was open. */
+function restorePosterUploadNode(project: CanvasProject): CanvasProject {
+  const scene = project.studioScene!;
+  const splitId = project.id + '-cover-batch';
+  const split = scene.nodes.find(node => node.id === splitId);
+  const productId = project.id + '-product';
+  if (!split || !scene.nodes.some(node => node.id === productId)) return project;
+  const guideId = project.id + '-guide';
+  const batch = compilerSettings(split).beikeCoverBatch;
+  const changes = new Map<string, StudioScene['nodes'][number]>();
+  const nodes = scene.nodes.filter(node => node.id !== splitId).map(node => {
+    const settings = compilerSettings(node);
+    let next: Record<string, unknown> | undefined;
+    if (node.id === productId && batch && !settings.beikeCoverBatch) next = { ...settings, beikeCoverBatch: batch };
+    else if (node.id === guideId && settings.text === splitPosterGuide) next = { ...settings, text: posterGuide };
+    if (!next) return node;
+    const restored = { ...node, settings: next };
+    changes.set(node.id, restored);
+    return restored;
+  });
+  return {
+    ...project,
+    studioScene: { ...scene, nodes, connections: scene.connections.filter(edge => edge.from !== splitId && edge.to !== splitId) },
+    nodes: project.nodes.filter(node => node.id !== splitId).map(node => {
+      const raw = changes.get(node.id);
+      if (!raw) return node;
+      return { ...node, studioRaw: raw,
+        ...(node.id === guideId && node.content === splitPosterGuide ? { content: posterGuide } : {}),
+      };
+    }),
+    edges: project.edges?.filter(edge => edge.sourceNodeId !== splitId && edge.targetNodeId !== splitId),
+  };
 }
 
 export type LegacyCommerceOutput = {

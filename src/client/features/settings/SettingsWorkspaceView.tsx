@@ -3,11 +3,12 @@ import { CANVAS_SETTINGS_PAGES, clearQueuedSettingsSection, initialCanvasSetting
 import { CanvasPreview } from './components/SettingsPreview';
 import { PetSettingsPanel } from './components/pet/PetSettingsPanel';
 import { AppearanceSettingsPanel } from './components/appearance/AppearanceSettingsPanel';
+import { FalCatalogPanel } from './components/models/FalCatalogPanel';
 import { useI18n, type SupportedLocale } from '@client/shared/i18n';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@client/shared/hooks/useToast';
 import {
-  Activity, AudioLines, Bot, Check, FolderOpen, HardDrive, Languages, LayoutGrid, MessageSquare,
+  Activity, AudioLines, Bot, Check, FolderOpen, HardDrive, Languages, Layers, LayoutGrid, MessageSquare,
   Palette, Plug, SunMedium, Video, X,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -41,6 +42,7 @@ const SECTION_ICONS = {
   chat: MessageSquare,
   image: Palette,
   video: Video,
+  fal: Layers,
   voice: AudioLines,
   canvas: LayoutGrid,
   pet: Bot,
@@ -477,6 +479,7 @@ export default function SettingsWorkspaceView({ onBack }: Props) {
                   />
                 )}
                 {navSection === 'language' && <LanguageSettingsPanel />}
+                {navSection === 'fal' && <FalCatalogPanel showToast={showToast} onConfigure={() => changeSection('api')} />}
                 {navSection === 'library' && <LibraryPreferencesPanel />}
                 {navSection === 'profile' && (
                   <UsageTab

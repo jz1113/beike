@@ -72,6 +72,8 @@ export type GenerationTask = ContractGenerationTask & {
   routeQueryBlock?: string;
   /** Real runtime data when mediaType === 'agent' */
   agentTurn?: AgentTurnTaskData;
+  /** Extracted documents retained independently of the ephemeral upload registry. */
+  agentDocuments?: MediaAttachment[];
   /** 模态条目 id。与 model 不同时，请求凭证按这个条目而不是上游 ID 的第一条匹配。 */
   modelRouteKey?: string;
   usageScope?: UsageScope;

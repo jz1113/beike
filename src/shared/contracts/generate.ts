@@ -1,5 +1,18 @@
 import { z } from 'zod';
 
+export const FalDirectoryResponseSchema = z.object({
+  fetchedAt: z.string().datetime(),
+  models: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    lab: z.string(),
+    endpoints: z.array(z.object({ id: z.string(), label: z.string() })),
+    videoModelId: z.string().optional(),
+  })),
+});
+
+export type FalDirectoryModel = z.infer<typeof FalDirectoryResponseSchema>['models'][number];
+
 /** Independent of apiFormat: Responses remains a separate transport selection. */
 export const TextProtocolSchema = z.enum(['auto', 'openai', 'gemini', 'anthropic']);
 export const TextRequestRoutingFields = { textProtocol: TextProtocolSchema.optional() };
@@ -70,6 +83,9 @@ export const GenerationTaskSchema = z.object({
   videoResolution: z.string().optional(),
   videoRefMode: z.string().optional(),
   generateAudio: z.boolean().optional(),
+  audioFormat: z.enum(['mp3', 'wav', 'aac', 'flac']).optional(),
+  audioVoice: z.string().optional(),
+  audioSpeed: z.number().optional(),
   videoContextIrEnabled: z.boolean().optional(),
   productImageUrl: z.string().optional(),
   referenceImageUrl: z.string().optional(),

@@ -32,6 +32,7 @@ export const jaJP: TranslationSchema = {
       image: '画像生成',
       video: '動画生成',
       voice: '音声',
+      fal: 'fal モデル',
       storage: 'ストレージ',
       appearance: '外観とテーマ',
       language: '言語',

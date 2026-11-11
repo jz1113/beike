@@ -184,14 +184,27 @@ export const canvasProjectStorage: PersistStorage<CanvasSnapshot['state']> = {
         const ids = new Set(old?.ids);
         const currentRevisions = { ...old?.revisions };
         const writes = changed.filter(project => !(initialSeeds.has(project) && !baseline.has(project.id) && ids.has(project.id)));
+        const projects = tx.objectStore('projects');
+        const nextRevisions = { ...revisions };
+        const alreadySaved = new Set<string>();
         for (const id of [...removed, ...writes.map(project => project.id)]) {
           if (ids.has(id) !== baseline.has(id) || currentRevisions[id] !== revisions?.[id]) {
+            const project = next.get(id);
+            // A different writer may already have saved this exact snapshot. Do not
+            // overwrite it, but accept its revision so subsequent edits can save.
+            if (project && ids.has(id)) {
+              const stored = await projects.get(id);
+              const serialized = serializers.get(id)?.(project) ?? project;
+              if (stored && JSON.stringify(stored) === JSON.stringify(serialized)) {
+                alreadySaved.add(id);
+                nextRevisions[id] = currentRevisions[id];
+                continue;
+              }
+            }
             await tx.done;
             throw new Error('画布已在另一个窗口修改。请先导出此窗口的编辑，再重新打开画布。');
           }
         }
-        const projects = tx.objectStore('projects');
-        const nextRevisions = { ...revisions };
         if (removed.length) removeDeletedProjectsFromLegacyBackup(name, removed);
         for (const id of removed) {
           await projects.delete(id);
@@ -200,6 +213,7 @@ export const canvasProjectStorage: PersistStorage<CanvasSnapshot['state']> = {
           delete nextRevisions[id];
         }
         for (const project of writes) {
+          if (alreadySaved.has(project.id)) continue;
           await projects.put(serializers.get(project.id)?.(project) ?? project, project.id);
           ids.add(project.id);
           currentRevisions[project.id] = nextRevisions[project.id] = crypto.randomUUID();

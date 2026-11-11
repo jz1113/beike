@@ -1,3 +1,4 @@
+import { coverBatchGenerationRatio, coverLayoutImageInput, isCurrentCoverTextOperation, normalizeBatchCoverPrompt, validateCoverPromptFormat } from './coverBatch';
 import { resolveRefMediaIdentity } from '@client/shared/media/refMediaRegistry';
 import { parseSubjectMention, PROMPT_MENTION_REGEX } from '@shared/domain/prompts/prompt-engine/mentions';
 import type { StudioScene } from './types';
@@ -37,8 +38,8 @@ export function studioStoryboardRoles(scene:StudioScene,targetId:string,refs:Rea
   const label=mediaType==='image'?'图片':mediaType==='video'?'视频':mediaType==='text'?'文本':'音频';
   const token=`@${label}${String(position1Based).replace(/^text:/,'')}`;
   let role:string;
-  if(nodeId===sourceId&&mediaType==='video')role='原片视频：观察动作、镜头、节奏与声音；不采用原人物身份或原服装';
-  else if(mediaType==='image'&&nodeId===prefix+'-person')role='目标人物身份和脸，以及发型与体态；不采用原服装或背景';
+  if(nodeId===sourceId&&mediaType==='video')role='原片视频：观察动作、镜头、节奏、可见的表情视线与声音；不采用原人物身份或原服装';
+  else if(mediaType==='image'&&nodeId===prefix+'-person')role='目标人物身份和脸，以及发型与体态；仅参考稳定外观，不沿用照片表情、视线、滤镜、布光、服装或背景';
   else if(mediaType==='image'&&nodeId===prefix+'-product')role='目标服装与商品外观，包括款式、颜色与材质；不采用模特身份或背景';
   else if(mediaType==='image'&&s.beikeStoryboardSourceId===sourceId&&s.beikeStoryboardFacesMasked===true&&s.beikeStoryboardActive!==false)
    role=`原片遮脸分镜第${Number(s.beikeStoryboardPageIndex||0)+1}页；${target.type==='gen-image'?'只用开场对应格的背景、道具与光线':'用于核对各镜的动作、机位、场景、道具与光线'}，不采用原脸或原服装`;
@@ -139,7 +140,16 @@ export const stripVideoPromptRoles=(prompt:string)=>prompt.replace(rolesPattern,
 
 export function studioVideoPromptRoles(scene:StudioScene,refs:ReadonlyArray<{nodeId:string;position1Based?:number}>,storyboardSceneSource:unknown) {
  const nodes=new Map(scene.nodes.map(node=>[node.id,node]));
- const role=(node:Node)=>compilerSettings(node).beikeStoryboardFacesMasked===true?'原片逐秒分镜参考：保留动作顺序、镜头构图、机位、场景、道具与接触关系、光线和切点；遮挡区域不是目标外观，不生成黑块，不采用原人物身份、原脸或原服装。最终输出连续视频，不输出宫格、时间码或拼图':node.id.endsWith('-keyframe')&&storyboardSceneSource?'目标人物身份与服装商品外观参考；各镜场景、道具和光线以遮脸分镜对应画面为准，不锁定姿势或首尾帧':node.id.endsWith('-keyframe')?'整体外观与光色参考；已连接文字若限定更小范围则按其要求，不锁定姿势或首尾帧':node.id.endsWith('-product')?'仅提供商品或服装款式、结构、固有色与材质，不采用原背景':node.id.endsWith('-person')?'仅提供人物身份、面容、发型和体态，不采用原服装与背景':node.id.endsWith('-background')?'仅提供场景布局、地面、透视及现场光向':`参考用途以已连接文字中对「${typeof node.nodeName==='string'&&node.nodeName.trim()||node.type||node.id}」的要求为准，不猜测画面`;
+ const role=(node:Node)=>{
+  if(compilerSettings(node).beikeStoryboardFacesMasked===true)return '原片逐秒分镜参考：保留动作顺序、镜头构图、机位、场景、道具与接触关系、光线和切点；遮挡区域不是目标外观，不生成黑块，不采用原人物身份、原脸或原服装。最终输出连续视频，不输出宫格、时间码或拼图';
+  if(node.id.endsWith('-keyframe'))return storyboardSceneSource
+   ?'目标人物身份与服装商品外观参考；各镜场景、道具和光线以遮脸分镜对应画面为准。静态图不锁定姿势、表情、视线或首尾帧，逐段表情和视线随文字时间轴的动作变化'
+   :'整体外观与光色参考；已连接文字若限定更小范围则按其要求，不锁定姿势或首尾帧';
+  if(node.id.endsWith('-product'))return '仅提供商品或服装款式、结构、固有色与材质，不采用原背景';
+  if(node.id.endsWith('-person'))return '仅提供人物身份、面容、发型和体态，不采用原服装与背景'+(storyboardSceneSource?'，也不沿用照片的表情、视线和打光':'');
+  if(node.id.endsWith('-background'))return '仅提供场景布局、地面、透视及现场光向';
+  return `参考用途以已连接文字中对「${studioNodeLabel(node)}」的要求为准，不猜测画面`;
+ };
  const rows=refs.flatMap((ref,index)=>{
   const node=nodes.get(ref.nodeId);
   return node?[`@图片${ref.position1Based??index+1}：${role(node)}`]:[];
@@ -299,6 +309,7 @@ export function canConnectStudioNodes(from:Node, to:Node, edges:Edge[] = [], inp
   if(settingsOf(to).beikeCompilerSource && from.id!==settingsOf(to).beikeCompilerSource&&!['gen-image','input-image'].includes(from.type))return false;
   const kind=studioNodeKind(from);
   const targetSettings=settingsOf(to);
+  if (targetSettings.beikeCoverStage === 'layout') return kind === 'image' || kind === 'text';
   if(kind==='video'&&targetSettings.beikeTextResultRequired===true&&typeof targetSettings.beikeStoryboardSceneSourceId==='string')
     return from.id===targetSettings.beikeStoryboardSceneSourceId;
   if(settingsOf(to).beikePromptCompiler===true&&settingsOf(to).beikeScriptOnly===false) return kind==='image'||kind==='text';
@@ -367,7 +378,7 @@ export function studioNodeMedia(node:Node):{url:string;assetId?:string} {
 
 /** Every visible upstream input must be ready; never silently downgrade an incomplete graph to text-only. */
 export function resolveStudioInputs(scene:StudioScene,targetId:string):{
-  prompt:string; refs:Array<{nodeId:string;type:'image'|'video'|'audio';url:string;assetId?:string}>; duration?:number; audio?:boolean; soundMode?:string;
+  prompt:string; refs:Array<{nodeId:string;type:'image'|'video'|'audio';url:string;assetId?:string}>; duration?:number; audio?:boolean; soundMode?:string; coverReferencePath?:string;
 } {
   const target=scene.nodes.find(node=>node.id===targetId);
   if(!target)throw new Error('生成节点已不存在');
@@ -410,6 +421,7 @@ export function resolveStudioInputs(scene:StudioScene,targetId:string):{
     const type=studioNodeKind(source);
     if(type==='text') {
       if(Number(settings.beikeSourceVideoChangedAt)>Number(settings._chatCompletedAt||0))throw new Error('原视频已更换，请先重新运行05分析，再生成06并确认07');
+      if(Number(settings.beikePersonReferenceEditedAt)>Number(settings._chatCompletedAt||0))throw new Error('目标人物参考图已更新，请先重新运行05分析，再生成06并确认07');
       if(Number(settings.beikeStoryboardEditedAt)>Number(settings._chatCompletedAt||0))throw new Error('分镜图已更新，请先重新运行05分析，再生成06并确认07');
       const value=(settings.beikeTextResultRequired ? text(settings.textNodeDisplayText) : '')||text(settings.text)||text(source.content)||(settings.beikeTextResultRequired ? '' : text(source.prompt));
       if(!value && settings.beikeTextResultRequired)throw new Error(`请先运行分镜分析并检查结果：${name}`);
@@ -478,6 +490,7 @@ export function resolveStudioInputs(scene:StudioScene,targetId:string):{
       }
       const roles=studioVideoPromptRoles(scene,refs,storyboardSceneSource);
       if(roles)inputs.prompt+='\n'+roles;
+      if(storyboardSceneSource)inputs.prompt+='\n整理稿须在相应动作区间保留05已写明的视线、表情变化和收势；脸不可见的区间不补表情。';
 
       return {...inputs,audio,soundMode:typeof targetSettings.beikeVideoAudio==='boolean'?(audio?'生成声音':'静音'):inputs.soundMode,prompt:inputs.prompt,refs};
     }
@@ -502,6 +515,45 @@ export function resolveStudioInputs(scene:StudioScene,targetId:string):{
     const selected=storyboardVideo ? selectVideoCopyStoryboard(texts,text(target.prompt),names) : selectVideoCopyKeyframe(texts,text(target.prompt),names);
     if(storyboardFirstFrame && !refs.length)throw new Error('请先生成并连接本片段的目标关键帧');
     return {...selected,refs};
+  }
+  if (target.type === 'gen-image') {
+    const batchRatio = targetSettings.beikeCoverExportRatio;
+    const batchCover = batchRatio === '3:4' || batchRatio === '4:3';
+    const required = Array.isArray(targetSettings.beikeRequiredInputs) ? targetSettings.beikeRequiredInputs : [];
+    const singleWriter = scene.nodes.find(source =>
+      settingsOf(source).beikeCoverPromptWriter === true &&
+      (required.includes(source.id) || ids.includes(source.id)));
+    if (batchCover || singleWriter) {
+      const writerId = batchCover ? target.id + '-writer' : singleWriter?.id;
+      const writer = writerId ? nodes.get(writerId) : undefined;
+      const writerSettings = writer && settingsOf(writer);
+      if (!writer || !ids.includes(writer.id) || writer.errorMsg || writer.beikeTextRecoveryRequired ||
+          (batchCover && writerSettings?.beikeBatchCoverWriter !== true)) {
+        throw new Error('请先完成并连接本张封面的 Skill 提示词');
+      }
+      const output = text(writerSettings?.textNodeDisplayText) || text(writerSettings?.text) || text(writer.content);
+      if (!output || output === text(writer.prompt)) throw new Error('缺少已生成的封面设计正文，请先运行 Skill');
+      if (refs.length !== 1 || refs[0].type !== 'image' ||
+          (batchCover && refs[0].nodeId !== target.id.replace(/-render$/, '-ref')) ||
+          refs[0].url !== writerSettings?.beikeCoverSourceUrl) {
+        throw new Error('请连接撰写提示词时使用的同一张商品图');
+      }
+      const layout = writerSettings?.beikeBatchCoverLayout;
+      if (batchCover && typeof layout !== 'string') throw new Error('缺少批量封面版式');
+      const design = typeof layout === 'string' && batchCover ? normalizeBatchCoverPrompt(output, layout) : output;
+      const operationId = batchCover ? writer.beikeTextOperationId : writerSettings?.beikeCoverPromptOperationId;
+      if (!isCurrentCoverTextOperation(operationId)) throw new Error('版式素材库已更新，请重新撰写封面提示词');
+      const visual = coverLayoutImageInput(
+        design,
+        batchCover ? coverBatchGenerationRatio(batchRatio) : String(targetSettings.ratio || '3:4'),
+        batchRatio === '4:3',
+      );
+      if (!visual) throw new Error('封面提示词缺少有效的版式编号，请重新撰写');
+      validateCoverPromptFormat(design, undefined, batchCover);
+      const prompt = visual.prompt;
+      if (batchCover) validateCoverPromptFormat(prompt, undefined, true);
+      return { prompt, refs, coverReferencePath: visual.referencePath };
+    }
   }
   const labeledTexts=texts.map((value,index)=>`【@文本${index+1}】\n${value}`);
   const draft = target.type === 'text-node' && targetSettings.beikeTextResultRequired === true

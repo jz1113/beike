@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom';
 import {
   Box,
+  ChevronDown,
   ChevronRight,
   FastForward,
   Grid3X3,
@@ -13,6 +14,7 @@ import {
   Table2,
   UserCog,
   UserRound,
+  X,
 } from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
 import { useAppTheme } from '@client/shared/hooks/useAppTheme';
@@ -686,7 +688,6 @@ export function CanvasGridSkillChip({
   onClear: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [hover, setHover] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -700,39 +701,33 @@ export function CanvasGridSkillChip({
 
   return (
     <div ref={rootRef} className="relative shrink-0" data-grid-skill-chip-root="true">
-      <button
-        type="button"
-        data-grid-skill-chip="true"
-        aria-expanded={open}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-white/[0.14] bg-slate-100 dark:bg-white/[0.04] px-2.5 text-xs font-medium text-slate-800 dark:text-white/92 hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors cursor-pointer select-none"
-      >
-        {open || hover ? (
-          <span
-            role="button"
-            tabIndex={-1}
-            title="移除当前预设标签"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(false);
-              onClear();
-            }}
-            className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-300 dark:bg-white/[0.14] text-slate-700 dark:text-white/85 hover:bg-slate-400 dark:hover:bg-white/25 transition-colors text-[10px] leading-none"
-          >
-            ×
-          </span>
-        ) : (
+      <div className="inline-flex h-7 items-stretch overflow-hidden rounded-lg border border-slate-200 bg-slate-100 text-xs font-medium text-slate-800 dark:border-white/[0.14] dark:bg-white/[0.04] dark:text-white/90">
+        <button
+          type="button"
+          data-grid-skill-chip="true"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+          className="flex cursor-pointer items-center gap-1.5 px-2 hover:bg-slate-200 dark:hover:bg-white/[0.08]"
+        >
           <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
             {renderSkillPresetIcon(preset.id)}
           </span>
-        )}
-        <span>{preset.label}</span>
-      </button>
+          <span>{preset.label}</span>
+          <ChevronDown size={12} />
+        </button>
+        <button
+          type="button"
+          aria-label="移除当前预设标签"
+          title="移除当前预设标签"
+          onClick={() => {
+            setOpen(false);
+            onClear();
+          }}
+          className="grid w-6 cursor-pointer place-items-center border-l border-slate-200 hover:bg-slate-200 dark:border-white/[0.14] dark:hover:bg-white/[0.08]"
+        >
+          <X size={12} />
+        </button>
+      </div>
       {open && (
         <div
           data-grid-skill-popover="true"

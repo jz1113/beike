@@ -141,7 +141,7 @@ export const CanvasAudioNode: React.FC<Props> = ({ node, nodes, projectId, selec
   const [generating, setGenerating] = useState(false);
   const [uploadingRef, setUploadingRef] = useState(false);
   const [uploadingClone, setUploadingClone] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(node.status === 'error' ? node.errorMessage || '' : '');
   const [openPopover, setOpenPopover] = useState<'model' | 'mode' | 'subMode' | 'voice' | 'lyricMode' | 'settings' | null>(null);
 
   const [audioModels, setAudioModels] = useState<AudioModelOption[]>(loadConfiguredAudioModels());
@@ -270,7 +270,7 @@ export const CanvasAudioNode: React.FC<Props> = ({ node, nodes, projectId, selec
     abortRef.current = controller;
     setGenerating(true);
     setError('');
-    updateNode(projectId, node.id, { status: 'generating', content: effectiveText });
+    updateNode(projectId, node.id, { status: 'generating', errorMessage: undefined, content: effectiveText });
     try {
       const voiceChannels = studioChannels().filter((item) => item.kind === 'voice');
       const channel = voiceChannels.find(item => item.id === activeModel.channelId ||
@@ -311,6 +311,7 @@ export const CanvasAudioNode: React.FC<Props> = ({ node, nodes, projectId, selec
         taskId: undefined,
         speechRecoveryRequired: false,
         status: 'success',
+        errorMessage: undefined,
       });
     } catch (err) {
       if (controller.signal.aborted) return;
@@ -319,6 +320,7 @@ export const CanvasAudioNode: React.FC<Props> = ({ node, nodes, projectId, selec
       updateNode(projectId, node.id, {
         content: effectiveText,
         status: 'error',
+        errorMessage: message,
         speechRecoveryRequired: requiresGenerationRecovery(err),
       });
     } finally {

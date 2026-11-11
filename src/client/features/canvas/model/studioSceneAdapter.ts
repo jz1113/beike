@@ -1,3 +1,4 @@
+import { coverSizes } from './coverBatch';
 import { CANVAS_LOCAL_TOOLS, CANVAS_PRIORITY_TOOLS, isCanvasLocalTool, isCanvasPriorityTool } from './canvasNodeFactory';
 import { studioEdgeSources, studioNodeKind, studioNodeMedia } from './studioConnections';
 import { syncEdgesWithNodeReferences } from './canvasGraph';
@@ -79,6 +80,9 @@ export function studioNodeToCanvasNode(saved: StudioNode, scene: StudioScene, no
 
   const base: CanvasNode = {
     id: node.id,
+    coverSourceUrl: asText(settings.beikeCoverSourceUrl) || undefined,
+    coverPromptOperationId: asText(settings.beikeCoverPromptOperationId) || undefined,
+    originalFileName: asText(settings.beikeOriginalFileName) || undefined,
     studioRaw: structuredClone(node),
     type: 'note',
     title: asText(node.nodeName) || asText(node.title) || undefined,
@@ -87,6 +91,7 @@ export function studioNodeToCanvasNode(saved: StudioNode, scene: StudioScene, no
     width: asNumber(node.width, 340),
     height: asNumber(node.height, 300),
     status,
+    errorMessage: errorText || undefined,
     progress: asNumber(settings.progress, 0) || undefined,
     taskId: asText(node.beikeCanvasTaskId) || asText(node.beikeTaskId) || asText(node.beikeLastTaskId) || undefined,
     generationIntent: node.beikeCanvasTaskRecord as CanvasNode['generationIntent'],
@@ -152,7 +157,7 @@ export function studioNodeToCanvasNode(saved: StudioNode, scene: StudioScene, no
 
   if (node.type === 'text-node' || node.type === 'custom-agent') {
     const bodyText = asText(settings.textNodeDisplayText) || asText(settings.text) || asText(node.content);
-    const subType = node.type === 'text-node' && settings.beikePromptCompiler ? 'video-prompt-optimizer' : undefined;
+    const subType = node.type === 'text-node' && settings.beikeCoverPromptWriter ? 'cover-prompt-writer' : node.type === 'text-node' && settings.beikePromptCompiler ? 'video-prompt-optimizer' : undefined;
     const draft = asText(settings.textNodeDraftPrompt);
     const instruction = asText(node.prompt);
     const separateDraft = subType === 'video-prompt-optimizer' && settings.beikeScriptOnly === true;
@@ -161,13 +166,14 @@ export function studioNodeToCanvasNode(saved: StudioNode, scene: StudioScene, no
       ...base,
       type: settings.beikeCanvasType === 'note' || settings.beikeCanvasType === 'frame' || settings.beikeCanvasType === 'group'
         ? settings.beikeCanvasType : 'prompt',
+      ...(subType === 'cover-prompt-writer' || settings.beikeBatchCoverWriter === true
+        ? { width: 250, height: 250 } : {}),
       studioSubType: subType,
       content: errorText && status === 'error' ? errorText : bodyText,
       textPrompt: promptInstruction || undefined,
       textModel: stripStudioPrefix(asText(settings.textNodeChatModel) || asText(settings.model)) || undefined,
       textHtml: asText(settings.beikeTextHtml) || undefined,
       textBackground: asText(settings.textNodeBackgroundColor) || undefined,
-      textAutoHeight: settings.textNodeAutoHeight === true,
       textWebSearch: settings.textNodeWebSearchEnabled === true,
       textBase64Image: settings.textNodeForceBase64Image === true,
       textApiFormat: ['openai-compatible', 'gemini-official'].includes(asText(settings.textNodeGeminiApiFormat))
@@ -212,11 +218,19 @@ export function studioNodeToCanvasNode(saved: StudioNode, scene: StudioScene, no
     const rawModel = stripStudioPrefix(asText(settings.model));
     const quality = isVideo ? asText(settings.resolution) || '768P' : asText(settings.gptImageQuality) || 'medium';
     const aspect = asText(settings.ratio) || (isVideo ? '16:9' : '1:1');
+    const coverRatio = settings.beikeCoverOutputRatio ?? settings.beikeCoverExportRatio;
+    const squareSize = asNumber(settings.beikeCoverOutputWidth, 0);
+    let dimensions: readonly [number, number] | undefined;
+    if (media.url && settings.beikeSizedCoverUrl === media.url) {
+      if (coverRatio === '1:1' && squareSize > 0) dimensions = [squareSize, squareSize];
+      else if (coverRatio === '3:4' || coverRatio === '4:3') dimensions = coverSizes[coverRatio];
+    }
     return {
       ...base,
       type: 'drawing',
+      ...(dimensions ? { resultWidth: dimensions[0], resultHeight: dimensions[1] } : {}),
       generationKind: isVideo ? 'video' : 'image',
-      content: status === 'error' && errorText ? errorText : asText(node.prompt),
+      content: asText(node.prompt),
       model: rawModel || undefined,
       aspectRatio: aspect,
       imageUrl: !isVideo ? media.url || undefined : undefined,
@@ -293,6 +307,9 @@ export function canvasNodeToStudioNode(node: CanvasNode, previous?: StudioNode):
       : { id: node.id, type: 'text-node' };
 
   const settings: Record<string, unknown> = { ...asRecord(raw.settings) };
+  settings.beikeCoverSourceUrl = node.coverSourceUrl;
+  settings.beikeCoverPromptOperationId = node.coverPromptOperationId;
+  settings.beikeOriginalFileName = node.originalFileName;
   Object.assign(raw, {
     id: node.id,
     x: node.x,
@@ -315,10 +332,13 @@ export function canvasNodeToStudioNode(node: CanvasNode, previous?: StudioNode):
   settings.beikeFoldedCount = node.foldedCount;
   if (node.title !== undefined) raw.nodeName = node.title;
   settings.isGenerating = node.status === 'generating';
-  if (node.status === 'error' && node.content) {
-    raw.errorMsg = node.content;
-    settings.error = node.content;
-  } else if (node.status !== 'error') {
+  if (node.status === 'error') {
+    // Older native nodes stored their failure in content; studio nodes retain a separate cause.
+    const legacyError = node.type === 'drawing' || node.type === 'audio' ? undefined : node.content;
+    const error = node.errorMessage || asText(raw.errorMsg) || asText(settings.error) || legacyError || '生成失败，请检查设置后重试';
+    raw.errorMsg = error;
+    settings.error = error;
+  } else {
     raw.errorMsg = undefined;
     delete settings.error;
   }
@@ -369,6 +389,10 @@ export function canvasNodeToStudioNode(node: CanvasNode, previous?: StudioNode):
     if (raw.type === 'custom-agent' || (!previous && !node.studioRaw)) {
       raw.type = 'text-node';
     }
+    if (node.studioSubType === 'cover-prompt-writer') {
+      settings.beikeCoverPromptWriter = true;
+      if (node.status === 'success' && !node.textRecoveryRequired) delete settings.beikeTextRunError;
+    }
     if (node.studioSubType === 'video-prompt-optimizer') {
       settings.beikePromptCompiler = true;
       settings.beikeScriptOnly ??= false;
@@ -397,7 +421,6 @@ export function canvasNodeToStudioNode(node: CanvasNode, previous?: StudioNode):
     }
     settings.beikeTextHtml = node.textHtml;
     settings.textNodeBackgroundColor = node.textBackground;
-    settings.textNodeAutoHeight = node.textAutoHeight;
     settings.textNodeWebSearchEnabled = node.textWebSearch;
     settings.textNodeForceBase64Image = node.textBase64Image;
     settings.textNodeGeminiApiFormat = node.textApiFormat;
@@ -414,7 +437,7 @@ export function canvasNodeToStudioNode(node: CanvasNode, previous?: StudioNode):
       settings.beikeCanvasRuns = node.runs;
       settings.beikeCanvasRunIndex = node.activeRunIndex;
     }
-    if (node.status !== 'error' && node.content !== undefined) raw.prompt = node.content;
+    if (node.content !== undefined) raw.prompt = node.content;
     if (node.drawing) {
       const { generationQuality, backgroundMode, customWidth, customHeight, base64Output, contextIrEnabled, portraitTexture, cinemaConfig } = node.drawing;
       settings.beikeDrawingExtras = { generationQuality, backgroundMode, customWidth, customHeight, base64Output, contextIrEnabled, portraitTexture, cinemaConfig };

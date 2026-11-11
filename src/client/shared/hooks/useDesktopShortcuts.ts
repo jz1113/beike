@@ -57,6 +57,9 @@ export function useDesktopShortcuts({ onOpenSettings }: ShortcutHandlers = {}) {
 
       // 3. 即刻生成：Cmd/Ctrl + Enter
       if (e.key === 'Enter') {
+        const modalOpen = Array.from(document.querySelectorAll('dialog:modal, [role="dialog"][aria-modal="true"]'))
+          .some(dialog => dialog.getClientRects().length > 0 && !dialog.closest('[inert], [aria-hidden="true"]'));
+        if (e.defaultPrevented || e.isComposing || modalOpen) return;
         window.dispatchEvent(new CustomEvent('app:trigger-generate'));
         return;
       }

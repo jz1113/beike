@@ -4,7 +4,7 @@ import type {
   ModalityKind,
   ModalityModelItem,
 } from '../../model/modalityModelStorage';
-import { inferVendorFromModelId, isModelMatchModality } from '../../model/modalityMeta';
+import { inferVendorFromModelId, isModalitySyncCandidate } from '../../model/modalityMeta';
 import { ModelIcon } from '@client/shared/ui/ModelIcons';
 import {
   Eye,
@@ -64,7 +64,7 @@ export function ModalityModelCard({
   // 按模态智能过滤，避免跨模态混杂（如在绘画卡片内出现视频模型）
   const relevantCandidates = useMemo(() => {
     return remoteModelCandidates.filter((candidate) => {
-      if (!isModelMatchModality(candidate, kind)) return false;
+      if (!isModalitySyncCandidate(candidate, kind)) return false;
       return inferVendorFromModelId(candidate, kind) === model.vendor;
     });
   }, [remoteModelCandidates, kind, model.vendor]);

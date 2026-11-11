@@ -1,4 +1,5 @@
-import { inspirationVideoUseOptions, type InspirationItem, type InspirationUseOptions } from '../../model/inspirationItem';
+import { replacePromptReferenceMentions } from '@shared/domain/prompts/prompt-engine/mentions';
+import { inspirationImageUseOptions, inspirationVideoUseOptions, type InspirationItem, type InspirationUseOptions } from '../../model/inspirationItem';
 import { useState, useEffect, useCallback, useMemo, useRef, useId, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
@@ -173,12 +174,11 @@ interface Props {
   allItems: InspirationItem[];
   isOpen: boolean;
   onClose: () => void;
-  onUsePromptOnly: (prompt: string) => void;
-  onUseAsReference: (prompt: string, imageUrl: string, opts?: InspirationUseOptions) => void;
+  onUsePrompt: (prompt: string, opts: InspirationUseOptions) => string | undefined;
   onNavigate?: (newItem: InspirationItem) => void;
 }
 
-export default function InspirationModal({ item, allItems, isOpen, onClose, onUsePromptOnly, onUseAsReference, onNavigate }: Props) {
+export default function InspirationModal({ item, allItems, isOpen, onClose, onUsePrompt, onNavigate }: Props) {
   const dismissReferenceRef = useRef<(() => void) | null>(null);
   const registerReferencePreview = useCallback((dismiss: (() => void) | null) => { dismissReferenceRef.current = dismiss; }, []);
   const dialogRef = useModalDialog(isOpen, () => {
@@ -188,6 +188,8 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
   useScrollLock(isOpen, '[data-hub-scroll]');
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [downloadError, setDownloadError] = useState<string>();
+  const [applyError, setApplyError] = useState<string>();
   const [videoLoadFailed, setVideoLoadFailed] = useState(false);
   const downloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -246,6 +248,7 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
     const url = item.video || item.image;
     if (!url || isDownloading) return;
     setIsDownloading(true);
+    setDownloadError(undefined);
     try {
       const ext = isVideo ? 'mp4' : 'jpg';
       const filename = `${item.title || 'inspiration'}_${Date.now()}.${ext}`;
@@ -256,7 +259,7 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
         setDownloadSuccess(false);
       }, 2000);
     } catch (err) {
-      console.error('下载素材失败:', err);
+      setDownloadError(err instanceof Error ? err.message : '下载失败，请重试');
     } finally {
       setIsDownloading(false);
     }
@@ -310,7 +313,7 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
       className="fixed inset-0 z-[9999] overflow-y-auto overscroll-contain bg-black/60 flex items-start md:items-center justify-center p-4 sm:p-6 lg:p-10 select-none font-sans animate-fade-in cursor-zoom-out"
       onClick={onClose}
     >
-      <button type="button" aria-label="关闭作品预览" onClick={onClose} className="fixed right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
+      <button type="button" aria-label="关闭作品预览" onClick={event => { event.stopPropagation(); onClose(); }} className="fixed right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
         <X className="h-5 w-5" />
       </button>
       {/* 🌟 居中大方的主容器 (左侧媒体展示 + 左右大箭头 + 右侧信息面板) */}
@@ -425,6 +428,8 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
               </div>
             </div>
 
+            {downloadError && <p role="status" className="text-sm text-amber-700 dark:text-amber-300">{downloadError}</p>}
+
             {/* 日期与生成标记 */}
             <div className="text-xs text-slate-400 dark:text-[#8E8E93] font-sans">
               <span>{item.date || '精选作品'}</span>
@@ -443,20 +448,16 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
             </div>
           </div>
 
+          {applyError && <p role="status" className="mt-4 text-sm text-amber-700 dark:text-amber-300">{applyError}</p>}
           {/* 🌟 底部双按钮 (做同款 / 用作参考图) */}
           <div className="pt-5 mt-4 border-t border-slate-100 dark:border-white/[0.06] flex items-center gap-3">
             {/* 做同款 */}
             <button
               type="button"
-              onClick={() => {
-                if (isVideo) {
-                  onUseAsReference(item.referencePrompt || item.prompt, item.video || item.image, inspirationVideoUseOptions(item));
-                } else {
-                  // 文生图做同款：只填提示词，不把成品图当参考图
-                  onUsePromptOnly(item.prompt);
-                }
-                onClose();
-              }}
+              onClick={() => setApplyError(onUsePrompt(
+                item.referencePrompt || item.prompt,
+                isVideo ? inspirationVideoUseOptions(item) : inspirationImageUseOptions(item),
+              ))}
               className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-transparent hover:bg-slate-100 dark:hover:bg-white/10 text-slate-800 dark:text-[#EDEDED] font-medium text-[13.5px] sm:text-[14px] flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
             >
               <RotateCcw className="w-4 h-4 text-slate-700 dark:text-[#E5E5EA] stroke-[2.2]" />
@@ -466,14 +467,12 @@ export default function InspirationModal({ item, allItems, isOpen, onClose, onUs
             {/* 用作参考图 */}
             <button
               type="button"
-              onClick={() => {
-                onUseAsReference(
-                  item.referencePrompt || item.prompt,
-                  item.video || item.image,
-                  isVideo ? inspirationVideoUseOptions(item) : undefined,
-                );
-                onClose();
-              }}
+              onClick={() => setApplyError(onUsePrompt(
+                replacePromptReferenceMentions(item.referencePrompt || item.prompt),
+                isVideo
+                  ? { ...inspirationVideoUseOptions(item), referenceImages: [item.video || item.image], videoRefMode: 'omni', referenceAudioUrls: [], referenceVideoUrls: [item.video || item.image] }
+                  : { ...inspirationImageUseOptions(item), referenceImages: [item.image] },
+              ))}
               className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-transparent hover:bg-slate-100 dark:hover:bg-white/10 text-slate-800 dark:text-[#EDEDED] font-medium text-[13.5px] sm:text-[14px] flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
             >
               <ImageIcon className="w-4 h-4 text-slate-700 dark:text-[#E5E5EA] stroke-[2.2]" />

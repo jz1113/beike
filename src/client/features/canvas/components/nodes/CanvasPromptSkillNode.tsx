@@ -670,7 +670,7 @@ export function CanvasPromptSkillNode({ node, nodes, projectId, selected, onChan
                   className="group relative size-11 shrink-0 rounded-[12px] border border-slate-200 dark:border-white/15 bg-slate-100 dark:bg-[#2a2a2e]"
                   title={[slot.name, source.title].filter(Boolean).join(' · ')}
                 >
-                  <span aria-hidden="true" className="pointer-events-none absolute -left-1 -top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-black/85 px-1 text-[10px] font-semibold leading-none text-white ring-1 ring-white/25">{slot.name}</span>
+                  <span aria-hidden="true" className="canvas-reference-badge">{slot.name}</span>
                   <button type="button" disabled={busy || node.layerLocked} onMouseDown={(e) => e.preventDefault()} aria-label={`引用${slot.name}`} onClick={() => promptInputRef.current?.insertReference(idx)} className="h-full w-full overflow-hidden rounded-[11px] cursor-pointer">
                     <CanvasPromptReferenceThumbnail key={slot.url} url={slot.url} poster={source.imageUrl} isVideo={mediaReferenceVideoFlags[idx]} />
                   </button>
@@ -687,7 +687,7 @@ export function CanvasPromptSkillNode({ node, nodes, projectId, selected, onChan
                 title={source.title || `点击引用 文本 ${idx + 1}`}
                 className="group relative flex size-11 shrink-0 items-center justify-center rounded-[12px] border border-slate-200 dark:border-white/15 bg-slate-100 dark:bg-[#2a2a2e] text-slate-600 dark:text-zinc-200"
               >
-                <span aria-hidden="true" className="pointer-events-none absolute -left-1 -top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-black/85 px-1 text-[10px] font-semibold leading-none text-white ring-1 ring-white/25">文本{idx + 1}</span>
+                <span aria-hidden="true" className="canvas-reference-badge">文本{idx + 1}</span>
                 <button type="button" disabled={busy || node.layerLocked} onMouseDown={(e) => e.preventDefault()} aria-label={`引用文本${idx + 1}`} onClick={() => promptInputRef.current?.insertToken(`@文本${idx + 1}`)} className="flex h-full w-full items-center justify-center rounded-[11px] cursor-pointer">
                   <AlignLeft size={15} /><span className="sr-only">{source.title || '上游文本'}</span>
                 </button>

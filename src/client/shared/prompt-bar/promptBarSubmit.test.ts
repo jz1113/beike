@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { prepareGenerationAttempt } from '@client/shared/media/generationAttempt';
 import { isTaskVideoReference } from '@client/shared/media/mediaHelper';
 import { registerRefMediaKind, unregisterRefMedia } from '@client/shared/media/refMediaRegistry';
 import { resolvePromptPlaceholder } from './promptBarDisplay';
 import { buildPromptBarGenerationTasks, buildPromptBarSubjects, canSubmitPromptBar, type PromptBarSubmitInput } from './promptBarSubmit';
+
+afterEach(() => vi.unstubAllGlobals());
 
 function input(currentView: string): PromptBarSubmitInput {
   return {
@@ -95,6 +97,20 @@ describe('buildPromptBarGenerationTasks session', () => {
       expect(res.tasks[0].model).toBe('cosyvoice-v2');
       expect(res.tasks[0].prompt).toBe('欢迎使用贝壳云图进行专业音频创作');
     }
+  });
+
+  it('snapshots audio preferences before queued work, storage and retries', async () => {
+    let audio = { format: 'wav', voice: 'saved-voice', speed: 0.8 };
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify({ audio }) });
+    const result = buildPromptBarGenerationTasks({ ...input('home'), quickGenMode: 'audio' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    audio = { format: 'mp3', voice: 'changed-voice', speed: 1.5 };
+    const task = JSON.parse(JSON.stringify(result.tasks[0]));
+    expect(task).toMatchObject({ audioFormat: 'wav', audioVoice: 'saved-voice', audioSpeed: 0.8 });
+    const retry = await prepareGenerationAttempt({ ...task, status: 'FAILURE' }, 'retry');
+    expect(retry).toMatchObject({ audioFormat: 'wav', audioVoice: 'saved-voice', audioSpeed: 0.8 });
   });
 
   it('validates audio mode submission requirements', () => {

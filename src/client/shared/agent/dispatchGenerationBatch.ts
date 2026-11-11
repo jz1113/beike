@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { loadPromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 import { useAppStore } from '@client/store';
 import { persistDrawingStateToStorage } from '@client/store/persist/generation';
 import { GENERATION_BATCH_LIMIT } from '@shared/domain/assistant/generationPrompts';
@@ -32,13 +33,14 @@ const draftSchema = z.object({
   entries: z.array(z.object({
     id: z.string().min(1).max(128), title: z.string().max(160), prompt: z.string().min(1).max(100_000),
     mediaType: z.enum(['image', 'video']), aspect: z.string().max(32).optional(), duration: z.number().finite().optional(),
-    issue: z.string().optional(), referenceIndexes: z.array(z.number().int().min(0).max(49)).max(50).optional(),
+    issue: z.string().optional(), imageSize: z.string().max(32).optional(), imageResolution: z.literal('512px').optional(),
+    referenceAudioUrls: z.array(z.string()).max(50).optional(), referenceIndexes: z.array(z.number().int().min(0).max(49)).max(50).optional(),
   })).max(30),
   settings: z.object({
-    imageModel: z.string().max(200), imageAspect: z.string().max(32), imageQuality: z.enum(['high', 'medium', 'low']),
+    imageModel: z.string().max(200), imageAspect: z.string().max(32), imageQuality: z.enum(['high', 'medium', 'low', '512px']),
     imageQualityTier: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
     imageInferenceStrength: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
-    videoModel: z.string().max(200), videoAspect: z.string().max(32), videoResolution: z.enum(['480P', '540P', '720P', '768P', '1080P', '2K', '4K']),
+    videoModel: z.string().max(200), videoAspect: z.string().max(32), videoResolution: z.enum(['360P', '480P', '540P', '720P', '768P', '1080P', '2K', '4K']),
     videoDuration: z.number().finite(), videoRefMode: z.string().max(40), videoGenerateAudio: z.boolean().optional(),
     videoContextIrEnabled: z.boolean().optional(),
   }),
@@ -103,9 +105,11 @@ export function reserveGenerationBatch(receipt: GenerationBatchReceipt): void {
 
 export function currentBatchSettings(): BatchGenerationSettings {
   const state = useAppStore.getState();
+  const prefs = loadPromptPreferences();
   return { imageModel: state.quickModel, imageAspect: state.quickAspectId, imageQuality: state.quickQuality,
+    imageQualityTier: prefs.image.quality, imageInferenceStrength: prefs.image.inferenceStrength,
     videoModel: state.quickVideoModel, videoAspect: state.quickVideoAspectId, videoResolution: state.quickVideoResolution,
-    videoDuration: state.quickVideoDuration, videoRefMode: state.quickVideoRefMode, videoContextIrEnabled: state.quickVideoContextIrEnabled ?? true };
+    videoDuration: state.quickVideoDuration, videoGenerateAudio: prefs.video.generateAudio, videoRefMode: state.quickVideoRefMode, videoContextIrEnabled: state.quickVideoContextIrEnabled ?? true };
 }
 
 export interface GenerationBatchRequest {

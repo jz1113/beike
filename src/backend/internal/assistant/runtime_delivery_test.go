@@ -62,6 +62,7 @@ func TestTurnSurvivesDeliveryDisconnectAndStillHonorsInterrupt(t *testing.T) {
 				fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"完整分析结果\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
 			}))
 			defer upstream.Close()
+			useAssistantTestClient(t, upstream.Client())
 			body := `{"turnId":"delivery-turn","threadId":"delivery-thread","model":"gpt-6.1-sol","textProtocol":"openai","enableAgentTools":false,"customBaseUrl":"` + upstream.URL + `","customApiKey":"test-key","messages":[{"role":"user","content":"分析视频"}]}`
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

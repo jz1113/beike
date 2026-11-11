@@ -111,19 +111,20 @@ describe('modalityStorage', () => {
       { id: 'comfly_gateway', name: 'Comfly', baseUrl: 'https://channel.example', apiKey: 'sk-channel' },
     ]));
     memoryStore.set(getModalityStorageKey('chat'), JSON.stringify([
-      { id: 'chat_sync_a', name: 'Gateway Opus', modality: 'chat', vendor: 'anthropic', modelId: 'claude-opus-4-6', channelId: 'comfly_gateway' },
-      { id: 'chat_sync_b', name: 'Backup Opus', modality: 'chat', vendor: 'anthropic', modelId: 'claude-opus-4-6', channelId: '' },
+      { id: 'chat_sync_a', name: 'Gateway Opus', modality: 'chat', vendor: 'anthropic', modelId: 'claude-opus-4-8', channelId: 'comfly_gateway' },
+      { id: 'chat_sync_b', name: 'Backup Opus', modality: 'chat', vendor: 'anthropic', modelId: 'claude-opus-4-8', channelId: '' },
       { id: 'chat_bytedance', name: '豆包', modality: 'chat', vendor: 'bytedance', modelId: 'doubao-pro' },
     ]));
 
     const options = modalityPickerSelections('chat');
-    expect(options?.slice(0, 2).map((item) => item.modelId)).toEqual(['claude-opus-4-6', 'claude-opus-4-6']);
-    expect(options?.slice(0, 2).map((item) => item.id)).toEqual(['chat_sync_a', 'chat_sync_b']);
-    expect(options?.slice(0, 2).map((item) => item.name)).toEqual(['Gateway Opus · Comfly', 'Backup Opus']);
+    expect(options?.slice(0, 2).map((item) => item.modelId)).toEqual(['gemini-4-argon', 'gemini-3.8-flash']);
+    const opus = options?.filter((item) => item.modelId === 'claude-opus-4-8');
+    expect(opus?.map((item) => item.id)).toEqual(['chat_sync_a', 'chat_sync_b']);
+    expect(opus?.map((item) => item.name)).toEqual(['Gateway Opus · Comfly', 'Backup Opus']);
     expect(options?.some((item) => item.id === 'chat_bytedance')).toBe(false);
     expect(options?.some((item) => item.entryId === 'chat_openai_gpt')).toBe(true);
-    expect(upstreamModalityModelId('chat', 'chat_sync_a')).toBe('claude-opus-4-6');
-    expect(upstreamModalityModelId('chat', 'claude-opus-4-6')).toBe('claude-opus-4-6');
+    expect(upstreamModalityModelId('chat', 'chat_sync_a')).toBe('claude-opus-4-8');
+    expect(upstreamModalityModelId('chat', 'claude-opus-4-8')).toBe('claude-opus-4-8');
   });
 
   it('keeps a custom route when its upstream model is added to the shipped catalog', () => {
@@ -139,9 +140,9 @@ describe('modalityStorage', () => {
   it('does not offer disabled or removed channels, and keeps the other selection ID stable', () => {
     memoryStore.set(API_PROVIDERS_STORAGE_KEY, JSON.stringify([{id:'paused', enabled:false}, {id:'active'}]));
     memoryStore.set(getModalityStorageKey('image'), JSON.stringify(['paused','active','removed'].map(channelId => ({
-      id: 'entry-'+channelId, modelId:'qwen-image-edit', channelId,
+      id: 'entry-'+channelId, modelId:'grok-4.2-image', channelId,
     }))));
-    expect(modalityPickerSelections('image')?.filter(item => item.modelId === 'qwen-image-edit').map(item => item.id)).toEqual(['entry-active']);
+    expect(modalityPickerSelections('image')?.filter(item => item.modelId === 'grok-4.2-image').map(item => item.id)).toEqual(['entry-active']);
   });
 
   it('restores shipped defaults when a saved modality list is empty', () => {

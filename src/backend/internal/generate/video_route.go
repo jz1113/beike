@@ -282,6 +282,14 @@ func applyNativeVideoRoute(base, mode, apiKey string, a *videoAdapted) {
 	case "seedance":
 		a.endpoints = []string{root + "/api/v3/contents/generations/tasks"}
 		a.queries = []string{root + "/api/v3/contents/generations/tasks/{taskId}"}
+		if a.payload != nil {
+			switch a.modelID {
+			case "doubao-seedance-2.0-mini":
+				a.payload["model"] = "doubao-seedance-2-0-mini-260615"
+			case "doubao-seedance-2.5":
+				a.payload["model"] = "doubao-seedance-2-5-260628"
+			}
+		}
 	case "vidu":
 		a.endpoints = []string{root + "/ent/v2/" + viduSubmitPath(mode)}
 		a.queries = []string{root + "/ent/v2/tasks/{taskId}/creations"}
@@ -290,6 +298,18 @@ func applyNativeVideoRoute(base, mode, apiKey string, a *videoAdapted) {
 		}
 		a.headers["Authorization"] = "Token " + apiKey
 	case "kling":
+		if kling4Model(a.modelID) {
+			path := "omni-video"
+			switch mode {
+			case "text":
+				path = "text-to-video"
+			case "first_frame", "first_last_frame":
+				path = "image-to-video"
+			}
+			a.endpoints = []string{root + "/" + path + "/" + a.modelID}
+			a.queries = []string{root + "/tasks?task_ids={taskId}"}
+			return
+		}
 		if mode == "motion_control" {
 			version := "2.6"
 			if a.modelID == "kling-video-v3" {

@@ -2,7 +2,7 @@
  * AI 种草生图模型与参数适配引擎
  */
 
-import { listApprovedModels, vendorLabel } from '@shared/domain/models/modelCatalog';
+import { listSelectableModels, vendorLabel } from '@shared/domain/models/modelCatalog';
 
 export interface ImageGenModel {
   id: string;
@@ -17,7 +17,7 @@ export interface ImageGenModel {
   description?: string;
 }
 
-export const IMAGE_GEN_MODELS: ImageGenModel[] = listApprovedModels('image').map((m) => ({
+export const IMAGE_GEN_MODELS: ImageGenModel[] = listSelectableModels('image').map((m) => ({
   id: m.id,
   name: m.name,
   shortName: m.shortName,

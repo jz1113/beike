@@ -1,23 +1,26 @@
+import { CoverResultReview } from './CoverResultReview';
+import { coverReviewSource, coverWorkflowRole } from '../../model/coverBatch';
 import { NativeStudioCommandsContext } from '../../hooks/useNativeStudioCommands';
 import { hasVideoPromptRecovery, type VideoPromptContext } from '@client/shared/agent/videoPromptOperation';
 import { mediaReferenceSlots } from '@client/shared/media/videoReferences';
-import { videoInputError, resolveVideoMode, videoDurationOptions, videoModes } from '@shared/domain/media/videoCapabilities';
+import { videoInputError, resolveVideoParameters } from '@shared/domain/media/videoCapabilities';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { CanvasDrawingPromptPanel } from './CanvasDrawingPromptPanel';
+import { resolveCanvasImageConfig } from '../video/CanvasVideoPlayer';
 import { buildCinemaPrompt } from './CanvasCameraAndPrompts';
 import AIGeneratingCard from '@client/shared/ui/AIGeneratingCard';
 import { drawingGeometry, loadCanvasGenerationModels, persistCanvasMedia } from '../../model/canvasNodeFactory';
 import { useContext, useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Palette, PlusSquare, Trash2, WandSparkles, Video } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Maximize2, Palette, PlusSquare, Trash2, WandSparkles, Video } from 'lucide-react';
 import { useAppStore } from '@client/store';
 import { saveCanvasProjects, useCanvasStore } from '../../store/useCanvasStore';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
-import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
+import { getVideoModelById } from '@shared/domain/media/video';
 import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
 import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
 import { buildPromptBarGenerationTasks } from '@client/shared/prompt-bar/promptBarSubmit';
 import { calculateImageDimensions } from '@client/shared/prompt-bar/promptBarDisplay';
-import { IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
+import { ALL_IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
 import type { CanvasNode } from '../../model/types';
 import { appendNodeRun, canReference, DEFAULT_PORTRAIT_TEXTURE, isTextSource, referenceReady, linkedPrompt } from '../../model/canvasGraph';
 import { isCanvasGridSkillTitle } from '../stage/CanvasImageToolSubmenus';
@@ -37,35 +40,35 @@ export function CanvasDrawingNode({
   const updateNode = useCanvasStore((s) => s.updateNode);
   const initial = useAppStore.getState();
   const isVideo = node.generationKind === 'video';
-  const config = node.drawing || {
+  const storedConfig: NonNullable<CanvasNode['drawing']> = node.drawing || {
     model: isVideo ? initial.quickVideoModel : initial.quickModel,
-    quality: isVideo
-      ? resolveVideoResolution(initial.quickVideoResolution, getVideoModelById(upstreamModalityModelId('video', initial.quickVideoModel), getGatewayClientBaseUrl(initial.quickVideoModel))?.supportedResolutions)
-      : initial.quickQuality || 'medium',
-    aspect: isVideo ? '16:9' : initial.quickAspectId || '1:1',
+    quality: isVideo ? initial.quickVideoResolution : initial.quickQuality,
+    aspect: isVideo ? initial.quickVideoAspectId : initial.quickAspectId,
+    ...(isVideo ? { duration: initial.quickVideoDuration } : {}),
     count: 1, references: [],
   };
   const studioCommands = useContext(NativeStudioCommandsContext);
   const motion = node.studioSubType === 'motion-control';
-  const [allModels, setModels] = useState(() => loadCanvasGenerationModels(isVideo));
-  const [error, setError] = useState('');
+  const [allModels, setModels] = useState(() => loadCanvasGenerationModels(isVideo, motion));
+  const [error, setError] = useState(node.status === 'error' ? node.errorMessage || '' : '');
   const [failedImageUrl, setFailedImageUrl] = useState<string>();
   const imageLoadFailed = Boolean(node.imageUrl && failedImageUrl === node.imageUrl);
   const lock = useRef(false);
   const optimizationRequest = useRef<AbortController | null>(null);
   const [optimizing, setOptimizing] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const { requestReview, review } = useVideoPromptReview();
   useEffect(() => () => optimizationRequest.current?.abort(), []);
   const uploadLock = useRef(false);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    const refresh = () => setModels(loadCanvasGenerationModels(isVideo));
+    const refresh = () => setModels(loadCanvasGenerationModels(isVideo, motion));
     window.addEventListener('models_updated', refresh);
     window.addEventListener('modality_models_updated', refresh);
     return () => { window.removeEventListener('models_updated', refresh); window.removeEventListener('modality_models_updated', refresh); };
-  }, [isVideo]);
+  }, [isVideo, motion]);
 
   const change = (patch: Partial<typeof config>) => {
     const linkedUrls = nodes.filter((item) => node.referenceNodeIds?.includes(item.id)).map((item) => (isVideo ? item.videoUrl || item.imageUrl : item.imageUrl));
@@ -87,21 +90,18 @@ export function CanvasDrawingNode({
     });
   };
 
-  const models = motion ? allModels.filter(({id}) => videoModes(upstreamModalityModelId('video', id), getGatewayClientBaseUrl(id)).some(mode => mode.id === 'motion_control')) : allModels;
-  const busy = node.status === 'generating' || optimizing || reviewing;
-  const matchedModel = models.find((m) => m.id === config.model || m.modelId === config.model);
-  const selectedModel = (motion && !matchedModel ? '' : matchedModel?.id || (!models.length ? config.model : '')) || models[0]?.id || '';
+  const models = allModels;
+  const busy = node.status === 'generating' || submitting || optimizing || reviewing;
+  const matchedModel = models.find(m => m.id === storedConfig.model) ?? models.find(m => m.modelId === storedConfig.model);
+  const selectedModel = (motion && !matchedModel ? '' : matchedModel?.id || (!models.length ? storedConfig.model : '')) || models[0]?.id || '';
   const videoModel = upstreamModalityModelId('video', selectedModel);
   const videoBaseUrl = getGatewayClientBaseUrl(selectedModel);
 
-  useEffect(() => {
-    if (!isVideo || !selectedModel) return;
-    const supported = getVideoModelById(videoModel, videoBaseUrl)?.supportedResolutions ?? (models.find((item) => item.id === selectedModel)?.supportedResolutions as string[] | undefined);
-    const quality = resolveVideoResolution(config.quality, supported);
-    if (quality !== config.quality) change({ quality });
-  }, [isVideo, selectedModel, config.quality, models, videoModel, videoBaseUrl]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const linkedNodes = (node.referenceNodeIds || []).map((id) => nodes.find((item) => item.id === id)).filter((item): item is CanvasNode => Boolean(item));
+  const isCoverDrawing = linkedNodes.some(item => item.studioSubType === 'cover-prompt-writer');
+  const hasCoverReview = Boolean((node.studioRaw?.settings as Record<string, unknown> | undefined)?.beikeCoverReviewTaskId);
+  const hasReviewNode = hasCoverReview && nodes.some(item => !item.layerHidden && !item.foldedInGroupId &&
+    coverWorkflowRole(item) === 'review' && coverReviewSource(item, nodes)?.id === node.id);
   const linkedTextNodes = linkedNodes.filter(isTextSource);
   const optimizerNodes = linkedNodes.filter((item) => item.studioSubType === 'video-prompt-optimizer');
   const optimizerMediaUrls = optimizerNodes.flatMap((optNode) => {
@@ -117,7 +117,7 @@ export function CanvasDrawingNode({
   });
   const refs = [
     ...new Set([
-      ...config.references,
+      ...storedConfig.references,
       ...linkedNodes.filter((item) => canReference(item) || (isVideo && item.videoUrl && !item.missingMedia)).map((item) => (isVideo ? item.videoUrl || item.imageUrl! : item.imageUrl!)),
       ...optimizerMediaUrls,
     ]),
@@ -126,19 +126,24 @@ export function CanvasDrawingNode({
     (optimizer.referenceNodeIds || []).flatMap(id => nodes.filter(item => item.id === id))
   )].flatMap(item => item.audioUrl && !item.missingMedia ? [item.audioUrl] : []))];
   const referenceNames = mediaReferenceSlots(refs).map((item) => item.name);
-  const videoMode = motion ? 'motion_control' : resolveVideoMode(videoModel, config.refMode, refs.filter((url) => !isVideoMediaUrl(url)).length, refs.filter(isVideoMediaUrl).length);
+  const videoParams = resolveVideoParameters(videoModel, {
+    mode: motion ? 'motion_control' : storedConfig.refMode,
+    aspect: storedConfig.aspect, resolution: storedConfig.quality, duration: storedConfig.duration,
+  }, videoBaseUrl, {
+    images: refs.filter(url => !isVideoMediaUrl(url)).length, videos: refs.filter(isVideoMediaUrl).length,
+  });
+  const { mode: videoMode, aspect: videoAspect, duration } = videoParams;
+  const config = isVideo
+    ? { ...storedConfig, refMode: videoMode, aspect: videoAspect, duration, quality: videoParams.resolution,
+        audio: motion || getVideoModelById(videoModel, videoBaseUrl)?.audioSupport === 'controllable' ? storedConfig.audio ?? true : undefined }
+    : resolveCanvasImageConfig(storedConfig, upstreamModalityModelId('image', selectedModel), selectedModel);
   const preparationSignature = JSON.stringify({ model: selectedModel, videoModel, videoMode, config, prompt: linkedPrompt(node, nodes), refs, audioRefs });
   useEffect(() => { optimizationRequest.current?.abort(); }, [preparationSignature]);
 
-  const durations = videoDurationOptions(videoModel, config.quality, videoMode, videoBaseUrl);
-  const requestedDuration = config.duration || 5;
-  const duration = durations.includes(requestedDuration)
-    ? requestedDuration
-    : durations.reduce((best, value) => (Math.abs(value - requestedDuration) < Math.abs(best - requestedDuration) ? value : best), durations[0] || 5);
   const workflowSettings = node.studioRaw?.settings as Record<string, unknown> | undefined;
   const specialExecution = Boolean(workflowSettings && (workflowSettings.beikeOperation || workflowSettings.beikeCompilerSource || workflowSettings.beikeVideoWorkflow));
   const videoValidation = isVideo && !specialExecution
-    ? videoInputError({ model: videoModel, baseUrl: videoBaseUrl, refMode: videoMode, images: refs.filter((url) => !isVideoMediaUrl(url)), videos: refs.filter(isVideoMediaUrl), audios: audioRefs, audio: config.audio, duration, resolution: config.quality, aspectRatio: config.aspect })
+    ? videoInputError({ model: videoModel, baseUrl: videoBaseUrl, refMode: videoMode, images: refs.filter((url) => !isVideoMediaUrl(url)), videos: refs.filter(isVideoMediaUrl), audios: audioRefs, audio: config.audio, duration, resolution: config.quality, aspectRatio: videoAspect })
     : null;
 
   const uploadReferences = async (files: File[]) => {
@@ -213,8 +218,8 @@ export function CanvasDrawingNode({
     const project = useCanvasStore.getState().projects.find(item => item.id === projectId);
     const studioNode = project?.studioScene?.nodes.find(item => item.id === node.id);
     const workflow = studioNode?.settings as Record<string, unknown> | undefined;
-    if (workflow && (workflow.beikeVideoWorkflow || workflow.beikeStoryboardKeyframe || workflow.beikeOmniReferenceImage ||
-        workflow.beikeReferencePreparationRole || workflow.beikeCompilerSource || workflow.beikeOperation || workflow.beikeRequiredInputs)) {
+    if (isCoverDrawing || (workflow && (workflow.beikeVideoWorkflow || workflow.beikeStoryboardKeyframe || workflow.beikeOmniReferenceImage ||
+        workflow.beikeReferencePreparationRole || workflow.beikeCompilerSource || workflow.beikeOperation || workflow.beikeRequiredInputs))) {
       if (!studioCommands) { setError('画布运行器尚未就绪，请重新打开画布'); return; }
       lock.current = true;
       setError('');
@@ -253,7 +258,10 @@ export function CanvasDrawingNode({
     if (!models.some((model) => model.id === selectedModel)) { setError('请先配置并选择生成模型'); return; }
     if (isVideo && videoValidation) { setError(videoValidation); return; }
 
-    const ratio = IMAGE_RATIO_ITEMS.find((item) => item.id === config.aspect) || IMAGE_RATIO_ITEMS[0];
+    const ratio = ALL_IMAGE_RATIO_ITEMS.find((item) => item.id === config.aspect) || ALL_IMAGE_RATIO_ITEMS[0];
+    const imageSize = config.quality === 'custom' || config.aspect === 'custom'
+      ? `${config.customWidth || 1024}x${config.customHeight || 1024}`
+      : calculateImageDimensions({ quickModel: upstreamModalityModelId('image', selectedModel), quickAspectId: config.aspect, quickQuality: config.quality, baseRatio: ratio }).sizeStr;
     const isPortraitTexture = !isVideo && Boolean(config.portraitTexture?.isActive || node.title === '人像质感调节');
     const pt = { ...DEFAULT_PORTRAIT_TEXTURE, ...(config.portraitTexture || {}) };
     const portraitPromptPrefix = isPortraitTexture
@@ -269,15 +277,17 @@ export function CanvasDrawingNode({
       quickGenMode: isVideo ? 'video' : 'image', quickPrompt: effectivePrompt,
       quickRefImages: refs, activeSubjects: [], allSubjects: [],
       quickModel: selectedModel, quickQuality: config.quality, quickCount: config.count,
-      sizeStr: calculateImageDimensions({ quickModel: selectedModel, quickAspectId: config.aspect, quickQuality: config.quality, baseRatio: ratio }).sizeStr,
+      sizeStr: imageSize, imageQuality: config.generationQuality ?? 'high',
       currentView: 'canvas', hasImageModels: models.some((model) => model.id === selectedModel),
       quickVideoRefMode: videoMode, quickVideoFirstFrame: refs[0] || null, quickVideoLastFrame: refs[1] || null, quickVideoMultiFrames: refs, quickVideoAudioRefs: audioRefs,
-      quickVideoCount: config.count, quickVideoModel: selectedModel, quickVideoAspectId: config.aspect, quickVideoResolution: config.quality,
+      quickVideoCount: config.count, quickVideoModel: selectedModel, quickVideoAspectId: videoAspect, quickVideoResolution: config.quality,
       quickVideoDuration: duration, quickVideoGenerateAudio: config.audio, quickVideoContextIrEnabled: config.contextIrEnabled ?? true,
       quickDepthStyle: 'mocap', quickDepthQuality: 'standard',
     });
     if (!result.ok) { setError(result.error); return; }
-    lock.current = true; setError('');
+    lock.current = true;
+    setSubmitting(true);
+    setError('');
     const addedNodes: string[] = [];
     let previous: CanvasNode | undefined;
     const store = useCanvasStore.getState();
@@ -293,7 +303,7 @@ export function CanvasDrawingNode({
         setOptimizing(true);
         const input = {
           model: videoModel, prompt: result.tasks[0].prompt, mode: videoMode, duration,
-          aspect: config.aspect, resolution: config.quality, audio: result.tasks[0].generateAudio,
+          aspect: videoAspect, resolution: config.quality, audio: result.tasks[0].generateAudio,
           images: refs.filter((url) => !isVideoMediaUrl(url)).length, videos: refs.filter(isVideoMediaUrl).length, audios: audioRefs.length,
         };
         const inputKey = videoPromptReviewKey(input, [...refs, ...audioRefs], selectedModel);
@@ -348,19 +358,23 @@ export function CanvasDrawingNode({
             status: 'success',
           });
         }
-        const priorId = crypto.randomUUID();
-        addedNodes.push(priorId);
-        store.addNode(projectId, {
-          id: priorId, type: isVideo ? 'video' : 'image', title: `${node.title || (isVideo ? '视频' : '图片')} · 上一版`,
-          imageUrl: node.imageUrl, videoUrl: node.videoUrl, content: node.content, referenceNodeIds: node.referenceNodeIds,
-          x: node.x - 360, y: node.y, width: 280, height: drawingGeometry(node).height, status: 'success',
-        });
+        if (!isCoverDrawing) {
+          const priorId = crypto.randomUUID();
+          addedNodes.push(priorId);
+          store.addNode(projectId, {
+            id: priorId, type: isVideo ? 'video' : 'image', title: `${node.title || (isVideo ? '视频' : '图片')} · 上一版`,
+            imageUrl: node.imageUrl, videoUrl: node.videoUrl, content: node.content, referenceNodeIds: node.referenceNodeIds,
+            x: node.x - 360, y: node.y, width: 280, height: drawingGeometry(node).height, status: 'success',
+          });
+        }
       }
       updateNode(projectId, node.id, {
         ...priorRunPatch,
+        originalFileName: undefined,
         promptOptimization: optimization, taskId: result.tasks[0].id, generationIntent: result.tasks[0], status: 'generating',
+        errorMessage: undefined,
         imageUrl: undefined, videoUrl: undefined, resultWidth: undefined, resultHeight: undefined,
-        generationSize: isVideo ? config.aspect : calculateImageDimensions({ quickModel: selectedModel, quickAspectId: config.aspect, quickQuality: config.quality, baseRatio: ratio }).sizeStr,
+        generationSize: isVideo ? videoAspect : imageSize,
         progress: 0, drawing: { ...config, model: selectedModel },
       });
       result.tasks.slice(1).forEach((task, index) => {
@@ -392,7 +406,7 @@ export function CanvasDrawingNode({
       if (optimizationRequest.current?.signal.aborted) return;
       setError(cause instanceof Error ? cause.message : '提交失败');
     } finally {
-      lock.current = false; optimizationRequest.current = null; setOptimizing(false); setReviewing(false);
+      lock.current = false; optimizationRequest.current = null; setOptimizing(false); setReviewing(false); setSubmitting(false);
     }
   };
 
@@ -422,7 +436,8 @@ export function CanvasDrawingNode({
     : reviewing && matchingOptimization ? `待确认 · ${promptSkillName}`
     : optimizing ? `优化中 · ${promptSkillName}`
     : matchingOptimization ? `${matchingOptimization.submitted ? '已用' : '已优化'} · ${promptSkillName}` : `待用 · ${promptSkillName}`;
-  const hasMedia = Boolean(node.imageUrl || node.videoUrl);
+  const showGeneration = submitting || node.status === 'generating';
+  const hasMedia = !showGeneration && Boolean(node.imageUrl || node.videoUrl);
   const isPortraitTextureNode =
     !isVideo &&
     Boolean(
@@ -432,7 +447,7 @@ export function CanvasDrawingNode({
         node.specialized?.operation?.startsWith('skill:'),
     );
   const validRuns = (node.runs || []).filter((item) => Boolean(isVideo ? item.videoUrl : item.imageUrl));
-  const hasMultipleRuns = validRuns.length > 1;
+  const hasMultipleRuns = !isCoverDrawing && validRuns.length > 1;
   const activeRunIdx = node.activeRunIndex ?? 0;
 
   return (
@@ -445,6 +460,7 @@ export function CanvasDrawingNode({
       )}
 
       <div className="relative mx-auto" style={{ width: geometry.width, height: geometry.height }}>
+        {!isVideo && studioCommands && hasCoverReview && !hasReviewNode && <CoverResultReview key={node.taskId + (node.imageUrl || '')} node={node} commands={studioCommands} />}
         {/* Multi-result stacked back cards (reference x3s / O7n) */}
         {hasMedia && hasMultipleRuns && !resultsExpanded && (
           <div data-compact-stack-backs="true" className="pointer-events-none absolute inset-0 z-0 overflow-visible">
@@ -511,7 +527,9 @@ export function CanvasDrawingNode({
                   : 'border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-[#1f1f1f]'
           }`}
         >
-          {isVideo && node.videoUrl ? (
+          {showGeneration ? (
+            <AIGeneratingCard embedded task={{ id: node.taskId, model: selectedModel, mediaType: isVideo ? 'video' : 'image', prompt: node.content }} progressNumber={submitting && node.status !== 'generating' ? undefined : node.progress} className="h-full w-full" />
+          ) : isVideo && node.videoUrl ? (
             <video
               src={proxyMediaUrl(node.videoUrl)} controls playsInline preload="metadata"
               draggable={false} onDoubleClick={() => onPreview?.(node.videoUrl!)}
@@ -539,7 +557,7 @@ export function CanvasDrawingNode({
               )}
             </div>
           ) : node.imageUrl ? (
-            <button type="button" aria-label="预览绘图结果" onMouseDown={(e) => e.stopPropagation()} onClick={() => onPreview?.(node.imageUrl!)} className="h-full w-full cursor-pointer">
+            <>
               <img
                 key={node.imageUrl}
                 src={proxyMediaUrl(node.imageUrl)} alt="绘图结果"
@@ -548,9 +566,24 @@ export function CanvasDrawingNode({
                   const img = event.currentTarget;
                   if (img.naturalWidth && img.naturalHeight && (node.resultWidth !== img.naturalWidth || node.resultHeight !== img.naturalHeight)) updateNode(projectId, node.id, { resultWidth: img.naturalWidth, resultHeight: img.naturalHeight });
                 }}
-                className="h-full w-full object-contain" draggable={false}
+                className="h-full w-full cursor-grab object-contain active:cursor-grabbing" draggable={false}
               />
-            </button>
+              {onPreview && (
+                <button
+                  type="button"
+                  aria-label="预览绘图结果"
+                  title="查看大图"
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onPreview(node.imageUrl!);
+                  }}
+                  className="absolute left-2 top-2 grid size-7 cursor-pointer place-items-center rounded-full border border-white/15 bg-black/60 text-white hover:bg-black/80"
+                >
+                  <Maximize2 className="size-3.5" />
+                </button>
+              )}
+            </>
           ) : busy ? (
             <AIGeneratingCard embedded task={{ id: node.taskId, model: selectedModel, mediaType: isVideo ? 'video' : 'image', prompt: node.content }} progressNumber={node.progress} className="h-full w-full" />
           ) : isPortraitTextureNode ? (

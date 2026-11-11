@@ -130,6 +130,30 @@ it('旧深度复刻项目改用遮脸分镜，保留已上传背景、生成结�
  expect(upgradeVideoWorkflowProject(upgraded)).toBe(upgraded);
 });
 
+it('为已保存的新版电商视频画布更新05和06提示词一次，保留草稿与旧产出',()=>{
+ const project=createVideoWorkflowProject('depth-copy','saved-storyboard',1),scene=project.studioScene!;
+ const node=(key:string)=>scene.nodes.find(n=>n.id==='saved-storyboard-'+key)!;
+ const video=node('video'),analysis=node('analysis'),frame=node('keyframe');
+ delete compilerSettings(video).beikeStoryboardPromptVersion;
+ analysis.settings={...compilerSettings(analysis),textNodeDraftPrompt:'保留旧创作要求',textNodeDisplayText:'旧分析结果'};
+ frame.nodeName='我已命名的绘图节点';
+ frame.prompt='保留已确认的场景要求';
+ frame.content='/storage/old-portrait.jpg';
+ video.content='/storage/old-video.mp4';
+ const updated=upgradeVideoWorkflowProject(project),updatedNodes=updated.studioScene!.nodes;
+ const nextAnalysis=updatedNodes.find(n=>n.id===analysis.id)!;
+ expect(nextAnalysis.prompt).toContain('保留旧创作要求');
+ expect(nextAnalysis.prompt).toContain('【逐段表情与视线】');
+ expect(nextAnalysis.settings).toMatchObject({textNodeDraftPrompt:nextAnalysis.prompt,textNodeDisplayText:'旧分析结果'});
+ const nextFrame=updatedNodes.find(n=>n.id===frame.id)!;
+ expect(nextFrame.prompt).toContain('保留已确认的场景要求');
+ expect(nextFrame.prompt).toContain('【真人实拍质感】');
+ expect(nextFrame.nodeName).toBe(frame.nodeName);
+ expect(nextFrame.content).toBe(frame.content);
+ expect(updatedNodes.find(n=>n.id===video.id)?.content).toBe(video.content);
+ expect(upgradeVideoWorkflowProject(updated)).toBe(updated);
+});
+
 it('uses original references without additional image generation and keeps free original materials available to official video compilation',()=>{
  const project=buildVideoWorkflowProject('depth-copy','prep',1),scene=project.studioScene!;
  const preparations=scene.nodes.filter(n=>compilerSettings(n).beikeReferencePreparationRole);
@@ -181,7 +205,7 @@ it('uses the selected source scene in 06 and official 07 without submitting a co
  }
 });
 
-const script='【全片一致性】目标人物和目标服装；【声音模式：静音】【全片一致性结束】\n【参考图制作要求】0秒窗边、桌面有书。【参考图制作要求结束】\n【视频片段 01｜时长 15 秒】\n开场画面：窗边翻书\n本地时间轴：0至15秒翻书\n结束状态：合上书\n【视频片段结束】';
+const script='【全片一致性】目标人物和目标服装；【声音模式：静音】【全片一致性结束】\n【参考图制作要求】0秒窗边、桌面有书。【参考图制作要求结束】\n【视频片段 01｜时长 15 秒】\n开场画面：窗边翻书\n本地时间轴：\n0–8秒：低头看书，眉眼专注。\n8–15秒：抬眼看向镜头，嘴角轻提，合书后神态回落。\n结束状态：合上书\n【视频片段结束】';
 
 it('uses source sheets for 06 and 08 without a background upload, and keeps image roles after 07 confirmation',()=>{
  const scene=createVideoWorkflowProject('depth-copy','copy',1).studioScene!;
@@ -198,6 +222,7 @@ it('uses source sheets for 06 and 08 without a background upload, and keeps imag
  scene.connections=wireStudioStoryboards(scene).connections;
  const analysis=resolveStudioInputs(scene,node('analysis').id);
  expect(analysis.refs.map(ref=>ref.nodeId)).toEqual(['copy-source','copy-product','copy-person','page-1','page-2']);
+ expect(analysis.prompt).toContain('把表演写进成片本地时间轴');
  const analysisNode=node('analysis');
  const originalAnalysisSettings=analysisNode.settings;
  analysisNode.settings={...compilerSettings(analysisNode),inputItemOrder:['/storage/person.jpg'],textNodeDraftPrompt:'观察 @["canvas-node:copy-person","图片3"] 中的目标人物'};
@@ -217,6 +242,8 @@ it('uses source sheets for 06 and 08 without a background upload, and keeps imag
  expect(image.prompt).toContain('@图片2：目标人物身份和脸');
  expect(image.prompt).toContain('@图片3：原片遮脸分镜第1页');
  expect(image.prompt).toContain('只取05指定的开场时间码对应格');
+ expect(image.prompt).toContain('脸、耳、颈与手的受光连贯');
+ expect(image.prompt).not.toContain('合书后神态回落');
  expect(image.prompt).toContain('@文本2：05 分镜分析');
  assertStudioReferenceNumbers(image.prompt,image.refs.filter((ref):ref is typeof ref & {type:'image'|'video'}=>ref.type!=='audio'));
  assertStudioTextReferences(image.prompt);
@@ -226,6 +253,8 @@ it('uses source sheets for 06 and 08 without a background upload, and keeps imag
  expect(editorRoles.slice(0,2).map(({nodeId,token})=>[nodeId,token])).toEqual([['page-2','@图片1'],['copy-person','@图片2']]);
  for(const {token,role} of editorRoles)expect(reordered.prompt).toContain(`${token}：${role}`);
  const compiler=node('prompt'),inputs=resolveStudioInputs(scene,compiler.id);
+ expect(inputs.prompt).toContain('整理稿须在相应动作区间保留05已写明的视线、表情变化和收势');
+ expect(inputs.prompt).toContain('8–15秒：抬眼看向镜头，嘴角轻提，合书后神态回落');
  compiler.settings={...compilerSettings(compiler),text:'已确认稿',beikeCompilerApproved:'已确认稿',beikeCompilerInputKey:studioCompilerKey(compiler,inputs)};
  const video=resolveStudioInputs(scene,node('video').id);
  expect(video.refs).toEqual(inputs.refs);

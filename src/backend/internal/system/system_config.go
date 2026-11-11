@@ -244,7 +244,7 @@ func serveModelProbe(w http.ResponseWriter, r *http.Request, cfg config.Config, 
 	r = r.WithContext(gateway.WithTextProtocol(r.Context(), protocol))
 	var status int
 	var body map[string]any
-	if mediaModel(model) {
+	if mediaModel(cfg.Root, model) {
 		status, body = probeMediaCatalog(r.Context(), client, baseURL, apiKey, model)
 	} else {
 		status, body = probeChat(r.Context(), client, baseURL, apiKey, model)
@@ -271,15 +271,15 @@ func headerOrBody(payload map[string]any, field, header string) string {
 	return header
 }
 
-func mediaModel(id string) bool {
+func mediaModel(root, id string) bool {
+	if model, ok := selectableCatalogModel(root, id); ok && (model.IsImage || model.IsVideo) {
+		return true
+	}
+	if gateway.IsApprovedImage(id) || gateway.IsApprovedVideo(id) {
+		return true
+	}
 	switch id {
-	case "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2", "gemini-nano-banana-2.1", "gemini-3.1-flash-image", "gemini-3.1-flash-lite-image", "gemini-3-pro-image", "gemini-2.5-flash-image", "nano-banana-pro", "nano-banana",
-		"doubao-seedream-4-0-250828", "doubao-seedream-4-5-251128", "doubao-seedream-5-0-260128", "seedream-v5-pro",
-		"qwen-image-max", "z-image-turbo", "qwen-image", "qwen-image-edit", "midjourney", "flux", "flux-pro-max",
-		"grok-4.1-image", "grok-4.2-image", "grok-imagine-image-quality",
-		"veo3.1", "veo3.1-fast", "omni_flash-10s", "kling-video-v3", "kling-video-v3-omni", "kling-video-v2-5-turbo", "kling-video-v2-6",
-		"doubao-seedance-2-0-260128", "doubao-seedance-2-0-fast-260128", "doubao-seedance-2.0-mini", "doubao-seedance-2.5",
-		"sora-2", "sora-2-pro", "MiniMax-H3", "wan3.0-video", "grok-imagine-video-1.5", "viduq3", "viduq3-mix", "viduq3-turbo", "viduq3-pro", "viduq4-preview":
+	case "qwen-image-max", "qwen-image", "qwen-image-edit":
 		return true
 	default:
 		return false

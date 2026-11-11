@@ -8,6 +8,10 @@ import { buildPromptBarGenerationTasks, canSubmitPromptBar } from '@client/share
 import { registerDepthSubmit } from '@client/shared/api/generation/depthGeneration';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
 import type { SubjectItem } from '@client/shared/prompt-bar/promptBarConstants';
+import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
+import { getVideoModelById } from '@shared/domain/media/video';
+import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
+import { loadPromptPreferences } from '../promptBarPreferencesTypes';
 import { getCanvasWorkspaceSnapshot } from '@client/shared/workspace/canvasWorkspace';
 
 interface UsePromptBarSubmitOptions {
@@ -169,6 +173,9 @@ export function usePromptBarSubmit({
       quickVideoAspectId,
       quickVideoResolution,
       quickVideoDuration,
+      quickVideoGenerateAudio: quickGenMode === 'video' && getVideoModelById(upstreamModalityModelId('video', quickVideoModel), getGatewayClientBaseUrl(quickVideoModel))?.audioSupport === 'controllable'
+        ? loadPromptPreferences().video.generateAudio ?? false
+        : undefined,
       quickVideoContextIrEnabled,
       currentView,
       hasImageModels: availableImageModelsLength > 0,

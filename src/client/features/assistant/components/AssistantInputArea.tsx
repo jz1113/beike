@@ -10,7 +10,7 @@ import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { resolveRefMediaName } from '@client/shared/media/refMediaRegistry';
 import {
   FILE_ACCEPT,
-} from '@client/features/assistant/model/assistantConstants';
+} from '@client/shared/api/assistantDocuments';
 import AssistantSkillsMenu from '@client/features/assistant/components/skill/AssistantSkillsMenu';
 import { useShallow } from 'zustand/react/shallow';
 import type { AssistantSkillInputRequirement } from '@shared/domain/assistant/skills/types';

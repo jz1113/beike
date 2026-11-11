@@ -1,3 +1,5 @@
+import type { GenerationTask } from '@client/store/appStoreTypes';
+import { getAspectRatioFromSize } from '@shared/domain/media/drawing';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 
 export const HOME_PUBLISHED_STORAGE_KEY = 'beike.homePublished';
@@ -17,7 +19,51 @@ export interface HomeCanvasNode {
   referenceNodeIds?: string[];
 }
 
-export interface PublishedHomeItem {
+/** Original inputs for recreation, independent of the finished media URL. */
+export interface HomeGenerationSettings {
+  model?: string;
+  modelRouteKey?: string;
+  quality?: string;
+  imageQuality?: string;
+  inferenceStrength?: string;
+  videoResolution?: string;
+  videoDuration?: number;
+  videoRefMode?: string;
+  generateAudio?: boolean;
+  videoContextIrEnabled?: boolean;
+  referenceImages?: string[];
+  referenceAudioUrls?: string[];
+  referenceVideoUrls?: string[];
+}
+
+export function homeGenerationSettings(task: GenerationTask): HomeGenerationSettings & { aspectRatio?: string } {
+  const references = task.referenceImages ?? task.images ?? [task.referenceImageUrl || task.sourceImageUrl || task.productImageUrl].filter((url): url is string => Boolean(url));
+  return {
+    model: task.model, modelRouteKey: task.modelRouteKey, quality: task.quality,
+    aspectRatio: task.aspectRatio || (task.size && task.size !== '-' ? getAspectRatioFromSize(task.size) : undefined),
+    imageQuality: task.imageQuality, inferenceStrength: task.inferenceStrength,
+    videoResolution: task.videoResolution, videoDuration: task.videoDuration, videoRefMode: task.videoRefMode,
+    generateAudio: task.generateAudio, videoContextIrEnabled: task.videoContextIrEnabled,
+    referenceImages: [...references], referenceAudioUrls: task.referenceAudioUrls, referenceVideoUrls: task.referenceVideoUrls,
+  };
+}
+
+function normalizeGenerationSettings(item: Record<string, unknown>): HomeGenerationSettings {
+  const settings: Record<string, unknown> = {};
+  for (const key of ['model', 'modelRouteKey', 'quality', 'imageQuality', 'inferenceStrength', 'videoResolution', 'videoRefMode']) {
+    if (typeof item[key] === 'string') settings[key] = item[key];
+  }
+  for (const key of ['generateAudio', 'videoContextIrEnabled']) {
+    if (typeof item[key] === 'boolean') settings[key] = item[key];
+  }
+  if (typeof item.videoDuration === 'number' && Number.isFinite(item.videoDuration) && item.videoDuration > 0) settings.videoDuration = item.videoDuration;
+  for (const key of ['referenceImages', 'referenceAudioUrls', 'referenceVideoUrls']) {
+    if (Array.isArray(item[key]) && item[key].every(url => typeof url === 'string')) settings[key] = item[key];
+  }
+  return settings;
+}
+
+export interface PublishedHomeItem extends HomeGenerationSettings {
   id: string;
   category: string;
   tag: string;
@@ -85,6 +131,7 @@ function normalizePublishedItem(value: unknown): PublishedHomeItem | null {
   const video = typeof item.video === 'string' ? item.video : undefined;
   const mediaType = item.mediaType === 'video' || video || isVideoMediaUrl(item.image) ? 'video' : 'image';
   return {
+    ...normalizeGenerationSettings(item),
     id: item.id, image: item.image, publishedKind: item.publishedKind, mediaType, video,
     title: typeof item.title === 'string' && item.title.trim() ? item.title : mediaType === 'video' ? '生成视频' : '生成图片',
     prompt: typeof item.prompt === 'string' ? item.prompt : '',
@@ -118,10 +165,11 @@ function writeItems(items: PublishedHomeItem[]) {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(HOME_PUBLISHED_EVENT));
 }
 
-export function publishMediaResult(input: { id: string; prompt: string; url: string; mediaType?: string | null; title?: string }) {
+export function publishMediaResult(input: { id: string; prompt: string; url: string; mediaType?: string | null; title?: string; settings?: HomeGenerationSettings & { aspectRatio?: string } }) {
   const video = input.mediaType === 'video' || input.mediaType === 'depth-video' || isVideoMediaUrl(input.url);
   const title = input.title?.trim().slice(0, 28) || input.prompt.trim().slice(0, 28) || (video ? '生成视频' : '生成图片');
   const next: PublishedHomeItem = {
+    ...input.settings,
     id: `published-${input.id}`,
     category: video ? 'video' : 'photo',
     tag: '我的生成',

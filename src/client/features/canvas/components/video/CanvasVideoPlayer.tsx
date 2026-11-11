@@ -2,15 +2,19 @@ import React, { useEffect, useLayoutEffect, useRef, useState, type ReactNode, ty
 import { createPortal } from 'react-dom';
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { getVideoModelById } from '@shared/domain/media/video';
+import { imageCapabilities, imageOutputTier } from '@shared/domain/media/imageCapabilities';
 import {
   videoDurationOptions,
+  videoDurationFollowsSource,
   videoModes,
+  resolveVideoParameters,
   videoRatioLocked,
+  videoRatioOptions,
   videoResolutionLabel,
   videoResolutionOptions,
 } from '@shared/domain/media/videoCapabilities';
 import { upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
-import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
+import { getGatewayClientBaseUrl, getModelCredentials } from '@client/shared/api/gatewayClient';
 import { veoExtensionHint } from '@shared/domain/media/veoChannels';
 import { isMetasoH3 } from '@shared/domain/media/videoChannels';
 import { VideoGenerationCostNotice } from '@client/shared/ui/VideoGenerationCostNotice';
@@ -26,61 +30,40 @@ export interface ImageModelCapabilities {
   ratios: string[];
 }
 
-const RES_1K: ImageResolutionOption = { id: 'low', short: '1K', label: '标准画质' };
-const RES_2K: ImageResolutionOption = { id: 'medium', short: '2K', label: '高清画质' };
-const RES_4K: ImageResolutionOption = { id: 'high', short: '4K', label: '超清画质' };
-const RES_CUSTOM: ImageResolutionOption = { id: 'custom', short: '自定义', label: '自定义尺寸' };
-const RES_AUTO: ImageResolutionOption = { id: 'Auto', short: '自动', label: '自动画质' };
-const STD_QUALITIES: ImageQualityTierOption[] = [
-  { id: 'high', label: '高' },
-  { id: 'medium', label: '中' },
-  { id: 'low', label: '低' },
-];
-const PRO25_QUALITIES: ImageQualityTierOption[] = [
-  { id: 'max', label: '最高' },
-  { id: 'xhigh', label: '极高' },
-  ...STD_QUALITIES,
-];
-
-export function resolveImageModelCapabilities(rawModelId?: string | null): ImageModelCapabilities {
-  const m = String(rawModelId || 'gpt-image-2').toLowerCase().trim();
+export function resolveImageModelCapabilities(model = 'gpt-image-2', selection = model): ImageModelCapabilities {
+  const credentials = getModelCredentials(selection);
+  const caps = imageCapabilities(model, credentials.protocol, credentials.baseUrl);
+  const id = model.toLowerCase();
+  const supportsCustomSize = /gpt-image-2(?!.*(?:-2k|-4k))/.test(id);
+  const supportsBackground = supportsCustomSize || id.includes('gpt-image-1.5');
   const fullRatios = ['smart', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '21:9'];
-  const seedreamRatios = ['21:9', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16'];
+  const fixedSize = /midjourney|^mj|z-image|gpt-image-1[._-]5|gpt-4o-image|sora[_-]image/i.test(id);
+  const resolutions: ImageResolutionOption[] = fixedSize ? [] : caps.resolutions.map(size => ({ id: imageOutputTier(size), short: size, label: size }));
+  if (supportsCustomSize) resolutions.push({ id: 'custom', short: '自定义', label: '自定义尺寸' });
+  const labels = { max: '最高', xhigh: '极高', high: '高', medium: '中', low: '低' };
+  const qualities = [...(caps.qualities ?? [])].reverse().map(id => ({ id, label: labels[id] }));
+  const ratios = caps.aspectRatios ?? (id.includes('gpt-image-1.5') ? ['smart', '1:1', '3:2', '2:3'] : fullRatios);
+  return { resolutions, qualities, supportsBackground, supportsCustomSize, ratios: supportsCustomSize ? [...ratios, 'custom'] : ratios };
+}
 
-  if (/gpt-image-2[._-]5/i.test(m)) {
-    return { resolutions: [RES_1K, RES_2K, RES_4K, RES_CUSTOM], qualities: PRO25_QUALITIES, supportsBackground: true, supportsCustomSize: true, ratios: [...fullRatios, 'custom'] };
-  }
-  if (/gpt-image-1[._-]5|gpt-4o-image|sora[_-]image/i.test(m)) {
-    const is4o = /4o|sora/i.test(m);
-    return { resolutions: [], qualities: STD_QUALITIES, supportsBackground: !is4o, supportsCustomSize: false, ratios: is4o ? ['1:1', '3:2', '2:3'] : ['smart', '1:1', '3:2', '2:3'] };
-  }
-  if (/nano-banana-2-lite|flash-lite-image|gemini-2[._-]5-flash-image/i.test(m)) {
-    return { resolutions: [RES_1K], qualities: [], supportsBackground: false, supportsCustomSize: false, ratios: fullRatios.slice(1) };
-  }
-  if (/nano-banana-2(?!\.1|-lite)|gemini-3[._-]1-flash-image/i.test(m)) {
-    return { resolutions: [RES_AUTO, { id: '512px', short: '512px', label: '512px' }, RES_1K, RES_2K, RES_4K], qualities: [], supportsBackground: false, supportsCustomSize: false, ratios: fullRatios };
-  }
-  if (/nano-banana-2\.1|nano-banana-pro|gemini-3-pro-image/i.test(m)) {
-    return { resolutions: [RES_AUTO, RES_1K, RES_2K, RES_4K], qualities: [], supportsBackground: false, supportsCustomSize: false, ratios: fullRatios };
-  }
-  if (/^nano-banana$/i.test(m)) {
-    return { resolutions: [RES_AUTO, { id: 'high', short: 'HD', label: '高清 HD' }], qualities: [], supportsBackground: false, supportsCustomSize: false, ratios: fullRatios };
-  }
-  if (/seedream[-_.]?(v)?(4[._-]5|5[._-]0(?!-pro))/i.test(m)) {
-    return { resolutions: [RES_2K, RES_4K], qualities: [], supportsBackground: false, supportsCustomSize: false, ratios: seedreamRatios };
-  }
-  if (/seedream|jimeng|即梦/i.test(m)) {
-    return { resolutions: [RES_1K, RES_2K, RES_4K], qualities: [], supportsBackground: /5[._-]0[-_.]?pro/i.test(m), supportsCustomSize: false, ratios: ['smart', ...seedreamRatios] };
-  }
-  if (/flux|qwen/i.test(m)) {
-    const baseRatios = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
-    return { resolutions: [RES_1K, RES_2K], qualities: [], supportsBackground: false, supportsCustomSize: false, ratios: /qwen/i.test(m) ? baseRatios : [...baseRatios, '21:9'] };
-  }
-  if (/midjourney|^mj|z-image|grok/i.test(m)) {
-    const baseRatios = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
-    return { resolutions: [], qualities: [], supportsBackground: false, supportsCustomSize: false, ratios: /z-image/i.test(m) ? baseRatios : [...baseRatios, '21:9'] };
-  }
-  return { resolutions: [RES_1K, RES_2K, RES_4K, RES_CUSTOM], qualities: STD_QUALITIES, supportsBackground: true, supportsCustomSize: true, ratios: [...fullRatios, 'custom'] };
+export function resolveCanvasImageConfig<T extends Pick<VideoConfig, 'aspect' | 'quality' | 'generationQuality' | 'backgroundMode'>>(
+  config: T, model: string, selection = model,
+): T {
+  const caps = resolveImageModelCapabilities(model, selection);
+  const aspect = caps.ratios.includes(config.aspect) ? config.aspect : caps.ratios.includes('3:4') ? '3:4' : caps.ratios[0];
+  const savedResolution = caps.resolutions.find(item => item.id === config.quality || item.short === config.quality);
+  const quality = aspect === 'custom' ? 'custom' : savedResolution && savedResolution.id !== 'custom'
+    ? savedResolution.id
+    : caps.resolutions.find(item => item.id === 'medium')?.id
+      ?? caps.resolutions.filter(item => item.id !== 'custom').at(-1)?.id
+      ?? (config.quality === 'custom' ? 'medium' : config.quality);
+  return {
+    ...config, aspect, quality,
+    generationQuality: caps.qualities.length
+      ? caps.qualities.find(item => item.id === config.generationQuality)?.id ?? 'high'
+      : undefined,
+    backgroundMode: caps.supportsBackground ? config.backgroundMode : undefined,
+  };
 }
 
 export interface VideoModelCapabilityOption { id: string; label: string; desc?: string }
@@ -104,40 +87,16 @@ export function resolveVideoModelCapabilities(
   currentResolution?: string,
   baseUrl?: string,
 ): VideoModelCapabilities {
-  const m = String(rawModel || 'doubao-seedance-2.0-mini').toLowerCase().trim();
   const profile = getVideoModelById(rawModel, baseUrl);
   const mode = currentMode || 'omni';
-
-  const modes: VideoModelCapabilityOption[] = videoModes(rawModel, baseUrl).map((item) => ({
-    id: item.id,
-    label: item.name,
-    desc: item.desc,
-  }));
-
-  let ratios: string[];
-  if (/seedance-(v)?2[._-]0-mini/i.test(m)) {
-    ratios = ['adaptive', '1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '3:2', '2:3'];
-  } else if (/seedance-(v)?2[._-](5|0)/i.test(m) || /minimax-h3|metaso-h3|秘塔h3|wan[-_.]?3/i.test(m)) {
-    ratios = ['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'];
-  } else if (/seedance-(v)?1/i.test(m)) {
-    ratios = ['adaptive', '16:9', '9:16', '1:1', '4:3', '3:4', '21:9'];
-  } else if (/veo|omni_flash/i.test(m)) {
-    ratios = ['16:9', '9:16'];
-  } else if (/sora|kling/i.test(m)) {
-    ratios = ['16:9', '9:16', '1:1'];
-  } else if (/vidu|hailuo|wan[-_.]?2/i.test(m)) {
-    ratios = ['16:9', '9:16', '1:1', '4:3', '3:4'];
-  } else if (profile?.supportedAspectRatios?.length) {
-    const rest = profile.supportedAspectRatios.filter((r) => r !== 'adaptive');
-    ratios = profile.supportedAspectRatios.includes('adaptive') ? ['adaptive', ...rest] : rest;
-  } else {
-    ratios = ['adaptive', '16:9', '9:16', '1:1', '4:3', '3:4'];
-  }
+  const modes = videoModes(rawModel, baseUrl).map(item => ({ id: item.id, label: item.name, desc: item.desc }));
+  const supportedRatios = videoRatioOptions(rawModel, mode, baseUrl);
+  const ratios = supportedRatios.length ? supportedRatios : ['16:9', '9:16', '1:1'];
 
   const resolutions = videoResolutionOptions(rawModel, mode, baseUrl) || profile?.supportedResolutions || ['480P', '720P'];
   const durations = videoDurationOptions(rawModel, currentResolution || resolutions[0], mode, baseUrl);
   const customDurationBounds = durations.length > 12 ? { min: durations[0], max: durations[durations.length - 1] } : undefined;
-  const supportsAudio = !/seedance-(v)?2[._-]0-(mini|fast)/i.test(m) && profile?.audioSupport === 'controllable';
+  const supportsAudio = profile?.audioSupport === 'controllable';
 
   return { modes, ratios, resolutions, durations, customDurationBounds, supportsAudio };
 }
@@ -179,10 +138,12 @@ export function CanvasVideoSettings({ config, model, baseUrl, modesOnly, section
     (root.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]') || root.current?.querySelector<HTMLButtonElement>('button'))?.focus();
   }, [section, modesOnly]);
   const profile = getVideoModelById(model, baseUrl);
-  const mode = config.refMode || 'omni';
+  const resolve = (overrides: { mode?: string; resolution?: string } = {}) => resolveVideoParameters(model, {
+    mode: config.refMode, aspect: config.aspect, resolution: config.quality, duration: config.duration, ...overrides,
+  }, baseUrl);
+  const { mode, aspect, resolution, duration } = resolve();
   const lockedRatio = videoRatioLocked(model, mode, baseUrl);
-  const durations = videoDurationOptions(model, config.quality, mode, baseUrl);
-  const duration = config.duration ?? 5;
+  const durations = videoDurationOptions(model, resolution, mode, baseUrl);
   if (!profile) return <p className="p-4 text-xs text-slate-500 dark:text-slate-400">请先选择已启用的视频模型，再设置生成参数。</p>;
   return <section ref={root} role="dialog" aria-label={modesOnly ? '视频生成方式' : '视频生成参数'} data-drawing-settings className={`${section && section !== 'aspect' ? 'p-2' : 'p-3'} text-left`} onKeyDown={event => {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
@@ -195,19 +156,19 @@ export function CanvasVideoSettings({ config, model, baseUrl, modesOnly, section
   }}>
     {modesOnly ? <div className="grid gap-1">
       {videoModes(model, baseUrl).map(item => <button key={item.id} type="button" aria-pressed={mode === item.id} className={`${choice(mode === item.id)} text-left`} onClick={() => {
-        const allowed = videoDurationOptions(model, config.quality, item.id, baseUrl);
-        onChange({ refMode: item.id, duration: allowed.includes(duration) ? duration : allowed[0] });
+        const next = resolve({ mode: item.id });
+        onChange({ refMode: next.mode, aspect: next.aspect, quality: next.resolution, duration: next.duration });
       }}><span className="block font-medium">{item.name}</span><span className="mt-1 block text-[11px] opacity-70">{item.desc}</span></button>)}
     </div> : <div className="space-y-4">
       {(!section || section === 'aspect') && <div><p className="mb-2 text-xs text-slate-500 dark:text-slate-400">比例{lockedRatio && ' · 跟随原素材'}</p>
-        <div className="grid grid-cols-5 gap-1.5">{(lockedRatio ? ['adaptive'] : profile?.supportedAspectRatios || []).map(ratio => <button key={ratio} type="button" aria-pressed={lockedRatio || config.aspect === ratio} className={`${choice(lockedRatio || config.aspect === ratio)} flex h-16 flex-col items-center justify-center gap-2`} onClick={() => onChange({ aspect: ratio })}><span aria-hidden="true" className={`block rounded-[2px] border border-current ${ratio === 'adaptive' ? 'border-dashed' : ''}`} style={{ width: 20 * Math.min(1, Number(ratio.split(':')[0]) / Number(ratio.split(':')[1]) || 1), height: 20 * Math.min(1, Number(ratio.split(':')[1]) / Number(ratio.split(':')[0]) || 1) }} />{ratio === 'adaptive' ? '自动' : ratio}</button>)}</div>
+        <div className="grid grid-cols-5 gap-1.5">{videoRatioOptions(model, mode, baseUrl).map(ratio => <button key={ratio} type="button" aria-pressed={aspect === ratio} className={`${choice(aspect === ratio)} flex h-16 flex-col items-center justify-center gap-2`} onClick={() => onChange({ aspect: ratio })}><span aria-hidden="true" className={`block rounded-[2px] border border-current ${ratio === 'adaptive' ? 'border-dashed' : ''}`} style={{ width: 20 * Math.min(1, Number(ratio.split(':')[0]) / Number(ratio.split(':')[1]) || 1), height: 20 * Math.min(1, Number(ratio.split(':')[1]) / Number(ratio.split(':')[0]) || 1) }} />{ratio === 'adaptive' ? '自动' : ratio}</button>)}</div>
       </div>}
-      {(!section || section === 'quality') && <div><p className="mb-2 text-xs text-slate-500 dark:text-slate-400">清晰度</p><div className="flex flex-col gap-1">{videoResolutionOptions(model, mode, baseUrl)?.map(res => <button key={res} type="button" className={`${choice(config.quality === res)} flex-1`} aria-pressed={config.quality === res} onClick={() => {
-        const allowed = videoDurationOptions(model, res, mode, baseUrl);
-        onChange({ quality: res, duration: allowed.includes(duration) ? duration : allowed[0] });
+      {(!section || section === 'quality') && <div><p className="mb-2 text-xs text-slate-500 dark:text-slate-400">清晰度</p><div className="flex flex-col gap-1">{videoResolutionOptions(model, mode, baseUrl)?.map(res => <button key={res} type="button" className={`${choice(resolution === res)} flex-1`} aria-pressed={resolution === res} onClick={() => {
+        const next = resolve({ resolution: res });
+        onChange({ quality: next.resolution, duration: next.duration });
       }}>{videoResolutionLabel(model, res, baseUrl)}</button>)}</div></div>}
-      {(!section || section === 'duration') && <div><p className="mb-2 flex justify-between text-xs text-slate-500 dark:text-slate-400">时长<span>{['edit', 'motion_control'].includes(mode) ? '跟随原视频' : `${duration} 秒`}</span></p>
-        {!['edit', 'motion_control'].includes(mode) && <div className={durations.length > 4 ? 'grid max-h-64 grid-cols-6 gap-1 overflow-y-auto' : 'flex max-h-64 flex-col gap-1 overflow-y-auto'}>{durations.map(seconds => <button key={seconds} type="button" aria-pressed={duration === seconds} className={`${choice(duration === seconds)} shrink-0 border-transparent text-center`} onClick={() => onChange({ duration: seconds })}>{seconds}s</button>)}</div>}
+      {(!section || section === 'duration') && <div><p className="mb-2 flex justify-between text-xs text-slate-500 dark:text-slate-400">时长<span>{videoDurationFollowsSource(model, mode) ? '跟随原视频' : `${duration} 秒`}</span></p>
+        {!videoDurationFollowsSource(model, mode) && <div className={durations.length > 4 ? 'grid max-h-64 grid-cols-6 gap-1 overflow-y-auto' : 'flex max-h-64 flex-col gap-1 overflow-y-auto'}>{durations.map(seconds => <button key={seconds} type="button" aria-pressed={duration === seconds} className={`${choice(duration === seconds)} shrink-0 border-transparent text-center`} onClick={() => onChange({ duration: seconds })}>{seconds}s</button>)}</div>}
         {veoExtensionHint(model, mode, baseUrl) && <p className="mt-2 text-xs leading-relaxed text-slate-500">{veoExtensionHint(model, mode, baseUrl)}</p>}
         {isMetasoH3(model, baseUrl) && <label className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
           <input type="checkbox" checked={config.contextIrEnabled ?? true} onChange={(event) => onChange({ contextIrEnabled: event.target.checked })} />
@@ -482,18 +443,17 @@ export function CanvasUnifiedVideoControls({
   const anchor = useRef<HTMLButtonElement | null>(null);
   const model = upstreamModalityModelId('video', selection);
   const baseUrl = getGatewayClientBaseUrl(selection);
-  const mode = config.refMode || 'omni';
+  const { mode, aspect: activeRatio, resolution: activeRes, duration } = resolveVideoParameters(model, {
+    mode: config.refMode, aspect: config.aspect, resolution: config.quality, duration: config.duration,
+  }, baseUrl);
   const locked = videoRatioLocked(model, mode, baseUrl);
-  const caps = resolveVideoModelCapabilities(model, mode, config.quality, baseUrl);
+  const caps = resolveVideoModelCapabilities(model, mode, activeRes, baseUrl);
   const activeModeObj =
     caps.modes.find((item) => item.id === mode) ||
     (mode === 'first_frame' ? caps.modes.find((item) => item.id === 'first_last_frame') : undefined) ||
     caps.modes[caps.modes.length - 1] || { id: mode, label: '全能参考' };
-  const activeRatio = locked ? 'adaptive' : caps.ratios.includes(config.aspect) ? config.aspect : caps.ratios[0] || '16:9';
   const ratioLabel = activeRatio === 'adaptive' ? '自适应' : activeRatio;
-  const activeRes = caps.resolutions.includes(config.quality) ? config.quality : caps.resolutions[0] || '720P';
   const resLabel = formatVideoResolutionPill(model, activeRes, baseUrl);
-  const duration = config.duration ?? caps.durations[0] ?? 5;
   const audioOn = config.audio ?? true;
 
   useEffect(() => {
@@ -519,7 +479,7 @@ export function CanvasUnifiedVideoControls({
     caps.modes.length > 0 ? activeModeObj.label : '',
     ratioLabel,
     resLabel,
-    ['edit', 'motion_control'].includes(mode) ? '原时长' : `${duration}s`,
+    videoDurationFollowsSource(model, mode) ? '原时长' : `${duration}s`,
   ].filter(Boolean);
 
   return (
@@ -583,11 +543,8 @@ export function CanvasUnifiedVideoControls({
                           title={item.desc || item.label}
                           aria-selected={active}
                           onClick={() => {
-                            const nextCaps = resolveVideoModelCapabilities(model, item.id, activeRes, baseUrl);
-                            onChange({
-                              refMode: item.id,
-                              duration: nextCaps.durations.includes(duration) ? duration : nextCaps.durations[0],
-                            });
+                            const next = resolveVideoParameters(model, { mode: item.id, aspect: activeRatio, resolution: activeRes, duration }, baseUrl);
+                            onChange({ refMode: next.mode, aspect: next.aspect, quality: next.resolution, duration: next.duration });
                           }}
                           className={`flex items-center justify-center rounded-[9px] px-1 py-1.5 text-[11px] font-medium transition-all cursor-pointer ${
                             active
@@ -660,11 +617,8 @@ export function CanvasUnifiedVideoControls({
                           role="tab"
                           aria-selected={active}
                           onClick={() => {
-                            const allowed = videoDurationOptions(model, res, mode, baseUrl);
-                            onChange({
-                              quality: res,
-                              duration: allowed.includes(duration) ? duration : allowed[0],
-                            });
+                            const next = resolveVideoParameters(model, { mode, aspect: activeRatio, resolution: res, duration }, baseUrl);
+                            onChange({ quality: next.resolution, duration: next.duration });
                           }}
                           className={`flex items-center justify-center rounded-[9px] py-1.5 text-[11px] font-medium transition-all cursor-pointer ${
                             active
@@ -680,7 +634,7 @@ export function CanvasUnifiedVideoControls({
                 </div>
               )}
 
-              {!['edit', 'motion_control'].includes(mode) && caps.durations.length > 0 && (() => {
+              {!videoDurationFollowsSource(model, mode) && caps.durations.length > 0 && (() => {
                 const presetDurations =
                   caps.durations.length > 12
                     ? [4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30].filter((d) => caps.durations.includes(d))

@@ -1,9 +1,10 @@
+import { coverBatchFileName, coverComparisonInputs, coverReviewSource, coverReviewState, coverWorkflowRole, downloadCoverBatchZip, renderCoverPng } from '../../model/coverBatch';
+import { saveToDownloadDir } from '@client/shared/media/saveDownload';
 import React, { useCallback, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowLeftRight,
   CheckCircle2,
-  Columns2,
   Download,
   Eye,
   FileText,
@@ -11,14 +12,12 @@ import {
   FolderArchive,
   GitCompare,
   Grid2X2,
-  Layers,
   LayoutGrid,
   Loader2,
   Maximize2,
   Pause,
   Play,
   Scan,
-  Tv,
   X,
 } from 'lucide-react';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
@@ -33,14 +32,13 @@ interface SimpleNodeProps {
   nodes: CanvasNode[];
   projectId: string;
   selected?: boolean;
+  onPreview?: (url: string, type: 'image' | 'video') => void;
 }
 
-type CompareMode = NonNullable<CanvasNode['compareMode']>;
+type CompareMode = 'side-by-side' | 'tap';
 
 const COMPARE_MODE_ITEMS: Array<{ mode: CompareMode; label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = [
-  { mode: 'split', label: '滑动对比', Icon: Columns2 },
-  { mode: 'side-by-side', label: '并排对比', Icon: LayoutGrid },
-  { mode: 'overlay', label: '叠加对比', Icon: Layers },
+  { mode: 'side-by-side', label: '双栏', Icon: LayoutGrid },
   { mode: 'tap', label: '点按', Icon: Eye },
 ];
 
@@ -53,61 +51,29 @@ export const CanvasCompareNode: React.FC<SimpleNodeProps> = ({ node, nodes, proj
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
   const linkedNodes = (node.referenceNodeIds || []).map((id) => nodes.find((n) => n.id === id)).filter(Boolean) as CanvasNode[];
-  const linkedImages = linkedNodes.map((n) => n.imageUrl || n.referenceImageUrl).filter(Boolean) as string[];
+  const orderedNodes = linkedNodes.length === 2 && linkedNodes[0].type === 'drawing' && linkedNodes[1].type === 'image'
+    ? [linkedNodes[1], linkedNodes[0]]
+    : linkedNodes;
+  const linkedImages = orderedNodes.map((n) => n.imageUrl || n.referenceImageUrl).filter(Boolean) as string[];
 
-  const rawFirst = linkedImages[0] || node.compareBeforeUrl || node.referenceImageUrl || node.imageUrl;
-  const rawSecond = linkedImages[1] || node.compareAfterUrl;
+  const cover = coverWorkflowRole(node) === 'compare' ? coverComparisonInputs(node, nodes) : undefined;
+  const rawFirst = cover ? cover.productUrl || cover.resultUrl : linkedImages[0] || node.compareBeforeUrl || node.referenceImageUrl || node.imageUrl;
+  const rawSecond = cover ? cover.productUrl && cover.resultUrl : linkedImages[1] || node.compareAfterUrl;
   const hasSecond = Boolean(rawSecond);
   const firstImage = swapped && hasSecond ? rawSecond : rawFirst;
   const secondImage = swapped && hasSecond ? rawFirst : rawSecond || rawFirst;
 
-  const split = Math.max(0, Math.min(100, node.compareSplit ?? 50));
-  const mode: CompareMode = node.compareMode || 'split';
+  const generatedFirst = (cover && !cover.productUrl) || (swapped && hasSecond);
+  const firstLabel = generatedFirst ? '生成' : '原始';
+  const secondLabel = generatedFirst ? '原始' : '生成';
+  const onlyCoverResult = Boolean(cover?.resultUrl && !cover.productUrl);
+  const waitingLabel = onlyCoverResult ? '本次成品无关联原图' : '等待第 2 张图片';
 
-  const setSplit = useCallback(
-    (next: number) => updateNode(projectId, node.id, { compareSplit: Math.max(0, Math.min(100, Math.round(next))) }),
-    [node.id, projectId, updateNode],
-  );
+  const mode: CompareMode = node.compareMode === 'tap' ? 'tap' : 'side-by-side';
 
   const setMode = useCallback(
     (nextMode: CompareMode) => updateNode(projectId, node.id, { compareMode: nextMode }),
     [node.id, projectId, updateNode],
-  );
-
-  const updateFromClientX = useCallback(
-    (clientX: number, targetEl: HTMLDivElement | null) => {
-      if (!targetEl) return;
-      const rect = targetEl.getBoundingClientRect();
-      if (rect.width > 0) setSplit(((clientX - rect.left) / rect.width) * 100);
-    },
-    [setSplit],
-  );
-
-  const startDrag = useCallback(
-    (e: React.MouseEvent, targetEl: HTMLDivElement | null) => {
-      e.preventDefault();
-      e.stopPropagation();
-      updateFromClientX(e.clientX, targetEl);
-      const onMove = (ev: MouseEvent) => updateFromClientX(ev.clientX, targetEl);
-      const onUp = () => {
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
-      };
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
-    },
-    [updateFromClientX],
-  );
-
-  const handleSliderKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      const step = e.shiftKey ? 10 : 2;
-      if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); setSplit(split - step); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); setSplit(split + step); }
-      else if (e.key === 'Home') { e.preventDefault(); e.stopPropagation(); setSplit(0); }
-      else if (e.key === 'End') { e.preventDefault(); e.stopPropagation(); setSplit(100); }
-    },
-    [setSplit, split],
   );
 
   const toolbar = selected ? (
@@ -157,13 +123,13 @@ export const CanvasCompareNode: React.FC<SimpleNodeProps> = ({ node, nodes, proj
     </div>
   ) : null;
 
-  const renderViewport = (viewportRef: React.RefObject<HTMLDivElement | null>, isFullscreen = false) => {
+  const renderViewport = (viewportRef: React.RefObject<HTMLDivElement | null>) => {
     if (!firstImage) {
       return (
         <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 bg-[#1f1f1f]/50 rounded-2xl border border-zinc-800 border-dashed">
           <GitCompare size={24} className="mb-2 opacity-50" />
-          <span className="text-xs font-medium">连接图片以对比</span>
-          {linkedNodes.length > 0 && (
+          <span className="text-xs font-medium">{cover ? '等待生成封面' : '连接图片以对比'}</span>
+          {!cover && linkedNodes.length > 0 && (
             <span className="mt-1 text-[10px] text-zinc-500">已连接 {linkedNodes.length} 个上游节点，等待生成图片…</span>
           )}
         </div>
@@ -174,10 +140,10 @@ export const CanvasCompareNode: React.FC<SimpleNodeProps> = ({ node, nodes, proj
       <div
         ref={viewportRef}
         className={`relative h-full w-full overflow-hidden rounded-2xl border border-zinc-800 bg-[#09090b] select-none group ${
-          mode === 'tap' ? 'cursor-pointer' : mode === 'side-by-side' ? 'cursor-default' : 'cursor-ew-resize'
+          mode === 'tap' ? 'cursor-pointer' : 'cursor-default'
         }`}
         onClick={
-          mode === 'tap'
+          mode === 'tap' && !onlyCoverResult
             ? (e) => {
                 e.stopPropagation();
                 setTapShowFirst((v) => !v);
@@ -196,7 +162,7 @@ export const CanvasCompareNode: React.FC<SimpleNodeProps> = ({ node, nodes, proj
         />
         {!hasSecond && (
           <div className="pointer-events-none absolute top-2 left-1/2 z-20 -translate-x-1/2 rounded bg-black/70 px-2 py-0.5 text-[10px] font-medium text-zinc-300 backdrop-blur-sm border border-white/10">
-            再连接一张图片开始对比
+            {cover ? waitingLabel : '再连接一张图片开始对比'}
           </div>
         )}
         {hasSecond && (
@@ -215,113 +181,47 @@ export const CanvasCompareNode: React.FC<SimpleNodeProps> = ({ node, nodes, proj
           </button>
         )}
 
-        {mode === 'side-by-side' ? (
+        {mode === 'side-by-side' && !onlyCoverResult ? (
           <div className="relative z-10 grid h-full w-full grid-cols-2 gap-1 bg-black/70 p-1">
             <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl bg-black/50">
               <img
                 src={proxyMediaUrl(firstImage)}
-                alt="原始图片"
+                alt={firstLabel + "图片"}
                 className="h-full w-full object-contain pointer-events-none"
                 draggable={false}
               />
               <span className="pointer-events-none absolute bottom-2 left-2 rounded border border-white/10 bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white">
-                原始
+                {firstLabel}
               </span>
             </div>
             <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl bg-black/50">
               {hasSecond && secondImage ? (
                 <img
                   src={proxyMediaUrl(secondImage)}
-                  alt="对比图片"
+                  alt={secondLabel + "图片"}
                   className="h-full w-full object-contain pointer-events-none"
                   draggable={false}
                 />
               ) : (
-                <span className="text-[11px] text-zinc-500">等待第 2 张图片</span>
+                <span className="text-[11px] text-zinc-500">{waitingLabel}</span>
               )}
               <span className="pointer-events-none absolute bottom-2 right-2 rounded border border-white/10 bg-blue-600/80 px-2 py-0.5 text-[10px] font-medium text-white">
-                生成
+                {secondLabel}
               </span>
             </div>
           </div>
-        ) : mode === 'tap' ? (
+        ) : (
           <div className="relative z-10 h-full w-full">
             <img
               src={proxyMediaUrl((tapShowFirst || !hasSecond ? firstImage : secondImage) || firstImage)}
-              alt={tapShowFirst || !hasSecond ? '原始图片' : '对比图片'}
+              alt={(tapShowFirst || !hasSecond ? firstLabel : secondLabel) + '图片'}
               className="w-full h-full object-contain pointer-events-none"
               draggable={false}
             />
             <div className="pointer-events-none absolute bottom-2 left-2 rounded border border-white/10 bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white">
-              {tapShowFirst || !hasSecond ? '原始' : '生成'} · 点击切换
+              {tapShowFirst || !hasSecond ? firstLabel : secondLabel}{hasSecond ? ' · 点击切换' : ''}
             </div>
           </div>
-        ) : (
-          <>
-            <img
-              src={proxyMediaUrl(firstImage)}
-              alt="原始图片"
-              className="w-full h-full object-contain pointer-events-none"
-              draggable={false}
-            />
-            {secondImage && (
-              <div
-                className="absolute inset-0 w-full h-full overflow-hidden"
-                style={
-                  mode === 'overlay'
-                    ? { opacity: split / 100 }
-                    : { clipPath: `inset(0 0 0 ${split}%)` }
-                }
-              >
-                <img
-                  src={proxyMediaUrl(secondImage)}
-                  alt="对比图片"
-                  className="w-full h-full object-contain pointer-events-none"
-                  draggable={false}
-                />
-              </div>
-            )}
-            <div
-              className="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-white shadow-[0_0_8px_rgba(0,0,0,0.55)]"
-              style={{ left: `${split}%` }}
-            >
-              <div className="absolute top-1/2 left-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white/85 bg-black/40 shadow-xl backdrop-blur-sm">
-                <div className="flex items-center gap-1 text-xs font-semibold text-white">
-                  <span>&lt;</span>
-                  <span>&gt;</span>
-                </div>
-              </div>
-            </div>
-            <button
-              type="button"
-              role="slider"
-              aria-label={
-                isFullscreen
-                  ? '全屏对比分割位置'
-                  : mode === 'overlay'
-                    ? '叠加不透明度'
-                    : '对比分割位置'
-              }
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(split)}
-              onKeyDown={handleSliderKeyDown}
-              onMouseDown={(e) => startDrag(e, viewportRef.current)}
-              onClick={(e) => e.stopPropagation()}
-              className="nodrag absolute top-0 bottom-0 z-20 w-8 -translate-x-1/2 cursor-ew-resize bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
-              style={{ left: `${split}%` }}
-            />
-            <div className="absolute bottom-2 left-2 bg-black/70 text-white text-[10px] font-medium px-2 py-0.5 rounded backdrop-blur-sm border border-white/10 pointer-events-none">
-              原始
-            </div>
-            <div
-              className={`absolute bottom-2 right-2 text-white text-[10px] font-medium px-2 py-0.5 rounded backdrop-blur-sm border border-white/10 pointer-events-none ${
-                hasSecond ? 'bg-blue-600/80' : 'bg-amber-600/80'
-              }`}
-            >
-              {mode === 'overlay' ? `${Math.round(split)}%` : hasSecond ? '生成' : '需要第 2 路'}
-            </div>
-          </>
         )}
       </div>
     );
@@ -333,7 +233,7 @@ export const CanvasCompareNode: React.FC<SimpleNodeProps> = ({ node, nodes, proj
       style={{ height: `${node.height || 240}px` }}
     >
       {toolbar}
-      {renderViewport(containerRef, false)}
+      {renderViewport(containerRef)}
       {fullscreenOpen &&
         typeof document !== 'undefined' &&
         createPortal(
@@ -382,7 +282,7 @@ export const CanvasCompareNode: React.FC<SimpleNodeProps> = ({ node, nodes, proj
               className="mx-auto flex w-full max-w-6xl flex-1 items-center justify-center overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              {renderViewport(fullscreenRef, true)}
+              {renderViewport(fullscreenRef)}
             </div>
           </div>,
           document.body,
@@ -391,7 +291,7 @@ export const CanvasCompareNode: React.FC<SimpleNodeProps> = ({ node, nodes, proj
   );
 };
 
-export const CanvasMonitorNode: React.FC<SimpleNodeProps> = ({ node, nodes, projectId }) => {
+export const CanvasMonitorNode: React.FC<SimpleNodeProps> = ({ node, nodes, projectId, selected, onPreview }) => {
   const updateNode = useCanvasStore((s) => s.updateNode);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -400,10 +300,15 @@ export const CanvasMonitorNode: React.FC<SimpleNodeProps> = ({ node, nodes, proj
     .map((id) => nodes.find((n) => n.id === id))
     .filter((source): source is CanvasNode => Boolean(source));
   const linkedNode = linkedNodes.find(source => !source.missingMedia && Boolean(source.videoUrl || source.imageUrl));
-  const emptyMessage = !linkedNodes.length ? '连接任一生成或视频节点以接入信号源'
-    : linkedNodes.some(source => source.status === 'generating') ? '上游正在生成，完成后会自动显示'
-    : linkedNodes.some(source => source.status === 'error' || source.missingMedia) ? '上游素材不可用，请检查上游节点'
-    : '已连接上游，等待生成结果或素材';
+  const isUpstreamGenerating = linkedNodes.some(source => source.status === 'generating');
+  const isUpstreamError = linkedNodes.some(source => source.status === 'error' || source.missingMedia);
+  const emptyMessage = !linkedNodes.length
+    ? '连接任一生成或视频节点以接入画面'
+    : isUpstreamGenerating
+      ? '上游正在生成，完成后会自动显示'
+      : isUpstreamError
+        ? '上游素材不可用，请检查上游节点'
+        : '已连接上游，等待生成结果或素材';
 
   const mediaUrl = linkedNode?.videoUrl || linkedNode?.imageUrl || node.videoUrl || node.imageUrl;
   const videoSource = linkedNode?.videoUrl || (!linkedNode ? node.videoUrl : undefined);
@@ -427,32 +332,88 @@ export const CanvasMonitorNode: React.FC<SimpleNodeProps> = ({ node, nodes, proj
     updateNode(projectId, node.id, { previewFit: fitMode === 'contain' ? 'cover' : 'contain' });
   };
 
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!mediaUrl) return;
+    const ext = isVideo ? 'mp4' : 'png';
+    void downloadMediaOrOpen(mediaUrl, `${node.title || linkedNode?.title || '预览素材'}.${ext}`);
+  };
+
   return (
     <div
-      className="relative flex flex-col w-full h-full rounded-2xl bg-black border-2 border-slate-800 shadow-2xl overflow-hidden select-none group/monitor"
-      style={{ minHeight: `${node.height || 360}px` }}
+      data-testid="monitor-preview"
+      onDoubleClick={(e) => {
+        if (!mediaUrl || !onPreview) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onPreview(mediaUrl, isVideo ? 'video' : 'image');
+      }}
+      className={`relative flex flex-col w-full overflow-hidden rounded-[18px] select-none group/monitor cursor-grab active:cursor-grabbing transition-[border-color,box-shadow] ${
+        mediaUrl
+          ? selected
+            ? 'border border-slate-400 dark:border-white/45 bg-slate-100 dark:bg-[#141416]'
+            : 'border border-slate-200/90 dark:border-white/10 bg-slate-100 dark:bg-[#141416]'
+          : selected
+            ? 'border border-slate-400 dark:border-white/45 bg-white dark:bg-[#1f1f1f]'
+            : 'border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-[#1f1f1f]'
+      }`}
+      style={{ height: `${node.height || 300}px` }}
     >
-      <div className="flex items-center justify-between px-3 py-2 bg-slate-900/90 border-b border-white/10 text-xs z-10">
-        <div className="flex items-center gap-2 text-slate-300">
-          <Tv className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-          <span className="font-mono text-[11px] tracking-wide text-cyan-400">MONITOR // {node.title || '导演监视器'}</span>
-        </div>
-        <button
-          type="button"
-          onClick={toggleFit}
-          title={fitMode === 'contain' ? '画面铺满' : '画面完整包含'}
-          className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+      {mediaUrl && (
+        <div
+          className={`nodrag absolute top-2.5 right-2.5 z-20 flex items-center gap-1.5 transition-opacity ${
+            selected ? 'opacity-100' : 'opacity-0 group-hover/monitor:opacity-100 focus-within:opacity-100'
+          }`}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
-          <Scan className="w-3.5 h-3.5" />
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={toggleFit}
+            title={fitMode === 'contain' ? '切换为画面铺满' : '切换为完整显示'}
+            aria-label={fitMode === 'contain' ? '切换为画面铺满' : '切换为完整显示'}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 bg-black/55 text-white/90 backdrop-blur-md transition-colors hover:bg-black/75 cursor-pointer"
+          >
+            <Scan className="w-3.5 h-3.5" />
+          </button>
+          {onPreview && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPreview(mediaUrl, isVideo ? 'video' : 'image');
+              }}
+              title="全屏预览"
+              aria-label="全屏预览"
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 bg-black/55 text-white/90 backdrop-blur-md transition-colors hover:bg-black/75 cursor-pointer"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleDownload}
+            title="下载素材"
+            aria-label="下载素材"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 bg-black/55 text-white/90 backdrop-blur-md transition-colors hover:bg-black/75 cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
-      <div className="relative flex-1 w-full h-full flex items-center justify-center bg-zinc-950 overflow-hidden">
+      <div className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden">
         {!mediaUrl ? (
-          <div className="flex flex-col items-center justify-center text-zinc-600 text-xs p-6 text-center">
-            <Tv className="w-8 h-8 mb-2 opacity-40 text-cyan-500" />
-            <p className="font-mono text-zinc-400">NO SIGNAL</p>
-            <p className="text-[11px] text-zinc-500 mt-1">{emptyMessage}</p>
+          <div className="pointer-events-none flex flex-col items-center justify-center gap-2 px-6 text-center">
+            {isUpstreamGenerating ? (
+              <Loader2 aria-hidden="true" className="h-8 w-8 animate-spin text-slate-400 dark:text-white/35 stroke-[1.7]" />
+            ) : (
+              <Eye aria-hidden="true" className="h-9 w-9 text-slate-400 dark:text-white/28 stroke-[1.7]" />
+            )}
+            <p className="text-xs font-medium text-slate-500 dark:text-zinc-400">
+              {isUpstreamGenerating ? '正在同步上游画面' : linkedNodes.length > 0 ? '等待上游画面输出' : '画面预览'}
+            </p>
+            <p className="text-[11px] leading-relaxed text-slate-400 dark:text-zinc-500">{emptyMessage}</p>
           </div>
         ) : isVideo ? (
           <div className="relative w-full h-full flex items-center justify-center">
@@ -465,42 +426,94 @@ export const CanvasMonitorNode: React.FC<SimpleNodeProps> = ({ node, nodes, proj
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
             />
-            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between px-3 py-2 rounded-xl bg-black/60 backdrop-blur-md opacity-0 group-hover/monitor:opacity-100 transition-opacity z-20">
+            <div
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="nodrag absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-white/10 bg-black/65 backdrop-blur-md opacity-0 group-hover/monitor:opacity-100 transition-opacity z-20"
+            >
               <button
                 type="button"
                 onClick={togglePlay}
-                className="flex items-center gap-2 text-white text-xs font-semibold hover:text-cyan-400 cursor-pointer"
+                className="flex items-center gap-1.5 text-white text-xs font-medium hover:text-zinc-200 cursor-pointer"
               >
                 {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                 <span>{isPlaying ? '暂停' : '播放'}</span>
               </button>
-              <span className="font-mono text-[10px] text-cyan-400 uppercase">{linkedNode?.title || '主控视频源'}</span>
+              <span className="truncate text-[11px] text-zinc-300">{linkedNode?.title || node.title || '视频预览'}</span>
             </div>
           </div>
         ) : (
-          <img src={proxyMediaUrl(mediaUrl)} alt="Monitor" className={`w-full h-full ${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`} />
+          <img
+            src={proxyMediaUrl(mediaUrl)}
+            alt={node.title || '画面预览'}
+            draggable={false}
+            className={`w-full h-full pointer-events-none select-none ${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`}
+          />
         )}
       </div>
     </div>
   );
 };
 
-export const CanvasSaveNode: React.FC<SimpleNodeProps> = ({ node, nodes }) => {
+function getExportSourceName(result: CanvasNode, nodes: CanvasNode[]): string | undefined {
+  if (result.originalFileName) return result.originalFileName;
+  if (result.type !== 'drawing' || !result.imageUrl) return undefined;
+
+  const inputs = (result.referenceNodeIds || [])
+    .map(id => nodes.find(node => node.id === id));
+  if (!inputs.some(input => input?.studioSubType === 'cover-prompt-writer')) return undefined;
+
+  // Older cover results lack filename metadata. Use the sole direct product
+  // image, without following the writer's separate style reference input.
+  const products = inputs.filter(input => input?.type === 'image' && input.imageUrl);
+  if (products.length !== 1) return undefined;
+  const product = products[0];
+  // Legacy uploads stored the filename stem in the node title.
+  return product?.originalFileName || (product?.title ? `${product.title}.png` : undefined);
+}
+
+export const CanvasSaveNode: React.FC<SimpleNodeProps> = ({ node, nodes, projectId }) => {
   const [downloading, setDownloading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const linkedNodes = (node.referenceNodeIds || [])
+  const connectedNodes = [...new Set(node.referenceNodeIds || [])]
     .map((id) => nodes.find((n) => n.id === id))
     .filter(Boolean) as CanvasNode[];
+  const linkedNodes = [...new Map(connectedNodes.flatMap(source => {
+    if (coverWorkflowRole(source) !== 'review') return [[source.id, source] as const];
+    const result = coverReviewSource(source, nodes);
+    return result?.status === 'success' && !result.missingMedia ? [[result.id, result] as const] : [];
+  })).values()];
 
+  const poster = useCanvasStore(state => state.projects.find(project => project.id === projectId)?.nativeCommerce?.kind === 'poster');
+  const batchSave = poster && /^cover-.+-save$/.test(node.id);
+  const batch = (nodes.find(item => item.id === projectId + '-product')?.studioRaw?.settings as Record<string, unknown> | undefined)
+    ?.beikeCoverBatch as { name: string; ids: string[]; runId?: string } | undefined;
+  const batchPrefix = node.id.slice(0, -5);
+  const batchIds = batchSave ? new Set(batch?.ids.filter(id => id.replace(/-\d+-render$/, '') === batchPrefix)) : undefined;
+  const waitingForReview = new Set(linkedNodes.filter(item => {
+    const settings = item.studioRaw?.settings as Record<string, unknown> | undefined;
+    const review = coverReviewState(settings || {}, item.taskId, item.imageUrl || '');
+    return review === 'pending' || review === 'rejected';
+  }).map(item => item.id));
   const mediaItems = linkedNodes
+    .filter(item => !waitingForReview.has(item.id))
+    .filter(item => !batchIds || (batchIds.has(item.id) && item.status === 'success' &&
+      (!batch?.runId || (item.studioRaw?.settings as Record<string, unknown> | undefined)?.beikeCoverExportRunId === batch.runId)))
     .map((n) => ({
       id: n.id,
       title: n.title || '导出素材',
+      layout: (n.studioRaw?.settings as Record<string, unknown> | undefined)?.beikeSubmittedCoverLayout,
+      sizedUrl: (n.studioRaw?.settings as Record<string, unknown> | undefined)?.beikeSizedCoverUrl,
+      coverTitle: (n.studioRaw?.settings as Record<string, unknown> | undefined)?.beikeCoverTitle,
+      originalFileName: getExportSourceName(n, nodes),
+      outputRatio: (n.studioRaw?.settings as Record<string, unknown> | undefined)?.beikeCoverOutputRatio,
+      coverRatio: (n.studioRaw?.settings as Record<string, unknown> | undefined)?.beikeCoverExportRatio ??
+        (poster && n.id === projectId + '-image' ? n.drawing?.aspect : undefined),
       type: n.type === 'video' || n.generationKind === 'video' ? 'video' : 'image',
       url: (n.type === 'video' || n.generationKind === 'video' ? n.videoUrl : n.imageUrl) || '',
     }))
-    .filter((item) => Boolean(item.url));
+    .filter(item => Boolean(item.url) && (!batchIds || item.sizedUrl === item.url));
 
   const handleExportAll = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -508,10 +521,27 @@ export const CanvasSaveNode: React.FC<SimpleNodeProps> = ({ node, nodes }) => {
     try {
       setDownloading(true);
       setSuccess(false);
-      for (let i = 0; i < mediaItems.length; i++) {
-        const item = mediaItems[i];
-        const ext = item.type === 'video' ? 'mp4' : 'png';
-        await downloadMediaOrOpen(item.url, `${node.savePrefix || '短剧产出'}_${i + 1}_${item.title}.${ext}`);
+      if (batchIds) {
+        await downloadCoverBatchZip(batch?.name || '批量封面', mediaItems.map(item => ({
+          title: typeof item.coverTitle === 'string' ? item.coverTitle : item.title,
+          url: item.url,
+          referenceUrl: nodes.find(source => source.id === item.id.replace(/-render$/, '-ref'))?.imageUrl,
+          ratio: item.outputRatio ?? item.coverRatio,
+          layout: item.layout,
+        })));
+      } else {
+        for (let i = 0; i < mediaItems.length; i++) {
+          const item = mediaItems[i];
+          const ext = item.type === 'video' ? 'mp4' : 'png';
+          const ratio = item.outputRatio ?? item.coverRatio;
+          if (ratio === '3:4' || ratio === '4:3' || (ratio === '1:1' && item.outputRatio === '1:1')) {
+            const name = typeof item.coverTitle === 'string' ? coverBatchFileName(item.coverTitle)
+              : (item.originalFileName || item.title).replace(/\.[^.]+$/, '') + '.png';
+            await saveToDownloadDir(name, await renderCoverPng(item.url, ratio));
+            continue;
+          }
+          await downloadMediaOrOpen(item.url, item.originalFileName || `${node.savePrefix || '短剧产出'}_${i + 1}_${item.title}.${ext}`);
+        }
       }
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -524,24 +554,24 @@ export const CanvasSaveNode: React.FC<SimpleNodeProps> = ({ node, nodes }) => {
 
   return (
     <div
-      className="relative flex flex-col w-full h-full rounded-2xl bg-white dark:bg-[#1B1B1E] border border-slate-200/90 dark:border-white/10 shadow-lg p-4 select-none"
+      className="relative flex flex-col w-full h-full rounded-2xl bg-white dark:bg-[#1f1f1f] border border-zinc-200 dark:border-white/10 p-4 select-none"
       style={{ minHeight: `${node.height || 260}px` }}
     >
       <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
         <div className="flex items-center gap-2">
-          <FolderArchive className="w-4 h-4 text-emerald-500" />
+          <FolderArchive className="w-4 h-4 text-zinc-500" />
           <span className="font-semibold text-xs text-slate-800 dark:text-slate-100">{node.title || '本地批量导出'}</span>
         </div>
-        <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
-          已连入 {mediaItems.length} 项
+        <span className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 text-[10px] font-bold">
+          {batchIds ? `可下载 ${mediaItems.length}/${batchIds.size}` : `已连入 ${mediaItems.length} 项`}
         </span>
       </div>
       <div className="flex-1 py-3 overflow-y-auto max-h-[160px] space-y-1.5">
         {mediaItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400 text-xs py-6 text-center">
             <FileText className="w-6 h-6 mb-1 opacity-40" />
-            <p className="text-[11px]">暂无连入素材</p>
-            <p className="text-[10px] text-slate-500 mt-0.5 dark:text-slate-400">将上游画面连入左侧端点自动归档</p>
+            <p className="text-[11px]">{waitingForReview.size ? '请先完成成图质检' : batchIds ? (batchIds.size ? '当前批次暂无可下载成品' : '此批次已归档') : '暂无连入素材'}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5 dark:text-slate-400">{batchIds ? (batchIds.size ? batch?.name : '请使用当前批次的下载节点') : '将上游画面连入左侧端点自动归档'}</p>
           </div>
         ) : (
           mediaItems.map((item, idx) => (
@@ -550,7 +580,7 @@ export const CanvasSaveNode: React.FC<SimpleNodeProps> = ({ node, nodes }) => {
                 {item.type === 'video' ? (
                   <video src={proxyMediaUrl(item.url)} className="w-full h-full object-cover" muted />
                 ) : (
-                  <img src={proxyMediaUrl(item.url)} alt="" className="w-full h-full object-cover" />
+                  <img src={proxyMediaUrl(item.url)} alt="" className="w-full h-full object-contain" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -566,7 +596,7 @@ export const CanvasSaveNode: React.FC<SimpleNodeProps> = ({ node, nodes }) => {
           type="button"
           disabled={mediaItems.length === 0 || downloading}
           onClick={handleExportAll}
-          className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full py-2.5 px-3 rounded-xl bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-900 font-medium text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {downloading ? (
             <>
@@ -581,7 +611,7 @@ export const CanvasSaveNode: React.FC<SimpleNodeProps> = ({ node, nodes }) => {
           ) : (
             <>
               <Download className="w-3.5 h-3.5" />
-              <span>一键导出全部素材 ({mediaItems.length})</span>
+              <span>{batchIds ? '下载当前批次 ZIP' : '一键导出全部素材'} ({mediaItems.length})</span>
             </>
           )}
         </button>

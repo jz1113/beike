@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeReasoningEffort, reasoningCapability, reasoningRequestOptions } from '../assistant/reasoning';
 import { configureDomainRuntime } from '../core/runtime';
 import { configuredTextProtocol, resolveTextProtocol, textModelCapability } from './deepseek';
+import { compareModelDisplayOrder } from './modelCatalog';
 import { resolveModalityModelRoute } from './modalityStorage';
 import {
   GEMINI_EXTENDED_ASPECT_RATIOS,
@@ -21,6 +22,26 @@ import { formatUserError, unwrapJsonErrorMessage } from './upstreamErrors';
 import { reconcileStoredWorkflowDefaults, resolveEnabledModelId } from './workflowModelDefaults';
 import { repairWorkflowModelsForSettings, type WorkflowCapability } from './workflowModels';
 import { selectedTextModel, selectedTextProtocol } from './workflowModelStorage';
+
+it.each([
+  [
+    'gemini-4-argon', 'gemini-3.8-flash', 'openai-responses:gpt-6.1-terra', 'gpt-6-luna',
+    'gpt-5.6-sol', 'claude-haiku-5-5', 'claude-fable-5-1', 'claude-opus-5', 'claude-opus-4-8',
+    'grok-4.7', 'deepseek-official:deepseek-v4.1-flash', 'kimi-k3.1-pro', 'doubao-seed-2-0-pro-260215',
+    'glm-5.3', 'mimo-v2.6-pro',
+  ],
+  [
+    'vendor/nano-banana-2', 'gemini-nano-banana-2.1', 'gpt-image-2.6-sunburst', 'gpt-image-2.5-flare',
+    'gpt-image-2', 'grok-4.2-image', 'doubao-seedream-5-0-260128', 'doubao-seedream-4-5-251128',
+  ],
+  [
+    'veo-3.1-fast-generate-001', 'gemini-omni-1.0-flash', 'gemini-omni-1.2-flash', 'sora-2-pro',
+    'grok-imagine-video-1.5', 'wan3.0-video', 'wan3.0-video-prime', 'doubao-seedance-2-5-260628',
+    'doubao-seedance-2-0-fast-260128', 'MiniMax-H3', 'kling-4.0', 'vidu-q4-preview',
+  ],
+].map(ids => ({ ids })))('keeps catalog family and version order for $ids.0', ({ ids }) => {
+  expect(ids.toReversed().sort(compareModelDisplayOrder)).toEqual(ids);
+});
 
 describe('modelSorting', () => {
   describe('inferVendorId', () => {
@@ -219,14 +240,14 @@ describe('text protocol and thinking capabilities', () => {
     expect(resolveModalityModelRoute('image', 'gemini-image')).not.toHaveProperty('textProtocol');
   });
 
-  it('lets an auto model protocol inherit the configured channel protocol', () => {
+  it('selects the native model protocol when the model protocol is automatic', () => {
     data.set('beike_modality_models_v1_chat', JSON.stringify([
       { id: 'chat-auto', modelId: 'gemini-3-flash', name: 'Gemini via relay', modality: 'chat', channelId: 'auto-channel', textProtocol: 'auto' },
     ]));
     data.set('beike_api_providers_v2', JSON.stringify([
       { id: 'auto-channel', baseUrl: 'https://auto-channel.example', apiKey: 'key', providerType: 'openai' },
     ]));
-    expect(resolveModalityModelRoute('chat', 'chat-auto').textProtocol).toBe('openai');
+    expect(resolveModalityModelRoute('chat', 'chat-auto').textProtocol).toBe('gemini');
   });
 
   it('shows Argon levels and Haiku adaptive effort only on the supported protocol', () => {

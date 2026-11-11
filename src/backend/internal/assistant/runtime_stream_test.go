@@ -7,8 +7,57 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
+
+func useAssistantTestClient(t *testing.T, client *http.Client) {
+	t.Helper()
+	previous := assistantHTTP
+	assistantHTTP = func() *http.Client { return client }
+	t.Cleanup(func() { assistantHTTP = previous })
+}
+
+func TestAssistantProductionGatewayRejectsPrivateAddresses(t *testing.T) {
+	for _, base := range []string{"https://10.0.0.1", "https://192.168.1.1", "https://172.16.0.1", "https://[::1]", "https://[fd00::1]", "https://localhost.", "https://user:password@gateway.example", "https://gateway.example?target=private"} {
+		r := httptest.NewRequest("POST", "/", nil)
+		if _, err := resolveTurnCreds(r, "gpt-6-luna", base, "test-key", true); err == nil {
+			t.Errorf("accepted production gateway %s", base)
+		}
+	}
+	if _, err := resolveTurnCreds(httptest.NewRequest("POST", "/", nil), "gpt-6-luna", "https://gateway.example/api", "test-key", true); err != nil {
+		t.Fatalf("valid public gateway rejected: %v", err)
+	}
+}
+
+func TestAssistantModelClientRejectsPrivateTargetsAndRedirects(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1) }))
+	defer server.Close()
+	response, err := postModel(context.Background(), gatewayCreds{baseURL: server.URL, apiKey: "test-key"}, []byte(`{"model":"gpt-6-luna"}`), false)
+	if response != nil {
+		response.Body.Close()
+	}
+	if err == nil || calls.Load() != 0 {
+		t.Errorf("private target reached: calls=%d err=%v", calls.Load(), err)
+	}
+	client := assistantHTTP()
+	client.Transport = assistantRoundTripper(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host != "public.example" {
+			calls.Add(1)
+			return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("")), Request: r}, nil
+		}
+		return &http.Response{StatusCode: 307, Header: http.Header{"Location": {server.URL + "/private"}}, Body: io.NopCloser(strings.NewReader("")), Request: r}, nil
+	})
+	calls.Store(0)
+	response, err = client.Get("https://public.example/model")
+	if response != nil {
+		response.Body.Close()
+	}
+	if err == nil || calls.Load() != 0 {
+		t.Fatalf("private redirect followed: calls=%d err=%v", calls.Load(), err)
+	}
+}
 
 func TestStreamDeltasKeepItemIdentityAndRetryBeforeFirstToken(t *testing.T) {
 	requests := 0
@@ -28,6 +77,7 @@ func TestStreamDeltasKeepItemIdentityAndRetryBeforeFirstToken(t *testing.T) {
 		_, _ = io.WriteString(w, "data: [DONE]\n\n")
 	}))
 	defer server.Close()
+	useAssistantTestClient(t, server.Client())
 
 	events := []map[string]any{}
 	loop := testLoop(server.URL, func(event map[string]any) { events = append(events, event) })
@@ -83,6 +133,7 @@ func TestStreamDoesNotRetryAfterFirstDelta(t *testing.T) {
 		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"半句\"}}]}\n\n")
 	}))
 	defer server.Close()
+	useAssistantTestClient(t, server.Client())
 
 	loop := testLoop(server.URL, func(map[string]any) {})
 	_, err := loop.complete(true, false)
@@ -108,6 +159,7 @@ func TestStreamRetriesServerErrorBeforeFirstDelta(t *testing.T) {
 		_, _ = io.WriteString(w, "data: [DONE]\n\n")
 	}))
 	defer server.Close()
+	useAssistantTestClient(t, server.Client())
 
 	loop := testLoop(server.URL, func(map[string]any) {})
 	round, err := loop.complete(true, false)
@@ -171,6 +223,7 @@ func TestStreamClampsNamedCompletionLimit(t *testing.T) {
 		_, _ = io.WriteString(w, "data: [DONE]\n\n")
 	}))
 	defer server.Close()
+	useAssistantTestClient(t, server.Client())
 
 	loop := testLoop(server.URL, func(map[string]any) {})
 	body := []byte(`{"model":"gemini-3.7-flash","messages":[{"role":"user","content":"你好"}],"stream":true,"max_tokens":32768}`)

@@ -50,15 +50,15 @@ describe('model-specific capabilities for video and image nodes', () => {
   it('distinguishes Seedance 2.0 Mini and Seedance 2.5 video capabilities (ratios, resolutions, durations, audio)', () => {
     const mini = resolveVideoModelCapabilities('doubao-seedance-2.0-mini', 'omni', '480P');
     expect(mini.modes.map((m) => m.label)).toEqual(['全能参考', '首帧生视频', '首尾帧', '文生视频', '视频编辑', '视频延长']);
-    expect(mini.ratios).toEqual(['adaptive', '1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '3:2', '2:3']);
+    expect(mini.ratios).toEqual(['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', 'adaptive']);
     expect(mini.resolutions).toEqual(['480P', '720P']);
     expect(mini.durations).toEqual(Array.from({ length: 12 }, (_, i) => i + 4));
     expect(mini.customDurationBounds).toBeUndefined();
-    expect(mini.supportsAudio).toBe(false);
+    expect(mini.supportsAudio).toBe(true);
 
     const v25 = resolveVideoModelCapabilities('doubao-seedance-2.5', 'omni', '480P');
     expect(v25.modes.map((m) => m.label)).toEqual(['全能参考', '首帧生视频', '首尾帧', '文生视频', '视频编辑', '视频延长']);
-    expect(v25.ratios).toEqual(['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16']);
+    expect(v25.ratios).toEqual(['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', 'adaptive']);
     expect(v25.resolutions).toEqual(['480P', '720P', '1080P']);
     expect(v25.durations.at(0)).toBe(4);
     expect(v25.durations.at(-1)).toBe(30);
@@ -75,7 +75,7 @@ describe('model-specific capabilities for video and image nodes', () => {
       }),
     );
     expect(miniMarkup).toContain('全能参考 · 9:16 · 480p · 15s');
-    expect(miniMarkup).not.toContain('已开启生成音频');
+    expect(miniMarkup).toContain('已开启生成音频');
 
     const v25Markup = renderToStaticMarkup(
       createElement(CanvasUnifiedVideoControls, {
@@ -99,7 +99,7 @@ describe('model-specific capabilities for video and image nodes', () => {
     expect(gpt25.supportsBackground).toBe(true);
 
     const banana2 = resolveImageModelCapabilities('nano-banana-2');
-    expect(banana2.resolutions.map((r) => r.short)).toEqual(['自动', '512px', '1K', '2K', '4K']);
+    expect(banana2.resolutions.map((r) => r.short)).toEqual(['512px', '1K', '2K', '4K']);
     expect(banana2.qualities).toEqual([]);
     expect(banana2.supportsBackground).toBe(false);
 

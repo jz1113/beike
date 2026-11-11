@@ -1,3 +1,4 @@
+import { CoverBatchRun } from './CoverBatchRun';
 import { createPortal } from 'react-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AudioLines, Copy, Download, History, Image, ListTodo, Play, Search, X } from 'lucide-react';
@@ -9,7 +10,6 @@ import { downloadMedia } from '@client/shared/media/downloadMedia';
 import { SpotlightCard } from '@client/shared/ui/SpotlightCard';
 import { useAppStore } from '@client/store';
 import { isImageTaskActive, isImageTaskFailed, isImageTaskSucceeded } from '@shared/domain/core/taskStatus';
-import { createDepthCopyRunner, type DepthCopyStage } from '../../model/depthCopyRunner';
 import { createStudioVideoPosterQueue } from '../../model/studioVideoPosters';
 import { NativeStudioCommandsContext, useNativeStudioCommands } from '../../hooks/useNativeStudioCommands';
 import { studioNodeLabel } from '../../model/studioConnections';
@@ -31,7 +31,6 @@ import {
 import type { CanvasProject, StudioScene } from '../../model/types';
 import { videoWorkflowKind } from '../../model/videoWorkflowRecovery';
 import { createW3CopyRunner, finishW3CopyVideo, w3PendingDelivery, type W3CopyStage } from '../../model/w3CopyRunner';
-import { CanvasSaveStatus } from '../projects/CanvasRecentProjects';
 import {
   StudioPromptCompilerDialog,
   StudioStoryboardTools,
@@ -42,13 +41,7 @@ import {
 
 
 /** Saving stays automatic; only failures need space over the canvas. */
-export function StudioProjectMenu() {
-  return (
-    <div className="pointer-events-none absolute bottom-14 left-3 right-3 z-30 flex justify-start [&>*]:pointer-events-auto">
-      <CanvasSaveStatus failuresOnly />
-    </div>
-  );
-}
+
 
 const w3StageLabels:Record<W3CopyStage,string>={
   preflight:'正在检查素材与流程',analysis:'正在分析分镜',keyframe:'2/3 正在生成目标首帧',
@@ -84,31 +77,6 @@ export function StudioW3Run({commands,enabled,onSave,scene}:{commands:StudioTask
       {error&&<p role="alert" className="break-words text-red-300">{error}</p>}
       {(!busy&&error&&stage==='delivery'||canFinish) && <button onClick={()=>void run(true)} className="rounded-lg border border-white/20 p-2">{error&&stage==='delivery'?'重试无声处理（不重新生成）':'继续无声交付（不重新生成）'}</button>}
     </div>}
-  </aside>;
-}
-
-function StudioDepthRun({ commands, onSave }: { commands: StudioTaskCommands; onSave: (scene: StudioScene) => Promise<void> }) {
-  const live = useRef({ commands, onSave });
-  live.current = { commands, onSave };
-  const [runner] = useState(() => createDepthCopyRunner({
-    commands: () => live.current.commands, save: scene => live.current.onSave(scene), stopTask: stopStudioTask,
-  }));
-  const [busy, setBusy] = useState(false);
-  const [stage, setStage] = useState<DepthCopyStage>();
-  const [error, setError] = useState('');
-  useEffect(() => () => runner.cancel(), [runner]);
-  const run = async () => {
-    setBusy(true);
-    setError('');
-    try { await runner.run(setStage); }
-    catch (cause) { setError(cause instanceof Error && cause.name !== 'AbortError' ? cause.message : '已停止后续步骤'); }
-    finally { setBusy(false); }
-  };
-  return <aside aria-label="深度复刻准备" className="canvas-fixed-ui absolute bottom-16 right-4 z-30 w-56 rounded-lg bg-[#252527]/95 p-2 text-xs text-white">
-    <button type="button" disabled={busy} onClick={() => void run()}>一键准备深度复刻</button>
-    {busy && <button type="button" className="ml-3" onClick={() => runner.cancel()}>停止</button>}
-    {stage === 'ready' && !error && <p role="status">提示词已确认，可到 08 手动生成视频。</p>}
-    {error && <p role="alert" className="mt-2 text-red-300">{error}</p>}
   </aside>;
 }
 
@@ -457,11 +425,9 @@ export function NativeStudioHostOverlays({
   return (
     <NativeStudioCommandsContext.Provider value={taskCommands}>
       {children}
-      <StudioProjectMenu />
       <StudioStoryboardTools key={`native-storyboard:${projectId}`} commands={taskCommands} onSave={saveScene} />
+      {project.nativeCommerce?.kind === 'poster' && <CoverBatchRun key={projectId} project={project} commands={taskCommands} onSave={saveScene} />}
       <StudioW3Run key={`native-w3:${projectId}`} commands={taskCommands} enabled={wfKind === 'w3-copy'} scene={project.studioScene} onSave={saveScene} />
-      {wfKind === 'depth-copy' && project.studioScene?.nodes.some(node => (node.settings as Record<string, unknown> | undefined)?.beikePromptCompiler === true) &&
-        <StudioDepthRun commands={taskCommands} onSave={saveScene} />}
       {compiler && (
         <StudioPromptCompilerDialog
           projectId={projectId}

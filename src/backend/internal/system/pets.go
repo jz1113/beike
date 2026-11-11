@@ -33,7 +33,6 @@ var builtinPetOrder = []string{
 	"q-ban-da-fei-yu",
 	"pet-6ac83c93535081918861d5c78bb9a8fc",
 	"pet-6ac97d6e82208191a38e047be23e1293",
-	"the-real-tronald-dump",
 }
 
 var petCommandPattern = regexp.MustCompile(`^npx\s+codex-pets\s+add\s+([a-z0-9]+(?:-[a-z0-9]+)*)\s*$`)

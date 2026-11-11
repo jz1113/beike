@@ -126,6 +126,36 @@ func TestServeProxiedMediaInfersAudioTypeAndSkipsHeadBody(t *testing.T) {
 	}
 }
 
+func TestServeProxiedMediaRejectsDocumentTypes(t *testing.T) {
+	for _, contentType := range []string{"text/html", "image/svg+xml", "application/xhtml+xml", "application/json", "text/javascript", "video/not-a-media-format"} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			t.Run(contentType+"/"+method, func(t *testing.T) {
+				body := "<html><title>inert document</title></html>"
+				upstream := &http.Response{StatusCode: http.StatusOK, ContentLength: int64(len(body)),
+					Header: http.Header{"Content-Type": {contentType}}, Body: io.NopCloser(strings.NewReader(body))}
+				response := httptest.NewRecorder()
+				request := httptest.NewRequest(method, "/api/system/proxy-video?url=https://cdn.example/video.mp4", nil)
+				serveProxiedVideo(response, request, upstream)
+				if response.Code != http.StatusBadGateway || !strings.HasPrefix(response.Header().Get("Content-Type"), "text/plain") || strings.Contains(response.Body.String(), "inert document") {
+					t.Fatalf("document escaped media boundary: status=%d headers=%v", response.Code, response.Header())
+				}
+			})
+		}
+	}
+}
+
+func TestServeProxiedMediaParsesMediaTypeAndPreventsSniffing(t *testing.T) {
+	for _, contentType := range []string{"VIDEO/MP4; codecs=avc1", "audio/wav", "audio/opus", "video/webm"} {
+		upstream := &http.Response{StatusCode: http.StatusOK, ContentLength: 5,
+			Header: http.Header{"Content-Type": {contentType}}, Body: io.NopCloser(strings.NewReader("media"))}
+		response := httptest.NewRecorder()
+		serveProxiedVideo(response, httptest.NewRequest(http.MethodGet, "/", nil), upstream)
+		if response.Code != http.StatusOK || response.Body.String() != "media" || response.Header().Get("X-Content-Type-Options") != "nosniff" {
+			t.Fatalf("valid media rejected or sniffable: type=%s status=%d headers=%v", contentType, response.Code, response.Header())
+		}
+	}
+}
+
 func TestServeProxiedVideoDoesNotTruncateAtImageLimit(t *testing.T) {
 	body := bytes.Repeat([]byte("v"), maxProxyBytes+1024)
 	response := httptest.NewRecorder()

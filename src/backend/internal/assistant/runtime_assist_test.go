@@ -49,6 +49,7 @@ func TestCompressHistorySummarizesOverflow(t *testing.T) {
 		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"用户要做封面"}}]}`)
 	}))
 	defer server.Close()
+	useAssistantTestClient(t, server.Client())
 	messages := []map[string]any{{"role": "system", "content": "规则"}}
 	for i := 0; i < 41; i++ {
 		messages = append(messages, map[string]any{"role": "user", "content": "消息"})

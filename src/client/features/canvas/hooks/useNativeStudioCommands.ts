@@ -24,7 +24,7 @@ import {
 } from '../model/studioTaskState';
 import type { StudioScene } from '../model/types';
 import { setCanvasProjectSerializer } from '../store/canvasProjectDefaults';
-import { hydrateCanvasScene } from '../store/canvasArchiveStorage';
+import { hydrateCanvasScene, readCanvasAsset } from '../store/canvasArchiveStorage';
 import { saveCanvasProjects, useCanvasStore } from '../store/useCanvasStore';
 import { useVideoPromptReview } from './useCanvasSelectionActions';
 
@@ -208,8 +208,11 @@ export function useNativeStudioCommands({
             finish: resolve,
           });
         }),
-      runText: (nodeId, signal) =>
-        executeStudioTextNodeAnalysis(projectId, nodeId, commands, saveScene, signal),
+      runText: (nodeId, signal, recoveryOnly) =>
+        executeStudioTextNodeAnalysis(projectId, nodeId, commands, saveScene, signal, {
+          recoveryOnly,
+          loadAsset: (_url, id) => id ? readCanvasAsset(projectId, id) : Promise.resolve(undefined),
+        }),
     };
     return commands;
   }, [projectId, readCurrentScene, commitScene, saveScene, requestReview]);

@@ -1,8 +1,8 @@
+import { extractAssistantDocument, isDocumentFile, LEGACY_OFFICE_EXT_RE } from '@client/shared/api/assistantDocuments';
 import { readImageFileAsDataUrl, readVideoPreviewUrl, isImageFile, isVideoFile } from '@client/shared/api/mediaUpload';
 
 const TEXT_EXT = /\.(txt|md|csv|json)$/i;
 const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|flac)$/i;
-const DOC_EXT = /\.(pdf|docx?|pptx?|xlsx?|xls)$/i;
 
 export type AgentFileKind = 'audio' | 'ppt' | 'word' | 'text' | 'pdf' | 'sheet' | 'file';
 
@@ -16,9 +16,7 @@ export interface AgentAttachmentMeta {
 const metas = new Map<string, AgentAttachmentMeta>();
 
 export function isAgentAttachmentFile(file: File): boolean {
-  if (file.type.startsWith('audio/')) return true;
-  if (file.type.startsWith('text/')) return true;
-  return TEXT_EXT.test(file.name) || AUDIO_EXT.test(file.name) || DOC_EXT.test(file.name);
+  return isDocumentFile(file) || LEGACY_OFFICE_EXT_RE.test(file.name) || file.type.startsWith('audio/') || AUDIO_EXT.test(file.name);
 }
 
 export function isAgentAttachmentUrl(url: string): boolean {
@@ -40,17 +38,18 @@ function kindOf(file: File): AgentFileKind {
   return 'file';
 }
 
-export async function loadPromptBarUploads(files: File[], agentMode: boolean): Promise<{
+export async function loadPromptBarUploads(files: File[], agentMode: boolean, signal?: AbortSignal): Promise<{
   media: Array<{ previewUrl: string; origName: string; file: File }>;
   agentUrls: string[];
 }> {
   const media: Array<{ previewUrl: string; origName: string; file: File }> = [];
   const agentUrls: string[] = [];
   for (const file of files) {
+    signal?.throwIfAborted();
     if (agentMode && isAgentAttachmentFile(file) && !isImageFile(file) && !isVideoFile(file)) {
-      const text = file.type.startsWith('text/') || TEXT_EXT.test(file.name)
-        ? (await file.text()).slice(0, 8000)
-        : undefined;
+      if (file.type.startsWith('audio/') || AUDIO_EXT.test(file.name)) throw new Error('Agent 暂不支持音频附件，请先转成文字后上传');
+      const { text } = await extractAssistantDocument(file, signal);
+      signal?.throwIfAborted();
       const url = `agent-file:${globalThis.crypto.randomUUID()}`;
       metas.set(url, { name: file.name, kind: kindOf(file), size: file.size, text });
       agentUrls.push(url);
@@ -67,8 +66,7 @@ export function formatAgentAttachmentNote(urls: string[]): string {
   const lines = urls.map((url) => {
     const meta = readAgentAttachment(url);
     if (!meta) return '';
-    const excerpt = meta.text ? `\n${meta.text.slice(0, 1500)}` : '';
-    return `- ${meta.name}（${meta.kind}，${meta.size} 字节）${excerpt}`;
+    return `- ${meta.name}（${meta.kind}，${meta.size} 字节）`;
   }).filter(Boolean);
   return lines.length ? `【附件】\n${lines.join('\n')}` : '';
 }
@@ -81,4 +79,12 @@ export function agentFileLabel(kind: AgentFileKind): string {
   if (kind === 'sheet') return '表格';
   if (kind === 'text') return '文本';
   return '文件';
+}
+
+/** Serializable snapshot: document text must survive reloads and later turns. */
+export function snapshotAgentDocuments(urls: string[]) {
+  return urls.flatMap(url => {
+    const meta = readAgentAttachment(url);
+    return meta ? [{ id: url, type: 'document' as const, url: '', name: meta.name, size: meta.size, extractedText: meta.text }] : [];
+  });
 }

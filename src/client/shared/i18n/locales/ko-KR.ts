@@ -32,6 +32,7 @@ export const koKR: TranslationSchema = {
       image: '이미지 생성',
       video: '동영상 생성',
       voice: '음성',
+      fal: 'fal 모델',
       storage: '스토리지',
       appearance: '화면 및 테마',
       language: '언어',

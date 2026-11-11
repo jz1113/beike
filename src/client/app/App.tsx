@@ -386,13 +386,6 @@ export default function App() {
               onNavigateSkills={() => setCurrentView('skills')}
               onOpenSettings={navigateToSettings}
               onOpenSession={(id) => {
-                const session = useAppStore.getState().sessions.find((item) => item.id === id);
-                if (session?.canvasProjectId) {
-                  useCanvasStore.getState().selectProject(session.canvasProjectId);
-                  setHomeMode('canvas');
-                  setCurrentView('canvas');
-                  return;
-                }
                 useAppStore.getState().setQuickGenMode('agent');
                 useAppStore.getState().switchSession(id);
                 setCurrentView('generate');

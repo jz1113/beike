@@ -1,16 +1,17 @@
+import { imageCapabilities, imageOutputTier } from '@shared/domain/media/imageCapabilities';
 import { availableBatchModels, buildGenerationPromptBatch } from '@client/shared/agent/buildGenerationPromptBatch';
 import { currentBatchSettings } from '@client/shared/agent/dispatchGenerationBatch';
 import { apiFetch, storageConfigHeaders } from '@client/shared/api/apiClient';
-import { getGatewayClientBaseUrl, getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
+import { getGatewayClientBaseUrl, getModelCredentials, getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { registerDepthSubmit } from '@client/shared/api/generation/depthGeneration';
 import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import { registerRefMedia, registerRefMediaKind } from '@client/shared/media/refMediaRegistry';
 import { useAppStore } from '@client/store';
 import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
-import { resolveVideoMode, videoDurationOptions, videoModes, videoRatioLocked, videoResolutionOptions } from '@shared/domain/media/videoCapabilities';
-import { isMetasoH3 } from '@shared/domain/media/videoChannels';
+import { resolveVideoMode, videoDurationOptions, videoModes, videoRatioOptions, videoResolutionOptions } from '@shared/domain/media/videoCapabilities';
+import { isFalOmniVideoModel, isMetasoH3 } from '@shared/domain/media/videoChannels';
 import { modalityPickerSelections, readEffectiveModalityModels } from '@shared/domain/models/modalityStorage';
-import { canonicalModelId, listApprovedModels } from '@shared/domain/models/modelCatalog';
+import { canonicalModelId, compareModelDisplayOrder, listSelectableModels } from '@shared/domain/models/modelCatalog';
 import { inferVendorId } from '@shared/domain/models/modelSorting';
 import { getEnabledMultimodalModelsFromSettings, hasWorkflowModelConfiguration, readWorkflowModelsFromStorage } from '@shared/domain/models/workflowModels';
 import { requestCanvasText, type CanvasTextContext } from './canvasTextRequest';
@@ -23,25 +24,18 @@ function versionParts(modelId: string): number[] {
   return id.match(/\d+(?:[._-]\d{1,2}(?!\d))*/)?.[0].split(/[._-]/).map(Number) ?? [];
 }
 
-const MULTIMODAL_VENDOR_ORDER = [
-  'google', 'openai', 'anthropic', 'xai', 'muse', 'deepseek', 'moonshot', 'alibaba',
-];
-
 export function sortStudioModels<T extends { modelId: string }>(
-  models: readonly T[], kind?: 'chat',
+  models: readonly T[], kind?: 'voice',
 ): T[] {
+  if (kind !== 'voice') return models.toSorted((a, b) => compareModelDisplayOrder(a.modelId, b.modelId));
   const vendors = new Map<string, Array<{ model: T; version: number[] }>>();
   for (const model of models) {
-    const vendor = kind === 'chat' && /(?:^|\/)muse(?:$|[-_])/i.test(model.modelId)
-      ? 'muse' : inferVendorId(model.modelId);
+    const vendor = inferVendorId(model.modelId);
     const group = vendors.get(vendor) ?? [];
     group.push({ model, version: versionParts(model.modelId) });
     vendors.set(vendor, group);
   }
-  const order = kind === 'chat'
-    ? [...MULTIMODAL_VENDOR_ORDER, ...[...vendors.keys()].filter(vendor => !MULTIMODAL_VENDOR_ORDER.includes(vendor))]
-    : [...vendors.keys()];
-  return order.flatMap(vendor => (vendors.get(vendor) ?? []).sort((a, b) => {
+  return [...vendors.values()].flatMap(group => group.sort((a, b) => {
     for (let index = 0; index < Math.max(a.version.length, b.version.length); index++) {
       const difference = (b.version[index] ?? 0) - (a.version[index] ?? 0);
       if (difference) return difference;
@@ -74,7 +68,7 @@ export function normalizeStudioReferenceNumbers(prompt:string, refs:ReadonlyArra
 
 /** Connected text is embedded with the same numbered source header as the editor. */
 export function assertStudioTextReferences(prompt:string):void {
-  const headers=[...prompt.matchAll(/【@文本(\d+) · [^】]*】/g)];
+  const headers=[...prompt.matchAll(/【@文本(\d+)(?: · [^】]*)?】/g)];
   const available=new Set(headers.filter((match,index)=>
     prompt.slice(match.index!+match[0].length,headers[index+1]?.index).trim()).map(match=>Number(match[1])));
   for(const match of prompt.matchAll(/@文本(\d+)/g)) {
@@ -87,20 +81,24 @@ export function studioChannels() {
   const fallback = !hasWorkflowModelConfiguration();
   const chatSettings = getEnabledMultimodalModelsFromSettings(readWorkflowModelsFromStorage(), 'assistant');
   const chat = modalityPickerSelections('chat') ?? ((chatSettings.length || !fallback
-    ? chatSettings : listApprovedModels('multimodal')).map(m => ({id:m.id,name:m.name,modelId:m.id})));
-  const chats = sortStudioModels(chat, 'chat').map(m => ({id:'beike:chat:'+m.id, name:m.name || m.id, kind:'chat' as const, route:m.id, modelId:m.modelId, preferred:m.id === state.assistantModel}));
+    ? chatSettings : listSelectableModels('multimodal')).map(m => ({id:m.id,name:m.name,modelId:m.id})));
+  const chats = sortStudioModels(chat).map(m => ({id:'beike:chat:'+m.id, name:m.name || m.id, kind:'chat' as const, route:m.id, modelId:m.modelId, preferred:m.id === state.assistantModel}));
   const media = (['image', 'video'] as const).flatMap(kind => {
     const configured = availableBatchModels(kind);
     const options = configured.length || !fallback || modalityPickerSelections(kind) ? configured
-      : listApprovedModels(kind).map(m => ({id:m.id,modelId:m.id,name:m.name}));
+      : listSelectableModels(kind).filter(m => m.adapter !== 'fal-omni').map(m => ({id:m.id,modelId:m.id,name:m.name}));
     const ordered = sortStudioModels(options);
     return ordered.map(model => ({id:`beike:${kind}:${model.id}`,name:model.name,kind,route:model.id,
       modelId:model.modelId,metasoH3:kind==='video' && isMetasoH3(model.modelId,getGatewayClientBaseUrl(model.id)),preferred:model.id === (kind === 'image' ? state.quickModel : state.quickVideoModel)}));
   });
   const voiceOptions = modalityPickerSelections('voice') ?? readEffectiveModalityModels('voice').models.map(m => ({...m,id:m.modelId}));
   const voices = sortStudioModels(voiceOptions.map(m => ({id:'beike:voice:'+m.id, route:m.id,
-    modelId:m.modelId, name:m.name || m.id, kind:'voice' as const, preferred:false})));
+    modelId:m.modelId, name:m.name || m.id, kind:'voice' as const, preferred:false})), 'voice');
   return [...media, ...chats, ...voices];
+}
+
+export function supportsCoverStyleReference(modelId: string) {
+  return (imageCapabilities(modelId).maxReferenceImages ?? 2) >= 2;
 }
 
 export interface StudioRequest {
@@ -110,7 +108,9 @@ export interface StudioRequest {
   model: string;
   prompt: string;
   refs: Array<string | {type:'image' | 'video' | 'audio'; url:string}>;
+  requiresCoverStyleReference?: boolean;
   imageQuality?: string;
+  imageSize?: string;
   ratio?: string;
   duration?: number;
   resolution?: string;
@@ -135,6 +135,10 @@ export function prepareStudioGeneration(request: StudioRequest) {
     if(typeof request.duration!=='number' || !Number.isInteger(request.duration) || request.duration<4 || request.duration>15)throw new Error('分镜片段时长必须为 4–15 秒的整数');
     if(typeof request.audio!=='boolean')throw new Error('请在分镜中确定静音或生成声音');
   }
+  if (request.requiresCoverStyleReference &&
+      (channel.kind !== 'image' || !supportsCoverStyleReference(channel.modelId))) {
+    throw new Error('所选模型不支持同时使用商品图和版式图，请更换图片模型');
+  }
   const prompt = request.prompt.trim();
   if (!prompt) throw new Error('请先填写提示词或连接文字节点');
   if ([...store.generationTasks, ...store.sessions.flatMap(s => s.tasks)].some(task => task.id === request.taskId)) return;
@@ -145,10 +149,12 @@ export function prepareStudioGeneration(request: StudioRequest) {
     if(type!=='audio')registerRefMediaKind(url, type);
     return {id:String(index), name:`参考${type === 'video' ? '视频' : type === 'audio' ? '音频' : '图'} ${index + 1}`, type, url};
   });
-  assertStudioReferenceNumbers(prompt,media);
-  assertStudioTextReferences(prompt);
-  // Text references are already embedded above; only media retain @ attachment tokens.
-  const providerPrompt=prompt.replace(/@文本(\d+)/g,'文本$1');
+  // The cover compiler has already bound both references. Keep its formatted
+  // prompt out of generic cleanup, which can rewrite literal text in titles.
+  const taskBuilderPrompt = request.requiresCoverStyleReference ? '商品图 @图片1，版式样张 @图片2' : prompt;
+  assertStudioReferenceNumbers(taskBuilderPrompt,media);
+  assertStudioTextReferences(taskBuilderPrompt);
+  const providerPrompt = taskBuilderPrompt.replace(/@文本(\d+)/g,'文本$1');
   if(channel.kind==='image' && media.some(item=>item.type!=='image'))throw new Error('图片生成不支持视频引用或音频引用，请移除后重试');
   const visual = media.flatMap(item=>item.type==='audio'?[]:[{...item,type:item.type}]);
   const audios = media.filter(item=>item.type==='audio').map(item=>item.url);
@@ -159,13 +165,24 @@ export function prepareStudioGeneration(request: StudioRequest) {
   let appliedVideoSettings;
   if (channel.kind === 'image') {
     settings.imageModel = channel.route;
+    if (request.ratio === 'smart' || request.ratio === 'auto') aspect = request.ratio;
     const quality = request.imageQuality;
-    if (/gpt-image/i.test(channel.modelId) && (quality === 'low' || quality === 'medium' || quality === 'high')) {
-      settings.imageQuality = settings.imageQualityTier = quality;
+    const credentials = getModelCredentials(channel.route);
+    const caps = imageCapabilities(channel.modelId, credentials.protocol, credentials.baseUrl);
+    if (!request.resolution && !caps.sendsQuality && (quality === 'low' || quality === 'medium' || quality === 'high')) {
+      settings.imageQuality = quality;
+    }
+    if (request.resolution === '512px' || request.resolution === '1K' || request.resolution === '2K' || request.resolution === '4K') {
+      if (!caps.resolutions.includes(request.resolution)) throw new Error('所选图片模型不支持当前分辨率，请重新选择');
+      settings.imageQuality = imageOutputTier(request.resolution);
+    }
+    if (quality && caps.qualities?.some(value => value === quality)) {
+      settings.imageQualityTier = quality as NonNullable<typeof settings.imageQualityTier>;
     }
   } else {
     settings.videoModel = channel.route;
     const model = channel.modelId;
+    if (isFalOmniVideoModel(model) && request.audio === undefined) settings.videoGenerateAudio = undefined;
     const baseUrl = getGatewayClientBaseUrl(channel.route);
     const profile = getVideoModelById(model, baseUrl);
     if(audios.length&&!profile)throw new Error('当前视频模型未接入参考音频');
@@ -176,23 +193,36 @@ export function prepareStudioGeneration(request: StudioRequest) {
       const mode = resolveVideoMode(model, request.videoMode==='auto'?(audios.length?'omni':undefined):request.videoMode || (request.videoWorkflow==='w3-copy'?'first_frame':audios.length?'omni':undefined), images.length, videos.length, baseUrl);
       if(request.scriptOnly && (mode!=='omni'||!videoModes(model,baseUrl).some(option=>option.id==='omni')))throw new Error('当前模型或线路不支持全能参考模式，请切换模型，视频尚未提交');
       settings.videoRefMode = mode;
-      settings.videoResolution = resolveVideoResolution(storyboardFirstFrame?'768P':request.resolution || settings.videoResolution, videoResolutionOptions(model, mode, baseUrl));
+      const selectedResolution = request.resolution?.toUpperCase();
+      const requestedResolution = (storyboardFirstFrame || (isMetasoH3(model, baseUrl) && selectedResolution === '720P')) ? '768P' : selectedResolution;
+      settings.videoResolution = resolveVideoResolution(requestedResolution || settings.videoResolution, videoResolutionOptions(model, mode, baseUrl));
+      if (requestedResolution && requestedResolution !== settings.videoResolution) {
+        throw new Error('当前视频模型或生成方式不支持所选清晰度，请重新选择');
+      }
       const requestedDuration = duration ?? settings.videoDuration;
       const options = videoDurationOptions(model, settings.videoResolution, mode, baseUrl);
       if (!options.length) throw new Error('当前视频线路没有可用时长，请重新选择模型或参数');
       if(request.scriptOnly&&!options.includes(requestedDuration))throw new Error('所选模型不支持当前分镜时长，请按可用时长重新拆分，视频尚未提交');
+      if (request.duration !== undefined && !options.includes(request.duration)) throw new Error('当前视频模型或生成方式不支持所选时长，请重新选择');
       duration = options.reduce((best, value) => Math.abs(value - requestedDuration) < Math.abs(best - requestedDuration) ? value : best);
       const requestedAspect = /^(Auto|adaptive)$/i.test(request.ratio || '') ? 'adaptive' : aspect || settings.videoAspect;
-      aspect = videoRatioLocked(model, mode, baseUrl) ? 'adaptive' : profile.supportedAspectRatios.includes(requestedAspect) ? requestedAspect : profile.supportedAspectRatios[0];
+      const ratios = videoRatioOptions(model, mode, baseUrl);
+      aspect = ratios.includes(requestedAspect) ? requestedAspect : ratios[0];
       appliedVideoSettings = { resolution:settings.videoResolution, duration:`${duration}s`, ratio:aspect, beikeResolvedVideoMode:mode };
     }
   }
   const entry = {
-    id: request.taskId, title: providerPrompt.slice(0, 40), prompt:normalizeStudioReferenceNumbers(providerPrompt, media), mediaType: channel.kind,
+    id: request.taskId, title: (request.requiresCoverStyleReference ? prompt : providerPrompt).slice(0, 40),
+    prompt: normalizeStudioReferenceNumbers(providerPrompt, media), mediaType: channel.kind,
     referenceIndexes: visual.map((_, index) => index), referenceAudioUrls:audios,
-    aspect, duration,
+    aspect, duration, imageSize: request.imageSize, imageResolution: request.resolution === '512px' ? '512px' as const : undefined,
   };
   const [task] = buildGenerationPromptBatch([entry], visual, settings, false); // 渠道已与当前的宿主目录校验。
+  if (request.requiresCoverStyleReference && (task.referenceImages?.length !== 2 ||
+      task.referenceImages.some((url, index) => url !== media[index]?.url))) {
+    throw new Error('商品图或版式图未按顺序进入生图请求，图片未提交');
+  }
+  if (request.requiresCoverStyleReference) task.prompt = prompt;
   if(request.scriptOnly&&task.videoDuration!==request.duration)throw new Error('最终提交时长与分镜不一致，视频尚未提交');
   if(request.scriptOnly&&task.generateAudio!==request.audio)throw new Error('当前模型无法落实分镜声音参数，请切换模型或声音模式，视频尚未提交');
   const videoUrls=new Set(media.filter(item=>item.type==='video').map(item=>item.url));

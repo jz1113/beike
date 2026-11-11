@@ -199,7 +199,7 @@ func writeProxyImageError(w http.ResponseWriter, err error) {
 }
 
 func writeProxyBytes(w http.ResponseWriter, contentType, etag string, body []byte) {
-	w.Header().Set("Content-Type", contentType)
+	setProxyContentHeaders(w, contentType)
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800")
@@ -209,14 +209,14 @@ func writeProxyBytes(w http.ResponseWriter, contentType, etag string, body []byt
 }
 
 func writeProxyText(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	setProxyContentHeaders(w, "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	_, _ = w.Write([]byte(message))
 }
 
 func writeProxySVG(w http.ResponseWriter, status int, label string) {
-	w.Header().Set("Content-Type", "image/svg+xml")
+	setProxyContentHeaders(w, "image/svg+xml")
 	if status == http.StatusBadGateway {
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("X-Proxy-Fallback", "true")
@@ -225,6 +225,13 @@ func writeProxySVG(w http.ResponseWriter, status int, label string) {
 	}
 	w.WriteHeader(status)
 	_, _ = w.Write([]byte(proxySVG(label)))
+}
+
+func setProxyContentHeaders(w http.ResponseWriter, contentType string) {
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// Keep remote images (including SVG) isolated when navigated to as documents.
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
 }
 
 func publicFileExists(cfg config.Config, raw string) bool {
@@ -391,6 +398,7 @@ func serveCachedProxy(w http.ResponseWriter, r *http.Request, key string) bool {
 	}
 	entry := cached
 	if r.Header.Get("If-None-Match") == entry.ETag {
+		setProxyContentHeaders(w, entry.ContentType)
 		w.Header().Set("ETag", entry.ETag)
 		w.Header().Set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800")
 		w.WriteHeader(http.StatusNotModified)

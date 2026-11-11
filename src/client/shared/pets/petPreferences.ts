@@ -66,16 +66,17 @@ export interface PetPreferences {
 
 export const PET_SIZES: Record<PetSizeName, number> = { sm: 72, md: 96, lg: 128 };
 const PREFERENCE_KEY = 'beike.pet.preferences.v1';
-const fallback: PetPreferences = { petId: 'beike', visible: true, size: 'md', canvasVisible: true, canvasLink: 'all' };
+const fallback: PetPreferences = { petId: 'beike', visible: false, size: 'md', canvasVisible: true, canvasLink: 'all' };
 
 function read(storage: Pick<Storage, 'getItem'>): PetPreferences {
   try {
     const value: unknown = JSON.parse(storage.getItem(PREFERENCE_KEY) || 'null');
     if (!value || typeof value !== 'object') return fallback;
     const record = value as Partial<PetPreferences>;
+    const removedPet = record.petId === 'the-real-tronald-dump';
     return {
-      petId: typeof record.petId === 'string' && record.petId ? record.petId : fallback.petId,
-      visible: record.visible !== false,
+      petId: !removedPet && typeof record.petId === 'string' && record.petId ? record.petId : fallback.petId,
+      visible: !removedPet && record.visible === true,
       canvasVisible: record.canvasVisible !== false,
       canvasLink: record.canvasLink === 'generation' || record.canvasLink === 'off' ? record.canvasLink : 'all',
       size: record.size === 'sm' || record.size === 'lg' ? record.size : 'md',

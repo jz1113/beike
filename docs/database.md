@@ -25,6 +25,8 @@
 3. 设置 `AZHUO_DATA_DIR` 时，会读取该目录的 `.env`；Linux 服务用户的 home 包含 `storage` 时，兼容读取 home 下的 `.env`。已有进程环境优先于这些配置文件。
 4. 未配置数据库 URL 时，使用 `AZHUO_DATA_DIR/azhuo.db` 或系统应用数据目录中的 `azhuo.db`。
 
+`pnpm start` 使用同一套配置加载与路径解析，并在启动日志显示最终 SQLite 路径。普通 `pnpm dev` 尊重进程显式 `DATABASE_URL`，但忽略根 `.env` 中的旧数据库 URL；`BEIKE_ISOLATED_DEV=1` 则强制使用隔离数据目录中的 `azhuo.db`，不继承数据库 URL。维护隔离开发库时应显式传入日志中的文件路径，避免误用当前终端继承的生产配置。启动检查只准备所选路径的父目录，不复制、移动或覆盖已有库。
+
 维护命令不加载根目录 `.env` 的旧 `file:./dev.db` 配置，也不在运行库缺失时自动选择 `database/dev.db`。需要操作旧库时明确传参，避免迁移、备份或导出作用在错误的数据文件上。`seed:export` 同时兼容旧的 `AZHUO_DB_PATH` 文件参数环境变量。
 
 macOS 系统应用数据目录为 `~/Library/Application Support/com.azhuo.workbench`；Windows 为 `%APPDATA%/com.azhuo.workbench`；Linux 为 `~/.local/share/com.azhuo.workbench`。生产数据目录以服务环境配置为准。

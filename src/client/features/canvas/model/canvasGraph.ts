@@ -291,6 +291,19 @@ export function nodeBounds(node: CanvasNode) {
   }
   return { x: node.x, y: node.y, width: node.width, height: node.height };
 }
+
+export function isCanvasNodeVisible(node: CanvasNode) {
+  return !node.layerHidden && !node.foldedInGroupId;
+}
+
+export function canvasNavigationNodes(nodes: CanvasNode[]) {
+  return nodes.filter(isCanvasNodeVisible).flatMap(node => {
+    const bounds = nodeBounds(node);
+    return Object.values(bounds).every(Number.isFinite) && bounds.width > 0 && bounds.height > 0
+      ? [{ node, bounds }] : [];
+  });
+}
+
 export function connectionError(nodes: CanvasNode[], sourceId: string, targetId: string, edges?: { sourceNodeId: string; targetNodeId: string }[]) {
   const source = nodes.find(node => node.id === sourceId);
   const target = nodes.find(node => node.id === targetId);

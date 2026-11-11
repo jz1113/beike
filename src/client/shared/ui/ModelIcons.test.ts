@@ -44,7 +44,7 @@ const vendorLogos = {
   openai: ['openai', 'sora'], google: ['gemini'], bytedance: ['jimeng'],
   alibaba: ['qwen'], midjourney: ['midjourney'], bfl: ['flux'], kuaishou: ['kling'],
   xai: ['grok'], minimax: ['minimax'], anthropic: ['claude'], deepseek: ['deepseek'],
-  moonshot: ['kimi', 'moonshot'], vidu: ['vidu'],
+  moonshot: ['kimi', 'moonshot'], vidu: ['vidu'], zhipu: ['zhipu'], xiaomi: ['xiaomi'],
 };
 describe('catalog model logos', () => {
   it.each(APPROVED_MODELS)('$id matches its declared vendor and has light/dark assets', model => {

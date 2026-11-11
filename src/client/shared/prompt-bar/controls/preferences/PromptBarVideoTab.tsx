@@ -1,7 +1,7 @@
-import { useEffect, useMemo, type KeyboardEvent, type PointerEvent } from 'react';
+import { useMemo, type KeyboardEvent, type PointerEvent } from 'react';
 import { LockKeyhole } from 'lucide-react';
-import { videoModes, videoResolutionLabel, videoDurationOptions, videoResolutionOptions } from '@shared/domain/media/videoCapabilities';
-import { VIDEO_ASPECT_RATIOS, VIDEO_RESOLUTIONS, resolveVideoResolution } from '@shared/domain/media/video';
+import { videoModes, videoResolutionLabel, videoDurationOptions, videoDurationFollowsSource, videoRatioOptions, videoResolutionOptions } from '@shared/domain/media/videoCapabilities';
+import { VIDEO_ASPECT_RATIOS, VIDEO_RESOLUTIONS } from '@shared/domain/media/video';
 import { VideoGenerationCostNotice } from '@client/shared/ui/VideoGenerationCostNotice';
 import { veoExtensionHint } from '@shared/domain/media/veoChannels';
 import { isMetasoH3 } from '@shared/domain/media/videoChannels';
@@ -97,7 +97,7 @@ const MODE_LABELS: Record<string, string> = {
   extend: '视频延长',
 };
 
-export type VideoResolutionValue = '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
+export type VideoResolutionValue = '360P' | '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
 
 interface Props {
   modelId: string;
@@ -147,14 +147,6 @@ function aspectAllowed(id: string, supported?: string[]) {
   return id === 'adaptive' && supported.includes('smart');
 }
 
-function nearestId(current: string, order: string[], enabled: string[]) {
-  if (!enabled.length || enabled.includes(current)) return current;
-  const index = Math.max(0, order.indexOf(current));
-  return enabled.reduce((best, id) => (
-    Math.abs(order.indexOf(id) - index) < Math.abs(order.indexOf(best) - index) ? id : best
-  ), enabled[0]);
-}
-
 export function PromptBarVideoTab({
   modelId,
   baseUrl,
@@ -174,13 +166,12 @@ export function PromptBarVideoTab({
   onDuration,
 }: Props) {
   const modes = videoModes(modelId || '', baseUrl);
-  const aspectOrder = VIDEO_ASPECT_RATIOS.map((item) => item.id);
+  const ratios = videoRatioOptions(modelId, mode, baseUrl);
   const aspects = VIDEO_ASPECT_RATIOS.map((item) => ({
     id: item.id,
     label: item.id === 'adaptive' ? '智能' : item.label,
-    disabled: !aspectAllowed(item.id, supportedAspectRatios),
+    disabled: !aspectAllowed(item.id, ratios.length ? ratios : supportedAspectRatios),
   }));
-  const enabledAspects = aspects.filter((item) => !item.disabled).map((item) => item.id);
   const currentAspect = aspect === 'smart' ? 'adaptive' : aspect;
   const modeResolutions = videoResolutionOptions(modelId, mode, baseUrl) || supportedResolutions;
   const resolutions = VIDEO_RESOLUTIONS
@@ -189,22 +180,6 @@ export function PromptBarVideoTab({
       id: item,
       label: videoResolutionLabel(modelId, item, baseUrl),
     }));
-  const enabledResolutions = resolutions.map((item) => item.id);
-
-  useEffect(() => {
-    if (modes.length && !modes.some((item) => item.id === mode)) onMode(modes[0].id);
-  }, [mode, modes.map((item) => item.id).join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const next = nearestId(currentAspect, aspectOrder, enabledAspects);
-    if (next !== currentAspect) onAspect(next);
-  }, [currentAspect, aspectOrder.join('|'), enabledAspects.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const next = resolveVideoResolution(resolution, enabledResolutions);
-    if (next !== resolution) onResolution(next);
-  }, [resolution, enabledResolutions.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const resolutionBlock = (
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-slate-500 dark:text-slate-400">视频分辨率</div>
@@ -227,7 +202,9 @@ export function PromptBarVideoTab({
   const durationBlock = (
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-slate-500 dark:text-slate-400">时长</div>
-      {mode === 'motion_control' ? <p className="text-xs text-slate-500 dark:text-slate-400">时长跟随动作参考视频（3–30 秒），保留参考视频的人物朝向。</p> : supportedDurations?.length === 0
+      {videoDurationFollowsSource(modelId, mode) ? <p className="text-xs text-slate-500 dark:text-slate-400">
+        {mode === 'motion_control' ? '时长跟随动作参考视频（3–30 秒）。' : '时长跟随原视频。'}
+      </p> : supportedDurations?.length === 0
         ? <p className="text-xs text-amber-600 dark:text-amber-300">当前模型时长不足以完成整条脚本，请更换模型或参考脚本。</p>
         : <VideoDurationRulerSlider value={duration} allowedDurations={supportedDurations ?? videoDurationOptions(modelId, resolution, mode, baseUrl)} onChange={onDuration} />}
       {veoExtensionHint(modelId, mode, baseUrl) && <p className="text-xs leading-relaxed text-slate-500">{veoExtensionHint(modelId, mode, baseUrl)}</p>}

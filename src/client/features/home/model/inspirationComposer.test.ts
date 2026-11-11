@@ -1,8 +1,12 @@
+import { extractPromptMentions, mentionTokenToName } from '@shared/domain/prompts/prompt-engine/mentions';
+import { mediaReferenceSlots, normalizeVideoReferenceMentions } from '@client/shared/media/videoReferences';
+import { INSPIRATION_ITEMS } from '../data/inspirationData';
 import { describe, expect, it } from 'vitest';
 import {
   fitShowcaseCanvas,
   inspirationAspectRatio,
   inspirationComposerState,
+  inspirationImageUseOptions,
   inspirationVideoUseOptions,
   matchesInspirationSearch,
   visibleJustifiedRows,
@@ -12,9 +16,21 @@ import {
 const video: InspirationItem = { id: 'video', title: '案例', prompt: '视频', category: 'video', tag: '', image: '/movie.mp4', aspectRatio: '16:9', quality: '1080p', videoDuration: 15, model: 'video-model' };
 
 describe('apply home inspiration', () => {
+  it('restores image settings without treating image options as a video request', () => {
+    const image: InspirationItem = { ...video, image: '/poster.png', video: undefined, model: 'gpt-image-2', aspectRatio: '2:3', quality: '4K超清' };
+    const options = inspirationImageUseOptions(image);
+    expect(inspirationComposerState(image.prompt, undefined, options)).toMatchObject({
+      quickGenMode: 'image', quickModel: 'gpt-image-2', quickAspectId: '2:3', quickQuality: 'high', quickRefImages: [],
+    });
+    expect(inspirationComposerState(image.prompt, image.image, { ...options, referenceImages: [image.image] })).toMatchObject({
+      quickGenMode: 'image', quickAspectId: '2:3', quickQuality: 'high', quickRefImages: ['/poster.png'],
+    });
+    expect(inspirationImageUseOptions({ ...image, quality: '未知画质' }).imageQuality).toBeUndefined();
+  });
+
   it('applies video parameters even when the example has no reference images', () => {
     const patch = inspirationComposerState(video.prompt, video.image, inspirationVideoUseOptions(video));
-    expect(patch).toMatchObject({ quickGenMode: 'video', quickVideoModel: 'video-model', quickVideoDuration: 15, quickVideoAspectId: '16:9', quickVideoResolution: '1080P', quickRefImages: ['/movie.mp4'] });
+    expect(patch).toMatchObject({ quickGenMode: 'video', quickVideoModel: 'video-model', quickVideoDuration: 15, quickVideoAspectId: '16:9', quickVideoResolution: '1080P', quickRefImages: [] });
   });
 
   it('clears previous frame references when applying an image or a text-only example', () => {
@@ -38,29 +54,33 @@ describe('apply home inspiration', () => {
   });
 
   it('normalizes unsupported quality text instead of casting it into resolution controls', () => {
-    expect(inspirationVideoUseOptions({ ...video, quality: '4K超清' }).videoResolution).toBe('480P');
+    expect(inspirationVideoUseOptions({ ...video, quality: '4K超清' }).videoResolution).toBeUndefined();
   });
 });
 
 const poster = { title: '皇家猫粮海报', prompt: '黑金产品摄影', category: 'poster', tag: '广告', author: { name: 'Studio ABC' } };
 describe('home inspiration search', () => {
-  it('combines actual content category with all search terms', () => {
-    expect(matchesInspirationSearch(poster, 'design', '皇家 黑金')).toBe(true);
-    expect(matchesInspirationSearch(poster, 'ecommerce', '皇家')).toBe(false);
-    expect(matchesInspirationSearch(poster, 'design', '皇家 不存在')).toBe(false);
+  it('requires all search terms to match', () => {
+    expect(matchesInspirationSearch(poster, '皇家 黑金')).toBe(true);
+    expect(matchesInspirationSearch(poster, '皇家 不存在')).toBe(false);
   });
+
   it('searches category labels and authors with normalized case and full-width input', () => {
-    expect(matchesInspirationSearch(poster, 'all', '平面设计 ａｂｃ')).toBe(true);
+    expect(matchesInspirationSearch(poster, '平面设计 ａｂｃ')).toBe(true);
   });
-  it('keeps published works with unknown categories available in the all view', () => {
-    const item = { ...poster, category: 'custom' };
-    expect(matchesInspirationSearch(item, 'all', '')).toBe(true);
-    expect(matchesInspirationSearch(item, 'design', '')).toBe(false);
+
+  it('keeps published works with unknown categories searchable', () => {
+    expect(matchesInspirationSearch({ ...poster, category: 'custom' }, '皇家')).toBe(true);
   });
-  it('groups illustration and 3D without including unrelated photos', () => {
-    expect(matchesInspirationSearch({ ...poster, category: '3d' }, 'animation', '')).toBe(true);
-    expect(matchesInspirationSearch({ ...poster, category: 'photo' }, 'animation', '')).toBe(false);
-  });
+});
+
+it.each(INSPIRATION_ITEMS.filter(item => item.mediaType === 'video'))('binds video example reference mentions for $id', item => {
+  const refs = inspirationVideoUseOptions(item).referenceImages ?? [];
+  const prompt = normalizeVideoReferenceMentions(item.referencePrompt || item.prompt, refs, []);
+  const slots = mediaReferenceSlots(refs).map(slot => slot.name);
+  for (const token of extractPromptMentions(prompt)) {
+    expect(slots).toContain(mentionTokenToName(token));
+  }
 });
 
 describe('home feed layout', () => {
@@ -124,4 +144,18 @@ describe('home canvas preview fitting', () => {
     expect(view.pan.x + (distant.x + distant.width) * view.zoom).toBeLessThanOrEqual(768.01);
     expect(fitShowcaseCanvas([], 800, 600)).toEqual({ zoom: 1, pan: { x: 400, y: 300 } });
   });
+});
+
+it('keeps unknown legacy video settings unset and explicit empty references empty', () => {
+  const options = inspirationVideoUseOptions({ ...video, quality: undefined, videoDuration: undefined });
+  const patch = inspirationComposerState('prompt', '/finished.mp4', options);
+  expect(patch.quickRefImages).toEqual([]);
+  expect(patch.quickVideoResolution).toBeUndefined();
+  expect(patch.quickVideoDuration).toBeUndefined();
+});
+
+it('recreates edited images using original inputs and the selected route', () => {
+  const options = inspirationImageUseOptions({ ...video, model: 'upstream', modelRouteKey: 'route-2', referenceImages: ['/original.png'], quality: 'medium', imageQuality: 'max', inferenceStrength: 'high' });
+  expect(inspirationComposerState('prompt', undefined, options)).toMatchObject({ quickGenMode: 'image', quickModel: 'route-2', quickQuality: 'medium', quickRefImages: ['/original.png'] });
+  expect(options).toMatchObject({ imageGenerationQuality: 'max', inferenceStrength: 'high' });
 });

@@ -1,6 +1,6 @@
 import { createElement, Fragment } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BeikePet } from './BeikePet';
 import { beikePetMotion, type BeikePetPhase } from './petPreferences';
 
@@ -52,6 +52,35 @@ describe('cover feed monster artwork', () => {
 
 const phases: BeikePetPhase[] = ['idle', 'ready', 'dragging', 'uploading', 'analyzing', 'success', 'partial', 'error'];
 const tracks = ['body', 'ears', 'eyes', 'gaze', 'mouthMotion', 'feedback'] as const;
+
+describe('pet display preferences', () => {
+  it.each([null, '{}', '{"size":"lg"}', 'invalid JSON'])('keeps the pet hidden without an explicit saved choice: %s', async (saved) => {
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: { getItem: () => saved }, addEventListener: vi.fn() });
+    try {
+      const { getPetPreferences } = await import('./petPreferences');
+      expect(getPetPreferences().visible).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('remembers an explicit opt-in, but hides a removed character saved by an older version', async () => {
+    let saved = '{"petId":"beike","visible":true}';
+    vi.stubGlobal('window', { localStorage: { getItem: () => saved }, addEventListener: vi.fn() });
+    try {
+      vi.resetModules();
+      const enabled = await import('./petPreferences');
+      expect(enabled.getPetPreferences()).toMatchObject({ petId: 'beike', visible: true });
+      saved = '{"petId":"the-real-tronald-dump","visible":true,"size":"lg"}';
+      vi.resetModules();
+      const removed = await import('./petPreferences');
+      expect(removed.getPetPreferences()).toMatchObject({ petId: 'beike', visible: false, size: 'lg' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
 
 describe('beike pet motion', () => {
   it.each(phases)('provides visible body movement and a bounded one-shot feedback for %s', (phase) => {

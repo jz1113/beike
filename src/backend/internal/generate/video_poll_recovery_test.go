@@ -138,6 +138,14 @@ func TestReadVideoPollRequiresResultURL(t *testing.T) {
 	if content.status != "SUCCESS" || content.result != "https://cdn.example/a.mp4" {
 		t.Fatalf("content url: %+v", content)
 	}
+	seedanceGateway := readVideoPoll(map[string]any{"status": "SUCCESS", "data": map[string]any{"output": "https://cdn.example/seedance.mp4?signature=abc"}})
+	if seedanceGateway.status != "SUCCESS" || seedanceGateway.result != "https://cdn.example/seedance.mp4?signature=abc" {
+		t.Fatalf("Seedance gateway output: %+v", seedanceGateway)
+	}
+	invalidGateway := readVideoPoll(map[string]any{"status": "SUCCESS", "data": map[string]any{"output": "render completed"}})
+	if invalidGateway.status == "SUCCESS" || invalidGateway.result != "" {
+		t.Fatalf("invalid gateway output became a result: %+v", invalidGateway)
+	}
 	kling := readVideoPoll(map[string]any{"data": map[string]any{"task_status": "succeed", "task_result": map[string]any{"videos": []any{map[string]any{"url": "https://cdn.example/b.mp4"}}}}})
 	if kling.status != "SUCCESS" || kling.result != "https://cdn.example/b.mp4" {
 		t.Fatalf("kling url: %+v", kling)

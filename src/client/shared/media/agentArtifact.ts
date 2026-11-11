@@ -22,7 +22,8 @@ export function parseAgentAttachments(task: GenerationTask): ParsedAttachment[] 
 
   for (const url of urls) {
     if (url.startsWith('agent-file:')) {
-      const meta = readAgentAttachment(url);
+      const saved = task.agentDocuments?.find(item => item.id === url);
+      const meta = readAgentAttachment(url) || (saved ? { name: saved.name || '上传文档', kind: 'file' as const, size: saved.size, text: saved.extractedText } : undefined);
       if (meta) {
         list.push({
           url,

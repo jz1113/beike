@@ -1,3 +1,4 @@
+import type { CoverBatch } from '../../model/coverBatch';
 import {
   CanvasCompareNode,
   CanvasLocalToolNode,
@@ -6,17 +7,16 @@ import {
 } from '../nodes/CanvasLocalToolNodes';
 import { CanvasPanoramaNode, CanvasProviderNode } from '../nodes/CanvasProviderNode';
 import { CanvasAnalysisNode } from '../nodes/CanvasAnalysisNodes';
-import { buildLightingDerivedNode, buildMultiAngleDerivedNode, canvasMediaKind, canvasMediaUploadLimitMb, isCanvasPriorityTool, isCanvasLocalTool, persistCanvasMedia } from '../../model/canvasNodeFactory';
+import { buildLightingDerivedNode, buildMultiAngleDerivedNode, isCanvasPriorityTool, isCanvasLocalTool } from '../../model/canvasNodeFactory';
 import { CanvasMultiAngleModal } from '@client/shared/modals/multi-angle/CanvasMultiAngleModal';
 import { CanvasLightingModal } from '../tools/CanvasLightingModal';
-import { canvasLibraryDragType, canvasLibraryMedia, openCanvasMediaLibrary } from '@client/shared/workspace/canvasWorkspace';
 import { CanvasStoryboardChartNode } from '../nodes/CanvasStudioProductionNodes';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { recoverLayerDecompositionTask, retryLayerDecompositionTask } from '../../model/layerDecompositionTask';
-import { canvasWorkflowUploadAccept, canvasWorkflowUploadError, canvasWorkflowUploadSlot } from '../../model/videoWorkflowRecovery';
+import { canvasWorkflowUploadAccept, canvasWorkflowUploadSlot } from '../../model/videoWorkflowRecovery';
 import { CanvasPromptNode } from '../prompt/CanvasPromptNode';
 import { CanvasPromptSkillNode } from '../nodes/CanvasPromptSkillNode';
-import { useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { CanvasDrawingNode } from '../nodes/CanvasDrawingNode';
 import { CanvasVideoPlayer } from '../video/CanvasVideoPlayer';
 import { extractVideoFrame } from '../../model/canvasVideoFrame';
@@ -29,128 +29,11 @@ import {
 } from '../nodes/CanvasStudioSpecializedNodes';
 import AIGeneratingCard from '@client/shared/ui/AIGeneratingCard';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
-import { AlertCircle, Frame, ImageOff, Library, Loader2, StickyNote, Type, Upload } from 'lucide-react';
+import { AlertCircle, Frame, ImageOff, Loader2, StickyNote, Type } from 'lucide-react';
 import type { CanvasNode } from '../../model/types';
+import { CanvasFileNode } from './CanvasFileNode';
 import type { CanvasStageNodeProps } from './CanvasStageNodeToolbar';
 
-function CanvasFileNode({ node, slot, selected, onUpload, children }: {
-  node: CanvasNode;
-  slot: ReturnType<typeof canvasWorkflowUploadSlot>;
-  selected: boolean;
-  onUpload: (media: Partial<CanvasNode>) => void;
-  children?: ReactNode;
-}) {
-  const input = useRef<HTMLInputElement>(null);
-  const busyRef = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const empty = node.type === 'file';
-  const disabled = node.layerLocked || busy;
-  const actionVisibility = empty || selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100';
-  const settings = node.studioRaw?.settings as Record<string, unknown> | undefined;
-  const retiredStoryboard = Boolean(settings?.beikeStoryboardSourceId && settings.beikeStoryboardActive === false);
-
-  const upload = async (file?: File) => {
-    if (!file || node.layerLocked || busyRef.current) return;
-    const kind = canvasMediaKind(file);
-    const mismatch = canvasWorkflowUploadError(slot, kind);
-    if (mismatch) { setError(mismatch); return; }
-    if (!kind) { setError('仅支持图片、视频和音频文件'); return; }
-    busyRef.current = true;
-    setBusy(true);
-    setError('');
-    try {
-      const media = await persistCanvasMedia(file, 0, 0);
-      const { resultWidth, resultHeight } = media;
-      const scale = resultWidth && resultHeight ? 250 / Math.min(resultWidth, resultHeight) : undefined;
-      onUpload({
-        type: media.type,
-        title: media.title,
-        imageUrl: media.imageUrl,
-        videoUrl: media.videoUrl,
-        audioUrl: media.audioUrl,
-        resultWidth: media.resultWidth,
-        resultHeight: media.resultHeight,
-        missingMedia: media.missingMedia,
-        width: slot?.kind === 'video' ? node.width : scale && resultWidth ? Math.round(resultWidth * scale) : 250,
-        height: slot?.kind === 'video' ? node.height : scale && resultHeight ? Math.round(resultHeight * scale) : kind === 'audio' ? 86 : 250,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '上传失败，请重试');
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
-  };
-
-  const receiveLibraryMedia = (raw: string) => {
-    try {
-      const media = canvasLibraryMedia(JSON.parse(raw));
-      if (!media) throw new Error('素材链接无效');
-      const mismatch = canvasWorkflowUploadError(slot, media.type);
-      if (mismatch) { setError(mismatch); return; }
-      onUpload({ ...media, width: 250, height: media.type === 'audio' ? 86 : 250, resultWidth: undefined, resultHeight: undefined });
-      setError('');
-    } catch { setError('素材链接无效'); }
-  };
-
-  return <div
-    data-upload-node tabIndex={0} aria-label={slot?.label || '文件上传节点'} aria-busy={busy}
-    onMouseDown={event => {
-      if (!(event.target as HTMLElement).closest('button,input,video,audio')) event.currentTarget.focus({ preventScroll: true });
-    }}
-    onKeyDown={event => {
-      if (!disabled && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') event.stopPropagation();
-    }}
-    onPaste={event => {
-      const file = event.clipboardData.files[0];
-      if (file) { event.preventDefault(); event.stopPropagation(); void upload(file); }
-    }}
-    onDragOver={event => {
-      if (!event.dataTransfer.types.some(type => type === 'Files' || type === canvasLibraryDragType)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.dataTransfer.dropEffect = disabled ? 'none' : 'copy';
-    }}
-    onDrop={event => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (disabled || busyRef.current) return;
-      const media = event.dataTransfer.getData(canvasLibraryDragType);
-      if (media) receiveLibraryMedia(media);
-      else void upload(event.dataTransfer.files[0]);
-    }}
-    className={`relative w-full rounded-2xl outline-none focus-visible:ring-1 focus-visible:ring-zinc-500 ${empty ? 'flex flex-col items-center justify-center bg-white dark:bg-[#1f1f1f]' : ''}`}
-    style={empty ? { height: node.height } : undefined}
-  >
-    {empty && <div className="absolute -top-6 left-0 flex max-w-full items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400"><Upload size={14} className="shrink-0" /><span className="truncate">{slot?.label || '上传'}</span></div>}
-    {!empty && (retiredStoryboard || slot) && <span className="pointer-events-none absolute left-2 top-2 z-20 max-w-[calc(100%-1rem)] truncate rounded bg-black/75 px-1.5 py-0.5 text-xs text-white">{retiredStoryboard ? '旧分镜 · 已停用' : slot?.label}</span>}
-    {empty && (
-      <div className="absolute right-2 top-2 z-20 flex gap-1">
-        <button type="button" disabled={disabled} aria-label="从素材库替换" title="从素材库替换"
-          onMouseDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();openCanvasMediaLibrary(node.id);}}
-          className={`grid size-7 place-items-center rounded-lg bg-zinc-100 text-zinc-600 hover:bg-zinc-200 focus-visible:opacity-100 disabled:opacity-30 dark:bg-[#292929] dark:text-zinc-300 dark:hover:bg-[#333333] ${actionVisibility}`}><Library size={14} /></button>
-      </div>
-    )}
-    <input ref={input} type="file" accept={canvasWorkflowUploadAccept(slot)} className="hidden" aria-label="选择素材文件"
-      onChange={event=>{void upload(event.target.files?.[0]);event.target.value='';}} />
-    {empty ? <>
-      <button type="button" disabled={disabled}
-        onMouseDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();input.current?.click();}}
-        className="flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border dark:border-zinc-500 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-800/60">
-        {busy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-        {busy ? '正在上传…' : '上传'}
-      </button>
-      <div className="mt-2 text-center text-[10px] text-zinc-500">或拖放文件到此处<br />或 Ctrl+V 粘贴</div>
-      <div className="mt-1 text-center text-[9px] text-zinc-400 dark:text-zinc-500">{slot ? `支持${slot.kind === 'image' ? '图片' : '视频'}，上限 ${canvasMediaUploadLimitMb[slot.kind]} MB` : `图片 ${canvasMediaUploadLimitMb.image} MB · 视频 ${canvasMediaUploadLimitMb.video} MB · 音频 ${canvasMediaUploadLimitMb.audio} MB`}</div>
-    </> : children}
-    {busy && !empty && <div role="status" className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center gap-2 rounded-2xl bg-zinc-100/85 text-xs text-zinc-700 ring-2 ring-zinc-400 dark:bg-black/65 dark:text-zinc-100 dark:ring-white/40">
-      <Loader2 size={15} className="animate-spin" />
-      正在上传…
-    </div>}
-    {error && <p role="alert" className="absolute inset-x-2 bottom-2 z-30 rounded-md bg-white/95 p-1 text-center text-xs text-red-600 dark:bg-[#1f1f1f] dark:text-rose-400">{error}</p>}
-  </div>;
-}
 
 function CanvasTextNode({ node, onChange }: { node: CanvasNode; onChange: (patch: Partial<CanvasNode>) => void }) {
   const note = node.type === 'note';
@@ -165,6 +48,7 @@ function CanvasTextNode({ node, onChange }: { node: CanvasNode; onChange: (patch
 interface Props extends CanvasStageNodeProps {
   isSelected: boolean;
   isGenerating: boolean;
+  coverBatch?: CoverBatch;
   isCurrentDragging: boolean;
   audioPanelDismissed: boolean;
 }
@@ -176,6 +60,7 @@ export function CanvasStageNodeMedia({
   multiSelected,
   isGenerating,
   isSelected,
+  coverBatch,
   isCurrentDragging,
   audioPanelDismissed,
   editingDrawingId,
@@ -186,6 +71,20 @@ export function CanvasStageNodeMedia({
   deleteNode,
   onRegenerate,
 }: Props) {
+  const mediaUpload = (children?: ReactNode, tools?: ReactNode) => <CanvasFileNode projectId={projectId} node={node} coverBatch={coverBatch} tools={tools} slot={canvasWorkflowUploadSlot(useCanvasStore.getState().projects.find(project => project.id === projectId), node.id)} selected={isSelected} onUpload={media => {
+    const current = useCanvasStore.getState().projects.find(project => project.id === projectId)?.nodes.find(item => item.id === node.id);
+    if (current && !current.layerLocked) {
+      updateNode(projectId, node.id, {
+        ...media,
+        ...(current.studioRaw?.settings && (current.studioRaw.settings as Record<string, unknown>).beikeCoverSharedInput === true
+          ? { title: current.title } : {}),
+        mediaUpload: true,
+        ...(current.type !== media.type && { activeUploadTool: null }),
+      });
+    }
+  }}>{children}</CanvasFileNode>;
+  if (coverBatch && (node.type === 'file' || node.missingMedia)) return mediaUpload();
+
   if (node.studioSubType && node.studioSubType !== 'motion-control' && isCanvasPriorityTool(node.studioSubType)) {
     const props = {
       node, projectId,
@@ -324,7 +223,7 @@ export function CanvasStageNodeMedia({
         </div>
         <span className="text-xs font-bold text-rose-800 dark:text-rose-300">生成中断或失败</span>
         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-[220px] line-clamp-2">
-          {node.content || '网络响应超时或模型服务忙'}
+          {node.errorMessage || node.content || '网络响应超时或模型服务忙'}
         </p>
         <div className="flex items-center gap-2 mt-3.5">
           <button
@@ -375,10 +274,6 @@ export function CanvasStageNodeMedia({
       </div>
     );
   }
-  const mediaUpload = (children?: ReactNode) => <CanvasFileNode node={node} slot={canvasWorkflowUploadSlot(useCanvasStore.getState().projects.find(project => project.id === projectId), node.id)} selected={isSelected} onUpload={media => {
-    const current = useCanvasStore.getState().projects.find(project => project.id === projectId)?.nodes.find(item => item.id === node.id);
-    if (current && !current.layerLocked) updateNode(projectId, node.id, { ...media, mediaUpload: true });
-  }}>{children}</CanvasFileNode>;
   if (node.type === 'file') return mediaUpload();
   if (node.type === 'compare') {
     return <CanvasCompareNode node={node} nodes={nodes} projectId={projectId} selected={isSelected} />;
@@ -387,7 +282,15 @@ export function CanvasStageNodeMedia({
     return <CanvasSaveNode node={node} nodes={nodes} projectId={projectId} />;
   }
   if (node.type === 'preview') {
-    return <CanvasMonitorNode node={node} nodes={nodes} projectId={projectId} />;
+    return (
+      <CanvasMonitorNode
+        node={node}
+        nodes={nodes}
+        projectId={projectId}
+        selected={isSelected}
+        onPreview={(url, type) => setPreviewMedia({ url, type })}
+      />
+    );
   }
   if (node.type === 'audio') {
     if (node.mediaUpload && node.audioUrl) return mediaUpload(
@@ -399,9 +302,9 @@ export function CanvasStageNodeMedia({
     return <CanvasAudioNode node={node} nodes={nodes} projectId={projectId} selected={isSelected && !multiSelected && !isCurrentDragging && !audioPanelDismissed} />;
   }
   if (node.type === 'image') {
-    const image = (
+    const image = <CanvasStageImage key={node.imageUrl} node={node} projectId={projectId} setPreviewMedia={setPreviewMedia} />;
+    const tools = (
       <>
-        <CanvasStageImage key={node.imageUrl} node={node} projectId={projectId} setPreviewMedia={setPreviewMedia} />
         {node.activeUploadTool === 'multiAngle' && (
           <div className="absolute left-1/2 top-full z-[130] mt-3 -translate-x-1/2">
             <CanvasMultiAngleModal
@@ -433,7 +336,7 @@ export function CanvasStageNodeMedia({
         )}
       </>
     );
-    return node.mediaUpload ? mediaUpload(image) : image;
+    return node.mediaUpload || coverBatch ? mediaUpload(image, tools) : <>{image}{tools}</>;
   }
   if (node.type === 'video') {
     const video = (
@@ -464,7 +367,7 @@ export function CanvasStageNodeMedia({
             }}
           />
         </div>
-        {isSelected && node.activeUploadTool && (
+        {isSelected && node.activeUploadTool && (node.activeUploadTool.startsWith('video') || node.activeUploadTool === 'lut') && (
           <CanvasUploadInlineToolPanel node={node} projectId={projectId} updateNode={updateNode} />
         )}
       </>

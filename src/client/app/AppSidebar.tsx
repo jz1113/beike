@@ -1,6 +1,10 @@
 import { useLibraryPreferences } from '@client/shared/api/credentialClient';
-import { FolderOpen, Frame, History, MessageSquare, PanelLeft, Wrench } from 'lucide-react';
-import { useState, type ReactNode, type SVGProps } from 'react';
+import { FolderOpen, Frame, History, MessageSquare, PanelLeft, Wrench, X } from 'lucide-react';
+import { useEffect, useState, type ReactNode, type SVGProps } from 'react';
+import { createPortal } from 'react-dom';
+import { MD_QUERY, useMediaQuery } from '@client/shared/hooks/useMediaQuery';
+import { useModalDialog } from '@client/shared/hooks/useModalDialog';
+import { useScrollLock } from '@client/shared/hooks/useSafeTimeout';
 import type { AppView } from '@client/store/appView';
 import { useToast } from '@client/shared/hooks/useToast';
 import { useI18n } from '@client/shared/i18n';
@@ -90,7 +94,7 @@ function NavItem({
       } ${
         active
           ? 'bg-white dark:bg-[#1F1F24] text-slate-900 dark:text-white shadow-xs border border-black/[0.04] dark:border-white/[0.06]'
-          : 'text-slate-600 dark:text-[#8E8E93] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:text-slate-900 dark:hover:text-[#EDEDED]'
+          : 'text-slate-600 dark:text-[#AEAEB4] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:text-slate-900 dark:hover:text-[#EDEDED]'
       }`}
     >
       <span className={`flex shrink-0 items-center justify-center ${showLabel ? 'h-5 w-5 md:h-[20px] md:w-[20px]' : 'h-5 w-5'}`}>{icon}</span>
@@ -146,6 +150,32 @@ function CreatorDock({
   );
 }
 
+function MobileConversations({ currentView, onOpenSession, onCreateConversation, onClose }: {
+  currentView: AppView;
+  onOpenSession: (id: string) => void;
+  onCreateConversation: () => void;
+  onClose: () => void;
+}) {
+  // Inline rename handles Escape before the drawer closes.
+  const dialogRef = useModalDialog(true, onClose, { escapeCapture: false });
+  useScrollLock(true, 'body');
+  return createPortal(
+    <div className="fixed inset-0 z-[60] bg-black/50" onClick={onClose}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="创作对话" tabIndex={-1}
+        className="flex h-full w-[min(320px,calc(100vw-40px))] flex-col gap-4 border-r border-slate-200 bg-[#F7F7F8] p-4 text-slate-900 dark:border-white/10 dark:bg-[#101012] dark:text-white"
+        onClick={event => event.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <span className="text-base font-semibold">创作对话</span>
+          <button type="button" aria-label="关闭对话列表" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-black/5 dark:hover:bg-white/10"><X className="h-5 w-5" /></button>
+        </div>
+        <SidebarHistory currentView={currentView}
+          onOpenSession={id => { onClose(); onOpenSession(id); }}
+          onCreateConversation={() => { onClose(); onCreateConversation(); }} />
+      </div>
+    </div>, document.body,
+  );
+}
+
 export default function AppSidebar({
   currentView,
   onNavigateHub,
@@ -160,6 +190,9 @@ export default function AppSidebar({
 }: Props) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [logoHover, setLogoHover] = useState(false);
+  const [mobileChatsOpen, setMobileChatsOpen] = useState(false);
+  const desktop = useMediaQuery(MD_QUERY);
+  useEffect(() => { if (desktop) setMobileChatsOpen(false); }, [desktop]);
   const { message: toastMsg } = useToast(2500);
   const { t } = useI18n();
   const preferences = useLibraryPreferences();
@@ -265,12 +298,14 @@ export default function AppSidebar({
             icon={<History className="h-[20px] w-[20px]" strokeWidth={1.8} />}
           />
         </nav>
-        {!showLabel && (
+        {(!desktop || !showLabel) && (
           <button
             type="button"
             aria-label="对话"
-            onClick={toggleCollapsed}
-            className="group relative mt-1 flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 hover:bg-black/[0.04] hover:text-slate-900 dark:text-[#8E8E93] dark:hover:bg-white/[0.06] dark:hover:text-[#EDEDED]"
+            aria-haspopup={!desktop ? 'dialog' : undefined}
+            aria-expanded={!desktop ? mobileChatsOpen : undefined}
+            onClick={() => { if (desktop) toggleCollapsed(); else setMobileChatsOpen(true); }}
+            className="group relative mt-1 flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 hover:bg-black/[0.04] hover:text-slate-900 dark:text-[#AEAEB4] dark:hover:bg-white/[0.06] dark:hover:text-[#EDEDED]"
           >
             <MessageSquare className="h-5 w-5" strokeWidth={1.8} />
             <SidebarTooltip>对话</SidebarTooltip>
@@ -278,7 +313,7 @@ export default function AppSidebar({
         )}
       </div>
 
-      {showLabel && (
+      {desktop && showLabel && (
         <div className="hidden min-h-0 w-full flex-1 md:flex">
           <SidebarHistory
             currentView={currentView}
@@ -291,6 +326,8 @@ export default function AppSidebar({
       <div className={`mt-auto flex w-full flex-col items-center pt-2 ${collapsed ? '' : 'md:items-stretch md:pb-1 md:pt-2'}`}>
         <CreatorDock collapsed={!showLabel} onOpenSettings={onOpenSettings} />
       </div>
+
+      {!desktop && mobileChatsOpen && <MobileConversations currentView={currentView} onOpenSession={onOpenSession} onCreateConversation={onCreateConversation} onClose={() => setMobileChatsOpen(false)} />}
 
       {toastMsg && (
         <div

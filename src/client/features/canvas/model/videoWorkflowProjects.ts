@@ -26,6 +26,14 @@ const storyboardImagePrompt=videoCopyKeyframePrompt
  .replace('场景图确定布局','原片开场分镜确定布局')
  .replace('明确落实侧向受光','按开场分镜还原实际光向')
  +'\n只取05指定的开场时间码对应格；用该格的空间、道具与光线画一张完整单图，其他格用于核对，不混合场景。若旧文字与分镜所见的场景冲突，以分镜为准。';
+const storyboardExpressionInstructions=`【逐段表情与视线】
+逐镜记录脸部可见性和首、中、尾可确认的眼神、眼睑、眉眼、嘴角及下颌变化，标明变化对应的动作或停顿。只看到头部朝向时记录朝向，遮挡、背身、脸出画或细节不可辨时注明无法确认。
+把表演写进成片本地时间轴：每个露脸动作区间在原有“0–2秒：”格式内，写清初始神态、视线对象、动作触发的眉眼或嘴角变化及回落或停留状态。脸出画的区间标明脸不可见。开场、动作中的反应和收尾都要交代，连续镜头的表情随动作自然过渡，切镜后按新动作延续或转换。比如整理衣领时视线落向手部、唇部放松，抬眼回看时嘴角轻提，收手后神态回落；示例只说明写法，实际按原片和商品动作决定。原片细节不清时可设计符合动作的轻微反应，并把它写在目标改编里。
+人物参考图提供稳定的面部结构与身份。它的笑容、嘴形、注视方向和头部角度不延用到整个视频。避免全片同一微笑、持续盯镜头或无依据的夸张换表情。全片一致性中的人物描述只写稳定外观；参考图制作要求只写静态写实质感和放松神态。`;
+const storyboardPortraitInstructions=`【真人实拍质感】
+以原片开场对应格为现场，在同一光线和曝光下重绘目标人物。目标人像只用来辨认脸型、五官间距、发际线、肤色和体态，保留原有面部比例及自然不对称；参考照的笑容、滤镜、修容和打光不照搬。让眼睑、面颊和下颌自然放松，嘴角轻松，视线与身体朝向协调，呈现真人试穿时自然停留的一刻。
+用开场实际主光方向和软硬度表现脸颊、鼻翼、眼窝、下颌与颈部的连续明暗。背景灯光按所在位置还原，只有画面有受光依据时才照到人物轮廓或脸部。肤色有轻微冷暖起伏，按景别保留细腻的皮肤纹理和发际线碎发，眼睛只有与现场光源一致的自然反光。脸、耳、颈与手的受光连贯，头发边缘自然融入环境，衣领和脚下有合理接触阴影。脸和商品可辨，背景保留现场的清晰程度。
+避免磨皮蜡面、塑料高光、统一增白、大眼尖下巴、过度对称、贴脸边缘、锐化毛孔、影楼补光和强行虚化。只呈现该景别下实际看得见的细节。`;
 const storyboardVideoPrompt=depthCopyVideoPrompt
  .replace(/^@图片1[^\n]+/m,opening+'06整合图补充目标人物脸和商品外观；各镜场景、道具、机位和光线以对应分镜格为准。整合图不是首尾帧，不把其开场背景套到后续镜头。')
  +'\n优化稿必须保留各编号图片的职责及逐镜的场景、道具交互、动作、光线和切点。旧分镜文字若与遮脸分镜的场景冲突，以对应画面为准。';
@@ -165,7 +173,8 @@ function applyOriginalStoryboardScene(project:CanvasProject):CanvasProject {
  const scene=project.studioScene;
  const video=scene?.nodes.find(n=>n.id.endsWith('-video')&&compilerSettings(n).beikeVideoWorkflow==='depth-copy');
  if(!scene||!video)return project;
- if(compilerSettings(video).beikeOriginalStoryboardScene===true)return compilerSettings(video).beikeStoryboardLabelsVersion===1?project:labelStoryboardNodes(project,video.id.slice(0,-6));
+ const videoSettings=compilerSettings(video);
+ if(videoSettings.beikeOriginalStoryboardScene===true)return videoSettings.beikeStoryboardLabelsVersion===1&&videoSettings.beikeStoryboardPromptVersion===1?project:refreshStoryboardNodes(project,video.id.slice(0,-6));
  const prefix=video.id.slice(0,-6),sourceId=prefix+'-source',backgroundId=prefix+'-background';
  const compilerId=compilerSettings(video).beikeCompilerSource;
  const targets=new Set([prefix+'-analysis',prefix+'-keyframe',compilerId,video.id]);
@@ -200,11 +209,13 @@ function applyOriginalStoryboardScene(project:CanvasProject):CanvasProject {
   return {...n,prompt,settings:{...settings,beikeStoryboardSceneSourceId:sourceId,
    ...(analysis?{textNodeDraftPrompt:prompt,beikeTextImageCount:3,...(settings._chatCompletedAt||n.content||settings.text?{beikeSourceVideoChangedAt:Math.max(Date.now(),Number(settings._chatCompletedAt||0)+1)}:{})}:frame?{beikeRequiredInputs:inputIds,beikeReferenceInputIds:inputIds}:{beikeCompilerApproved:undefined,beikeCompilerInputKey:undefined})}};
  });
- return labelStoryboardNodes({...project,studioScene:wireStudioStoryboards({...scene,nodes,connections})},prefix);
+ return refreshStoryboardNodes({...project,studioScene:wireStudioStoryboards({...scene,nodes,connections})},prefix);
 }
 
-function labelStoryboardNodes(project:CanvasProject,prefix:string):CanvasProject {
+function refreshStoryboardNodes(project:CanvasProject,prefix:string):CanvasProject {
  const scene=project.studioScene!;
+ const video=scene.nodes.find(node=>node.id===prefix+'-video')!;
+ const refreshLabels=compilerSettings(video).beikeStoryboardLabelsVersion!==1;
  const labels:Record<string,string>={
   [prefix+'-analysis']:'05 分析原片分镜',
   [prefix+'-keyframe']:'06 开场整合图 · 沿用原片场景',
@@ -213,11 +224,22 @@ function labelStoryboardNodes(project:CanvasProject,prefix:string):CanvasProject
  const brief=prefix+'-brief';
  let changed=false;
  const nodes=scene.nodes.map(node=>{
-  const label=labels[node.id];
+  const label=refreshLabels?labels[node.id]:undefined;
   const s=compilerSettings(node);
-  if(node.id===prefix+'-video'){changed=true;return {...node,settings:{...s,beikeStoryboardLabelsVersion:1}};}
-  if(node.id===brief&&String(s.text||'').trim()==='填写商品名称、已核实卖点、要保留的外观细节、替换场景，以及台词和声音要求。'){
+  if(node===video){changed=true;return {...node,settings:{...s,beikeStoryboardLabelsVersion:1,beikeStoryboardPromptVersion:1}};}
+  if(refreshLabels&&node.id===brief&&String(s.text||'').trim()==='填写商品名称、已核实卖点、要保留的外观细节、替换场景，以及台词和声音要求。'){
    changed=true;return {...node,settings:{...s,text:'填写商品、服装细节及声音要求。背景、道具和光线沿用原片分镜。'}};
+  }
+  const analysis=node.id===prefix+'-analysis'&&node.type==='text-node';
+  const frame=node.id===prefix+'-keyframe'&&node.type==='gen-image';
+  if(analysis||frame){
+   const instructions=analysis?storyboardExpressionInstructions:storyboardPortraitInstructions;
+   const saved=String((analysis&&s.textNodeDraftPrompt)||node.prompt||'').trim();
+   if(!saved.includes(instructions)){
+    const prompt=`${saved||(analysis?storyboardAnalysisPrompt:storyboardImagePrompt)}\n${instructions}`;
+    changed=true;
+    return {...node,nodeName:label||node.nodeName,prompt,settings:analysis?{...s,textNodeDraftPrompt:prompt}:node.settings};
+   }
   }
   if(!label||node.nodeName===label)return node;
   changed=true;return {...node,nodeName:label};

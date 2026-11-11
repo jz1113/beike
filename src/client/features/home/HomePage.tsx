@@ -1,7 +1,12 @@
+import { registerRefMediaKind } from '@client/shared/media/refMediaRegistry';
+import { loadPromptPreferences, savePromptPreferences, restoreImagePromptOptions } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAppStore } from '@client/store';
 import { useQuickRefMediaDrop } from '@client/shared/hooks/useQuickRefMediaDrop';
-import { useViewVisibility } from '@client/shared/hooks/useSafeTimeout';
+import { useSafeTimeout, useViewVisibility } from '@client/shared/hooks/useSafeTimeout';
+import { useToast } from '@client/shared/hooks/useToast';
+import { modalityPickerSelections } from '@shared/domain/models/modalityStorage';
+import { getEnabledImageModelsFromSettings, getEnabledVideoModelsFromSettings } from '@shared/domain/models/workflowModels';
 import PromptActionBar from '@client/shared/prompt-bar/PromptActionBar';
 import InspirationFeed from './components/inspiration/InspirationFeed';
 import { inspirationComposerState, type InspirationUseOptions } from './model/inspirationItem';
@@ -20,8 +25,19 @@ export default function HomePage({
 
   const { dropZoneProps: pageMediaDropProps, toastMsg: dropToastMsg } = useQuickRefMediaDrop();
   const visible = useViewVisibility();
+  const quickGenMode = useAppStore(state => state.quickGenMode);
+  const { message: inspirationNotice, show: showInspirationNotice, clear: clearInspirationNotice } = useToast(6000);
+  const { setSafeTimeout } = useSafeTimeout();
+  const heading = homeMode === 'canvas' ? '让灵感，在画布上展开' : {
+    agent: '把想法，交给 Agent', image: '把灵感，变成画面', video: '让想法，动起来',
+    audio: '让创意，被听见', collect: '从商品，开始创作',
+    'depth-image': '提取画面中的空间层次', 'depth-video': '捕捉视频中的动作与深度',
+  }[quickGenMode];
   const [canvasVisited, setCanvasVisited] = useState(homeMode === 'canvas');
-  useEffect(() => { if (homeMode === 'canvas') setCanvasVisited(true); }, [homeMode]);
+  useEffect(() => {
+    useAppStore.getState().invalidatePromptAttachments();
+    if (homeMode === 'canvas') setCanvasVisited(true);
+  }, [homeMode]);
   const modePanel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (visible && useAppStore.getState().previousView === 'canvas') {
@@ -32,9 +48,45 @@ export default function HomePage({
     }
   }, [visible]);
 
-  const handleUsePrompt = (prompt: string, refMedia?: string, opts?: InspirationUseOptions) => {
+  const handleUsePrompt = (prompt: string, opts: InspirationUseOptions) => {
+    clearInspirationNotice();
+    if (opts?.referenceAudioUrls?.length) {
+      return '此作品包含参考音频，请回原画布编辑或重试原任务以保留完整素材';
+    }
+    if (opts?.referenceImages?.some(url => url.startsWith('blob:'))) {
+      return '此作品的参考素材使用临时地址，请回原任务确认素材后重试';
+    }
+    restoreImagePromptOptions(opts?.imageGenerationQuality, opts?.inferenceStrength);
+    if (opts?.generateAudio !== undefined) {
+      const prefs = loadPromptPreferences();
+      savePromptPreferences({ ...prefs, video: { ...prefs.video, generateAudio: opts.generateAudio } });
+    }
+    for (const url of opts?.referenceVideoUrls ?? []) registerRefMediaKind(url, 'video');
+    useAppStore.getState().invalidatePromptAttachments();
+    const patch = inspirationComposerState(prompt, undefined, opts);
+    const kind = patch.quickGenMode === 'video' ? 'video' : 'image';
+    const modelKey = kind === 'video' ? 'quickVideoModel' : 'quickModel';
+    const requestedModel = patch[modelKey];
+    if (requestedModel) {
+      const choices: { id: string; upstreamId?: string }[] = modalityPickerSelections(kind)?.map(model => ({ id: model.id, upstreamId: model.modelId }))
+        ?? (kind === 'video' ? getEnabledVideoModelsFromSettings() : getEnabledImageModelsFromSettings());
+      const matching = choices.filter(model => model.id === requestedModel || model.upstreamId === requestedModel);
+      const currentModel = useAppStore.getState()[modelKey];
+      const selected = matching.find(model => model.id === currentModel) || matching[0];
+      if (selected) patch[modelKey] = selected.id;
+      else {
+        delete patch[modelKey];
+        showInspirationNotice(`案例模型 ${requestedModel} 当前不可用，${currentModel ? '已保留当前模型，请确认生成参数' : '请先配置并选择可用模型'}`);
+      }
+    }
     setHomeMode('generate');
-    useAppStore.setState(inspirationComposerState(prompt, refMedia, opts));
+    useAppStore.setState(patch);
+    setSafeTimeout(() => {
+      const panel = modePanel.current;
+      panel?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus({ preventScroll: true });
+      panel?.closest('[data-hub-scroll]')?.scrollTo({ top: 0 });
+    }, 0);
+    return undefined;
   };
 
   return (
@@ -51,13 +103,20 @@ export default function HomePage({
       <div className="w-full px-4 pb-5 pt-6 sm:px-6 sm:pt-8 lg:px-8 2xl:px-10">
         <section className="mx-auto w-full max-w-6xl xl:max-w-[1440px] 2xl:max-w-[1640px]">
           <h1 className="relative z-20 mx-auto mb-6 max-w-[1200px] text-[24px] font-medium tracking-tight text-slate-950 dark:text-white sm:text-[28px]">
-            {homeMode === 'canvas' ? '让灵感，在画布上展开' : '把想法，交给 Agent'}
+            {heading}
           </h1>
 
-          <div ref={modePanel} id="home-mode-panel" role="region" tabIndex={-1} aria-label={homeMode === 'canvas' ? '无限画布' : 'Agent 创作'} className={`mx-auto w-full max-w-[1200px] rounded-3xl ${homeMode === 'canvas' ? 'outline-none' : ''}`}>
+          <div ref={modePanel} id="home-mode-panel" role="region" tabIndex={-1} aria-label={homeMode === 'canvas' ? '无限画布' : quickGenMode === 'agent' ? 'Agent 创作' : '生成创作'} className={`mx-auto w-full max-w-[1200px] rounded-3xl ${homeMode === 'canvas' ? 'outline-none' : ''}`}>
             {homeMode === 'generate' && (
               <div className="relative z-30">
-                <PromptActionBar showBrandHero={false} inputPlaceholder="输入想法、描述或上传参考，开始创作" />
+                <PromptActionBar inputPlaceholder={{
+                  agent: '输入想法、描述或上传参考，开始创作',
+                  image: '描述想生成的画面，或上传参考图',
+                  video: '描述镜头与动作，或上传参考素材',
+                  audio: '输入台词或声音描述，开始生成音频',
+                  collect: undefined, 'depth-image': undefined, 'depth-video': undefined,
+                }[quickGenMode]} />
+                {inspirationNotice && <p role="status" className="mt-3 px-2 text-sm text-amber-700 dark:text-amber-300">{inspirationNotice}</p>}
               </div>
             )}
             {(homeMode === 'canvas' || canvasVisited) && (

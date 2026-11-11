@@ -3,7 +3,10 @@ import { apiFetch } from '@client/shared/api/apiClient';
 import { getMultimodalClientOverrides } from '@client/shared/api/gatewayClient';
 import { clearUsageLogs, getUsageLogs } from '@client/shared/utils/usageTracker';
 import { readCanvasTextOperation, requestCanvasText } from './canvasTextRequest';
+import { coverLayoutOptions, newCoverTextOperationId } from './coverBatch';
 import { cloneCanvasProject } from './creativeWorkflowProjects';
+import { executeStudioTextNodeAnalysis } from './studioHostExecution';
+import { studioNodeToCanvasNode } from './studioSceneAdapter';
 import type { StudioTaskCommands } from './studioTaskState';
 import type { StudioScene } from './types';
 import { recoverStudioTextNode, recoverStudioTextRun, studioTextRequest } from './videoWorkflowRecovery';
@@ -133,6 +136,49 @@ it('S11 refresh and explicit recovery bypass removed models and broken reference
  await recoverStudioTextRun('project','analysis',commands,save);
  expect(nodes[0].content).toBe('saved final result');
 });
+
+it('displays the recovered 05 result over the previous preview, rich text and interruption error', async () => {
+ nodes[0] = {
+   ...nodes[0], prompt: 'analyse original footage', errorMsg: 'previous request interrupted',
+   beikeTextOperationId: 'original', beikeTextRecoveryRequired: true,
+   settings: { text: 'old content', textNodeDisplayText: 'old preview', beikeTextHtml: '<b>old preview</b>' },
+ };
+ vi.mocked(apiFetch).mockResolvedValueOnce(complete());
+ await recoverStudioTextRun('project', 'analysis', commands, save);
+ expect(studioNodeToCanvasNode(nodes[0], commands.read())).toMatchObject({
+   content: 'saved final result', status: 'success', textHtml: undefined, textPrompt: 'analyse original footage',
+ });
+});
+
+it('reads the same receipt again if the original analysis is still running', async () => {
+ vi.useFakeTimers();
+ try {
+   vi.mocked(apiFetch).mockResolvedValueOnce(Response.json({
+     operationKey: 'original', submissionUnknown: true, stage: 'result',
+   }, { status: 409 })).mockResolvedValueOnce(complete());
+   const recovered = run({ previousOperationId: 'original', recoveryOnly: true }).catch(error => error);
+   await vi.advanceTimersByTimeAsync(2000);
+   expect(await recovered).toMatchObject({ success: true, operationKey: 'original' });
+   expect(vi.mocked(apiFetch).mock.calls.map(([url, init]) => [url, init?.method ?? 'GET'])).toEqual([
+     ['/api/generate/canvas-text?operationKey=original', 'GET'],
+     ['/api/generate/canvas-text?operationKey=original', 'GET'],
+   ]);
+   expect(body).not.toHaveBeenCalled();
+ } finally {
+   vi.useRealTimers();
+ }
+});
+
+it('ends the recovery click after checking an obsolete cover receipt', async () => {
+ nodes[0].beikeTextOperationId = 'original';
+ nodes[0].beikeTextRecoveryRequired = true;
+ nodes[0].settings = { text: 'old content', beikeBatchCoverWriter: true };
+ vi.mocked(apiFetch).mockResolvedValueOnce(complete());
+ await expect(executeStudioTextNodeAnalysis('project', 'analysis', commands, save, new AbortController().signal))
+   .rejects.toThrow('旧版提示词回执已核对');
+ expect(nodes[0].beikeTextRecoveryRequired).toBe(false);
+ expect(vi.mocked(apiFetch).mock.calls.map(([, init]) => init?.method ?? 'GET')).toEqual(['GET']);
+});
 it('S11 overlapping node runs keep separate identities when replies finish in reverse order',async()=>{
  let release!:(value:Response)=>void;vi.mocked(apiFetch).mockImplementationOnce(()=>new Promise(resolve=>{release=resolve}));
  const first=studioTextRequest('project',payload(),new AbortController().signal,commands,save);await vi.waitFor(()=>expect(release).toBeDefined());
@@ -162,4 +208,68 @@ it('a rejected recovery unlocks the original node without submitting another req
  await expect(recoverStudioTextRun('project','analysis',commands,save)).rejects.toThrow('上游拒绝改编请求');
  expect(nodes[0]).toMatchObject({beikeTextOperationId:'original',beikeTextRecoveryRequired:false,settings:{text:'old content'}});
  expect(vi.mocked(apiFetch).mock.calls.map(([,init])=>init?.method||'GET')).toEqual(['POST','GET']);
+});
+
+it('an upstream authentication rejection unlocks the cover node and explains the channel key failure', async () => {
+ vi.mocked(apiFetch).mockRejectedValueOnce(Error('lost reply'));
+ await expect(studioTextRequest('project', payload(), new AbortController().signal, commands, save)).rejects.toThrow();
+ nodes[0].settings = { ...nodes[0].settings as object, beikeTextRunError: '封面提示词结果待核对，可查询原请求回执' };
+ vi.mocked(apiFetch).mockResolvedValueOnce(Response.json({
+   operationKey: 'original', success: false, submissionRejected: true, submissionUnknown: false,
+   error: '文本模型 gemini-test 调用失败（协议 gemini，HTTP 401）：text upstream HTTP 401: invalid token',
+ }, { status: 502 }));
+ await expect(recoverStudioTextRun('project', 'analysis', commands, save)).rejects.toThrow('请检查当前模型渠道的密钥后重试');
+ expect(nodes[0].beikeTextRecoveryRequired).toBe(false);
+ expect(studioNodeToCanvasNode(nodes[0], commands.read()).errorMessage).toBe('文本模型拒绝了 API Key，请检查当前模型渠道的密钥后重试');
+ expect(readCanvasTextOperation(context)?.status).toBe('rejected');
+ expect(vi.mocked(apiFetch).mock.calls.map(([, init]) => init?.method ?? 'GET')).toEqual(['POST', 'GET']);
+});
+
+it('a legacy replayed upstream 401 receipt unlocks recovery even before the server is upgraded', async () => {
+ vi.mocked(apiFetch).mockRejectedValueOnce(Error('lost reply'));
+ await expect(run()).rejects.toThrow();
+ vi.mocked(apiFetch).mockResolvedValueOnce(Response.json({
+   operationKey: 'original', replayed: true, success: false, submissionUnknown: true,
+   error: '文本模型 gemini-test 调用失败（协议 gemini，HTTP 401）：text upstream HTTP 401: invalid token',
+ }, { status: 502 }));
+ await expect(run({ recoveryOnly: true })).rejects.toMatchObject({ submissionRejected: true });
+ expect(readCanvasTextOperation(context)?.status).toBe('rejected');
+ expect(vi.mocked(apiFetch).mock.calls.map(([, init]) => init?.method ?? 'GET')).toEqual(['POST', 'GET']);
+});
+
+it('an unconfirmed 401-looking error remains query-only', async () => {
+ vi.mocked(apiFetch).mockResolvedValueOnce(Response.json({
+   operationKey: 'original', success: false, submissionUnknown: true,
+   error: '文本模型 gemini-test 调用失败（协议 gemini，HTTP 401）：text upstream HTTP 401: invalid token',
+ }, { status: 502 }));
+ await expect(run()).rejects.toMatchObject({ recoveryRequired: true });
+ expect(readCanvasTextOperation(context)?.status).toBe('pending');
+});
+
+it('recovers rewritten cover copy without changing the original title or sending a second POST', async () => {
+ const operation = newCoverTextOperationId();
+ const originalTitle = '红米保持原文';
+ const displayedTitle = '红米使用体验';
+ const layout = coverLayoutOptions(7, 'phone-back')[0].id;
+ nodes[0].settings = {
+   beikeBatchCoverWriter: true, beikeCoverRotationOffset: 8,
+   beikeCoverDraftRequest: { offset: 7, title: originalTitle, sourceUrl: '/storage/original.png', model: 'test' },
+ };
+ vi.mocked(apiFetch).mockRejectedValueOnce(new Error('lost reply'));
+ await expect(studioTextRequest('project', payload('analysis', operation), new AbortController().signal, commands, save)).rejects.toThrow();
+ vi.mocked(apiFetch).mockResolvedValueOnce(Response.json({
+   success: true, operationKey: operation, text: JSON.stringify({
+     layout, profile: 'phone-back', composition: '正面背面一起', background: '麦田',
+     product: '红米正反面', typography: '蜡笔字', lighting: '暖光', constraints: '同时画两面',
+     titleLines: [{ text: displayedTitle, size: '大', position: '左上', style: '浅黄' }],
+   }),
+ }));
+ expect(await recoverStudioTextRun('project', 'analysis', commands, save)).toBe(true);
+ expect(nodes[0].content).toContain('单台手机只展示背面');
+ expect(nodes[0].content).toContain(displayedTitle);
+ expect(nodes[0].settings).toMatchObject({
+   beikeCoverSourceUrl: '/storage/original.png', beikeBatchCoverLayout: layout,
+   beikeCoverDraftRequest: { title: originalTitle },
+ });
+ expect(vi.mocked(apiFetch).mock.calls.map(([, init]) => init?.method || 'GET')).toEqual(['POST', 'GET']);
 });

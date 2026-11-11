@@ -24,15 +24,16 @@ export function useQuickRefMediaDrop() {
 
   const ingestPageMediaFiles = useCallback(
     (files: File[]) => {
-      void useAppStore.getState().readPromptAttachments(() => processDroppedMediaFiles(
+      void useAppStore.getState().readPromptAttachments((isCurrent) => processDroppedMediaFiles(
         files,
         (url, origName, file) => {
+          if (!isCurrent()) return;
           registerRefMedia(url, file, origName);
           addQuickRefImage(url);
         },
         {
-          onAllSkipped: rejectDrop,
-          onError: (msg) => showToast(msg),
+          onAllSkipped: () => { if (isCurrent()) rejectDrop(); },
+          onError: (msg) => { if (isCurrent()) showToast(msg); },
         },
       )).catch(() => showToast('无法读取拖入的文件'));
     },

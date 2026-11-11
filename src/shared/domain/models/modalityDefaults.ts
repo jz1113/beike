@@ -1,4 +1,4 @@
-import { DEFAULT_MULTIMODAL_MODEL_ID, listApprovedModels } from './modelCatalog';
+import { DEFAULT_MULTIMODAL_MODEL_ID, listSelectableModels } from './modelCatalog';
 import type { TextProtocol } from './deepseek';
 
 export type ModalityStorageKind = 'chat' | 'image' | 'video' | 'voice';
@@ -36,8 +36,8 @@ function seed(
 
 /** 使用宿主模型目录的精确上游 ID 和展示名。每个预设只指向全局渠道。 */
 function catalogSeeds(kind: 'chat' | 'image' | 'video', ids: readonly string[]): DefaultModalityModel[] {
-  const catalog = listApprovedModels(kind === 'chat' ? 'multimodal' : kind);
-  const vendors: Record<string, string> = { alibaba: 'qwen', kuaishou: 'kling', bfl: 'flux' };
+  const catalog = listSelectableModels(kind === 'chat' ? 'multimodal' : kind);
+  const vendors: Record<string, string> = { alibaba: 'qwen', kuaishou: 'kling', bfl: 'flux', zhipu: 'glm' };
   return ids.map(id => {
     const model = catalog.find(item => item.id === id);
     if (!model) throw new Error(`未收录的${kind}线路：${id}`);
@@ -49,58 +49,29 @@ function catalogSeeds(kind: 'chat' | 'image' | 'video', ids: readonly string[]):
 export const DEFAULT_MODALITY_MODELS: Record<ModalityStorageKind, DefaultModalityModel[]> = {
   chat: [
     seed('chat_openai_gpt', 'GPT', 'chat', 'openai', DEFAULT_MULTIMODAL_MODEL_ID, { isDefault: true }),
-    seed('chat_google_gemini', 'Gemini', 'chat', 'google', 'gemini-3-flash-preview-thinking-128'),
-    seed('chat_anthropic_claude', 'Claude', 'chat', 'anthropic', 'claude-3-7-sonnet-20250219'),
-    seed('chat_xai_grok', 'Grok', 'chat', 'xai', 'grok-4.6'),
-    seed('chat_deepseek', 'DeepSeek', 'chat', 'deepseek', 'deepseek-chat'),
-    seed('chat_moonshot', 'Moonshot', 'chat', 'moonshot', 'moonshot-v1-auto'),
-    seed('chat_minimax', 'MiniMax', 'chat', 'minimax', 'abab6.5s-chat'),
-    seed('chat_glm', 'GLM', 'chat', 'glm', 'glm-4v'),
-    seed('chat_qwen', 'Qwen', 'chat', 'qwen', 'qwen-vl-max'),
     ...catalogSeeds('chat', [
-      'gpt-6-astra',
-      'gemini-3.1-pro-preview',
-      'grok-4.7',
-      'qwen3.8-max',
+      'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-astra', 'gpt-5.6-sol', 'gemini-4-argon', 'gemini-3.8-flash',
+      'claude-opus-5-5', 'claude-fable-5-1', 'claude-opus-5', 'claude-opus-4-8', 'grok-4.7',
+      'deepseek-v4.1-flash', 'kimi-k3.1-pro', 'doubao-seed-2-0-pro-260215', 'glm-5.3', 'mimo-v2.6-pro',
     ]),
   ],
   image: [
     seed('img_openai', 'GPT Image', 'image', 'openai', 'gpt-image-2', { isDefault: true }),
     seed('img_google', 'Nano Banana', 'image', 'google', 'gemini-nano-banana-2.1'),
-    seed('img_mj', 'Midjourney', 'image', 'midjourney', 'midjourney'),
-    seed('img_xai', 'Grok Image', 'image', 'xai', 'grok-image'),
-    seed('img_kling', 'Kolors', 'image', 'kling', 'kling-image'),
-    seed('img_qwen', 'Qwen Image', 'image', 'qwen', 'qwen-image'),
     ...catalogSeeds('image', [
-      'qwen-image-edit',
-      'gemini-3.1-flash-image',
-      'doubao-seedream-4-5-251128',
-      'seedream-v5-pro',
-      'grok-4.2-image',
-      'grok-imagine-image-quality',
+      'gpt-image-2.6-sunburst', 'gpt-image-2.6-flare', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare',
+      'gemini-3.1-flash-image', 'grok-4.2-image', 'doubao-seedream-5-0-pro-260628',
+      'doubao-seedream-5-0-flash-260915', 'doubao-seedream-5-0-260128', 'doubao-seedream-4-5-251128',
     ]),
   ],
   video: [
     seed('vid_bytedance', 'Seedance', 'video', 'bytedance', 'doubao-seedance-2.5', { isDefault: true }),
     seed('vid_openai', 'Sora', 'video', 'openai', 'sora-2'),
     seed('vid_google', 'Veo', 'video', 'google', 'veo-3.1'),
-    seed('vid_flux', 'Flux', 'video', 'flux', 'flux-video'),
-    seed('vid_xai', 'Grok Video', 'video', 'xai', 'grok-video'),
-    seed('vid_minimax', 'MiniMax Video', 'video', 'minimax', 'video-01'),
-    seed('vid_qwen', 'Wan', 'video', 'qwen', 'wan-video'),
-    seed('vid_kling', 'Kling', 'video', 'kling', 'kling-v2-master'),
-    seed('vid_vidu', 'Vidu', 'video', 'vidu', 'vidu-2.0'),
-    seed('vid_mj', 'MJ Video', 'video', 'midjourney', 'midjourney-video'),
-    seed('vid_topaz', 'Topaz', 'video', 'topaz', 'topaz-video-upscale'),
     ...catalogSeeds('video', [
-      'veo3.1-fast',
-      'sora-2-pro',
-      'doubao-seedance-2.0-mini',
-      'doubao-seedance-2-0-fast-260128',
-      'kling-video-v3-omni',
-      'MiniMax-H3',
-      'viduq3-pro',
-      'viduq3-turbo',
+      'veo3.1-fast', 'sora-2-pro', 'grok-imagine-video-1.5',
+      'wan3.0-video', 'wan3.0-video-prime', 'doubao-seedance-2.0-mini', 'doubao-seedance-2-0-fast-260128',
+      'doubao-seedance-2-0-260128', 'kling-4.0', 'kling-4.0-flash', 'MiniMax-H3', 'viduq4-preview',
     ]),
   ],
   voice: [

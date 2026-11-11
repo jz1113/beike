@@ -4,7 +4,7 @@ import type { CanvasProject, StudioScene } from '../model/types';
 
 const mocks = vi.hoisted(()=>({open:vi.fn(),write:vi.fn(),failed:false,readFailed:false,publish:vi.fn(),
   transaction:vi.fn(),put:vi.fn(),
-  state:{projects:[] as {id:string}[]}}));
+  state:{projects:[] as {id:string}[],activeProjectId:null as string | null,activeNodeId:null as string | null}}));
 vi.mock('idb',()=>({openDB:mocks.open}));
 vi.mock('./canvasProjectDefaults', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./canvasProjectDefaults')>();
@@ -17,9 +17,35 @@ vi.mock('./canvasProjectDefaults', async (importOriginal) => {
 });
 vi.mock('./useCanvasStore',()=>({useCanvasStore:{getState:()=>mocks.state,setState:mocks.publish,subscribe:vi.fn(()=>()=>{}),persist:{hasHydrated:()=>true}}}));
 vi.mock('@client/shared/media/downloadMedia',()=>({fetchMediaBlob:vi.fn()}));
-afterEach(()=>{vi.resetAllMocks();vi.unstubAllGlobals();vi.resetModules();mocks.failed=false;mocks.readFailed=false;});
+afterEach(()=>{vi.resetAllMocks();vi.unstubAllGlobals();vi.resetModules();mocks.failed=false;mocks.readFailed=false;mocks.state.activeProjectId=null;mocks.state.activeNodeId=null;});
 const archive = (): CanvasArchive => ({project:{id:'restored',title:'恢复项目',nodes:[],createdAt:1,updatedAt:1,studioScene:{nodes:[],connections:[],groups:[],textBoxes:[],strokes:[],view:{x:0,y:0,zoom:1}}},
   assets:[{id:'file',blob:new Blob(['photo'],{type:'image/png'})}]});
+
+it('keeps hidden batch nodes and folded group members out of the assistant context', async () => {
+  const project = archive().project;
+  const image = { type: 'image' as const, x: 0, y: 0, width: 200, height: 200, createdAt: 1, imageUrl: '/storage/cover.png' };
+  project.nodes = [
+    { ...image, id: 'current', title: '当前封面' },
+    { ...image, id: 'archived', title: '旧批次', layerHidden: true },
+    { ...image, id: 'folded', title: '折叠成员', foldedInGroupId: 'group' },
+  ];
+  mocks.state.projects = [project];
+  mocks.state.activeProjectId = project.id;
+  mocks.state.activeNodeId = 'folded';
+  await import('./canvasArchiveStorage');
+  const { getCanvasWorkspaceAttachments, getCanvasWorkspaceSnapshot } = await import('@client/shared/workspace/canvasWorkspace');
+  expect(getCanvasWorkspaceSnapshot()).toMatchObject({
+    nodeCount: 1,
+    nodeTypes: { image: 1 },
+    selectedNode: undefined,
+    nodes: [{ title: '当前封面' }],
+  });
+  expect(getCanvasWorkspaceAttachments()).toEqual([]);
+  mocks.state.activeNodeId = 'current';
+  expect(getCanvasWorkspaceSnapshot()).toMatchObject({ nodeCount: 1, selectedNode: { title: '当前封面' } });
+  expect(getCanvasWorkspaceAttachments()).toMatchObject([{ id: 'canvas-node-current' }]);
+  expect(project.nodes).toHaveLength(3);
+});
 
 it('keeps the original project list intact when asset or project persistence fails, and reuses the same ID on retry', async()=>{
   mocks.state.projects=[{id:'original'}];
@@ -300,6 +326,34 @@ describe('canvasPersistence & canvasProjectDefaults', () => {
     await canvasProjectStorage.setItem('projects', { state: { projects: [changed, ...demos.slice(1), project] } });
     expect(hasCanvasSaveFailure()).toBe(true);
     expect(mocks.put).not.toHaveBeenCalledWith(changed, changed.id);
+  });
+
+  it('accepts an identical snapshot saved by another window while protecting different edits', async () => {
+    vi.doUnmock('./canvasProjectDefaults');
+    vi.resetModules();
+    const original = { ...draft, id: 'shared', title: '原稿' };
+    let stored = original;
+    let revision = 'first';
+    const meta = { get: vi.fn(async () => ({ ids: ['shared'], revisions: { shared: revision } })), put: vi.fn(async (value) => { revision = value.revisions.shared; }) };
+    const projects = { get: vi.fn(async () => stored), put: vi.fn(async (value) => { stored = value; }), delete: vi.fn() };
+    mocks.open.mockResolvedValue({ transaction: () => ({ objectStore: (name: string) => name === 'meta' ? meta : projects, done: Promise.resolve() }) });
+    const { canvasProjectStorage, finishCanvasHydration, hasCanvasSaveFailure } = await import('./canvasProjectDefaults');
+    const loaded = (await canvasProjectStorage.getItem('projects'))!;
+    finishCanvasHydration(loaded.state.projects);
+    const changed = { ...original, title: '共同结果' };
+    stored = changed;
+    revision = 'other-window';
+    await canvasProjectStorage.setItem('projects', { state: { projects: [changed] } });
+    expect(hasCanvasSaveFailure()).toBe(false);
+    expect(projects.put).not.toHaveBeenCalled();
+    await canvasProjectStorage.setItem('projects', { state: { projects: [{ ...changed, title: '后续编辑' }] } });
+    expect(hasCanvasSaveFailure()).toBe(false);
+    expect(stored.title).toBe('后续编辑');
+    stored = { ...original, title: '其他窗口的不同编辑' };
+    revision = 'other-window-again';
+    await canvasProjectStorage.setItem('projects', { state: { projects: [{ ...changed, title: '本窗口的不同编辑' }] } });
+    expect(hasCanvasSaveFailure()).toBe(true);
+    expect(stored.title).toBe('其他窗口的不同编辑');
   });
 
   it('reports repeated save failures and saves the latest project snapshot on retry', async () => {

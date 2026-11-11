@@ -105,6 +105,7 @@ func TestVideoStoryboardCoversFullDurationAndKeepsFrames(t *testing.T) {
 			fmt.Fprint(w, "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"先红色场景，再蓝色场景。\"}]},\"finishReason\":\"STOP\"}]}\n\n")
 		}))
 		defer upstream.Close()
+		useAssistantTestClient(t, upstream.Client())
 		loop := testLoop(upstream.URL, func(map[string]any) {})
 		loop.models = []string{"gemini-3.8-flash"}
 		loop.creds.protocol = "gemini"

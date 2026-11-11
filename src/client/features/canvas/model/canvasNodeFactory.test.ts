@@ -218,7 +218,7 @@ describe('buildQuickCanvasNode & 桥豆麻衣酱 1:1 节点与连接规则', () 
     const skillNode = buildQuickCanvasNode('video-prompt-optimizer', { x: 520, y: 260 }, {
       id: 'skill-node-1',
     });
-    expect(skillNode.title).toBe('提示词 Skill');
+    expect(skillNode.title).toBe('视频提示词优化');
     expect([skillNode.width, skillNode.height]).toEqual([300, 260]);
     expect(skillNode.drawing?.model).toBe('wan3.0-video');
     expect(PROMPT_SKILL_CATALOG.length).toBeGreaterThanOrEqual(10);

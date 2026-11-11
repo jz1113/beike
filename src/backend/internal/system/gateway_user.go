@@ -149,7 +149,9 @@ func gatewayGET(ctx context.Context, client *http.Client, rawURL, token, userID 
 	if err != nil {
 		return nil, 0, err
 	}
-	request.Header.Set("Authorization", "Bearer "+token)
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
 	request.Header.Set("Accept", "application/json")
 	if userID != "" {
 		request.Header.Set("New-API-User", userID)

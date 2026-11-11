@@ -1,4 +1,5 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
+import { coverLayoutImageInput, normalizeBatchCoverPrompt, validateCoverPromptFormat } from './coverBatch';
 import {studioVideoSettings} from './studioCompilerState';
 import {
   assertStudioReferenceNumbers,
@@ -30,6 +31,7 @@ const depthMocks=vi.hoisted(()=>({
 vi.mock('@client/store',()=>({useAppStore:{getState:()=>depthMocks.state}}));
 vi.mock('@client/shared/api/apiClient',()=>({apiFetch:depthMocks.fetch,storageConfigHeaders:()=>({'x-storage-config':'configured'})}));
 vi.mock('@client/shared/api/gatewayClient',()=>({
+  getModelCredentials:()=>({}),
   getGatewayClientBaseUrl:(route:string)=>route==='h3-metaso'?'https://metaso.cn/api':'https://other.example/api',
   getGatewayClientHeaders:vi.fn(),
   getMultimodalClientOverrides:depthMocks.overrides,
@@ -45,7 +47,7 @@ vi.mock('./canvasTextRequest',()=>({requestCanvasText:async(body:()=>object)=>{c
 vi.mock('@shared/domain/models/modalityStorage',async original=>({
   ...await original<typeof import('@shared/domain/models/modalityStorage')>(),
   modalityPickerSelections:(kind:string)=>kind==='video'?routes:kind==='image'?imageRoutes:kind==='chat'?chatRoutes:kind==='voice'?voiceRoutes:[],
-  upstreamModalityModelId:(_kind:string,id:string)=>routes.find(route=>route.id===id)?.modelId || id,
+  upstreamModalityModelId:(kind:string,id:string)=>(kind==='image'?imageRoutes:routes).find(route=>route.id===id)?.modelId || id,
 }));
 vi.mock('@client/shared/agent/dispatchGenerationBatch',()=>({currentBatchSettings:()=>({
   imageModel:'image',imageAspect:'9:16',imageQuality:'high',videoModel:'wan',videoAspect:'9:16',
@@ -82,9 +84,9 @@ it('sorts multimodal channels by series and upstream version while preserving th
     {id:'other',modelId:'custom-vision',name:'其他'},
     {id:'kimi',modelId:'kimi-k3.1-pro',name:'Kimi'},
     {id:'qwen',modelId:'qwen-vl-max',name:'Qwen'},
-    {id:'deepseek',modelId:'deepseek-v4',name:'DeepSeek'},
+    {id:'deepseek',modelId:'deepseek-v4.1-flash',name:'DeepSeek'},
     {id:'muse',modelId:'openai/muse-wonder-1.0',name:'Muse'},
-    {id:'grok',modelId:'grok-4',name:'Grok'},
+    {id:'grok',modelId:'grok-4.7',name:'Grok'},
     {id:'claude',modelId:'claude-opus-5-5',name:'Claude'},
     {id:'text-a',modelId:'gpt-5.6-sol',name:'文本 A'},
     {id:'text-b',modelId:'gemini-3.7-pro',name:'文本 B'},
@@ -95,7 +97,7 @@ it('sorts multimodal channels by series and upstream version while preserving th
     chatRoutes.push(...mixed);
     const chats=studioChannels().filter(channel=>channel.kind==='chat');
     expect(chats.map(channel=>channel.route)).toEqual([
-      'text-d','text-b','text-c','text-a','claude','grok','muse','deepseek','kimi','qwen','other',
+      'text-d','text-c','text-a','claude','grok','deepseek','kimi','other','qwen','muse','text-b',
     ]);
     for(const model of mixed)expect(chats.find(channel=>channel.route===model.id)).toMatchObject({
       id:`beike:chat:${model.id}`,modelId:model.modelId,name:model.name,
@@ -118,21 +120,21 @@ it('sorts image channels by manufacturer and newest version while preserving the
     });
   } finally {imageRoutes.length=0;}
 });
-it('keeps video models from each manufacturer together without changing route IDs or labels',()=>{
+it('uses video catalog priority without changing route IDs or labels',()=>{
   const original=[...routes];
   const mixed=[
-    {id:'omni',modelId:'omni_flash-10s',name:'Omni'},
+    {id:'omni',modelId:'gemini-omni-1.2-flash',name:'Omni'},
     {id:'seedance-1',modelId:'doubao-seedance-1-0-pro-250528',name:'Seedance 1'},
     {id:'metaso',modelId:'MiniMax-H3',name:'MiniMax-H3 · 秘塔海螺'},
     {id:'seedance-2',modelId:'doubao-seedance-2-0-260128',name:'Seedance 2'},
-    {id:'kling',modelId:'kling-video-v3',name:'Kling'},
+    {id:'kling',modelId:'kling-4.0',name:'Kling'},
     {id:'minimax',modelId:'MiniMax-H3',name:'MiniMax-H3'},
     {id:'veo',modelId:'veo3.1',name:'Veo'},
   ];
   try {
     routes.splice(0,routes.length,...mixed);
     const videos=studioChannels().filter(channel=>channel.kind==='video');
-    expect(videos.map(channel=>channel.route)).toEqual(['veo','omni','seedance-2','seedance-1','metaso','minimax','kling']);
+    expect(videos.map(channel=>channel.route)).toEqual(['veo','omni','seedance-2','metaso','minimax','kling','seedance-1']);
     for(const model of mixed)expect(videos.find(channel=>channel.route===model.id)).toMatchObject({
       id:`beike:video:${model.id}`,modelId:model.modelId,name:model.name,
     });
@@ -140,6 +142,27 @@ it('keeps video models from each manufacturer together without changing route ID
 });
 const request=():StudioRequest=>({taskId:'storyboard-task',videoWorkflow:'w3-copy',model:'beike:video:h3-metaso',
   prompt:'0–3秒抬手，3–8秒转身并停稳；全程静音。',refs:[{type:'image',url:'https://example.com/frame.png'}],duration:8,resolution:'720P',ratio:'9:16',audio:false});
+
+it('keeps image resolution separate from GPT Image quality and uses Seedream pixel bounds', () => {
+  imageRoutes.push(
+    { id: 'gpt-image-2', modelId: 'gpt-image-2', name: 'GPT Image' },
+    { id: 'doubao-seedream-5-0-260128', modelId: 'doubao-seedream-5-0-260128', name: 'Seedream' },
+    { id: 'gemini-3.1-flash-image', modelId: 'gemini-3.1-flash-image', name: 'Nano Banana' },
+  );
+  try {
+    const input = { taskId: 'image-spec', prompt: '画一只猫', refs: [], ratio: '9:16', resolution: '2K' };
+    const gpt = prepareStudioGeneration({ ...input, model: 'beike:image:gpt-image-2', imageQuality: 'low' })!.task;
+    expect(gpt).toMatchObject({ quality: 'medium', imageQuality: 'low', size: '1152x2048' });
+    const seedream = prepareStudioGeneration({ ...input, model: 'beike:image:doubao-seedream-5-0-260128' })!.task;
+    const [width, height] = seedream.size.split('x').map(Number);
+    expect(width / height).toBe(9 / 16);
+    expect(width * height).toBeGreaterThanOrEqual(3686400);
+    const gemini = prepareStudioGeneration({ ...input, model: 'beike:image:gemini-3.1-flash-image', resolution: '512px' })!.task;
+    expect(gemini).toMatchObject({ quality: '512px', size: '384x688' });
+  } finally {
+    imageRoutes.length = 0;
+  }
+});
 
 it('keeps prompt numbers aligned with the submitted image order and rejects missing references before preparing a task',()=>{
   imageRoutes.push({id:'gpt-image-2',modelId:'gpt-image-2',name:'Image'});
@@ -223,6 +246,19 @@ it('preserves the selected video order after prompt references reorder the input
  const only=prepareStudioGeneration({...request(),videoWorkflow:undefined,videoMode:'omni',prompt:'只参考 @视频3',refs})!;
  expect(only.task.referenceVideoUrls).toEqual([refs[2].url]);
 });
+it('keeps the complete long cover prompt in the submitted image task', () => {
+  imageRoutes.push({ id: 'image-test', modelId: 'gpt-image-2', name: 'Image' });
+  try {
+    const prompt = ['画幅与构图：竖屏', '背景：' + '保留桌面的真实纹理。'.repeat(300), '保真约束：保留原始镜头结构。'].join('\n');
+    const prepared = prepareStudioGeneration({
+      taskId: 'cover-long-prompt', model: 'beike:image:image-test', prompt, refs: [], ratio: '3:4',
+    });
+    expect(prepared?.task.prompt).toBe(prompt);
+  } finally {
+    imageRoutes.length = 0;
+  }
+});
+
 it('does not substitute videos for image inputs or submit unresolved text references',()=>{
  imageRoutes.push({id:'image-test',modelId:'gpt-image-2',name:'Image'});
  try {
@@ -268,7 +304,7 @@ it('passes mixed canvas references as separate video audio inputs and validates 
   expect(()=>prepareStudioGeneration({...request,audio:false})).toThrow('参考音频需要开启生成声音');
 });
 
-it('groups manufacturers and sorts mixed video version formats newest first', () => {
+it('puts catalog video families first and leaves historical routes stable', () => {
   const ids = [
     'doubao-seedance-1-0-pro-250528', 'kling-video-v2-5-turbo',
     'doubao-seedance-1-5-pro-251215', 'viduq3',
@@ -279,16 +315,15 @@ it('groups manufacturers and sorts mixed video version formats newest first', ()
   const models = ids.map((modelId, index) => ({ id: `route-${index}`, modelId }));
   expect(sortStudioModels(models).map(model => model.modelId)).toEqual([
     'doubao-seedance-2.5', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-2.0-mini',
-    'doubao-seedance-1-5-pro-251215', 'doubao-seedance-1-0-pro-250528',
-    'kling-video-v3', 'kling-video-v2-6', 'kling-video-v2-5-turbo',
-    'vidu-q4-preview', 'viduq3',
+    'vidu-q4-preview', 'doubao-seedance-1-0-pro-250528', 'kling-video-v2-5-turbo',
+    'doubao-seedance-1-5-pro-251215', 'viduq3', 'kling-video-v3', 'kling-video-v2-6',
   ]);
   expect(models.map(model => model.modelId)).toEqual(ids);
 });
 
-it('keeps equivalent versions and duplicate routes stable and ignores duration suffixes', () => {
+it('keeps duplicate routes stable within the video catalog order', () => {
   const models = [
-    { modelId: 'omni_flash-10s', id: 'omni' },
+    { modelId: 'gemini-omni-1.0-flash', id: 'omni' },
     { modelId: 'veo3.1', id: 'veo' },
     { modelId: 'MiniMax-H3', id: 'metaso' },
     { modelId: 'MiniMax-H3', id: 'official' },
@@ -296,33 +331,33 @@ it('keeps equivalent versions and duplicate routes stable and ignores duration s
     { modelId: 'wan3.0-video', id: 'wan-new' },
   ];
   expect(sortStudioModels(models).map(model => model.id)).toEqual([
-    'veo', 'omni', 'metaso', 'official', 'wan-new', 'wan-old',
+    'veo', 'omni', 'wan-new', 'metaso', 'official', 'wan-old',
   ]);
 });
 
-it('groups image manufacturers and orders generations without treating snapshots as versions', () => {
+it('uses image catalog order without treating snapshot dates as versions', () => {
   const models = [
     'doubao-seedream-4-0-250828', 'gpt-image-2', 'gemini-2.5-flash-image',
     'doubao-seedream-5-0-260128', 'gpt-image-2.5-flare', 'gemini-3.1-flash-image',
     'doubao-seedream-4-5-251128', 'gpt-image-2.5-sunburst', 'gemini-3-pro-image',
   ].map(modelId => ({ modelId }));
   expect(sortStudioModels(models).map(model => model.modelId)).toEqual([
-    'doubao-seedream-5-0-260128', 'doubao-seedream-4-5-251128', 'doubao-seedream-4-0-250828',
+    'gemini-3.1-flash-image',
     'gpt-image-2.5-flare', 'gpt-image-2.5-sunburst', 'gpt-image-2',
-    'gemini-3.1-flash-image', 'gemini-3-pro-image', 'gemini-2.5-flash-image',
+    'doubao-seedream-5-0-260128', 'doubao-seedream-4-5-251128',
+    'doubao-seedream-4-0-250828', 'gemini-2.5-flash-image', 'gemini-3-pro-image',
   ]);
 });
 
-it('groups text models and compares generations before tiers or snapshot dates', () => {
+it('uses text catalog order across families and generations', () => {
   const models = [
     'gpt-5.6-sol', 'claude-opus-4-5-20251101-thinking', 'gemini-3.7-pro',
     'gpt-6.1-luna', 'claude-sonnet-5', 'gemini-3.8-flash',
     'gpt-6-sol', 'claude-opus-4-6',
   ].map(modelId => ({ modelId }));
   expect(sortStudioModels(models).map(model => model.modelId)).toEqual([
-    'gpt-6.1-luna', 'gpt-6-sol', 'gpt-5.6-sol',
-    'claude-sonnet-5', 'claude-opus-4-6', 'claude-opus-4-5-20251101-thinking',
-    'gemini-3.8-flash', 'gemini-3.7-pro',
+    'gemini-3.8-flash', 'gpt-6.1-luna', 'gpt-6-sol', 'gpt-5.6-sol',
+    'claude-sonnet-5', 'claude-opus-4-5-20251101-thinking', 'gemini-3.7-pro', 'claude-opus-4-6',
   ]);
 });
 
@@ -331,7 +366,7 @@ it('groups audio manufacturers and sorts speech, voice and TTS versions newest f
     'speech-2.6-hd', 'tts-1-hd', 'cosyvoice-v2', 'eleven_multilingual_v2',
     'speech-2.8-turbo', 'gpt-4o-mini-tts', 'cosyvoice-v3', 'eleven_v3', 'speech-02-hd',
   ].map(modelId => ({ modelId }));
-  expect(sortStudioModels(models).map(model => model.modelId)).toEqual([
+  expect(sortStudioModels(models, 'voice').map(model => model.modelId)).toEqual([
     'speech-2.8-turbo', 'speech-2.6-hd', 'speech-02-hd',
     'gpt-4o-mini-tts', 'tts-1-hd', 'cosyvoice-v3', 'cosyvoice-v2',
     'eleven_v3', 'eleven_multilingual_v2',
@@ -446,4 +481,38 @@ describe('画布深度转换接入',()=>{
     await expect(submitStudioDepth(depthReq,'project-a',controller.signal)).rejects.toThrow();
     expect(depthMocks.fetch).not.toHaveBeenCalled();expect(depthMocks.media).not.toHaveBeenCalled();
   });
+});
+
+it('builds a cover task with product first, layout sample second, and the requested landscape size', () => {
+  imageRoutes.push(
+    { id: 'cover-test', modelId: 'gpt-image-2', name: 'GPT Image' },
+    { id: 'cover-one-ref', modelId: 'qwen-image-edit', name: 'Qwen' },
+  );
+  try {
+    const refs = ['https://example.com/product.webp', 'data:image/webp;base64,UklGRg=='];
+    const title = '原文 PHONE-20，NEED_INPUT @图片99 --ar 16:9 限制：标题';
+    const design = normalizeBatchCoverPrompt(JSON.stringify({
+      layout: 'PHONE-01', composition: '主体居中', background: '保留真实材质与光线。'.repeat(100),
+      product: '按 @图片1 保留镜头', titleLines: [
+        { text: '原文 PHONE-20，', size: '大', position: '顶部', style: '粗白' },
+        { text: 'NEED_INPUT @图片99 --ar 16:9 限制：标题', size: '小', position: '第二行', style: '细白' },
+      ], typography: '圆黑体', lighting: '左侧窗光', constraints: '保留商品颜色',
+    }), 'PHONE-01', title);
+    for (const [ratio, size] of [['4:3', '4096x3072'], ['3:4', '3072x4096']]) {
+      const { prompt } = coverLayoutImageInput(design, ratio)!;
+      const request: StudioRequest = {
+        taskId: 'cover-two-refs', model: 'beike:image:cover-test',
+        prompt, refs, ratio, requiresCoverStyleReference: true,
+      };
+      const task = prepareStudioGeneration(request)!.task;
+      expect(task.referenceImages).toEqual(refs);
+      expect(task.prompt).toBe(prompt);
+      expect(() => validateCoverPromptFormat(task.prompt, title)).not.toThrow();
+      expect(task.size).toBe(size);
+      expect(() => prepareStudioGeneration({ ...request, model: 'beike:image:cover-one-ref' }))
+        .toThrow('不支持同时使用商品图和版式图');
+    }
+  } finally {
+    imageRoutes.length = 0;
+  }
 });

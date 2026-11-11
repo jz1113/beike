@@ -2,23 +2,27 @@ import type { GenerationTask, MediaAttachment } from '@client/store/appStoreType
 import type { GenerationPromptEntry } from '@shared/domain/assistant/generationPrompts';
 import { GENERATION_BATCH_LIMIT } from '@shared/domain/assistant/generationPrompts';
 import { buildPromptBarGenerationTasks, type PromptBarSubmitInput } from '@client/shared/prompt-bar/promptBarSubmit';
-import { resolveGptImageSizeForModel } from '@shared/domain/models/model-adapters/image/gptImageSafeSizes';
-import { isGeminiImageModel, resolveGeminiPixelSize } from '@shared/domain/models/model-adapters/image/geminiImageSizes';
+import { calculateImageDimensions } from '@client/shared/prompt-bar/promptBarDisplay';
+import { ALL_IMAGE_RATIO_ITEMS, IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
+import { getGatewayClientBaseUrl, getModelCredentials } from '@client/shared/api/gatewayClient';
+import { getVideoModelById } from '@shared/domain/media/video';
+import { compareModelDisplayOrder } from '@shared/domain/models/modelCatalog';
 import { upstreamModalityModelId, modalityPickerSelections } from '@shared/domain/models/modalityStorage';
 import { getEnabledImageModelsFromSettings, getEnabledVideoModelsFromSettings, readWorkflowModelsFromStorage } from '@shared/domain/models/workflowModels';
-import { resolveVideoMode } from '@shared/domain/media/videoCapabilities';
+import { resolveVideoMode, resolveVideoParameters } from '@shared/domain/media/videoCapabilities';
+import { imageCapabilities, resolveImageAspect, resolveImageGenerationQuality, resolveImageOutputTier, type ImageOutputTier } from '@shared/domain/media/imageCapabilities';
 import { prepareAssistantImagePrompt, prepareBatchVideoPrompt } from './batchReferences';
 
-export interface BatchPromptDraft extends GenerationPromptEntry { referenceIndexes?: number[]; referenceAudioUrls?: string[] }
+export interface BatchPromptDraft extends GenerationPromptEntry { referenceIndexes?: number[]; referenceAudioUrls?: string[]; imageSize?: string; imageResolution?: '512px' }
 export interface BatchGenerationSettings {
   imageModel: string;
   imageAspect: string;
-  imageQuality: 'high' | 'medium' | 'low';
+  imageQuality: ImageOutputTier;
   imageQualityTier?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   imageInferenceStrength?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   videoModel: string;
   videoAspect: string;
-  videoResolution: '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
+  videoResolution: '360P' | '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
   videoDuration: number;
   videoRefMode: string;
   videoGenerateAudio?: boolean;
@@ -30,21 +34,33 @@ export function availableBatchModels(kind: 'image' | 'video') {
   if (synced) return synced.map(item => ({ id: item.id, name: item.name, modelId: item.modelId }));
   const settings = readWorkflowModelsFromStorage();
   const models = kind === 'image' ? getEnabledImageModelsFromSettings(settings) : getEnabledVideoModelsFromSettings(settings);
-  return models.map(item => ({ id: item.id, name: item.name || item.id, modelId: item.id }));
+  return models.toSorted((a, b) => compareModelDisplayOrder(a.id, b.id))
+    .map(item => ({ id: item.id, name: item.name || item.id, modelId: item.id }));
 }
 
-function imageSize(aspect: string, model: string, quality: string) {
-  if (/gpt-image/i.test(model)) return resolveGptImageSizeForModel(aspect, model, quality as 'high' | 'medium' | 'low');
-  if (isGeminiImageModel(model)) {
-    return aspect === 'smart' || aspect === 'auto'
-      ? 'auto'
-      : resolveGeminiPixelSize(aspect, model, quality);
-  }
-  const normalized = aspect === 'smart' || aspect === 'auto' ? '3:4' : aspect;
-  const [a, b] = normalized.split(':').map(Number);
-  if (!a || !b) throw new Error('图片比例无效');
-  const side = quality === 'high' ? 1536 : quality === 'low' ? 768 : 1024;
-  return `${Math.round(side * a / Math.max(a, b))}x${Math.round(side * b / Math.max(a, b))}`;
+export function batchImageParameters(settings: BatchGenerationSettings, aspect = settings.imageAspect, tier = settings.imageQuality) {
+  const model = upstreamModalityModelId('image', settings.imageModel) || settings.imageModel;
+  const credentials = getModelCredentials(settings.imageModel);
+  const caps = imageCapabilities(model, credentials.protocol, credentials.baseUrl);
+  const ratios = caps.aspectRatios ?? IMAGE_RATIO_ITEMS.map(item => item.id);
+  const requestedAspect = aspect === 'auto' ? 'smart' : aspect;
+  return {
+    model, caps, ratios,
+    aspect: resolveImageAspect(ratios.includes(requestedAspect) ? requestedAspect : '3:4', caps),
+    tier: resolveImageOutputTier(tier, caps),
+    quality: resolveImageGenerationQuality(settings.imageQualityTier, caps),
+  };
+}
+
+export function batchVideoParameters(settings: BatchGenerationSettings, entry?: BatchPromptDraft, prepared?: ReturnType<typeof prepareBatchVideoPrompt>) {
+  const model = upstreamModalityModelId('video', settings.videoModel) || settings.videoModel;
+  const baseUrl = getGatewayClientBaseUrl(settings.videoModel);
+  const mode = settings.videoRefMode;
+  const params = resolveVideoParameters(model, {
+    mode, aspect: entry?.aspect || settings.videoAspect,
+    resolution: settings.videoResolution, duration: entry?.duration ?? settings.videoDuration,
+  }, baseUrl, { images: prepared?.imageUrls.length, videos: prepared && prepared.urls.length - prepared.imageUrls.length });
+  return { ...params, model, baseUrl, audioSupported: getVideoModelById(model, baseUrl)?.audioSupport === 'controllable' };
 }
 
 /** All entries are prepared before any state mutation or network dispatch. */
@@ -65,20 +81,31 @@ export function buildGenerationPromptBatch(entries: BatchPromptDraft[], media: M
       const videoPrepared = video ? prepareBatchVideoPrompt(entry.prompt, media, entry.referenceIndexes) : undefined;
       const prepared = videoPrepared || prepareAssistantImagePrompt(entry.prompt, imageMedia);
       const imageRefs = videoPrepared?.imageUrls || prepared.urls;
-      const resolvedModel = upstreamModalityModelId(video ? 'video' : 'image', model) || model;
-      const mode = video
-        ? resolveVideoMode(resolvedModel, settings.videoRefMode, imageRefs.length, prepared.urls.length - imageRefs.length)
+      const videoParams = video ? batchVideoParameters(settings, entry, videoPrepared) : undefined;
+      const imageParams = video ? undefined : batchImageParameters(settings, entry.aspect, entry.imageResolution);
+      // Managed canvas has already validated its explicit mode and output settings.
+      const mode = videoParams
+        ? validateModels ? videoParams.mode : resolveVideoMode(videoParams.model, settings.videoRefMode, imageRefs.length, prepared.urls.length - imageRefs.length, videoParams.baseUrl)
         : 'omni';
-      const aspect = entry.aspect || (video ? settings.videoAspect : settings.imageAspect);
+      const aspect = (validateModels ? videoParams?.aspect : undefined) ?? imageParams?.aspect ?? entry.aspect ?? settings.videoAspect;
+      const imageResolution = imageParams?.tier ?? settings.imageQuality;
+      const ratio = ALL_IMAGE_RATIO_ITEMS.find(item => item.id === aspect) ?? ALL_IMAGE_RATIO_ITEMS[0];
+      const sizeStr = video ? aspect : entry.imageSize ?? calculateImageDimensions({
+        quickModel: imageParams?.model, quickAspectId: aspect, quickQuality: imageResolution, baseRatio: ratio,
+      }).sizeStr;
       const input: PromptBarSubmitInput = {
         quickGenMode: video ? 'video' : 'image', quickPrompt: prepared.prompt.replace(/--ar\s+\d+:\d+/g, '').trim(),
         quickRefImages: prepared.urls, quickVideoAudioRefs: entry.referenceAudioUrls, activeSubjects: [], allSubjects: [], quickVideoRefMode: mode,
         quickVideoFirstFrame: imageRefs[0] || null, quickVideoLastFrame: imageRefs.length >= 2 ? imageRefs.at(-1)! : null,
         quickVideoMultiFrames: imageRefs, quickCount: 1, quickVideoCount: 1,
         quickModel: settings.imageModel, quickVideoModel: settings.videoModel,
-        sizeStr: video ? aspect : imageSize(aspect, resolvedModel, settings.imageQuality), quickQuality: settings.imageQuality,
-        quickVideoAspectId: aspect, quickVideoResolution: settings.videoResolution, quickVideoDuration: entry.duration ?? settings.videoDuration,
-        quickVideoGenerateAudio: settings.videoGenerateAudio,
+        sizeStr, quickQuality: imageResolution,
+        imageQuality: imageParams?.quality,
+        quickVideoAspectId: aspect, quickVideoResolution: (validateModels ? videoParams?.resolution : undefined) ?? settings.videoResolution,
+        quickVideoDuration: (validateModels ? videoParams?.duration : undefined) ?? entry.duration ?? settings.videoDuration,
+        quickVideoGenerateAudio: videoParams && validateModels
+          ? videoParams.audioSupported ? settings.videoGenerateAudio ?? Boolean(entry.referenceAudioUrls?.length) : undefined
+          : settings.videoGenerateAudio,
         quickVideoContextIrEnabled: settings.videoContextIrEnabled ?? true,
         currentView: 'generate', hasImageModels: true, hasVideoModels: true, quickDepthStyle: 'mocap', quickDepthQuality: 'standard',
       };
@@ -88,7 +115,6 @@ export function buildGenerationPromptBatch(entries: BatchPromptDraft[], media: M
       return {
         ...result.tasks[0],
         ...(video ? {} : {
-          imageQuality: settings.imageQualityTier || settings.imageQuality,
           ...(settings.imageInferenceStrength ? { inferenceStrength: settings.imageInferenceStrength } : {}),
         }),
         id: `prompt-task-${crypto.randomUUID()}`, batchId, shotNo: index + 1, title: entry.title, progress: '0%',

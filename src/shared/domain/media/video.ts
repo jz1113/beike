@@ -19,7 +19,7 @@ export interface VideoGenModel {
   badge?: string;
   description: string;
   supportedDurations: number[]; // e.g. [4, 5, 8, 10]
-  supportedResolutions: ('480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K')[];
+  supportedResolutions: ('360P' | '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K')[];
   supportedAspectRatios: string[];
   audioSupport?: VideoAudioSupportType;
 }
@@ -77,7 +77,7 @@ export const VIDEO_REF_MODES: VideoRefModeItem[] = [
   { id: 'motion_control', name: '动作控制', desc: '用一张人物图片复现参考视频中的动作' },
 ];
 
-export const VIDEO_RESOLUTIONS: ('480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K')[] = ['480P', '540P', '720P', '768P', '1080P', '2K', '4K'];
+export const VIDEO_RESOLUTIONS: ('360P' | '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K')[] = ['360P', '480P', '540P', '720P', '768P', '1080P', '2K', '4K'];
 export type VideoResolution = (typeof VIDEO_RESOLUTIONS)[number];
 export const VIDEO_DURATIONS: number[] = [4, 5, 8, 10, 15, 30];
 

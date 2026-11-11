@@ -1,5 +1,5 @@
 import { COMFY_MODEL_PRICING } from '@client/shared/utils/modelPricing.data';
-import { getApprovedModel } from '@shared/domain/models/modelCatalog';
+import { compareModelDisplayOrder, getSelectableModel } from '@shared/domain/models/modelCatalog';
 import { channelDisplayName, type TextProtocol } from '@shared/domain/models/deepseek';
 import { reconcileStoredWorkflowDefaults } from '@shared/domain/models/workflowModelDefaults';
 import { isValidWorkflowModelList } from '@shared/domain/models/workflowModelStorage';
@@ -155,19 +155,18 @@ export function gatewayRouteId(id: string, channel: GatewayChannel): string {
   return channel === 'openai' ? openAIModelRouteId(canonical) : canonical;
 }
 
-export function isSupportedGatewayModel(id: string, channel: GatewayChannel): boolean {
-  const approved = getApprovedModel(id);
-  return Boolean(approved && (channel === 'openai' ? approved.capability === 'multimodal' : true));
+export function isSupportedGatewayModel(id: string): boolean {
+  return Boolean(getSelectableModel(id));
 }
 
-export function parseGatewayModels(value: unknown, channel: GatewayChannel): GatewayModelItem[] {
+export function parseGatewayModels(value: unknown): GatewayModelItem[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
   const result: GatewayModelItem[] = [];
   for (const item of value) {
     if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !item.id.trim()) continue;
     const id = item.id.trim();
-    if (seen.has(id.toLowerCase())) continue;
+    if (seen.has(id.toLowerCase()) || !isSupportedGatewayModel(id) || item.supported === false) continue;
     seen.add(id.toLowerCase());
     const caps = inferWorkflowCapabilitiesFromId(id);
     const category = ['text', 'image', 'video', 'audio', 'embedding'].includes(item.category) ? item.category : caps.isImage ? 'image' : caps.isVideo ? 'video' : caps.isEmbedding ? 'embedding' : caps.isAudio ? 'audio' : 'text';
@@ -179,7 +178,7 @@ export function parseGatewayModels(value: unknown, channel: GatewayChannel): Gat
       isVideo: typeof item.isVideo === 'boolean' ? item.isVideo : caps.isVideo,
       isAudio: typeof item.isAudio === 'boolean' ? item.isAudio : caps.isAudio,
       isEmbedding: typeof item.isEmbedding === 'boolean' ? item.isEmbedding : caps.isEmbedding,
-      isTool: item.isTool === true, supported: item.supported !== false && isSupportedGatewayModel(id, channel),
+      isTool: item.isTool === true, supported: true,
       owned_by: typeof item.owned_by === 'string' ? item.owned_by : undefined, isCustom: item.isCustom === true });
   }
   return result;
@@ -195,7 +194,7 @@ export function mergeGatewayModels(previous: WorkflowModel[], candidates: Gatewa
   const models = repairWorkflowModelsForSettings(previous);
   const seen = new Set(models.map(model => workflowModelRouteId(model).toLowerCase()));
   let addedCount = 0;
-  for (const candidate of parseGatewayModels(candidates, channel)) {
+  for (const candidate of parseGatewayModels(candidates)) {
     if (candidate.supported === false) continue;
     const model = repairWorkflowModelsForSettings([gatewayModelToWorkflowModel(candidate, channel)])[0];
     if (!model || seen.has(workflowModelRouteId(model).toLowerCase())) continue;
@@ -208,7 +207,7 @@ export function mergeGatewayModels(previous: WorkflowModel[], candidates: Gatewa
 
 export type ModelChannel = NonNullable<WorkflowModel['channel']>;
 export type CapabilityFilter = 'all' | 'text' | 'multimodal' | 'image' | 'video';
-export type ModelDisplaySort = 'configured' | 'name' | 'price';
+export type ModelDisplaySort = 'catalog' | 'configured' | 'name' | 'price';
 export const MODEL_CHANNELS: { id: ModelChannel; name: string; serviceId: string }[] = [
   { id: 'comfly', name: channelDisplayName('comfly'), serviceId: 'comfly_gateway' },
   { id: 'deepseek', name: channelDisplayName('deepseek'), serviceId: 'deepseek_official' },
@@ -236,6 +235,7 @@ export function selectModelRows(models: readonly WorkflowModel[], options: {
     && (options.status === 'all' || (model.enabled !== false) === (options.status === 'enabled'))
     && (!query || [model.id, model.name, channelName(modelChannel(model))].some(value => value?.toLowerCase().includes(query)))
   ).sort((a, b) => {
+    if (options.sort === 'catalog') return compareModelDisplayOrder(a.id, b.id);
     if (options.sort === 'name') return (a.name || a.id).localeCompare(b.name || b.id, 'zh-CN');
     if (options.sort !== 'price') return 0;
     const score = (m: WorkflowModel) => {

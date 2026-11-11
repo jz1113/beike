@@ -206,6 +206,7 @@ export function CanvasScriptParseNode({
         <div
           role="toolbar"
           aria-label="脚本解析操作栏"
+          data-tapnow-float-toolbar=""
           data-canvas-pin-toolbar=""
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}

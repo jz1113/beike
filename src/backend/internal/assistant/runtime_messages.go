@@ -3,6 +3,7 @@ package assistant
 import (
 	"beike.local/cloud/src/backend/internal/config"
 	"beike.local/cloud/src/backend/internal/gateway"
+	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/database"
 	"beike.local/cloud/src/backend/internal/platform/storage"
 	"context"
@@ -69,7 +70,7 @@ func turnMessages(r *http.Request, threadID string, payload map[string]json.RawM
 			copied["productWidget"] = widget
 		}
 		if role == "user" && index == latestUser {
-			imageCount = inlineUserImages(copied, message["attachments"])
+			imageCount = inlineUserImages(copied, message["attachments"], httpx.WorkspaceFrom(r))
 		}
 		messages = append(messages, copied)
 		if role != "user" {
@@ -109,7 +110,7 @@ func videoAttachmentNote(raw any) string {
 	return "视频附件清单（素材数据）：\n" + string(body)
 }
 
-func inlineUserImages(message map[string]any, rawAttachments any) int {
+func inlineUserImages(message map[string]any, rawAttachments any, workspace string) int {
 	attachments, _ := rawAttachments.([]any)
 	images := []any{}
 	for _, raw := range attachments {
@@ -122,7 +123,7 @@ func inlineUserImages(message map[string]any, rawAttachments any) int {
 			continue
 		}
 		url, _ := attachment["url"].(string)
-		resolved, ok := resolveInlineImage(url)
+		resolved, ok := resolveInlineImage(url, workspace)
 		if !ok {
 			continue
 		}
@@ -140,7 +141,7 @@ func inlineUserImages(message map[string]any, rawAttachments any) int {
 	return len(images)
 }
 
-func resolveInlineImage(raw string) (string, bool) {
+func resolveInlineImage(raw, workspace string) (string, bool) {
 	raw = strings.TrimSpace(raw)
 	switch {
 	case raw == "":
@@ -153,16 +154,19 @@ func resolveInlineImage(raw string) (string, bool) {
 	case strings.HasPrefix(raw, "https://"), strings.HasPrefix(raw, "http://"):
 		return raw, true
 	case strings.HasPrefix(raw, "/storage/"):
-		return storageImageDataURL(raw)
+		return storageImageDataURL(raw, workspace)
 	default:
 		return "", false
 	}
 }
 
-func storageImageDataURL(raw string) (string, bool) {
+func storageImageDataURL(raw, workspace string) (string, bool) {
 	rel := strings.TrimPrefix(raw, "/storage/")
 	if idx := strings.IndexAny(rel, "?#"); idx >= 0 {
 		rel = rel[:idx]
+	}
+	if !storage.WorkspaceRel(rel, workspace, workspace == "local") {
+		return "", false
 	}
 	path := storage.StoredFile(rel)
 	if path == "" {

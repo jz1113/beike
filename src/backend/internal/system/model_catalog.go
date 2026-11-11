@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -15,18 +16,19 @@ import (
 )
 
 type catalogModel struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	ShortName  string `json:"shortName"`
-	Category   string `json:"category"`
-	IsVision   bool   `json:"isVision"`
-	IsMulti    bool   `json:"isMultimodal"`
-	IsThinking bool   `json:"isThinking"`
-	IsImage    bool   `json:"isImage"`
-	IsVideo    bool   `json:"isVideo"`
-	Provider   string `json:"provider"`
-	OwnedBy    string `json:"owned_by"`
-	Capability string `json:"-"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	ShortName   string `json:"shortName"`
+	Category    string `json:"category"`
+	IsVision    bool   `json:"isVision"`
+	IsMulti     bool   `json:"isMultimodal"`
+	IsThinking  bool   `json:"isThinking"`
+	IsImage     bool   `json:"isImage"`
+	IsVideo     bool   `json:"isVideo"`
+	Provider    string `json:"provider"`
+	OwnedBy     string `json:"owned_by"`
+	Capability  string `json:"-"`
+	displayRank int
 }
 
 var catalogCache struct {
@@ -34,6 +36,39 @@ var catalogCache struct {
 	root   string
 	models []catalogModel
 	byID   map[string]catalogModel
+	rules  []catalogSelectionRule
+}
+
+type catalogSelectionRule struct {
+	pattern *regexp.Regexp
+	profile catalogModel
+}
+
+func loadCatalogSelectionRules(root string, byID map[string]catalogModel) []catalogSelectionRule {
+	raw, err := os.ReadFile(filepath.Join(root, "src/shared/domain/models/model-catalog/selectionRules.json"))
+	if err != nil {
+		return nil
+	}
+	var entries []struct {
+		Profile string `json:"profile"`
+		Pattern string `json:"pattern"`
+	}
+	if json.Unmarshal(raw, &entries) != nil {
+		return nil
+	}
+	rules := make([]catalogSelectionRule, 0, len(entries))
+	for _, entry := range entries {
+		profile, ok := byID[strings.ToLower(entry.Profile)]
+		if entry.Profile == "voice" {
+			profile = catalogModel{Category: "audio", Capability: "voice"}
+			ok = true
+		}
+		pattern, err := regexp.Compile("(?i)^(?:" + entry.Pattern + ")$")
+		if ok && err == nil {
+			rules = append(rules, catalogSelectionRule{pattern: pattern, profile: profile})
+		}
+	}
+	return rules
 }
 
 func loadApprovedModels(root string) []catalogModel {
@@ -57,21 +92,54 @@ func loadApprovedModels(root string) []catalogModel {
 	catalogCache.root = root
 	catalogCache.models = models
 	catalogCache.byID = byID
+	catalogCache.rules = loadCatalogSelectionRules(root, byID)
 	return models
 }
 
-func approvedModel(root, id string) (catalogModel, bool) {
+func selectableCatalogModel(root, id string) (catalogModel, bool) {
 	loadApprovedModels(root)
 	catalogCache.Lock()
 	defer catalogCache.Unlock()
-	model, ok := catalogCache.byID[strings.ToLower(strings.TrimSpace(id))]
-	if ok {
+	leaf := strings.TrimSpace(id)
+	if slash := strings.LastIndex(leaf, "/"); slash >= 0 {
+		leaf = leaf[slash+1:]
+	}
+	if len(leaf) > 4 && strings.EqualFold(leaf[:4], "net-") {
+		leaf = leaf[4:]
+	}
+	for rank, rule := range catalogCache.rules {
+		if !rule.pattern.MatchString(leaf) {
+			continue
+		}
+		if model, ok := catalogCache.byID[strings.ToLower(leaf)]; ok {
+			model.displayRank = rank
+			return model, true
+		}
+		model := rule.profile
+		model.ID, model.Name, model.ShortName = id, id, id
+		model.displayRank = rank
 		return model, true
 	}
-	if slash := strings.LastIndex(id, "/"); slash >= 0 {
-		model, ok = catalogCache.byID[strings.ToLower(id[slash+1:])]
+	return catalogModel{}, false
+}
+
+func selectableCatalogModels(root string) []catalogModel {
+	models := []catalogModel{}
+	for _, entry := range loadApprovedModels(root) {
+		if model, ok := selectableCatalogModel(root, entry.ID); ok && !falOnlyCatalogModel(model.ID) {
+			models = append(models, model)
+		}
 	}
-	return model, ok
+	sortCatalogModels(models)
+	return models
+}
+
+func sortCatalogModels(models []catalogModel) {
+	sort.SliceStable(models, func(i, j int) bool { return models[i].displayRank < models[j].displayRank })
+}
+
+func falOnlyCatalogModel(id string) bool {
+	return id == "gemini-omni-1.0-flash" || id == "gemini-omni-1.2-flash"
 }
 
 var approvedField = regexp.MustCompile(`(?m)^\s*(id|capability|vendor|name|shortName):\s*'([^']*)'`)
@@ -147,6 +215,10 @@ func vendorLabel(vendor string) string {
 		return "Moonshot"
 	case "vidu":
 		return "Shengshu"
+	case "zhipu":
+		return "Zhipu"
+	case "xiaomi":
+		return "Xiaomi"
 	default:
 		return vendor
 	}

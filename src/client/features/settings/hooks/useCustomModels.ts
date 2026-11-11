@@ -22,9 +22,9 @@ import {
   type ComflyPriceMap,
 } from '../model/modelManagement';
 import { createGatewayCatalogActions, cancelGatewayCatalogRequests, type GatewayRequestState } from './gatewayCatalogActions';
-import { APPROVED_MODELS } from '@shared/domain/models/modelCatalog';
+import { listSelectableModels } from '@shared/domain/models/modelCatalog';
 
-const DEFAULT_PRESET_MODELS: WorkflowModel[] = sortMultimodalModelsByPrice(APPROVED_MODELS.map((m) => ({
+const DEFAULT_PRESET_MODELS: WorkflowModel[] = sortMultimodalModelsByPrice(listSelectableModels().filter(model => model.adapter !== 'fal-omni').map((m) => ({
   id: m.id,
   channel: 'comfly',
   name: m.name,

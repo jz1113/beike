@@ -1960,6 +1960,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/models/fal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_api_system_models_fal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/models/fetch": {
         parameters: {
             query?: never;
@@ -6180,6 +6196,24 @@ export interface operations {
         };
     };
     post_api_system_memory_cleanup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 沿用现有 JSON 或二进制响应 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_api_system_models_fal: {
         parameters: {
             query?: never;
             header?: never;

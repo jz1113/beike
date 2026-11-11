@@ -24,7 +24,9 @@ import (
 var veoResourcePath = regexp.MustCompile(`^(.*?/v1/projects/[\w.-]+/locations/[\w-]+/publishers/google)(?:/models(?:/[^/:]+(?::predictLongRunning|:fetchPredictOperation)?)?)?/?$`)
 var veoOperationPath = regexp.MustCompile(`^projects/[\w.-]+/locations/[\w-]+/publishers/google/models/veo-3\.1-(?:fast-)?generate-001/operations/[\w-]+$`)
 
-func veoModel(model string) bool { return regexp.MustCompile(`(?i)^veo-?3\.1`).MatchString(model) }
+func veoModel(model string) bool {
+	return regexp.MustCompile(`(?i)^veo-?3\.1`).MatchString(videoCapabilityModelID(model))
+}
 
 func veoNativeBase(base string) bool {
 	u, err := url.Parse(base)

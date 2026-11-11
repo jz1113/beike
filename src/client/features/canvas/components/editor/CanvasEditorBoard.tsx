@@ -11,52 +11,117 @@ import { CanvasStudioFreeformLayer } from './CanvasStudioFreeformLayer';
 import { CanvasStageNode } from '../stage/CanvasStageNode';
 import { useCanvasFileDrop } from '../../hooks/useCanvasGenerationSync';
 import { useAppTheme } from '@client/shared/hooks/useAppTheme';
-import { nodeBounds } from '../../model/canvasGraph';
+import { canvasNavigationNodes, nodeBounds } from '../../model/canvasGraph';
 import type { CanvasNode, CanvasProject } from '../../model/types';
 import type { AlignmentGuide } from '../../hooks/useCanvasSnapping';
 
-function CanvasMinimap({nodes, pan, zoom, viewportRef, onCenter}: {nodes:CanvasNode[]; pan:{x:number;y:number}; zoom:number; viewportRef:RefObject<HTMLDivElement|null>; onCenter:(x:number,y:number)=>void}) {
+const minimapWidth = 186;
+const minimapHeight = 130;
+const minimapPadding = 12;
+const minimapFrameInset = 7;
+
+function CanvasMinimap({ nodes, pan, zoom, viewportSize, selectedNodeIds, onCenter }: {
+  nodes: CanvasNode[];
+  pan: { x: number; y: number };
+  zoom: number;
+  viewportSize: { width: number; height: number };
+  selectedNodeIds: string[];
+  onCenter: (x: number, y: number, zoomDelta?: number) => void;
+}) {
   const { isDark } = useAppTheme();
-  const [size,setSize]=useState({width:900,height:600});
-  const dragMap = useRef<{ x: number; y: number; scale: number } | null>(null);
-  useEffect(()=>{
-    const element=viewportRef.current;if(!element)return;
-    const update=()=>setSize({width:element.clientWidth,height:element.clientHeight});
-    update();const observer=new ResizeObserver(update);observer.observe(element);return()=>observer.disconnect();
-  },[viewportRef]);
-  const visible=nodes.filter(n=>!n.layerHidden);
-  const viewport={x:-pan.x/zoom,y:-pan.y/zoom,width:size.width/zoom,height:size.height/zoom};
-  const bounds=[viewport,...visible.map(nodeBounds)];
-  const x=Math.min(...bounds.map(b=>b.x))-60,y=Math.min(...bounds.map(b=>b.y))-60;
-  const width=Math.max(...bounds.map(b=>b.x+b.width))-x+60,height=Math.max(...bounds.map(b=>b.y+b.height))-y+60;
-  const scale=Math.min(152/width,92/height), offsetX=(186-width*scale)/2,offsetY=(108-height*scale)/2;
-  const moveViewport = (event: PointerEvent<SVGSVGElement>) => {
-    const map = dragMap.current;
-    if (!map) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    onCenter((event.clientX - rect.left) / map.scale + map.x, (event.clientY - rect.top) / map.scale + map.y);
+  const mapRef = useRef<SVGSVGElement>(null);
+  const visible = useMemo(() => canvasNavigationNodes(nodes), [nodes]);
+  const projection = useMemo(() => {
+    if (!visible.length) return null;
+    const bounds = visible.map(item => item.bounds);
+    const left = Math.min(...bounds.map(box => box.x));
+    const top = Math.min(...bounds.map(box => box.y));
+    const right = Math.max(...bounds.map(box => box.x + box.width));
+    const bottom = Math.max(...bounds.map(box => box.y + box.height));
+    const scale = Math.min(
+      (minimapWidth - minimapPadding * 2) / (right - left),
+      (minimapHeight - minimapPadding * 2) / (bottom - top),
+    );
+    return {
+      scale,
+      x: (minimapWidth - (right - left) * scale) / 2 - left * scale,
+      y: (minimapHeight - (bottom - top) * scale) / 2 - top * scale,
+    };
+  }, [visible]);
+  const viewport = { x: -pan.x / zoom, y: -pan.y / zoom,
+    width: viewportSize.width / zoom, height: viewportSize.height / zoom };
+  const contentInView = visible.some(({ bounds }) =>
+    bounds.x < viewport.x + viewport.width && bounds.x + bounds.width > viewport.x &&
+    bounds.y < viewport.y + viewport.height && bounds.y + bounds.height > viewport.y);
+  const selected = new Set(selectedNodeIds);
+  const viewFrame = projection && {
+    left: Math.max(minimapFrameInset, viewport.x * projection.scale + projection.x),
+    top: Math.max(minimapFrameInset, viewport.y * projection.scale + projection.y),
+    right: Math.min(minimapWidth - minimapFrameInset, (viewport.x + viewport.width) * projection.scale + projection.x),
+    bottom: Math.min(minimapHeight - minimapFrameInset, (viewport.y + viewport.height) * projection.scale + projection.y),
   };
-  return <aside aria-label="画布导航" className="canvas-fixed-ui absolute bottom-[52px] left-4 z-30 hidden overflow-hidden rounded-xl border border-white dark:border-white/10 bg-white/90 dark:bg-[#202022] sm:[@media(min-height:600px)]:block">
-    <svg role="img" aria-label="点击缩略图定位画布" width="186" height="108" className="touch-none cursor-crosshair"
-      onPointerDown={event=>{
-        if (!event.isPrimary || event.button !== 0) return;
-        dragMap.current = { x: x - offsetX / scale, y: y - offsetY / scale, scale };
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !projection) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const { left, top, width, height } = map.getBoundingClientRect();
+      const x = ((event.clientX - left) * minimapWidth / width - projection.x) / projection.scale;
+      const y = ((event.clientY - top) * minimapHeight / height - projection.y) / projection.scale;
+      const units = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? height : 1;
+      const delta = Math.max(-100, Math.min(100, event.deltaY * units));
+      if (delta) onCenter(x, y, -delta * 0.0005);
+    };
+    map.addEventListener('wheel', onWheel, { passive: false });
+    return () => map.removeEventListener('wheel', onWheel);
+  }, [onCenter, projection]);
+
+  const moveViewport = (event: PointerEvent<SVGSVGElement>) => {
+    if (!projection) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * minimapWidth / rect.width;
+    const y = (event.clientY - rect.top) * minimapHeight / rect.height;
+    onCenter((x - projection.x) / projection.scale, (y - projection.y) / projection.scale);
+  };
+
+  return <aside aria-label="画布导航" className="canvas-fixed-ui absolute bottom-[52px] left-4 z-30 hidden overflow-hidden rounded-[10px] border border-zinc-200 bg-zinc-50 dark:border-white/[0.14] dark:bg-[#18181a] sm:[@media(min-height:600px)]:block">
+    <svg ref={mapRef} role="img" aria-label="点击缩略图定位画布" width={minimapWidth} height={minimapHeight}
+      viewBox={`0 0 ${minimapWidth} ${minimapHeight}`} className={projection ? 'block touch-none cursor-crosshair' : 'block'}
+      onPointerDown={event => {
+        if (!projection || !event.isPrimary || event.button !== 0) return;
         event.currentTarget.setPointerCapture(event.pointerId);
-        moveViewport(event);
+        const nodeId = (event.target as Element).getAttribute('data-minimap-node-id');
+        const target = nodeId && visible.find(item => item.node.id === nodeId)?.bounds;
+        if (target) onCenter(target.x + target.width / 2, target.y + target.height / 2);
+        else moveViewport(event);
       }}
-      onPointerMove={event=>{ if(event.currentTarget.hasPointerCapture(event.pointerId)) moveViewport(event); }}
-      onLostPointerCapture={()=>{ dragMap.current = null; }}>
-      {visible.map(node=>{const b=nodeBounds(node);return <rect key={node.id} x={(b.x-x)*scale+offsetX} y={(b.y-y)*scale+offsetY} width={b.width*scale} height={b.height*scale} rx={2} fill={node.type === 'frame' ? (isDark ? '#323238' : '#e4e4e7') : (isDark ? '#71717a' : '#a1a1aa')} stroke={isDark?'#18191c':'#fff'} strokeWidth={0.5}/>;})}
-      <rect x={(viewport.x-x)*scale+offsetX} y={(viewport.y-y)*scale+offsetY}
-        width={viewport.width*scale} height={viewport.height*scale} rx={3} fill="none" stroke="#edb699" />
+      onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) moveViewport(event); }}>
+      {projection ? <>
+        {visible.map(({ node, bounds }) => {
+          const w = bounds.width * projection.scale;
+          const h = bounds.height * projection.scale;
+          return <rect key={node.id} data-minimap-node-id={node.id} x={bounds.x * projection.scale + projection.x - Math.max(0, 3 - w) / 2}
+            y={bounds.y * projection.scale + projection.y - Math.max(0, 3 - h) / 2}
+            width={Math.max(3, w)} height={Math.max(3, h)} rx={0.75}
+            fill={selected.has(node.id) ? (isDark ? '#686871' : '#71717a')
+              : node.type === 'frame' ? (isDark ? '#2d2d32' : '#e4e4e7') : (isDark ? '#3b3b43' : '#a1a1aa')} />;
+        })}
+        {contentInView && viewFrame && <rect pointerEvents="none"
+          x={viewFrame.left} y={viewFrame.top}
+          width={Math.max(0, viewFrame.right - viewFrame.left)}
+          height={Math.max(0, viewFrame.bottom - viewFrame.top)}
+          rx={12} fill="none" stroke={isDark ? '#74747b' : '#71717a'} strokeWidth={1.25} />}
+      </> : <text x={minimapWidth / 2} y={minimapHeight / 2} textAnchor="middle" dominantBaseline="middle" fontSize={11} fill="currentColor" className="text-zinc-500 dark:text-zinc-400">暂无节点</text>}
     </svg>
+    {projection && !contentInView && <span className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-[11px] text-zinc-600 dark:text-zinc-400">当前视野在内容外</span>}
   </aside>;
 }
 
 export interface CanvasEditorBoardProps {
   minimapVisible: boolean;
   alignmentGuides?: AlignmentGuide[];
-  centerAt: (x: number, y: number) => void;
+  centerAt: (x: number, y: number, zoomDelta?: number) => void;
   panForPrompt: (x: number, y: number) => void;
   selectedNodeIds: string[];
   setSelectedNodeIds: (ids: string[]) => void;
@@ -120,6 +185,7 @@ export function CanvasEditorBoard(p: CanvasEditorBoardProps) {
     handleSaveNodeTitle, handleAddNodeToComposer, setLightingModalNode, setMultiAngleModalNode, setPreviewMedia,
     updateNode, deleteNode,
   } = p;
+  const coverWorkflow = currentProject.nativeCommerce?.kind === 'poster';
 
   const contextNode = contextMenu?.projectId === currentProject.id
     ? nodes.find(node => node.id === contextMenu.nodeId && !node.layerHidden)
@@ -379,6 +445,7 @@ export function CanvasEditorBoard(p: CanvasEditorBoardProps) {
           <CanvasStudioFreeformLayer project={currentProject} nodes={nodes} />
           <CanvasConnections
             projectId={currentProject.id}
+            coverWorkflow={coverWorkflow}
             zoom={zoom}
             selectedNodeIds={p.selectedNodeIds}
             visibleBounds={visibleBounds}
@@ -455,7 +522,7 @@ export function CanvasEditorBoard(p: CanvasEditorBoardProps) {
         )}
       </div>
 
-      {!editingDrawingId && p.minimapVisible && <CanvasMinimap nodes={nodes} pan={pan} zoom={zoom} viewportRef={canvasViewportRef} onCenter={p.centerAt} />}
+      {!editingDrawingId && p.minimapVisible && <CanvasMinimap nodes={nodes} pan={pan} zoom={zoom} viewportSize={viewportSize} selectedNodeIds={p.selectedNodeIds} onCenter={p.centerAt} />}
     </CanvasPromptPanContext.Provider>
   );
 }

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ModalityChannelOption, ModalityKind, ModalityModelItem } from '../../model/modalityModelStorage';
-import { MODALITY_TITLES, isModelMatchModality, isModalitySyncCandidate, modalitySyncCandidateKey, compareModelVersionsDesc } from '../../model/modalityMeta';
+import { MODALITY_TITLES, isModalitySyncCandidate, modalitySyncCandidateKey, compareModelVersionsDesc } from '../../model/modalityMeta';
 import { groupModelsByGeneration } from '@shared/domain/models/modelGrouping';
+import { compareModelDisplayOrder } from '@shared/domain/models/modelCatalog';
 import { describeSyncModels, ModalitySyncModelPicker } from './ModalitySyncModelPicker';
 import { ModalitySyncChannelPicker } from './ModalitySyncChannelPicker';
 import { useSettingsDialogFocus } from '../../hooks/useApiProviders';
@@ -76,15 +77,12 @@ export function ModalitySyncModelsModal({
       seen.add(key);
       ids.push(trimmed);
     }
-    return ids;
+    return kind === 'voice' ? ids : ids.sort(compareModelDisplayOrder);
   }, [remoteModels, scopedModels, kind]);
 
-  // 1. 模态推荐模型 vs 全站所有模型（预先从新到老排序）
+  // 语音保留原来的版本顺序，其他模态使用统一目录顺序。
   const matchedModels = useMemo(
-    () =>
-      catalogIds
-        .filter((modelId) => kind !== 'chat' || isModelMatchModality(modelId, kind))
-        .sort(compareModelVersionsDesc),
+    () => kind === 'voice' ? catalogIds.toSorted(compareModelVersionsDesc) : catalogIds,
     [catalogIds, kind],
   );
 

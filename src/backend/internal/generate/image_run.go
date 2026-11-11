@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -83,6 +84,8 @@ func imageFamily(model string) string {
 		return "openai-dalle"
 	case strings.Contains(id, "grok"):
 		return "grok-image"
+	case isFalQwenImage3(id):
+		return "fal"
 	case strings.Contains(id, "seedream") || strings.Contains(id, "doubao-seedream"):
 		return "seedream"
 	case id == "qwen-image-edit" || id == "qwen-image-edit-2509":
@@ -101,6 +104,12 @@ func imageFamily(model string) string {
 func imageSubmitURLs(base string, edits bool, family, model string) []string {
 	_ = model
 	root := strings.TrimRight(gateway.NormalizeGatewayBaseURL(base), "/")
+	if u, err := url.Parse(root); err == nil && u.Hostname() == "api.openai.com" && family == "openai-dalle" {
+		if edits {
+			return []string{root + "/v1/images/edits"}
+		}
+		return []string{root + "/v1/images/generations"}
+	}
 	if family == "qwen-edit" {
 		return []string{root + "/v1/images/edits"}
 	}
@@ -110,10 +119,75 @@ func imageSubmitURLs(base string, edits bool, family, model string) []string {
 	return []string{root + "/v1/images/generations?async=true", root + "/v1/images/generations"}
 }
 
+func submitArkImage(req imageRequest, adapted imageAdapted) (imageSubmitResult, error) {
+	size, maxRefs := arkSeedreamSize(req.Model, req.Size)
+	if size == "" {
+		return imageSubmitResult{}, imageEditPrepareError{"当前尺寸或型号不符合火山方舟 Seedream 规格，请核对所选分辨率与官方模型 ID"}
+	}
+	if len(req.Refs) > maxRefs {
+		return imageSubmitResult{}, imageEditPrepareError{"参考图超过当前 Seedream 模型的上限"}
+	}
+	refs, err := dashscopeImageRefs(req)
+	if err != nil {
+		return imageSubmitResult{}, err
+	}
+	u, _ := url.Parse(req.Base)
+	endpoint := u.Scheme + "://" + u.Host + "/api/v3/images/generations"
+	body := map[string]any{"model": req.Model, "prompt": req.Prompt, "size": size, "response_format": "url"}
+	if len(refs) > 0 {
+		body["image"] = refs
+	}
+	adapted.size, adapted.endpoint = size, "/api/v3/images/generations"
+	return postDirectImage(req, adapted, endpoint, body)
+}
+
+func submitXAIImage(req imageRequest, adapted imageAdapted) (imageSubmitResult, error) {
+	if len(req.Refs) > 5 {
+		return imageSubmitResult{}, imageEditPrepareError{"xAI 图像编辑最多支持 5 张参考图"}
+	}
+	refs, err := dashscopeImageRefs(req)
+	if err != nil {
+		return imageSubmitResult{}, err
+	}
+	body := adapted.payload
+	delete(body, "image")
+	adapted.endpoint = "/v1/images/generations"
+	if len(refs) > 0 {
+		adapted.endpoint = "/v1/images/edits"
+		images := make([]map[string]string, 0, len(refs))
+		for _, ref := range refs {
+			images = append(images, map[string]string{"type": "image_url", "url": ref})
+		}
+		if len(images) == 1 {
+			body["image"] = images[0]
+		} else {
+			body["images"] = images
+		}
+	}
+	endpoint := strings.TrimRight(gateway.NormalizeGatewayBaseURL(req.Base), "/") + adapted.endpoint
+	return postDirectImage(req, adapted, endpoint, body)
+}
+
+func postDirectImage(req imageRequest, adapted imageAdapted, endpoint string, body map[string]any) (imageSubmitResult, error) {
+	status, raw, err := gateway.PostModel(req.context(), http.MethodPost, endpoint, req.APIKey, body, 180*time.Second)
+	data := map[string]any{}
+	_ = json.Unmarshal(raw, &data)
+	_, direct := imageOutcome(data)
+	if items, ok := data["data"].([]any); ok && len(items) > 0 {
+		if item, ok := items[0].(map[string]any); ok && firstString(item, "size") != "" {
+			adapted.size = firstString(item, "size")
+		}
+	}
+	return imageSubmitResult{Status: status, Data: data, Direct: direct, Adapted: adapted}, err
+}
+
 func dispatchImage(r *http.Request, urls []string, apiKey string, payload map[string]any, workspace string, production bool) (int, map[string]any, error) {
 	var lastStatus int
 	var lastData map[string]any
 	timeout := 45 * time.Second
+	if len(urls) == 1 && imageHostIs(urls[0], "api.openai.com") {
+		timeout = 180 * time.Second
+	}
 	for _, endpoint := range urls {
 		var status int
 		var raw []byte

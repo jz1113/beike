@@ -7,6 +7,7 @@ import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import { registerCanvasWorkspaceBridge } from '@client/shared/workspace/canvasWorkspace';
 import { buildCanvasArchive, completeCanvasArchive, mapCanvasMedia, restoreStudioCachedMedia } from '../model/canvasArchive';
 import type { CanvasArchive } from '../model/canvasArchive';
+import { isCanvasNodeVisible } from '../model/canvasGraph';
 import type { CanvasProject, StudioScene } from '../model/types';
 import { canvasMemoryWorkflow } from '../model/videoWorkflowRecovery';
 import { canvasAssetDatabase, canvasProjectStorage, hasCanvasReadFailure, hasCanvasSaveFailure, serializeCanvasProject } from './canvasProjectDefaults';
@@ -192,10 +193,11 @@ registerCanvasWorkspaceBridge({
   getSelection: () => {
     const canvasState = useCanvasStore.getState();
     const project = currentProject();
+    const nodes = project?.nodes.filter(isCanvasNodeVisible) ?? [];
     return {
-      activeNodeId: canvasState.activeNodeId,
+      activeNodeId: nodes.some(node => node.id === canvasState.activeNodeId) ? canvasState.activeNodeId : null,
       activeProject: project
-        ? { id: project.id, workflow: canvasMemoryWorkflow(project), title: project.title, nodes: project.nodes }
+        ? { id: project.id, workflow: canvasMemoryWorkflow(project), title: project.title, nodes }
         : undefined,
     };
   },
@@ -210,15 +212,15 @@ registerCanvasWorkspaceBridge({
         nodeCount: 0,
       };
     }
-    const nodeTypes = project.nodes.reduce<Record<string, number>>((counts, node) => {
+    const visibleNodes = project.nodes.filter(isCanvasNodeVisible);
+    const nodeTypes = visibleNodes.reduce<Record<string, number>>((counts, node) => {
       counts[node.type] = (counts[node.type] || 0) + 1;
       return counts;
     }, {});
     const activeNode = canvasState.activeNodeId
-      ? project.nodes.find((node) => node.id === canvasState.activeNodeId)
+      ? visibleNodes.find((node) => node.id === canvasState.activeNodeId)
       : undefined;
-    const nodes = project.nodes
-      .filter((node) => !node.layerHidden)
+    const nodes = visibleNodes
       .filter((node) => node.id !== activeNode?.id)
       .slice(-8)
       .map((node) => ({
@@ -229,9 +231,9 @@ registerCanvasWorkspaceBridge({
     return {
       workspaceType: 'canvas',
       title: project.title,
-      summary: `画布中有 ${project.nodes.length} 个节点。`,
+      summary: `画布中有 ${visibleNodes.length} 个可见节点。`,
       projectId: project.id,
-      nodeCount: project.nodes.length,
+      nodeCount: visibleNodes.length,
       nodeTypes,
       selectedNode: activeNode
         ? {
@@ -247,7 +249,7 @@ registerCanvasWorkspaceBridge({
     const canvasState = useCanvasStore.getState();
     const project = currentProject();
     const node = project?.nodes.find((item) => item.id === canvasState.activeNodeId);
-    if (!node || node.layerHidden || !['image', 'video', 'drawing'].includes(node.type)) return [];
+    if (!node || !isCanvasNodeVisible(node) || !['image', 'video', 'drawing'].includes(node.type)) return [];
     const isVideo = node.type === 'video' || node.generationKind === 'video';
     const url = isVideo ? node.videoUrl || node.imageUrl : node.imageUrl || node.videoUrl;
     if (!url) return [];

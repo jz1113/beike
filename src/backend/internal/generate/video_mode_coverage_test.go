@@ -6,6 +6,46 @@ import (
 	"testing"
 )
 
+func TestKling4OfficialPayloadAndQuery(t *testing.T) {
+	base := "https://api-singapore.klingai.com"
+	for _, item := range []struct {
+		model, mode, endpoint, aspect string
+		images, videos                []string
+	}{
+		{"kling-4.0", "text", "text-to-video", "21:9", nil, nil},
+		{"kling-4.0", "first_last_frame", "image-to-video", "adaptive", []string{"https://cdn.example/a.jpg", "https://cdn.example/b.jpg"}, nil},
+		{"kling-4.0-flash", "omni", "omni-video", "9:16", []string{"https://cdn.example/a.jpg"}, []string{"https://cdn.example/a.mp4"}},
+	} {
+		payload := map[string]json.RawMessage{
+			"ref_mode": rawJSON(t, item.mode), "images": rawJSON(t, item.images), "videos": rawJSON(t, item.videos),
+			"duration": rawJSON(t, 19), "resolution": rawJSON(t, "720P"), "aspect_ratio": rawJSON(t, item.aspect),
+		}
+		if message := videoInputError(payload, item.model, base); message != "" {
+			t.Fatalf("valid %s input rejected: %s", item.mode, message)
+		}
+		adapted := buildVideoPayload(item.model, "使用 @图片1 和 @视频1", payload)
+		applyNativeVideoRoute(base, item.mode, "fixture-key", &adapted)
+		if len(adapted.endpoints) != 1 || adapted.endpoints[0] != base+"/"+item.endpoint+"/"+item.model ||
+			len(adapted.queries) != 1 || adapted.queries[0] != base+"/tasks?task_ids={taskId}" {
+			t.Fatalf("wrong Kling route: %+v", adapted)
+		}
+		settings, _ := adapted.payload["settings"].(map[string]any)
+		if settings["duration"] != 19 || settings["resolution"] != "720p" || (item.mode == "first_last_frame" && settings["aspect_ratio"] != nil) {
+			t.Fatalf("wrong Kling settings: %#v", settings)
+		}
+		if item.mode == "omni" {
+			contents := adapted.payload["contents"].([]map[string]string)
+			if contents[0]["text"] != "使用 @image_1 和 @video_1" || contents[1]["type"] != "refer_image" || contents[2]["type"] != "feature_video" {
+				t.Fatalf("wrong reference roles: %#v", contents)
+			}
+		}
+	}
+	data := map[string]any{"data": []any{map[string]any{"id": "k4", "status": "succeeded", "outputs": []any{map[string]any{"type": "video", "url": "https://cdn.example/k4.mp4"}}}}}
+	if parsed := readVideoPoll(selectKlingTask(data, "k4")); parsed.status != "SUCCESS" || parsed.result != "https://cdn.example/k4.mp4" {
+		t.Fatalf("wrong Kling result: %+v", parsed)
+	}
+}
+
 func TestOmniFlashExplicitMediaRoles(t *testing.T) {
 	for _, tc := range []struct {
 		mode, tag      string

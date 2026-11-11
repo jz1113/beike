@@ -14,7 +14,7 @@ import {
 
 export { API_PROVIDERS_STORAGE_KEY, API_REMOVED_PROVIDERS_KEY };
 
-export type ApiProviderProtocol = 'gemini' | 'openai' | 'anthropic' | 'custom' | 'dashscope' | 'template';
+export type ApiProviderProtocol = 'gemini' | 'openai' | 'anthropic' | 'custom' | 'dashscope' | 'fal' | 'template';
 
 export interface ApiProvider {
   id: string;
@@ -65,6 +65,12 @@ export const PROTOCOL_OPTIONS: { id: ApiProviderProtocol; label: string; formatH
     label: '千问 / DashScope 原生',
     formatHint: '生图走 DashScope 原生接口，对话走 /compatible-mode/v1',
     defaultCatalog: '/compatible-mode/v1/models',
+  },
+  {
+    id: 'fal',
+    label: 'fal 队列协议',
+    formatHint: 'Gemini Omni Flash 1.2 · 视频生成、编辑与延长',
+    defaultCatalog: '/v1/models',
   },
   {
     id: 'template',
@@ -247,6 +253,7 @@ export async function testModelConnection(name: string, body: Record<string, unk
   });
   const data = await response.json().catch(() => ({}));
   const ok = Boolean(response.ok && data.success && !data.isFallback);
+  if (ok && data.provider === 'fal' && typeof data.warning === 'string') return { ok, message: data.warning };
   return { ok, message: ok
     ? `${name}模型目录测试通过 · ${Date.now() - start}ms；不代表所有模型可生成或余额充足`
     : `${name}测试失败 (${data.gatewayStatus || response.status})：${data.error || data.warning || '请检查地址与密钥'}` };

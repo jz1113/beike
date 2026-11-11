@@ -87,7 +87,9 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
   previewQueue: [],
   generationTasks: initialDrawing.tasks,
 
-  createSession: () => setDrawing((state) => {
+  createSession: () => {
+    get().invalidatePromptAttachments();
+    setDrawing((state) => {
     const prunedSessions = pruneEmptySessions(state.sessions, state.currentSessionId);
     const current = prunedSessions.find(s => s.id === state.currentSessionId);
     if (current && (!current.tasks || current.tasks.length === 0)) {
@@ -114,16 +116,21 @@ export const createGenerateSlice: StateCreator<AppState, [], [], GenerateSlice> 
     const updatedSessions = [newSession, ...prunedSessions];
     persistDrawingStateToStorage(undefined, updatedSessions, newSessionId);
     return { sessions: updatedSessions, currentSessionId: newSessionId, ...EMPTY_COMPOSER_MEDIA };
-  }),
+    });
+  },
 
-  switchSession: (id) => setDrawing((state) => {
-    const prunedSessions = pruneEmptySessions(state.sessions, id);
-    persistDrawingStateToStorage(undefined, prunedSessions.length !== state.sessions.length ? prunedSessions : undefined, id);
-    return {
-      ...(prunedSessions.length !== state.sessions.length ? { sessions: prunedSessions } : {}),
-      currentSessionId: id
-    };
-  }),
+  switchSession: (id) => {
+    const { currentView } = get();
+    setDrawing((state) => {
+      const prunedSessions = pruneEmptySessions(state.sessions, id);
+      persistDrawingStateToStorage(undefined, prunedSessions.length !== state.sessions.length ? prunedSessions : undefined, id);
+      return {
+        ...(prunedSessions.length !== state.sessions.length ? { sessions: prunedSessions } : {}),
+        currentSessionId: id,
+        ...(state.currentSessionId !== id || currentView !== 'generate' ? EMPTY_COMPOSER_MEDIA : {}),
+      };
+    });
+  },
 
   deleteSession: (id) => setDrawing((state) => {
     const { ids, urls } = collectSessionDeletion(state.sessions, state.generationTasks, id);

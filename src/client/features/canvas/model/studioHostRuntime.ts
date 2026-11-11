@@ -335,6 +335,7 @@ export function applyStudioTaskResult(
     isGenerating: false,
     progress: url ? 100 : 0,
     error,
+    ...(url && rawSettings.beikeCoverReviewTaskId === taskId ? { beikeCoverReviewUrl: url } : {}),
   };
   const update: Partial<StudioNode> = {
     beikeTaskId: undefined,

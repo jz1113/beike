@@ -273,6 +273,9 @@ func readVideoTaskID(data map[string]any, family string) string {
 	if data == nil || data["error"] != nil {
 		return ""
 	}
+	if family == "fal-omni" {
+		return strings.TrimSpace(firstString(data, "request_id"))
+	}
 	if family == "veo" {
 		if name := firstString(data, "name"); veoOperationPath.MatchString(name) {
 			return encodeVeoOperation(name)

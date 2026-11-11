@@ -52,12 +52,40 @@ func TestCanvasNativeVideoEmbedsRemoteVideoWithoutGatewayCredentials(t *testing.
 	t.Cleanup(func() { canvasVideoHTTP = previous })
 	video := map[string]any{"url": server.URL + "/video.mp4"}
 	wire := map[string]any{"messages": []any{map[string]any{"content": []any{map[string]any{"type": "video_url", "video_url": video}}}}}
-	if err := inlineCanvasChatVideos(context.Background(), wire); err != nil {
+	if err := inlineCanvasChatVideos(context.Background(), wire, "local", false); err != nil {
 		t.Fatal(err)
 	}
 	want := "data:video/mp4;base64," + base64.StdEncoding.EncodeToString(raw)
 	if video["url"] != want {
 		t.Fatal("remote video not embedded")
+	}
+}
+
+func TestCanvasNativeVideoReadsOnlyCurrentWorkspace(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AZHUO_CACHE_DIR", root)
+	if err := os.MkdirAll(filepath.Join(root, "owner"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	raw := []byte("\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00")
+	if err := os.WriteFile(filepath.Join(root, "owner", "clip.mp4"), raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := downloadCanvasChatVideo(t.Context(), "/storage/owner/clip.mp4"); err == nil || !strings.Contains(err.Error(), "参考视频地址无效") {
+		t.Fatalf("expected the original URL validator to reject a storage path: %v", err)
+	}
+	video := map[string]any{"url": "/storage/owner/clip.mp4"}
+	wire := map[string]any{"messages": []any{map[string]any{"content": []any{map[string]any{"type": "video_url", "video_url": video}}}}}
+	if err := inlineCanvasChatVideos(t.Context(), wire, "owner", true); err != nil {
+		t.Fatal(err)
+	}
+	if got := video["url"]; got != "data:video/mp4;base64,"+base64.StdEncoding.EncodeToString(raw) {
+		t.Fatalf("local video: %q", got)
+	}
+	for _, source := range []string{"/storage/owner/clip.mp4", "/storage/owner/%252e%252e/owner/clip.mp4"} {
+		if _, err := canvasChatVideoForWorkspace(t.Context(), source, "other", true); err == nil {
+			t.Fatalf("cross-workspace access accepted: %s", source)
+		}
 	}
 }
 
@@ -133,7 +161,7 @@ func TestCanvasStoryboardExtractsRealBoundariesAndEvidenceFrames(t *testing.T) {
 		t.Fatal(err)
 	}
 	wire := map[string]any{"messages": []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": "video_url", "video_url": map[string]any{"url": "data:video/mp4;base64," + base64.StdEncoding.EncodeToString(data)}}}}}}
-	evidence, err := prepareCanvasStoryboard(t.Context(), config.Config{Root: root}, wire)
+	evidence, err := prepareCanvasStoryboard(t.Context(), config.Config{Root: root}, wire, "local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,14 +228,29 @@ func TestCanvasStoryboardStageReceiptsNeverRedispatchUnknown(t *testing.T) {
 		t.Skip("FFmpeg unavailable")
 	}
 	file := filepath.Join(t.TempDir(), "source.mp4")
-	if out, err := exec.CommandContext(t.Context(), binary, "-nostdin", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=red:s=96x128:r=12:d=1", "-c:v", "libx264", file).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), binary, "-nostdin", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=red:s=96x128:r=30:d=1", "-f", "lavfi", "-i", "color=c=blue:s=96x128:r=30:d=0.2", "-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0[v]", "-map", "[v]", "-c:v", "libx264", file).CombinedOutput(); err != nil {
 		t.Fatal(err, string(out))
 	}
 	video, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, scenario := range []string{"success", "observation-unknown", "adaptation-unknown", "observation-settlement-failed"} {
+	storageRoot := t.TempDir()
+	t.Setenv("AZHUO_CACHE_DIR", storageRoot)
+	if err := os.MkdirAll(filepath.Join(storageRoot, "local"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(storageRoot, "local", "source.mp4"), video, 0600); err != nil {
+		t.Fatal(err)
+	}
+	png, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(storageRoot, "local", "product.png"), png, 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, scenario := range []string{"success", "storage-success", "observation-unknown", "adaptation-unknown", "observation-settlement-failed"} {
 		t.Run(scenario, func(t *testing.T) {
 			calls := 0
 			var failSettlement func()
@@ -217,8 +260,17 @@ func TestCanvasStoryboardStageReceiptsNeverRedispatchUnknown(t *testing.T) {
 				if err := json.NewDecoder(r.Body).Decode(&wire); err != nil {
 					t.Error(err)
 				}
+				if calls == 1 {
+					raw, _ := json.Marshal(wire["messages"])
+					if !strings.Contains(string(raw), "源片 1.167秒") {
+						t.Error("missing final decoded frame of short tail shot")
+					}
+				}
 				if calls == 2 {
 					raw, _ := json.Marshal(wire["messages"])
+					if scenario == "storage-success" && !strings.Contains(string(raw), "data:image/png;base64,") {
+						t.Error("workspace reference image was not embedded")
+					}
 					if strings.Contains(string(raw), "data:video/") || strings.Contains(string(raw), "video_url") {
 						t.Error("adaptation sent the source video instead of relying on the verified observation")
 					}
@@ -234,7 +286,7 @@ func TestCanvasStoryboardStageReceiptsNeverRedispatchUnknown(t *testing.T) {
 					w.Write([]byte(`{"error":{"message":"lost upstream result"}}`))
 					return
 				}
-				text := "【原片镜头 01】已核实观察"
+				text := "【原片镜头 01】已核实观察【原片镜头 02】尾镜"
 				if calls == 2 {
 					text = "【原片风格分析】改编结果"
 				}
@@ -258,6 +310,12 @@ func TestCanvasStoryboardStageReceiptsNeverRedispatchUnknown(t *testing.T) {
 				}
 			}
 			payload := map[string]any{"model": "test", "customBaseUrl": server.URL, "customApiKey": "mock-private", "beikeStoryboardAnalysis": true, "messages": []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": "video_url", "video_url": map[string]any{"url": "data:video/mp4;base64," + base64.StdEncoding.EncodeToString(video)}}, map[string]any{"type": "text", "text": "保留创作要求"}}}}}
+			if scenario == "storage-success" {
+				message := payload["messages"].([]any)[0].(map[string]any)
+				part := message["content"].([]any)[0].(map[string]any)
+				part["video_url"].(map[string]any)["url"] = "/storage/local/source.mp4"
+				message["content"] = append(message["content"].([]any), map[string]any{"type": "image_url", "image_url": map[string]any{"url": "/storage/local/product.png"}})
+			}
 			raw, _ := json.Marshal(payload)
 			handler := CanvasText(cfg)
 			for _, method := range []string{"POST", "GET", "POST", "GET"} {
@@ -265,7 +323,7 @@ func TestCanvasStoryboardStageReceiptsNeverRedispatchUnknown(t *testing.T) {
 				r.Header.Set("x-idempotency-key", "original")
 				w := httptest.NewRecorder()
 				handler.ServeHTTP(w, r)
-				if scenario == "success" {
+				if scenario == "success" || scenario == "storage-success" {
 					if w.Code != 200 || !strings.Contains(w.Body.String(), "改编结果") {
 						t.Fatal(w.Code, w.Body.String())
 					}

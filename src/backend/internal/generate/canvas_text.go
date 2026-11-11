@@ -61,6 +61,19 @@ func CanvasText(cfg config.Config) http.Handler {
 			recoverCanvasText(cfg, w, r)
 			return
 		}
+		if r.Method == http.MethodPost && r.URL.Query().Get("closeMissing") == "1" {
+			key := strings.TrimSpace(r.URL.Query().Get("operationKey"))
+			if key == "" || len(key) > 256 {
+				httpx.WriteJSON(w, 400, map[string]any{"submissionUnknown": true, "error": "缺少有效的原操作标识"})
+				return
+			}
+			if err := submission.CloseMissing(r.Context(), cfg.SQLiteFile(), workspaceOf(r), "canvas-text", key); err != nil {
+				httpx.WriteJSON(w, 503, map[string]any{"submissionUnknown": true, "error": "无法确认原请求状态"})
+				return
+			}
+			recoverCanvasText(cfg, w, r)
+			return
+		}
 		guarded.ServeHTTP(w, r)
 	})
 }
@@ -94,7 +107,7 @@ func writeCanvasText(cfg config.Config, w http.ResponseWriter, r *http.Request, 
 	prompt, _ := payload["prompt"].(string)
 	base, key, upstream, status, message := canvasCredentials(cfg, r, payload, model)
 	if message != "" {
-		httpx.WriteJSON(w, status, map[string]any{"success": false, "error": message})
+		httpx.WriteJSON(w, status, map[string]any{"success": false, "error": message, "submissionRejected": true})
 		return
 	}
 	format, _ := payload["apiFormat"].(string)
@@ -360,12 +373,12 @@ func recoverCanvasText(cfg config.Config, w http.ResponseWriter, r *http.Request
 }
 
 func replyCanvasTextReceipt(w http.ResponseWriter, row submission.Receipt) {
-	// Earlier storyboard adaptation receipts could record an explicit image
-	// rejection as unknown. Recover only known terminal responses.
+	// Earlier receipts marked explicit authentication and image rejections as
+	// unknown. Normalize only confirmed upstream rejections on read.
 	detail, _ := row.Body["error"].(string)
-	if row.Status == http.StatusBadGateway && row.Body["stage"] == "result" &&
-		row.Body["storyboardEvidence"] != nil &&
-		canvasStoryboardImageRejected(detail) {
+	if row.Status == http.StatusBadGateway && (detail == "请先配置文本模型的 API Key" ||
+		strings.Contains(detail, "，HTTP 401）：text upstream HTTP 401:") ||
+		(row.Body["stage"] == "result" && row.Body["storyboardEvidence"] != nil && canvasStoryboardImageRejected(detail))) {
 		row.Body["submissionRejected"] = true
 		row.Body["submissionUnknown"] = false
 	}

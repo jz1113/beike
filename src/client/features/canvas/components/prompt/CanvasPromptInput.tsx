@@ -279,13 +279,11 @@ export const CanvasPromptInput = forwardRef<
         if (!event.currentTarget.contains(event.relatedTarget)) setMention(null);
       }}
     >
-      <div
-        className={`flex items-start gap-2 transition-[min-height,max-height] duration-150 ${
-          expanded ? 'min-h-[180px] max-h-[340px] overflow-y-auto no-scrollbar' : 'min-h-[78px] max-h-[140px] overflow-y-auto no-scrollbar'
-        }`}
-      >
+      <div className="flex items-start gap-2">
         {leadingSlot}
-        <div className="min-w-0 flex-1">
+        <div className={`min-w-0 flex-1 overflow-y-auto no-scrollbar transition-[min-height,max-height] duration-150 ${
+          expanded ? 'min-h-[180px] max-h-[340px]' : 'min-h-[78px] max-h-[140px]'
+        }`}>
           <RichPromptInput
             ariaLabel={ariaLabel}
             ref={input}

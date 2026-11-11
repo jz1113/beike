@@ -96,7 +96,7 @@ export function useModalityChannelCatalog(
           ...catalogRequestProtocol(savedProviders.find((provider) => provider.id === channelId)?.providerType),
           baseUrl: channel.baseUrl,
           apiKey: channel.apiKey,
-          strict: false,
+          strict: true,
         }),
       });
       const data = await response.json().catch(() => ({}));

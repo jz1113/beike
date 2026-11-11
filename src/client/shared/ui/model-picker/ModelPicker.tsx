@@ -2,7 +2,7 @@ import { isDeepSeekRoute } from '@shared/domain/models/deepseek';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { getModelIcon } from '@client/shared/ui/ModelIcons';
-import { getApprovedModel, vendorLabel } from '@shared/domain/models/modelCatalog';
+import { compareModelDisplayOrder, getApprovedModel, vendorLabel } from '@shared/domain/models/modelCatalog';
 import { getVendorDisplayName, inferVendorId, VENDOR_PRIORITY } from '@shared/domain/models/modelSorting';
 import { upstreamModelId } from '@shared/domain/models/workflowModels';
 import { normalizeReasoningEffort, REASONING_EFFORT_LABELS, reasoningCapability, type ReasoningEffort } from '@shared/domain/assistant/reasoning';
@@ -159,10 +159,11 @@ export default function ModelPicker({
   </div>;
 }
 
-/** Group only the displayed options; order vendor groups by unified VENDOR_PRIORITY. */
+/** Group the displayed options without changing the saved route order. */
 function groupAssistantModels<T extends { id: string; modelId?: string }>(models: readonly T[]) {
   const groups = new Map<string, { vendor: string; label: string; models: T[] }>();
-  for (const model of models) {
+  const compare = (a: T, b: T) => compareModelDisplayOrder(a.modelId || a.id, b.modelId || b.id);
+  for (const model of models.toSorted(compare)) {
     const identity = model.modelId || model.id;
     const approved = getApprovedModel(identity) || getApprovedModel(upstreamModelId(identity));
     const vendor = approved?.vendor || inferVendorId(upstreamModelId(identity)) || 'other';
@@ -178,6 +179,8 @@ function groupAssistantModels<T extends { id: string; modelId?: string }>(models
     group.models.push(model);
   }
   return [...groups.values()].sort((a, b) => {
+    const catalogOrder = compare(a.models[0], b.models[0]);
+    if (catalogOrder) return catalogOrder;
     const aRank = VENDOR_PRIORITY.indexOf(a.vendor);
     const bRank = VENDOR_PRIORITY.indexOf(b.vendor);
     const effectiveARank = aRank >= 0 ? aRank : 999;

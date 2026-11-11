@@ -1,6 +1,8 @@
 import { configuredTextProtocol, parseTextProtocol, resolveTextProtocol, type TextProtocol } from './deepseek';
 import { domainStorage } from '../core/runtime';
 import { DEFAULT_MODALITY_MODELS, type ModalityStorageKind, type StoredModalityModelItem } from './modalityDefaults';
+import { isFalOmniVideoModel, isFalVideoBase } from '@shared/domain/media/videoChannels';
+import { compareModelDisplayOrder, getSelectableModel } from './modelCatalog';
 
 export type { ModalityStorageKind, StoredModalityModelItem } from './modalityDefaults';
 
@@ -249,7 +251,16 @@ export function selectableModalityModels(models: StoredModalityModelItem[], prov
       if (Array.isArray(removed) && !removed.includes('comfly_gateway')) enabled.add('comfly_gateway');
     } catch { /* 无法确认渠道状态时不加入候选。 */ }
   }
-  return models.filter(item => !item.channelId || enabled.has(item.channelId));
+  return models.filter(item => {
+    if (item.channelId && !enabled.has(item.channelId)) return false;
+    if (item.modality === 'voice') return true;
+    if (!getSelectableModel(item.modelId, item.modality === 'chat' ? 'multimodal' : item.modality)) return false;
+    if (isFalOmniVideoModel(item.modelId)) {
+      const provider = providers.find(provider => provider.id === item.channelId);
+      return isFalVideoBase(item.baseUrl || provider?.baseUrl);
+    }
+    return true;
+  });
 }
 
 /** 已同步模态的前台选项。存储键不存在时返回 null，调用方保留 custom_models。 */
@@ -263,10 +274,14 @@ export function modalityPickerSelections(kind: ModalityStorageKind): ModalityPic
     counts.set(modelId, (counts.get(modelId) || 0) + 1);
   }
   // 保留全部条目参与上面的 ID 计数，停用其中一条线路不会改变另一条的选择 ID。
-  return selectableModalityModels(read.models, providers).map((item) => {
+  const selectable = selectableModalityModels(read.models, providers);
+  if (kind !== 'voice') selectable.sort((a, b) => compareModelDisplayOrder(a.modelId, b.modelId));
+  return selectable.map((item) => {
     const modelId = item.modelId.trim();
     const duplicated = (counts.get(modelId) || 0) > 1;
-    const channel = item.channelId ? providers.find((provider) => provider.id === item.channelId)?.name || '' : '';
+    const configuredProvider = item.channelId ? providers.find(provider => provider.id === item.channelId) : undefined;
+    const channel = configuredProvider?.name || '';
+    const provider = isFalVideoBase(item.baseUrl || configuredProvider?.baseUrl) ? 'fal' : channel;
     const storedName = item.name?.trim() || modelId;
     const name = duplicated && channel && !storedName.includes(`· ${channel}`)
       ? `${storedName} · ${channel}`
@@ -276,7 +291,7 @@ export function modalityPickerSelections(kind: ModalityStorageKind): ModalityPic
       modelId,
       entryId: item.id,
       name,
-      ...(channel ? { provider: channel } : {}),
+      ...(provider ? { provider } : {}),
     };
   });
 }
@@ -427,9 +442,10 @@ export function resolveModalityModelRoute(
   const useDefaultChannel = options?.channel === 'default';
   const trimmed = value?.trim() || '';
   const legacy = kind === 'chat' ? findLegacyWorkflowModel(trimmed) : null;
+  const defaultModels = trimmed ? models : selectableModalityModels(models, readStoredApiProviders());
   const matched = trimmed
     ? models.find((item) => item.id === trimmed) || models.find((item) => item.modelId === trimmed)
-    : models.find((item) => item.isDefault) || models[0];
+    : defaultModels.find((item) => item.isDefault) || defaultModels[0];
   const legacyChannelId = legacy?.providerId || (legacy?.channel && readStoredApiProviders().some((item) => item.id === legacy.channel) ? legacy.channel : undefined);
   const channel = providerCredentials(matched?.channelId || legacyChannelId);
   const configuredModelProtocol = matched ? configuredTextProtocol(matched) : legacy ? configuredTextProtocol(legacy) : undefined;
@@ -440,22 +456,15 @@ export function resolveModalityModelRoute(
   const routeBaseUrl = useDefaultChannel
     ? globalConfig.baseUrl
     : matched?.baseUrl?.trim() || legacy?.customBaseUrl?.trim() || channel?.baseUrl || globalConfig.baseUrl;
-  // Synced models inherit the channel transport unless the model card explicitly
-  // chooses a protocol. This matters for OpenAI-compatible gateways that expose
-  // Claude/Gemini model IDs but do not implement their native endpoints.
+  const modelId = matched?.modelId || legacy?.id || trimmed;
+  const nativeModelProtocol = resolveTextProtocol(modelId);
   const channelProtocol = providerTextProtocol(channel?.providerType);
   const baseProtocol = protocolForBaseUrl(routeBaseUrl, readStoredApiProviders());
-  // The built-in Comfly endpoint is OpenAI-compatible even when its model
-  // catalog labels a Claude/Gemini entry with the vendor's native protocol.
-  // Keep explicit native overrides for separately configured channels.
-  const protocolPreference = useDefaultChannel
-    ? baseProtocol || modelProtocol
-    : !channel && baseProtocol === 'openai'
-      ? baseProtocol
-      : modelProtocol || channelProtocol || baseProtocol;
+  const protocolPreference = modelProtocol || (nativeModelProtocol !== 'openai' ? nativeModelProtocol
+    : useDefaultChannel ? baseProtocol : channelProtocol || baseProtocol);
   return {
-    modelId: matched?.modelId || legacy?.id || trimmed,
-    ...(kind === 'chat' ? { textProtocol: resolveTextProtocol(matched?.modelId || legacy?.id || trimmed, protocolPreference) } : {}),
+    modelId,
+    ...(kind === 'chat' ? { textProtocol: resolveTextProtocol(modelId, protocolPreference) } : {}),
     baseUrl: routeBaseUrl,
     apiKey: useDefaultChannel
       ? globalConfig.apiKey

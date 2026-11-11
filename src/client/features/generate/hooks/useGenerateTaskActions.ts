@@ -8,7 +8,7 @@ import { registerRefMedia, registerRefMediaKind } from '@client/shared/media/ref
 import { createGenerationAttemptId, isDepthImageTask, isDepthVideoTask, prepareGenerationAttempt } from '@client/shared/media/generationAttempt';
 import { queryOriginalGenerationBeforeRetry } from '@client/shared/media/generationRetryReceipt';
 import { isImageTaskFailed } from '@shared/domain/core/taskStatus';
-import { restoreImagePromptOptions } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
+import { loadPromptPreferences, savePromptPreferences, restoreImagePromptOptions } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 import { isGenerateVideoTask } from '../model/generateWorkspaceLayout';
 
 type VideoSettingsStore = Pick<AppState, 'setQuickVideoModel' | 'setQuickVideoAspectId' | 'setQuickVideoDuration' | 'setQuickVideoResolution' | 'setQuickVideoContextIrEnabled'>;
@@ -40,9 +40,11 @@ export function useGenerateTaskActions(onShowToast: (message: string) => void) {
 
   const handleReuseTask = useCallback((task: GenerationTask) => {
     const store = useAppStore.getState();
+    store.invalidatePromptAttachments();
     const depthVideo = isDepthVideoTask(task);
     const depthImage = isDepthImageTask(task);
     const video = isGenerateVideoTask(task);
+    const audio = task.mediaType === 'audio';
     if (video && task.referenceAudioUrls?.length) {
       onShowToast('此任务包含参考音频，请回原画布编辑，或重试原任务以保留音频');
       return;
@@ -53,7 +55,7 @@ export function useGenerateTaskActions(onShowToast: (message: string) => void) {
       for (const url of references) registerRefMediaKind(url, task.referenceVideoUrls.includes(url) ? 'video' : 'image');
     }
     store.setQuickPrompt(stripWorkshopPromptGuards(cleanPromptText(task.prompt || '', true), true));
-    store.setQuickGenMode(depthVideo ? 'depth-video' : depthImage ? 'depth-image' : video ? 'video' : 'image');
+    store.setQuickGenMode(depthVideo ? 'depth-video' : depthImage ? 'depth-image' : video ? 'video' : audio ? 'audio' : 'image');
     store.setQuickCount(1);
     store.setQuickVideoCount(1);
     store.setQuickVideoFirstFrame(null);
@@ -71,6 +73,14 @@ export function useGenerateTaskActions(onShowToast: (message: string) => void) {
         references = [url];
       }
       onShowToast(payload?.file ? '已恢复深度生成参数和参考文件' : '已恢复深度生成参数，请确认参考文件后生成');
+    } else if (audio) {
+      const selection = task.modelRouteKey || task.model;
+      if (selection) store.setQuickAudioModel(selection);
+      const preferences = loadPromptPreferences();
+      savePromptPreferences({ ...preferences, audio: {
+        modelId: selection, format: task.audioFormat || 'mp3',
+        voice: task.audioVoice || 'zh-female-commercial', speed: task.audioSpeed ?? 1,
+      } });
     } else if (video) {
       restoreVideoTaskSettings(store, task);
       const refMode = task.videoRefMode || 'omni';

@@ -1,3 +1,5 @@
+import { getModelCredentials } from '@client/shared/api/gatewayClient';
+import { imageCapabilities, resolveImageGenerationQuality } from '@shared/domain/media/imageCapabilities';
 import { DEFAULT_MULTIMODAL_MODEL_ID } from '@shared/domain/models/modelCatalog';
 import type { GenerationTask } from '@client/store';
 import {
@@ -23,7 +25,7 @@ import {
   type PromptBarSubmitInput,
   type PromptBarSubmitResult,
 } from './promptBarValidation';
-import { formatAgentAttachmentNote } from './agentAttachments';
+import { formatAgentAttachmentNote, snapshotAgentDocuments } from './agentAttachments';
 import { loadPromptPreferences } from './promptBarPreferencesTypes';
 import { upstreamModalityModelId, type ModalityStorageKind } from '@shared/domain/models/modalityStorage';
 
@@ -95,6 +97,7 @@ export function buildPromptBarGenerationTasks(
       title,
       prompt,
       mediaType: 'agent',
+      agentDocuments: quickGenMode === 'agent' ? snapshotAgentDocuments(effectiveImages) : undefined,
       model: quickGenMode === 'collect' ? 'direct-collection' : active.model || DEFAULT_MULTIMODAL_MODEL_ID,
       ...(quickGenMode !== 'collect' && active.modelRouteKey ? { modelRouteKey: active.modelRouteKey } : {}),
       size: '-',
@@ -120,6 +123,7 @@ export function buildPromptBarGenerationTasks(
     const cleaned = quickPrompt.trim();
     const title = cleaned.slice(0, 25) || '智能语音合成';
     const audio = resolvedModel('voice', input.quickAudioModel || '');
+    const audioPreferences = loadPromptPreferences().audio;
     const task: GenerationTask = {
       id: `hub-gen-${batchTimestamp}-0`,
       batchId,
@@ -127,6 +131,9 @@ export function buildPromptBarGenerationTasks(
       title,
       prompt: cleaned,
       mediaType: 'audio',
+      audioFormat: audioPreferences.format || 'mp3',
+      audioVoice: audioPreferences.voice || 'zh-female-commercial',
+      audioSpeed: audioPreferences.speed ?? 1,
       model: audio.model,
       ...(audio.modelRouteKey ? { modelRouteKey: audio.modelRouteKey } : {}),
       size: '-',
@@ -197,6 +204,8 @@ export function buildPromptBarGenerationTasks(
   const batchTimestamp = Date.now();
   const countToGen = quickGenMode === 'video' ? quickVideoCount || 1 : quickCount || 1;
   const refImg = effectiveImages[0] || undefined;
+  const imageCredentials = quickGenMode === 'image' ? getModelCredentials(quickModel) : undefined;
+  const imageCaps = imageCapabilities(upstreamModalityModelId('image', quickModel), imageCredentials?.protocol, imageCredentials?.baseUrl);
   const tasksToCreate: GenerationTask[] = [];
 
   const visual = resolvedModel(quickGenMode === 'video' ? 'video' : 'image', quickGenMode === 'video' ? quickVideoModel : quickModel);
@@ -213,7 +222,7 @@ export function buildPromptBarGenerationTasks(
       ...(visual.modelRouteKey ? { modelRouteKey: visual.modelRouteKey } : {}),
       size: quickGenMode === 'video' ? quickVideoAspectId : sizeStr,
       quality: quickGenMode === 'video' ? quickVideoResolution : quickQuality,
-      imageQuality: quickGenMode === 'image' ? loadPromptPreferences().image.quality : undefined,
+      imageQuality: quickGenMode === 'image' ? resolveImageGenerationQuality(input.imageQuality ?? loadPromptPreferences().image.quality, imageCaps) : undefined,
       inferenceStrength: quickGenMode === 'image' ? loadPromptPreferences().image.inferenceStrength : undefined,
       videoDuration: quickGenMode === 'video' ? quickVideoDuration : undefined,
       videoResolution: quickGenMode === 'video' ? quickVideoResolution : undefined,

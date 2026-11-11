@@ -10,7 +10,7 @@ import { homedir } from 'node:os';
 import { createServer } from 'node:net';
 import { get } from 'node:http';
 import { parseEnv } from 'node:util';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { recordWebProcess } from './web-processes.mjs';
 import { buildGoApi } from './go-build.mjs';
@@ -58,9 +58,49 @@ export function resolveAppDataDir() {
   return join(home, '.local', 'share', APP_IDENTIFIER);
 }
 
-export function ensureAppDatabase(_workspaceRoot, appDataDir) {
+export function depthEnvironmentPython(appDataDir) {
+  return join(appDataDir, 'depth-runtime', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+}
+
+export function resolveDepthPython(appDataDir = process.env.AZHUO_DATA_DIR || resolveAppDataDir(), environment = process.env) {
+  const configured = environment.DEPTH_VIDEO_PYTHON?.trim();
+  if (configured) return configured;
+  const managed = depthEnvironmentPython(appDataDir);
+  return existsSync(managed) ? managed : 'python3';
+}
+
+/** Service CLI defaults never load the repository's legacy development .env. */
+export function loadAppDataEnv() {
+  if (typeof process.loadEnvFile !== 'function') return;
+  const configured = process.env.AZHUO_DATA_DIR;
+  const serviceHome = process.platform === 'linux' && existsSync(join(homedir(), 'storage')) ? homedir() : null;
+  const file = configured ? resolve(getWorkspaceRoot(), configured, '.env') : serviceHome ? join(serviceHome, '.env') : null;
+  if (!file) return;
+  try { process.loadEnvFile(file); } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+}
+
+/** Launch and maintenance share one SQLite selection; isolated development always uses its own directory. */
+export function resolveDatabaseFile({ workspaceRoot = getWorkspaceRoot(), appDataDir = process.env.AZHUO_DATA_DIR || resolveAppDataDir(), environment = process.env, isolated = false } = {}) {
+  const url = isolated ? '' : environment.DATABASE_URL?.trim();
+  if (!url) return resolve(workspaceRoot, appDataDir, 'azhuo.db');
+  if (!url.startsWith('file:')) throw new Error('仅支持 SQLite file: URL');
+  let raw = url.slice('file:'.length);
+  if (url.startsWith('file://')) {
+    const parsed = new URL(url);
+    raw = decodeURIComponent(parsed.pathname);
+    if (parsed.hostname && parsed.hostname !== 'localhost') raw = `//${parsed.hostname}${raw}`;
+    if (/^\/[A-Za-z]:/.test(raw)) raw = raw.slice(1);
+  }
+  if (!raw) throw new Error('DATABASE_URL 缺少 SQLite 文件路径');
+  return isAbsolute(raw) || /^[A-Za-z]:[\\/]/.test(raw) ? normalize(raw) : resolve(workspaceRoot, raw);
+}
+
+export function ensureAppDatabase(workspaceRoot, appDataDir, databaseFile = resolveDatabaseFile({ workspaceRoot, appDataDir })) {
   mkdirSync(appDataDir, { recursive: true });
   mkdirSync(join(appDataDir, 'storage'), { recursive: true });
+  mkdirSync(dirname(databaseFile), { recursive: true });
   // New databases are initialized by the API's versioned migration runner.
   // Never copy a live SQLite main file without its WAL or overwrite user data.
 }
@@ -187,17 +227,20 @@ export function readDevApiDefaults(workspaceRoot, isolated) {
   }
 }
 
-export function buildApiEnv({ apiPort, appDataDir, accessToken, defaults = {}, extra = {} }) {
+export function buildApiEnv({ apiPort, appDataDir, accessToken, defaults = {}, extra = {}, workspaceRoot = getWorkspaceRoot(), isolated = false }) {
+  // Root development defaults may include a historical database URL; only an explicit process/launcher setting selects it.
+  const databaseFile = resolveDatabaseFile({ workspaceRoot, appDataDir, environment: { ...process.env, ...extra }, isolated });
   return {
     ...defaults,
     ...process.env,
     PORT: String(apiPort),
     HOSTNAME: '127.0.0.1',
     AZHUO_DATA_DIR: appDataDir,
-    DATABASE_URL: `file:${join(appDataDir, 'azhuo.db')}`,
     LOCAL_ACCESS_TOKEN: accessToken,
     BEIKE_WEB_LAUNCH: '1',
     ...extra,
+    DATABASE_URL: `file:${databaseFile}`,
+    DEPTH_VIDEO_PYTHON: resolveDepthPython(appDataDir, { ...defaults, ...process.env, ...extra }),
   };
 }
 
@@ -226,6 +269,8 @@ export function startGateway({ workspaceRoot, apiPort, appDataDir, accessToken, 
       accessToken,
       defaults: envDefaults,
       extra: extraEnv,
+      workspaceRoot,
+      isolated,
     }),
   });
   child.on('error', error => console.error(`Go API 启动失败：${error.message}`));

@@ -5,7 +5,8 @@
 
 import { IMAGE_GEN_MODELS } from '@shared/domain/media/drawing';
 import { VIDEO_GEN_MODELS } from '@shared/domain/media/video';
-import { DEFAULT_MULTIMODAL_MODEL_ID, isApprovedModel, getApprovedModel } from '@shared/domain/models/modelCatalog';
+import { isFalOmniVideoModel, isFalVideoBase } from '@shared/domain/media/videoChannels';
+import { DEFAULT_MULTIMODAL_MODEL_ID, isApprovedModel, getApprovedModel, getSelectableModel } from '@shared/domain/models/modelCatalog';
 import { channelBadge, channelDisplayName, deepSeekModel, deepSeekRouteId, isDeepSeekRoute, deepSeekModelId } from './deepseek';
 import { domainStorage } from '../core/runtime';
 import { inferWorkflowCapabilitiesFromId, isKnownImageOnlyModel, isKnownVideoOnlyModel } from './workflowCapabilities';
@@ -67,7 +68,7 @@ function collapseRepeatedResolutionSuffix(id: string): string {
 export function repairWorkflowModelId(id: string): string {
   const collapsed = collapseRepeatedResolutionSuffix(id);
   const aliased = IMAGE_MODEL_ID_ALIASES[collapsed.toLowerCase()] || collapsed;
-  return aliased.includes('/') || aliased.includes(':') ? aliased : getApprovedModel(aliased)?.id || aliased;
+  return aliased;
 }
 
 /** Normalize and deduplicate routes, preserving the first saved enabled state and stored order. */
@@ -306,7 +307,7 @@ export function getEnabledImageModelsFromSettings(
   const seen = new Set<string>();
   const list = models === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(models);
   return list
-    .filter((m) => m.enabled !== false && m.isImage)
+    .filter((m) => m.enabled !== false && m.isImage && getSelectableModel(m.id, 'image'))
     .filter((m) => {
       const key = m.id.toLowerCase();
       if (seen.has(key)) return false;
@@ -337,7 +338,8 @@ export function getEnabledVideoModelsFromSettings(
 ) {
   const list = models === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(models);
   return list
-    .filter((m) => m.enabled !== false && m.isVideo)
+    .filter((m) => m.enabled !== false && m.isVideo && getSelectableModel(m.id, 'video')
+      && (!isFalOmniVideoModel(m.id) || isFalVideoBase(m.customBaseUrl)))
     .map((m) => {
       const builtin = VIDEO_GEN_MODELS.find((x) => x.id === getApprovedModel(m.id)?.id);
       return {
@@ -385,7 +387,7 @@ export function getEnabledMultimodalModelsFromSettings(
 ): WorkflowCapability[] {
   const list = models === undefined ? repairWorkflowModelsInStorage() : repairWorkflowModelList(models);
   return sortModelsByMultimodalPriority(
-    list.filter((m) => m.enabled !== false && (m.channel === 'deepseek'
+    list.filter((m) => m.enabled !== false && getSelectableModel(m.id, 'multimodal') && (m.channel === 'deepseek'
       ? !!deepSeekModel(m.id) && (purpose === 'assistant' ? !!m.isAssistant : !!m.isVision)
       : isMultimodalWorkflowModel(m)))
       .map((m) => ({ ...m, id: workflowModelRouteId(m),

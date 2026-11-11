@@ -4,7 +4,7 @@ import { apiFetch } from './apiClient';
 
 type HttpVerb = 'get' | 'post' | 'put' | 'patch' | 'delete';
 type AllowedMethod<P extends keyof paths> = {
-  [M in HttpVerb]: paths[P][M] extends never ? never : Uppercase<M>;
+  [M in HttpVerb]: [NonNullable<paths[P][M]>] extends [never] ? never : Uppercase<M>;
 }[HttpVerb];
 
 function browserOrigin(): string {

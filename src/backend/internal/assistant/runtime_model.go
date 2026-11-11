@@ -8,12 +8,14 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"beike.local/cloud/src/backend/internal/gateway"
+	"beike.local/cloud/src/backend/internal/platform/network"
 )
 
 var approvedAssistantModels = map[string]bool{
@@ -79,7 +81,12 @@ func normalizeBase(raw string) string {
 }
 
 func safePublicHTTPS(raw string) bool {
-	return strings.HasPrefix(raw, "https://") && !strings.Contains(raw, "localhost") && !strings.Contains(raw, "127.0.0.1")
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return false
+	}
+	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
+	return host != "" && host != "localhost" && host != "metadata" && host != "metadata.google.internal" && !network.PrivateIP(host)
 }
 
 type modelRound struct {
@@ -201,7 +208,9 @@ func preserveReasoning(model string) bool {
 }
 
 var assistantHTTP = func() *http.Client {
-	return &http.Client{Timeout: 10 * time.Minute}
+	client := network.SafeClient()
+	client.Timeout = 10 * time.Minute
+	return client
 }
 
 func postModel(ctx context.Context, creds gatewayCreds, body []byte, stream bool) (*http.Response, error) {

@@ -140,7 +140,7 @@ func gptImagePixelBounded(model string) bool {
 			break
 		}
 	}
-	return base == "gpt-image-2" || base == "gpt-image-2.5-flare" || base == "gpt-image-2.5-sunburst"
+	return base == "gpt-image-2" || base == "gpt-image-2.5-flare" || base == "gpt-image-2.5-sunburst" || strings.HasPrefix(base, "gpt-image-2.6")
 }
 
 func maxEdgeForGptImage(model, quality string) int {
@@ -151,7 +151,7 @@ func maxEdgeForGptImage(model, quality string) int {
 	case "gpt-image-2-2k":
 		return 2048
 	}
-	if strings.HasPrefix(id, "gpt-image-2.5") || quality == "high" {
+	if strings.HasPrefix(id, "gpt-image-2.5") || strings.HasPrefix(id, "gpt-image-2.6") || quality == "high" {
 		return 3840
 	}
 	return 2048

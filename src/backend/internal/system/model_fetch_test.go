@@ -25,29 +25,32 @@ func TestModelFetchUsesApprovedFallback(t *testing.T) {
 	}
 }
 
-func TestModelFetchKeepsAllGatewayModels(t *testing.T) {
+func TestModelFetchFiltersGatewayModels(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/models" || r.Header.Get("Authorization") != "Bearer key" {
 			t.Errorf("request %s", r.URL.String())
 		}
-		_, _ = w.Write([]byte(`{"data":[{"id":"gpt-image-2"},{"id":"not-approved"}]}`))
+		_, _ = w.Write([]byte(`{"data":[{"id":"gpt-image-2.6-sunburst"},{"id":"claude-fable-5-1"},{"id":"grok-4.6"},{"id":"viduq3"},{"id":"omni_flash-10s"},{"id":"google/gemini-omni-1.1-flash"},{"id":"not-approved"}]}`))
 	}))
 	defer server.Close()
 	status, body := fetchModelCatalog(context.Background(), config.Config{Root: repoRoot(t)}, httptest.NewRequest(http.MethodPost, "/", nil), map[string]any{"baseUrl": server.URL, "apiKey": "key"}, server.Client())
 	models, _ := body["models"].([]catalogModel)
-	if status != http.StatusOK || len(models) != 2 || !containsModel(models, "gpt-image-2") || !containsModel(models, "not-approved") {
+	if status != http.StatusOK || len(models) != 2 || models[0].ID != "claude-fable-5-1" || models[1].ID != "gpt-image-2.6-sunburst" {
 		t.Fatalf("status %d models %#v", status, body["models"])
 	}
 }
 
 func TestModelFetchKeepsPrefixedGatewayID(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/paas/v4/models" {
+			t.Errorf("unexpected model directory %s", r.URL.Path)
+		}
 		_, _ = w.Write([]byte(`{"data":[{"id":"vendor/gpt-image-2"},{"id":"custom/not-approved"}]}`))
 	}))
 	defer server.Close()
-	status, body := fetchModelCatalog(context.Background(), config.Config{Root: repoRoot(t)}, httptest.NewRequest(http.MethodPost, "/", nil), map[string]any{"baseUrl": server.URL, "apiKey": "key"}, server.Client())
-	models, _ := body["models"].([]catalogModel)
-	if status != http.StatusOK || !containsModel(models, "vendor/gpt-image-2") || !containsModel(models, "custom/not-approved") || containsModel(models, "gpt-image-2") {
+	status, body := fetchModelCatalog(context.Background(), config.Config{Root: repoRoot(t)}, httptest.NewRequest(http.MethodPost, "/", nil), map[string]any{"provider": "openai", "baseUrl": server.URL + "/api/paas/v4", "apiKey": "key"}, server.Client())
+	models, _ := body["models"].([]map[string]any)
+	if status != http.StatusOK || len(models) != 1 || models[0]["id"] != "vendor/gpt-image-2" {
 		t.Fatalf("status %d models %#v", status, body["models"])
 	}
 }

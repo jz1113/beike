@@ -7,6 +7,7 @@ import { getModelIcon } from '@client/shared/ui/ModelIcons';
 import { settingsModalShell, settingsPanelPad } from '@client/shared/ui/layoutClasses';
 import { VENDORS, identifyVendor, type VendorMeta } from '@shared/domain/models/vendorRegistry';
 import { channelDisplayName } from '@shared/domain/models/deepseek';
+import { compareModelDisplayOrder } from '@shared/domain/models/modelCatalog';
 import {
   gatewayRouteId,
   parseGatewayModels,
@@ -106,7 +107,8 @@ export default function GatewayModelModal({
   const vendorRowRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const catalog = useMemo(() => parseGatewayModels(allGatewayModels, channel), [allGatewayModels, channel]);
+  const catalog = useMemo(() => parseGatewayModels(allGatewayModels)
+    .sort((a, b) => compareModelDisplayOrder(a.id, b.id)), [allGatewayModels]);
   const grouped = useMemo(() => {
     const map = new Map<string, GatewayModelItem[]>();
     for (const model of catalog) {
@@ -137,7 +139,8 @@ export default function GatewayModelModal({
         (model) => matchesSearch(model) && matchesGatewayModelType(model, selectedTypeTab),
       ),
     }))
-    .filter((group) => group.models.length > 0);
+    .filter((group) => group.models.length > 0)
+    .sort((a, b) => compareModelDisplayOrder(a.models[0].id, b.models[0].id));
   const totalMatchedCount = filteredGroups.reduce((sum, group) => sum + group.models.length, 0);
   useEffect(() => {
     const element = vendorRowRef.current;

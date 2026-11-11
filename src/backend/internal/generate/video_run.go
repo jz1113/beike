@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -20,6 +21,14 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 	}
 	adapted := buildVideoPayload(model, prompt, payload)
 	applyMinimaxH3Channel(base, payload, &adapted)
+	if adapted.family == "fal-omni" {
+		mode := resolveVideoMode(model, videoRefMode(payload), len(adapted.images), len(rawStringList(payload["videos"])))
+		endpoint := falImageBase(base) + falOmniEndpoint(model, mode)
+		adapted.endpoints = []string{endpoint}
+		adapted.queries = []string{falImageBase(base) + falOmniPath + "/requests/{taskId}"}
+		adapted.headers = falImageHeaders(apiKey)
+	}
+
 	if adapted.family == "grok-video" {
 		mode := resolveVideoMode(model, videoRefMode(payload), len(adapted.images), len(rawStringList(payload["videos"])))
 		adapted.endpoints, adapted.queries = routeGrokEndpoints(base, mode)
@@ -82,6 +91,8 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 			} else if rawString(payload, "ref_mode") == "extend" {
 				prepareErr = prepareVeoExtension(r.Context(), cfg, workspaceOf(r), claim.recordID, payload, &adapted)
 			}
+		case "fal-omni":
+			prepareErr = prepareFalOmniMedia(r.Context(), adapted.payload, workspaceOf(r), cfg.Production(), resolveVideoStorageConfig(r, payload))
 		case "omni-flash":
 			form, prepareErr = prepareOmniForm(r.Context(), adapted, rawStringList(payload["videos"]), workspaceOf(r), cfg.Production())
 		case "grok-video":
@@ -125,6 +136,17 @@ func submitVideo(cfg config.Config, w http.ResponseWriter, r *http.Request, payl
 		return
 	}
 	encoded, _ := json.Marshal(adapted.payload)
+	if r.Context().Err() != nil {
+		message := "视频提交已取消，尚未向上游提交"
+		_ = settleVideoSubmission(cfg, r, claim.recordID, imageTaskDraft{Status: "FAILURE", FailReason: message})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "taskKey": key, "recordId": claim.recordID, "submissionOutcome": "rejected", "submissionRejected": true, "retryable": false, "error": message})
+		return
+	}
+	// Once dispatched, receive and save the provider receipt even if the browser
+	// disconnects. The bounded context retains workspace and request metadata.
+	submitContext, cancelSubmit := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Minute)
+	defer cancelSubmit()
+	r = r.WithContext(submitContext)
 	started := time.Now()
 	result := gateway.SubmitVideo(r.Context(), gateway.SubmitCommand{
 		Endpoints: expandVideoURLs(base, adapted.endpoints, ""), APIKey: apiKey, PayloadJSON: string(encoded), EndpointBodies: alternateBodies, MultipartFields: multipartFields, Form: form, Headers: adapted.headers,
@@ -239,6 +261,11 @@ func buildVideoPayload(model, prompt string, payload map[string]json.RawMessage)
 	watermark := rawBool(payload, "watermark")
 	var body map[string]any
 	switch family {
+	case "fal-omni":
+		if payload["duration"] == nil {
+			duration = 8
+		}
+		body = falOmniPayload(model, prompt, mode, ratio, resolution, duration, images, videos)
 	case "omni-flash":
 		model = "omni_flash-10s"
 		duration = 10
@@ -258,10 +285,13 @@ func buildVideoPayload(model, prompt string, payload map[string]json.RawMessage)
 	case "seedance":
 		body = seedanceOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
 	case "kling":
-		body = klingOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, audio, audioSet, watermark)
-		attachKlingVideos(body, mode, videos, audio, audioSet)
-		if mode == "motion_control" {
+		if kling4Model(model) {
+			body = kling4Payload(prompt, mode, ratio, resolution, duration, images, videos, watermark)
+		} else if mode == "motion_control" {
 			body = klingMotionPayload(prompt, resolution, images, videos, audio, audioSet, watermark)
+		} else {
+			body = klingOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, audio, audioSet, watermark)
+			attachKlingVideos(body, mode, videos, audio, audioSet)
 		}
 	case "minimax":
 		body = minimaxOfficialPayload(model, prompt, mode, ratio, resolution, duration, images, videos, audio, audioSet, watermark)
@@ -307,6 +337,8 @@ func videoFamily(model string) string {
 	switch {
 	case strings.Contains(id, "seedance"):
 		return "seedance"
+	case falOmniVideo(model):
+		return "fal-omni"
 	case omniFlash(model):
 		return "omni-flash"
 	case strings.Contains(id, "veo"):

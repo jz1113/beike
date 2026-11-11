@@ -3,7 +3,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveAppDataDir } from '../web/web-shared.mjs';
+import { buildApiEnv, resolveAppDataDir } from '../web/web-shared.mjs';
 import { resolveSqliteFile } from './sqlite-path.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -69,6 +69,13 @@ describe('maintenance database selection', () => {
       process.env.DATABASE_URL = pathToFileURL(file).href;
     });
     expect(resolveSqliteFile()).toBe(file);
+    expect(buildApiEnv({ apiPort: 3101, appDataDir: process.env.AZHUO_DATA_DIR!, accessToken: 'fixture-token' }).DATABASE_URL).toBe(`file:${file}`);
+  });
+
+  it.each(['file:./custom.db', 'file:/temporary/selected.db'])('selects the same explicit database for startup and maintenance: %s', (url) => {
+    vi.stubEnv('DATABASE_URL', url);
+    const file = resolveSqliteFile();
+    expect(buildApiEnv({ apiPort: 3101, appDataDir: '/temporary/app', accessToken: 'fixture-token' }).DATABASE_URL).toBe(`file:${file}`);
   });
 
   it('tolerates missing optional configuration but reports unreadable configuration', () => {

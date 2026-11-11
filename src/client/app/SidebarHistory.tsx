@@ -1,9 +1,10 @@
 import { isAgentConversation } from '@client/store/agentHistory';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, MessageSquare, MoreHorizontal, Pencil, Pin, SquarePen, Trash2, X } from 'lucide-react';
 import { useAppStore, type ChatSession } from '@client/store';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
+import { useModalDialog } from '@client/shared/hooks/useModalDialog';
 
 function usableMediaUrl(url?: string | null): url is string {
   return Boolean(url && !url.startsWith('agent-file:'));
@@ -68,30 +69,37 @@ export function SidebarHistory({
   const pinSession = useAppStore((s) => s.pinSession);
   const deleteSession = useAppStore((s) => s.deleteSession);
   const [chatsOpen, setChatsOpen] = useState(true);
-  const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+  const [menu, setMenu] = useState<{ id: string; anchor: DOMRect } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const menuRef = useModalDialog(Boolean(menu), () => setMenu(null));
+  const deleteRef = useModalDialog(Boolean(deleteTarget), () => setDeleteTarget(null));
 
   const ordered = sessions.filter(isAgentConversation).sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)) || b.createdAt - a.createdAt);
 
-  useEffect(() => {
-    if (!menu && !deleteTarget) return;
-    const close = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setMenu(null);
-        setDeleteTarget(null);
-      }
-    };
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
-  }, [menu, deleteTarget]);
+  useLayoutEffect(() => {
+    const panel = menuRef.current;
+    if (!menu || !panel) return;
+    const { width, height } = panel.getBoundingClientRect();
+    const { anchor } = menu;
+    const edge = 8;
+    const gap = 4;
+    const below = anchor.bottom + gap;
+    const top = below + height <= window.innerHeight - edge ? below : anchor.top - gap - height;
+    panel.style.top = `${Math.max(edge, Math.min(top, window.innerHeight - height - edge))}px`;
+    panel.style.left = `${Math.max(edge, Math.min(anchor.right - width, window.innerWidth - width - edge))}px`;
+  }, [menu, menuRef]);
 
   useEffect(() => {
     if (!menu) return;
     const close = () => setMenu(null);
     window.addEventListener('click', close);
-    return () => window.removeEventListener('click', close);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('resize', close);
+    };
   }, [menu]);
 
   const saveRename = (id: string) => {
@@ -107,7 +115,7 @@ export function SidebarHistory({
           <button
             type="button"
             onClick={() => setChatsOpen((open) => !open)}
-            className="flex items-center gap-1 text-[13px] font-medium text-slate-500 hover:text-slate-800 dark:text-[#8E8E93] dark:hover:text-[#EDEDED] transition-colors cursor-pointer"
+            className="flex items-center gap-1 text-[13px] font-medium text-slate-500 hover:text-slate-800 dark:text-[#AEAEB4] dark:hover:text-[#EDEDED] transition-colors cursor-pointer"
             aria-expanded={chatsOpen}
           >
             创作对话
@@ -118,7 +126,7 @@ export function SidebarHistory({
             aria-label="新建对话"
             title="新建对话"
             onClick={onCreateConversation}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:text-slate-950 dark:text-[#8E8E93] dark:hover:bg-white/10 dark:hover:text-white transition-colors cursor-pointer"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:text-slate-950 dark:text-[#AEAEB4] dark:hover:bg-white/10 dark:hover:text-white transition-colors cursor-pointer"
           >
             <SquarePen className="h-4 w-4" />
           </button>
@@ -126,7 +134,7 @@ export function SidebarHistory({
         {chatsOpen && (
           <div className="mt-1.5 space-y-1">
             {ordered.length === 0 ? (
-              <div className="px-2 py-3 text-[12px] text-slate-400 dark:text-[#636366] select-none">
+              <div className="px-2 py-3 text-[12px] text-slate-400 dark:text-[#9898A0] select-none">
                 尚无创作对话
               </div>
             ) : (
@@ -141,41 +149,47 @@ export function SidebarHistory({
                           active ? 'bg-[#ECEDEF] font-medium text-slate-950 dark:bg-[#1F1F24] dark:text-white' : 'hover:bg-white text-slate-800 dark:text-[#E5E5EA] dark:hover:bg-white/[0.06] dark:hover:text-white'
                         }`}
                       >
-                        <button
-                          type="button"
-                          onClick={() => onOpenSession(session.id)}
-                          className="flex min-w-0 flex-1 items-center gap-1.5 text-left cursor-pointer"
-                          title={title}
-                        >
-                          <SessionLeadingMark session={session} />
-                          {session.isPinned && (
-                            <Pin className="h-3 w-3 shrink-0 text-amber-500 fill-amber-500 rotate-45" />
-                          )}
-                          {editingId === session.id ? (
-                            <input
-                              autoFocus
-                              value={editTitle}
-                              onChange={(event) => setEditTitle(event.target.value)}
-                              onClick={(event) => event.stopPropagation()}
-                              onBlur={() => saveRename(session.id)}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter') saveRename(session.id);
-                                if (event.key === 'Escape') setEditingId(null);
-                              }}
-                              className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[13px] text-slate-900 outline-none dark:border-white/15 dark:bg-[#151518] dark:text-[#EDEDED]"
-                            />
-                          ) : (
+                        {editingId === session.id ? (
+                          <input
+                            autoFocus
+                            aria-label="对话名称"
+                            value={editTitle}
+                            onChange={(event) => setEditTitle(event.target.value)}
+                            onBlur={() => saveRename(session.id)}
+                            onKeyDown={(event) => {
+                              if (event.nativeEvent.isComposing) return;
+                              if (event.key !== 'Enter' && event.key !== 'Escape') return;
+                              event.preventDefault();
+                              const actions = event.currentTarget.nextElementSibling;
+                              if (event.key === 'Enter') saveRename(session.id);
+                              else setEditingId(null);
+                              requestAnimationFrame(() => {
+                                if (actions instanceof HTMLButtonElement && actions.isConnected) actions.focus();
+                              });
+                            }}
+                            className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[13px] text-slate-900 outline-none dark:border-white/15 dark:bg-[#151518] dark:text-[#EDEDED]"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onOpenSession(session.id)}
+                            className="flex min-w-0 flex-1 items-center gap-1.5 text-left cursor-pointer"
+                            title={title}
+                          >
+                            <SessionLeadingMark session={session} />
+                            {session.isPinned && (
+                              <Pin className="h-3 w-3 shrink-0 text-amber-500 fill-amber-500 rotate-45" />
+                            )}
                             <span className="truncate text-[13px] leading-5">{title}</span>
-                          )}
-                        </button>
+                          </button>
+                        )}
                         <button
                           type="button"
                           aria-label={`${title}更多操作`}
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 hover:bg-slate-200/80 hover:text-slate-800 dark:hover:bg-white/10 dark:hover:text-white group-hover:opacity-100 transition-opacity cursor-pointer"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 hover:bg-slate-200/80 hover:text-slate-800 dark:hover:bg-white/10 dark:hover:text-white group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity cursor-pointer"
                           onClick={(event) => {
                             event.stopPropagation();
-                            const rect = event.currentTarget.getBoundingClientRect();
-                            setMenu({ id: session.id, top: rect.bottom + 4, left: rect.right - 132 });
+                            setMenu({ id: session.id, anchor: event.currentTarget.getBoundingClientRect() });
                           }}
                         >
                           <MoreHorizontal className="h-3.5 w-3.5" />
@@ -193,8 +207,11 @@ export function SidebarHistory({
       {menu &&
         createPortal(
           <div
-            className="fixed z-[70] w-32 rounded-xl border border-slate-100 bg-white p-1 text-[13px] shadow-lg dark:border-white/[0.08] dark:bg-[#1B1B1E]"
-            style={{ top: menu.top, left: menu.left }}
+            ref={menuRef}
+            role="dialog"
+            aria-label="对话操作"
+            tabIndex={-1}
+            className="fixed z-[70] max-h-[calc(100dvh-16px)] w-32 overflow-y-auto rounded-xl border border-slate-100 bg-white p-1 text-[13px] shadow-lg dark:border-white/[0.08] dark:bg-[#1B1B1E]"
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -241,9 +258,12 @@ export function SidebarHistory({
         createPortal(
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteTarget(null)}>
             <div
+              ref={deleteRef}
               className="relative w-full max-w-[440px] rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl dark:border-white/[0.08] dark:bg-[#1B1B1E]"
               onClick={(event) => event.stopPropagation()}
               role="dialog"
+              aria-modal="true"
+              tabIndex={-1}
               aria-label={`确认删除「${deleteTarget.title}」`}
             >
               <button
@@ -255,8 +275,8 @@ export function SidebarHistory({
                 <X className="h-4 w-4" />
               </button>
               <h3 className="pr-8 text-[16px] font-semibold text-slate-900 dark:text-white">确认删除「{deleteTarget.title}」</h3>
-              <p className="mt-3 text-[13px] leading-relaxed text-slate-500 dark:text-[#8E8E93]">
-                此操作无法撤回，删除对话后，仍可在「历史」中找回已生成的内容，确认删除么？
+              <p className="mt-3 text-[13px] leading-relaxed text-slate-500 dark:text-[#AEAEB4]">
+                删除后，此对话及其生成记录将从历史中移除。此操作无法撤回。
               </p>
               <div className="mt-7 flex justify-end gap-3">
                 <button

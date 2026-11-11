@@ -11,16 +11,20 @@ import {
   gatewayBinary,
   healthOk,
   killChild,
+  loadAppDataEnv,
   resolveAccessToken,
   resolveAppDataDir,
+  resolveDatabaseFile,
   startGateway,
   waitFor,
 } from './web-shared.mjs';
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..');
+loadAppDataEnv();
 const webDistDir = process.env.WEB_DIST_DIR || join(workspaceRoot, 'tools/build/ui');
 const appDataDir = process.env.AZHUO_DATA_DIR || resolveAppDataDir();
 const apiPort = Number.parseInt(process.env.PORT || '3000', 10);
+const databaseFile = resolveDatabaseFile({ workspaceRoot, appDataDir });
 
 if (!existsSync(join(webDistDir, 'index.html'))) {
   console.error(`找不到前端构建产物：${webDistDir}/index.html`);
@@ -34,7 +38,8 @@ if (!existsSync(gatewayBinary(workspaceRoot))) {
   process.exit(1);
 }
 
-ensureAppDatabase(workspaceRoot, appDataDir);
+ensureAppDatabase(workspaceRoot, appDataDir, databaseFile);
+console.log(`→ SQLite：${databaseFile}`);
 const accessToken = process.env.LOCAL_ACCESS_TOKEN || resolveAccessToken(workspaceRoot, appDataDir);
 
 const sharedEnv = {

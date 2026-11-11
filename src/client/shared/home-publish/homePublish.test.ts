@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HOME_PUBLISHED_EVENT, HOME_PUBLISHED_STORAGE_KEY, isMediaPublishedOnHome, publishCanvasResult, unpublishCanvasResult, publishMediaResult, readPublishedHomeItems, unpublishMediaFromHome } from './homePublish';
+import { HOME_PUBLISHED_EVENT, homeGenerationSettings, HOME_PUBLISHED_STORAGE_KEY, isMediaPublishedOnHome, publishCanvasResult, unpublishCanvasResult, publishMediaResult, readPublishedHomeItems, unpublishMediaFromHome } from './homePublish';
 
 const memory = new Map<string, string>();
 
@@ -90,4 +90,20 @@ describe('home showcase publish', () => {
     expect(() => publishMediaResult({ id: 'quota', url: '/image.png', prompt: '' })).toThrow('首页展示保存失败');
     expect(dispatchEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: HOME_PUBLISHED_EVENT }));
   });
+});
+
+
+it('round-trips the original generation inputs without replacing empty references with the result', () => {
+  const settings = homeGenerationSettings({ id: 'task', title: '', prompt: 'video', model: 'upstream', modelRouteKey: 'route', size: '16:9', quality: '1080P', videoDuration: 8, videoResolution: '1080P', videoRefMode: 'omni', generateAudio: false, videoContextIrEnabled: false, referenceImages: [], useReferenceImage: false, status: 'SUCCESS', progress: '100%' });
+  publishMediaResult({ id: 'task', prompt: 'video', url: '/finished.mp4', settings });
+  expect(readPublishedHomeItems()[0]).toMatchObject({ ...JSON.parse(JSON.stringify(settings)), image: '/finished.mp4' });
+});
+
+it('keeps legacy missing parameters absent and rejects malformed snapshots', () => {
+  memory.set(HOME_PUBLISHED_STORAGE_KEY, JSON.stringify([{ id: 'old', image: '/old.mp4', publishedKind: 'media', model: {}, referenceImages: ['valid', null], videoDuration: -1, generateAudio: 'false' }]));
+  const item = readPublishedHomeItems()[0];
+  expect(item.model).toBeUndefined();
+  expect(item.referenceImages).toBeUndefined();
+  expect(item.videoDuration).toBeUndefined();
+  expect(item.generateAudio).toBeUndefined();
 });

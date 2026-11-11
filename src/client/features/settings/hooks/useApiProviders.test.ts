@@ -92,7 +92,7 @@ describe('provider draft and commit acceptance', () => {
     expect(getGatewayClientHeaders('chat')).toMatchObject({ 'x-custom-base-url': saved.baseUrl, 'x-custom-api-key': saved.apiKey });
     await apiFetch('/api/generate/canvas-text', { method: 'POST', body: JSON.stringify({ model: 'chat', prompt: 'test' }) });
     const body = vi.mocked(fetch).mock.calls[0][1]?.body as string;
-    expect(JSON.parse(body)).toMatchObject({ customBaseUrl: saved.baseUrl, customApiKey: saved.apiKey, textProtocol: 'openai' });
+    expect(JSON.parse(body)).toMatchObject({ customBaseUrl: saved.baseUrl, customApiKey: saved.apiKey, textProtocol: 'gemini' });
     unmount();
     expect(render().currentProvider).toEqual(saved);
   });

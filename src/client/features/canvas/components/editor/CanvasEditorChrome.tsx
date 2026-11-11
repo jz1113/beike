@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Plus, ZoomIn, ZoomOut,
   Download, FolderOpen, History, GalleryHorizontalEnd,
-  Sun, Moon, Library, X, Map as MapIcon, PanelTop,
+  Sun, Moon, Library, X, Map as MapIcon, PanelTop, Scan,
 } from 'lucide-react';
 import { useI18n } from '@client/shared/i18n';
 import { useAppTheme } from '@client/shared/hooks/useAppTheme';
@@ -20,6 +20,7 @@ export interface CanvasEditorChromeProps {
   handleBackToHome: () => void;
   minimapVisible: boolean;
   onToggleMinimap: () => void;
+  onFitContent: () => void;
   setZoom: (zoom: number) => void;
   handleZoom: (delta: number) => void;
   zoom: number;
@@ -146,6 +147,10 @@ export function CanvasEditorChrome(p: CanvasEditorChromeProps) {
           <button type="button" onClick={p.onToggleMinimap} aria-label="画布小地图" aria-expanded={p.minimapVisible}
             title={p.minimapVisible ? '收起画布地图' : '展开画布地图'}
             className="grid size-7 cursor-pointer place-items-center rounded-md hover:bg-black/5 dark:hover:bg-white/10"><MapIcon size={16}/></button>
+          <button type="button" onClick={p.onFitContent} title="定位画布内容（⌘ / Ctrl + 0）"
+            className="flex h-7 cursor-pointer items-center gap-1 rounded-md px-1.5 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/10">
+            <Scan size={15} />定位节点
+          </button>
           <span className="h-4 w-px bg-black/10 dark:bg-white/15" />
           <div ref={zoomControl}>
             <button ref={zoomButton} type="button" aria-label={`缩放 ${Math.round(p.zoom * 100)}%`}
@@ -159,6 +164,8 @@ export function CanvasEditorChrome(p: CanvasEditorChromeProps) {
                 className="w-24 cursor-pointer accent-blue-500" />
               <span className="w-10 text-right text-xs font-medium tabular-nums">{Math.round(p.zoom * 100)}%</span>
               <button type="button" className={button} aria-label={t('canvas.zoomIn')} disabled={p.zoom >= canvasZoomMax} onClick={() => p.handleZoom(0.1)}><ZoomIn size={16}/></button>
+              <button type="button" className="h-7 rounded-md px-1.5 text-xs hover:bg-black/5 dark:hover:bg-white/10"
+                onClick={() => p.setZoom(1)} aria-label="还原为 100% 缩放">100%</button>
               <button type="button" className={button} aria-label="关闭缩放调节" onClick={() => {setZoomOpen(false);zoomButton.current?.focus();}}><X size={16}/></button>
             </div>}
           </div>

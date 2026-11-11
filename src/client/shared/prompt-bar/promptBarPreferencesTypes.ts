@@ -1,9 +1,10 @@
+import type { ImageCapabilityResolution } from '@shared/domain/media/imageCapabilities';
 import type { ReasoningEffort } from '@shared/domain/assistant/reasoning';
 
 export type PromptPreferencesTab = 'video' | 'image' | 'reasoning';
 
 export type VideoAspectOption = 'smart' | '21:9' | '16:9' | '3:2' | '4:3' | '1:1' | '3:4' | '2:3' | '9:16';
-export type VideoResolutionOption = '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
+export type VideoResolutionOption = '360P' | '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
 export type VideoDurationMode = 'smart' | 'custom';
 export type PreferenceGenerationMode = 'normal' | 'auto';
 
@@ -15,10 +16,11 @@ export interface PromptVideoPreferences {
   customDurationSec: number; // 4 ~ 180 秒
   generationMode: PreferenceGenerationMode;
   contextIrEnabled?: boolean;
+  generateAudio?: boolean;
 }
 
 export type ImageAspectOption = 'smart' | '21:9' | '16:9' | '3:2' | '4:3' | '1:1' | '3:4' | '2:3' | '9:16' | '5:4' | '4:5' | '4:1' | '1:4' | '8:1' | '1:8';
-export type ImageResolutionOption = '1K' | '2K' | '4K';
+export type ImageResolutionOption = ImageCapabilityResolution;
 export type ImageInferenceStrength = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type ImageQualityTier = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 

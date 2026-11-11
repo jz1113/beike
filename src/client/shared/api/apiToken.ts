@@ -109,12 +109,13 @@ export function getClientAccessToken(): string {
 }
 
 /**
- * 同步客户端可读 Cookie 与过期时间元数据；保持当前请求头认证方式。
+ * 同步开发或旧部署的客户端可读 Cookie 与过期元数据。
+ * 生产 HttpOnly Cookie 由 Go 签发，不能由此函数读取或替换。
  */
 export function setClientAccessToken(_token: string): void {
   if (typeof window === 'undefined') return;
   writeMeta();
-  // 当前 API 需要读取 Cookie 生成请求头，不能单独改成 HttpOnly。
+  // 仅兼容客户端可读 Cookie；生产请求依赖服务端签发的 HttpOnly Cookie。
   writeCookie(TOKEN_COOKIE_NAME, _token.trim(), TOKEN_TTL_SECONDS);
 }
 

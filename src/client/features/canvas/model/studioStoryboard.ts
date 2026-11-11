@@ -1,3 +1,4 @@
+import { fetchMediaBlob } from '@client/shared/media/downloadMedia';
 import { extractVideoFrame } from './canvasVideoFrame';
 import { compilerSettings } from './studioCompilerState';
 import { studioNodeMedia } from './studioConnections';
@@ -95,6 +96,82 @@ async function maskStoryboardFaces(dataUrl:string,signal:AbortSignal) {
   context.fill();
  }
  return canvas.toDataURL('image/jpeg',.92);
+}
+
+export function isStudioPersonCardSlot(scene: StudioScene | undefined, nodeId: string): boolean {
+ if (!nodeId.endsWith('-person')) return false;
+ const sourceId = nodeId.replace(/-person$/, '-source');
+ const videoId = nodeId.replace(/-person$/, '-video');
+ return scene?.nodes.some(node => {
+  const settings = compilerSettings(node);
+  return settings.beikeStoryboardSceneSourceId === sourceId ||
+   (node.id === videoId && (settings.beikeVideoWorkflow === 'depth-copy' || settings.beikeVideoWorkflow === 'w3-copy'));
+ }) ?? false;
+}
+
+const personCardMasks = [
+ { x: 0.103, y: 0.113, width: 0.061, height: 0.105 },
+ { x: 0.328, y: 0.127, width: 0.042, height: 0.087 },
+];
+
+export function paintStudioPersonCardMasks(ctx: CanvasRenderingContext2D) {
+ const { width, height } = ctx.canvas;
+ ctx.fillStyle = '#252525';
+ for (const region of personCardMasks) {
+  ctx.fillRect(region.x * width, region.y * height, region.width * width, region.height * height);
+ }
+}
+
+/** Recognize the white 16:9 portrait card before applying its two small face masks. */
+export async function maskStudioPersonCard(url: string, signal: AbortSignal): Promise<Blob | undefined> {
+ const source = URL.createObjectURL(await fetchMediaBlob(url));
+ try {
+  const image = new Image();
+  image.src = source;
+  await image.decode();
+  signal.throwIfAborted();
+  const { naturalWidth: width, naturalHeight: height } = image;
+  if (Math.abs(width / height - 16 / 9) > 0.035) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('无法创建人物图打码画布');
+  ctx.drawImage(image, 0, 0);
+  const pixel = (x: number, y: number) => ctx.getImageData(Math.floor(x * width), Math.floor(y * height), 1, 1).data;
+  if (personCardMasks.every(r => pixel(r.x + r.width / 2, r.y + r.height / 2).slice(0, 3).every(c => Math.abs(c - 37) < 5))) return;
+  const gutters = [0.23, 0.44, 0.65].flatMap(x => [0.25, 0.45, 0.68].map(y => pixel(x, y)));
+  if (gutters.filter(rgb => rgb[3] === 255 && rgb.slice(0, 3).every(c => c >= 220)).length < 8) return;
+
+  const { detectImageFaces } = await import('@client/shared/media/faceDetector');
+  const hasFace = async (x: number, y: number, w: number, h: number) => {
+   const crop = document.createElement('canvas');
+   const scale = Math.min(1, 512 / Math.max(w * width, h * height));
+   crop.width = Math.round(w * width * scale);
+   crop.height = Math.round(h * height * scale);
+   const context = crop.getContext('2d');
+   if (!context) throw new Error('无法读取人物图局部');
+   context.drawImage(image, x * width, y * height, w * width, h * height, 0, 0, crop.width, crop.height);
+   const sample = new Image();
+   sample.src = crop.toDataURL('image/png');
+   await sample.decode();
+   signal.throwIfAborted();
+   return (await detectImageFaces(sample)).some(face => {
+    const centerX = x + (face.x + face.width / 2) * w;
+    const centerY = y + (face.y + face.height / 2) * h;
+    return x > 0.5 || (centerX >= personCardMasks[0].x && centerX <= personCardMasks[0].x + personCardMasks[0].width &&
+      centerY >= personCardMasks[0].y && centerY <= personCardMasks[0].y + personCardMasks[0].height);
+   });
+  };
+  if (!await hasFace(0.06, 0.06, 0.15, 0.22) || !await hasFace(0.69, 0.14, 0.30, 0.51)) return;
+  signal.throwIfAborted();
+  paintStudioPersonCardMasks(ctx);
+  return await new Promise<Blob>((resolve, reject) => {
+   canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('无法导出人物图打码副本')), 'image/png');
+  });
+ } finally {
+  URL.revokeObjectURL(source);
+ }
 }
 
 /** A normal image node keeps full sheet resolution while occupying a small canvas card. */

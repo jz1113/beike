@@ -64,22 +64,24 @@ interface CanvasEditorOverlaysProps {
 function CanvasEditorOverlays(p: CanvasEditorOverlaysProps) {
   return (
     <>
-      {p.previewMedia && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-6 animate-in fade-in duration-150 select-none"
-          onClick={() => p.setPreviewMedia(null)}
+      {p.previewMedia && createPortal(
+        <dialog
+          ref={dialog => { if (dialog && !dialog.open) dialog.showModal(); }}
+          aria-label="素材全屏预览"
+          className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none bg-black/85 p-6 text-white backdrop:bg-black/85 open:grid open:place-items-center"
+          onCancel={(event) => { event.preventDefault(); p.setPreviewMedia(null); }}
+          onClick={(event) => { if (event.target === event.currentTarget) p.setPreviewMedia(null); }}
         >
-          <div className="relative max-w-5xl max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            {p.previewMedia.type === 'video' ? (
-              <video src={proxyMediaUrl(p.previewMedia.url) || p.previewMedia.url} controls autoPlay className="max-w-full max-h-[85vh] rounded-2xl" />
-            ) : (
-              <img src={proxyMediaUrl(p.previewMedia.url) || p.previewMedia.url} alt="素材全屏预览" className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl select-none" />
-            )}
-            <button type="button" onClick={() => p.setPreviewMedia(null)} className="absolute -top-12 right-0 w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center cursor-pointer transition-colors backdrop-blur-md dark:bg-[#18191c]/95" title="关闭预览">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+          {p.previewMedia.type === 'video' ? (
+            <video src={proxyMediaUrl(p.previewMedia.url, { asVideo: true })} controls autoPlay className="max-w-full max-h-[85dvh] rounded-2xl" />
+          ) : (
+            <img src={proxyMediaUrl(p.previewMedia.url)} alt="素材全屏预览" className="max-w-full max-h-[85dvh] object-contain rounded-2xl shadow-2xl select-none" />
+          )}
+          <button type="button" onClick={() => p.setPreviewMedia(null)} className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/20 hover:bg-white/30" aria-label="关闭预览" title="关闭预览">
+            <X className="size-5" />
+          </button>
+        </dialog>,
+        document.body,
       )}
       <CanvasLightingModal isOpen={!!p.lightingModalNode} onClose={() => p.setLightingModalNode(null)} node={p.lightingModalNode} onSubmit={p.handleApplyLighting} />
       <CanvasMultiAngleModal isOpen={!!p.multiAngleModalNode} onClose={() => p.setMultiAngleModalNode(null)} node={p.multiAngleModalNode} onSubmit={p.handleApplyMultiAngle} />
@@ -108,7 +110,7 @@ export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ proj
   const history = useCanvasHistory(projectId);
   const {
     centerAt, panForPrompt, pan, zoom, readView, isPanning, isHandMode, draggingNodeId, draggingNodePos, selectedNodeId, setSelectedNodeId,
-    handleZoom, setZoom, handleWheel, handleMouseDownCanvas, handleNodeDragStart, handleNodeClick,
+    handleZoom, setZoom, handleResetView, handleWheel, handleMouseDownCanvas, handleNodeDragStart, handleNodeClick,
     handTool, setHandTool, selectedNodeIds, setSelectedNodeIds, dragPositions, selectionBox, alignmentGuides,
   } = useCanvasGestures(currentProject, updateNode, () => {
     setEditingDrawingId(null);
@@ -193,6 +195,7 @@ export const InfiniteCanvasEditor: React.FC<InfiniteCanvasEditorProps> = ({ proj
         <CanvasEditorChrome
           minimapVisible={minimapVisible}
           onToggleMinimap={() => setMinimapVisible(value => !value)}
+          onFitContent={handleResetView}
           onArchive={setArchiveMode}
           onPublish={() => setPublishOpen(true)}
           onToggleComposer={() => useAppStore.getState().setIsAssistantOpen(true)}

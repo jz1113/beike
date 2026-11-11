@@ -22,7 +22,7 @@ import (
 const OfficialWorkspace = "official"
 const PromptSubcategoryPrefix = "prompt_subcategory:"
 
-var sqliteURIPathEscaper = strings.NewReplacer("#", "%23", "?", "%3f")
+var sqliteURIPathEscaper = strings.NewReplacer("%", "%25", "#", "%23", "?", "%3f")
 
 type ErrText string
 
@@ -54,14 +54,19 @@ func OpenRequired(path string) (*sql.DB, error) {
 }
 
 func OpenWrite(path string) (*sql.DB, error) {
-	escaped := sqliteURIPathEscaper.Replace(path)
-	return sql.Open("sqlite", "file:"+escaped+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)")
+	return sql.Open("sqlite", SQLiteDSN(path, "_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"))
+}
+
+// SQLiteDSN accepts a filesystem path, not an already escaped file URI.
+// Migration, health and maintenance connections must resolve the same file.
+func SQLiteDSN(path, options string) string {
+	return "file:" + sqliteURIPathEscaper.Replace(path) + "?" + options
 }
 
 // Check opens the current database read-only and reports the latest _BeikeMigration version.
 // Schema changes still run through the existing migration script before the API listens.
 func Check(path string) error {
-	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro&_pragma=busy_timeout(5000)")
+	db, err := sql.Open("sqlite", SQLiteDSN(path, "mode=ro&_pragma=busy_timeout(5000)"))
 	if err != nil {
 		return err
 	}
@@ -107,7 +112,7 @@ func FailOrphanTasks(path string) (int, error) {
 }
 
 func Checkpoint(path string) error {
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)")
+	db, err := sql.Open("sqlite", SQLiteDSN(path, "_pragma=busy_timeout(5000)"))
 	if err != nil {
 		return err
 	}
@@ -119,7 +124,7 @@ func Checkpoint(path string) error {
 }
 
 func CountRecords(path, workspace string) (RecordCounts, error) {
-	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro&_pragma=busy_timeout(5000)")
+	db, err := sql.Open("sqlite", SQLiteDSN(path, "mode=ro&_pragma=busy_timeout(5000)"))
 	if err != nil {
 		return RecordCounts{}, err
 	}

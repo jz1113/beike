@@ -12,7 +12,6 @@ import { claimGenerationDispatch, finishGenerationDispatch, isGenerationDispatch
 import { createUsageScope, operationUsageScope } from '@client/shared/utils/usageScope';
 import { logLatencyAudit } from '@shared/domain/core/latencyAudit';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
-import { loadPromptPreferences } from '@client/shared/prompt-bar/promptBarPreferencesTypes';
 import { GENERATION_CANCELLED_MESSAGE, isGenerationCancelled, throwIfGenerationAborted } from '@client/shared/api/generation/generationAbort';
 import { requiresGenerationRecovery, SUBMISSION_RECOVERY_HINT } from '@client/shared/api/generation/generationRecovery';
 import { isImageTaskActive } from '@shared/domain/core/taskStatus';
@@ -229,7 +228,9 @@ async function prepareMediaReferences(urls: string[], signal: AbortSignal | unde
 /** Resolve the selected channel before uploads and the submission flight claim. */
 export function prepareVideoSubmissionInput(task: GenerationTask, baseUrl: string | undefined, images: string[], videos: string[]) {
   const model = task.model || 'doubao-seedance-2.5';
-  const resolution = resolveVideoResolution(task.videoResolution, getVideoModelById(model, baseUrl)?.supportedResolutions);
+  const selectedResolution = task.videoResolution?.trim().toUpperCase();
+  const resolution = isMetasoH3(model, baseUrl) && selectedResolution === '720P' ? '768P'
+    : selectedResolution || resolveVideoResolution(undefined, getVideoModelById(model, baseUrl)?.supportedResolutions);
   const error = videoInputError({
     model, baseUrl, refMode: task.videoRefMode || 'omni', images, videos, audios:task.referenceAudioUrls, audio:task.generateAudio,
     duration: task.videoDuration || 5, resolution, aspectRatio: task.size || '16:9',
@@ -387,7 +388,6 @@ export async function submitSingleGenerationTask(
       throwIfGenerationAborted(() => Boolean(signal?.aborted));
       if (!claimSubmission()) return;
       submissionDispatched = true;
-      const audioPrefs = loadPromptPreferences().audio;
       res = await apiFetch('/api/generate/audio', {
         method: 'POST',
         headers: {
@@ -401,9 +401,9 @@ export async function submitSingleGenerationTask(
           prompt: t.prompt,
           text: t.prompt,
           model: t.model || 'speech-2.8-hd',
-          format: audioPrefs?.format || 'mp3',
-          voice: audioPrefs?.voice || 'zh-female-commercial',
-          speed: audioPrefs?.speed || 1,
+          format: t.audioFormat || 'mp3',
+          voice: t.audioVoice || 'zh-female-commercial',
+          speed: t.audioSpeed ?? 1,
           customBaseUrl: gatewayHeaders['x-custom-base-url'] || localUrl,
           storageConfig: readClientStorageConfig(),
         }),

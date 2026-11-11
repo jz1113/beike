@@ -42,7 +42,7 @@ describe('modality route credentials and protocols', () => {
         id: 'img_channel',
         name: 'Channel',
         modality: 'image',
-        modelId: 'channel-model',
+        modelId: 'gpt-image-2.6-sunburst',
         channelId: 'comfly_gateway',
         isDefault: true,
       },
@@ -68,12 +68,12 @@ describe('modality route credentials and protocols', () => {
       baseUrl: 'https://own.example',
       apiKey: 'sk-own',
     });
-    expect(resolveModalityModelRoute('image', 'channel-model')).toEqual({
-      modelId: 'channel-model',
+    expect(resolveModalityModelRoute('image', 'gpt-image-2.6-sunburst')).toEqual({
+      modelId: 'gpt-image-2.6-sunburst',
       baseUrl: 'https://channel.example',
       apiKey: 'sk-channel',
     });
-    expect(resolveModalityModelRoute('image', 'img_channel').modelId).toBe('channel-model');
+    expect(resolveModalityModelRoute('image', 'img_channel').modelId).toBe('gpt-image-2.6-sunburst');
     expect(resolveModalityModelRoute('image', 'img_missing')).toEqual({
       modelId: 'missing-model',
       baseUrl: 'https://global.example',
@@ -85,12 +85,12 @@ describe('modality route credentials and protocols', () => {
       apiKey: 'sk-partial',
     });
     expect(resolveModalityModelRoute('image')).toMatchObject({
-      modelId: 'channel-model',
+      modelId: 'gpt-image-2.6-sunburst',
       baseUrl: 'https://channel.example',
     });
   });
 
-  it('inherits the channel text protocol for vendor aliases exposed by compatible gateways', () => {
+  it('retains the native Claude protocol on a compatible gateway by default', () => {
     memoryStore.set(API_PROVIDERS_STORAGE_KEY, JSON.stringify([
       { id: 'comfly_gateway', baseUrl: 'https://channel.example', apiKey: 'sk-channel', providerType: 'openai' },
     ]));
@@ -107,13 +107,13 @@ describe('modality route credentials and protocols', () => {
 
     expect(resolveModalityModelRoute('chat', 'chat_claude_channel')).toMatchObject({
       modelId: 'claude-5.5-haiku',
-      textProtocol: 'openai',
+      textProtocol: 'anthropic',
       baseUrl: 'https://channel.example',
       apiKey: 'sk-channel',
     });
   });
 
-  it('inherits the protocol from a matching provider when a model uses the global channel', () => {
+  it('retains the native Gemini protocol when a model uses the global channel', () => {
     memoryStore.set(API_PROVIDERS_STORAGE_KEY, JSON.stringify([
       { id: 'comfly_gateway', baseUrl: 'https://channel.example/v1', apiKey: 'sk-channel', providerType: 'openai' },
     ]));
@@ -131,7 +131,7 @@ describe('modality route credentials and protocols', () => {
     ]));
 
     expect(resolveModalityModelRoute('chat', 'chat_global_gemini')).toMatchObject({
-      textProtocol: 'openai',
+      textProtocol: 'gemini',
       baseUrl: 'https://channel.example/v1',
       apiKey: 'sk-channel',
     });
@@ -153,7 +153,7 @@ describe('modality route credentials and protocols', () => {
     ]));
 
     expect(resolveModalityModelRoute('chat', 'chat_legacy_claude')).toMatchObject({
-      textProtocol: 'openai',
+      textProtocol: 'anthropic',
       baseUrl: 'https://legacy.example',
       apiKey: 'sk-legacy',
     });
@@ -180,7 +180,7 @@ describe('modality route credentials and protocols', () => {
     });
   });
 
-  it('treats the built-in Comfly global endpoint as OpenAI compatible', () => {
+  it('uses the native Gemini protocol on the configured global endpoint by default', () => {
     memoryStore.set('beike_modality_global_config_v1', JSON.stringify({
       baseUrl: 'https://ai.comfly.org', apiKey: 'comfly-key',
     }));
@@ -194,10 +194,10 @@ describe('modality route credentials and protocols', () => {
       },
     ]));
 
-    expect(resolveModalityModelRoute('chat', 'chat_comfly_gemini').textProtocol).toBe('openai');
+    expect(resolveModalityModelRoute('chat', 'chat_comfly_gemini').textProtocol).toBe('gemini');
   });
 
-  it('uses the built-in Comfly transport for a Claude model saved with a native protocol', () => {
+  it('honors an explicit Claude protocol on the configured global endpoint', () => {
     memoryStore.set('beike_modality_global_config_v1', JSON.stringify({
       baseUrl: 'https://ai.comfly.org', apiKey: 'comfly-key',
     }));
@@ -213,7 +213,7 @@ describe('modality route credentials and protocols', () => {
     ]));
 
     expect(resolveModalityModelRoute('chat', 'chat_comfly_claude')).toMatchObject({
-      textProtocol: 'openai',
+      textProtocol: 'anthropic',
       baseUrl: 'https://ai.comfly.org',
       apiKey: 'comfly-key',
     });
@@ -267,13 +267,13 @@ describe('modality route credentials and protocols', () => {
 
     expect(resolveModalityModelRoute('chat', 'chat_claude_default', { channel: 'default' })).toEqual({
       modelId: 'claude-haiku-5-5',
-      textProtocol: 'openai',
+      textProtocol: 'anthropic',
       baseUrl: 'https://ai.comfly.org',
       apiKey: 'default-key',
     });
     expect(resolveModalityModelRoute('chat', 'legacy-claude-route', { channel: 'default' })).toEqual({
       modelId: 'claude-haiku-5-5',
-      textProtocol: 'openai',
+      textProtocol: 'anthropic',
       baseUrl: 'https://ai.comfly.org',
       apiKey: 'default-key',
     });

@@ -2,6 +2,7 @@ package assistant
 
 import (
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/httpx"
 	"beike.local/cloud/src/backend/internal/platform/database"
 	"context"
 	"encoding/json"
@@ -106,6 +107,44 @@ func TestTurnMessagesInlineLatestImagesOnly(t *testing.T) {
 	}
 }
 
+func TestTurnMessagesOnlyInlineImagesFromRequestWorkspace(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AZHUO_CACHE_DIR", root)
+	t.Setenv("AZHUO_USER_DATA_DIR", t.TempDir())
+	owner, other := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	for _, rel := range []string{owner + "/assistant-attachments/sample.jpg", "assistant-attachments/legacy.jpg", "official/sample.jpg"} {
+		file := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte{0xff, 0xd8, 0xff, 0xd9}, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct {
+		name, workspace, rel string
+		want                 bool
+	}{
+		{"owned", owner, owner + "/assistant-attachments/sample.jpg?preview=1", true},
+		{"other workspace", other, owner + "/assistant-attachments/sample.jpg", false},
+		{"local cannot read hosted workspace", "local", owner + "/assistant-attachments/sample.jpg", false},
+		{"local legacy", "local", "assistant-attachments/legacy.jpg", true},
+		{"hosted cannot read legacy", other, "assistant-attachments/legacy.jpg", false},
+		{"official needs explicit access", other, "official/sample.jpg", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body, _ := json.Marshal([]map[string]any{{"role": "user", "content": "分析图片", "attachments": []map[string]any{{"type": "image", "url": "/storage/" + tc.rel}}}})
+			r := httptest.NewRequest("POST", "/api/assistant/turn/start", nil)
+			r = r.WithContext(httpx.WithWorkspace(r.Context(), tc.workspace))
+			messages, _ := turnMessages(r, "image-scope", map[string]json.RawMessage{"messages": body})
+			wire, _ := json.Marshal(messages)
+			if got := strings.Contains(string(wire), "data:image/jpeg;base64,"); got != tc.want {
+				t.Fatalf("inlined=%v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestNativeContinuationPersistsPrivatelyAndIsolatesRoutes(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "continuation.db")
 	db, err := database.OpenWrite(path)
@@ -195,6 +234,7 @@ func TestNativeGeminiStreamPreservesSignedToolCalls(t *testing.T) {
 		fmt.Fprint(w, "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"已完成\",\"thoughtSignature\":\"signed-final-block\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":3,\"candidatesTokenCount\":2,\"totalTokenCount\":5}}\n\n")
 	}))
 	defer server.Close()
+	useAssistantTestClient(t, server.Client())
 	loop := testLoop(server.URL, func(event map[string]any) {
 		encoded, _ := json.Marshal(event)
 		if strings.Contains(string(encoded), "signed-tool-block") {
@@ -227,6 +267,7 @@ func TestNativeStreamFailureDoesNotRetryOrSwitchProtocol(t *testing.T) {
 				fmt.Fprint(w, `{"error":{"message":"native unavailable"}}`)
 			}))
 			defer server.Close()
+			useAssistantTestClient(t, server.Client())
 			loop := testLoop(server.URL, func(map[string]any) {})
 			loop.creds.protocol = "gemini"
 			loop.models = []string{"gemini-4-argon", "gemini-3.8-flash", "gpt-6-sol"}

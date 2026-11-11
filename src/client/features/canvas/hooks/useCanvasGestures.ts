@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type RefObject, type MouseEvent as ReactMouseEvent } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
-import { nodeBounds } from '../model/canvasGraph';
+import { canvasNavigationNodes, nodeBounds } from '../model/canvasGraph';
 import { canvasGroupSelection, expandCanvasGroups } from '../model/canvasAlignment';
 import { computeSnapGuides, type AlignmentGuide } from './useCanvasSnapping';
 import type { CanvasNode, CanvasProject } from '../model/types';
@@ -12,13 +12,23 @@ export type { AlignmentGuide };
 type Point = {x:number; y:number};
 type Box = Point & {width:number; height:number};
 const intersects = (a:Box,b:Box) => a.x <= b.x+b.width && a.x+a.width >= b.x && a.y <= b.y+b.height && a.y+a.height >= b.y;
-export function fitCanvasNodes(nodes: CanvasNode[], width: number, height: number) {
-  const valid = nodes.filter(n => !n.layerHidden && [n.x,n.y,n.width,n.height].every(Number.isFinite)).map(nodeBounds);
+export function fitCanvasNodes(nodes: CanvasNode[], width: number, height: number, focus?: Point) {
+  const valid = canvasNavigationNodes(nodes).map(item => item.bounds);
   if (!valid.length) return {pan:{x:0,y:0},zoom:1};
-  const left=Math.min(...valid.map(n=>n.x)), top=Math.min(...valid.map(n=>n.y))-32;
-  const right=Math.max(...valid.map(n=>n.x+n.width)), bottom=Math.max(...valid.map(n=>n.y+n.height));
+  let left=Math.min(...valid.map(n=>n.x)), top=Math.min(...valid.map(n=>n.y))-32;
+  let right=Math.max(...valid.map(n=>n.x+n.width)), bottom=Math.max(...valid.map(n=>n.y+n.height));
   const availableWidth=Math.max(100,width-180), availableHeight=Math.max(100,height-200);
-  const zoom=Math.max(0.1,Math.min(1,availableWidth/(right-left),availableHeight/(bottom-top)));
+  const overviewZoom = Math.min(1, availableWidth / (right-left), availableHeight / (bottom-top));
+  if (overviewZoom < canvasZoomMin && valid.length > 1) {
+    const target = focus ?? { x: (left + right) / 2, y: (top + bottom) / 2 };
+    const distance = (box: Box) => Math.hypot(box.x + box.width / 2 - target.x, box.y + box.height / 2 - target.y);
+    const nearest = valid.reduce((best, box) => distance(box) < distance(best) ? box : best);
+    left = nearest.x;
+    top = nearest.y - 32;
+    right = nearest.x + nearest.width;
+    bottom = nearest.y + nearest.height;
+  }
+  const zoom=Math.max(canvasZoomMin,Math.min(1,availableWidth/(right-left),availableHeight/(bottom-top)));
   return {zoom,pan:{x:width/2-(left+right)/2*zoom,y:80+availableHeight/2-(top+bottom)/2*zoom}};
 }
 
@@ -124,7 +134,11 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
   const handleResetView=useCallback(()=>{
     onBackgroundSelect();
     const viewport=viewportRef.current;
-    const view=fitCanvasNodes(currentProject?.nodes || [],viewport?.clientWidth || 900,viewport?.clientHeight || 600);
+    const width = viewport?.clientWidth || 900;
+    const height = viewport?.clientHeight || 600;
+    const { pan, zoom } = live.current;
+    const focus = { x: (width / 2 - pan.x) / zoom, y: (height / 2 - pan.y) / zoom };
+    const view = fitCanvasNodes(currentProject?.nodes || [], width, height, focus);
     applyView(view);
   },[currentProject,viewportRef,onBackgroundSelect,applyView]);
   useEffect(()=>{
@@ -144,11 +158,15 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
     fitted.current=currentProject.id;
     const saved=currentProject.viewport;
     if(saved && [saved.x,saved.y,saved.zoom].every(Number.isFinite) && saved.zoom>=0.1 && saved.zoom<=2.5){
-      const view={pan:{x:saved.x,y:saved.y},zoom:saved.zoom};
+      const zoom = Math.max(canvasZoomMin, Math.min(canvasZoomMax, saved.zoom));
+      const centerX = (viewportRef.current?.clientWidth || 900) / 2;
+      const centerY = (viewportRef.current?.clientHeight || 600) / 2;
+      const scale = zoom / saved.zoom;
+      const view = { pan: { x: centerX - (centerX - saved.x) * scale, y: centerY - (centerY - saved.y) * scale }, zoom };
       live.current=view;renderedView.current=view;setPan(view.pan);setZoom(view.zoom);
     }else if(currentProject.nodes.length) handleResetView();
     else {live.current={pan:{x:0,y:0},zoom:1};renderedView.current=live.current;}
-  },[currentProject,handleResetView]);
+  },[currentProject,handleResetView,viewportRef]);
   useEffect(()=>{
     const existing = new Set(currentProject?.nodes.filter(node=>!node.layerHidden).map(node=>node.id));
     setSelectedNodeIds(ids=>ids.every(id=>existing.has(id))?ids:ids.filter(id=>existing.has(id)));
@@ -224,8 +242,12 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
     const selected=new Set(ids);
     const moving=nodes.filter(n=>selected.has(n.id) && !n.layerLocked && !n.layerHidden);
     const start={x:event.clientX,y:event.clientY}, dragZoom=live.current.zoom;let latest:Record<string,Point>={};let moved=false;
-    track(e=>{
-      const rawDx=(e.clientX-start.x)/dragZoom, rawDy=(e.clientY-start.y)/dragZoom;
+    let dragFrame: number | undefined;
+    let pendingPoint: Point | undefined;
+    const paintDrag = () => {
+      dragFrame = undefined;
+      if (!pendingPoint) return;
+      const rawDx=(pendingPoint.x-start.x)/dragZoom, rawDy=(pendingPoint.y-start.y)/dragZoom;
       if(!moved && Math.hypot(rawDx,rawDy)*dragZoom<3)return;
       // A selected node's editor can reappear after dragging. Keep the drop point under the pointer.
       suppressPromptPan.current=true;
@@ -237,11 +259,21 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
 
       latest=Object.fromEntries(moving.map(n=>[n.id,{x:n.x+Math.round(snap.dx),y:n.y+Math.round(snap.dy)}]));
       setDragPositions(latest);
+    };
+    track(e=>{
+      pendingPoint = {x:e.clientX,y:e.clientY};
+      dragFrame ??= requestAnimationFrame(paintDrag);
     },()=>{
+      if (dragFrame !== undefined) { cancelAnimationFrame(dragFrame); paintDrag(); }
       setAlignmentGuides([]);
       if(moved && currentProject)useCanvasStore.getState().patchNodes(currentProject.id,latest);
       suppressClick.current=moved;setDraggingNodeId(null);setDragPositions({});
     });
+    const cancelTracking = cleanup.current;
+    cleanup.current = () => {
+      if (dragFrame !== undefined) cancelAnimationFrame(dragFrame);
+      cancelTracking?.();
+    };
   };
   const handleNodeClick=(node:CanvasNode,event:ReactMouseEvent)=>{
     if(suppressClick.current){suppressClick.current=false;return false;}
@@ -268,7 +300,11 @@ export function useCanvasGestures(currentProject: CanvasProject | undefined, _up
       y: event.clientY - rect.top,
     });
   };
-  const centerAt=(x:number,y:number)=>applyView({pan:{x:(viewportRef.current?.clientWidth || 900)/2-x*live.current.zoom,y:(viewportRef.current?.clientHeight || 600)/2-y*live.current.zoom},zoom:live.current.zoom});
+  const centerAt = useCallback((x: number, y: number, zoomDelta = 0) => {
+    const zoom = Math.max(canvasZoomMin, Math.min(canvasZoomMax, live.current.zoom + zoomDelta));
+    applyView({ pan: { x: (viewportRef.current?.clientWidth || 900) / 2 - x * zoom,
+      y: (viewportRef.current?.clientHeight || 600) / 2 - y * zoom }, zoom });
+  }, [applyView, viewportRef]);
   return {
     centerAt,panForPrompt,pan,zoom,readView,isPanning,isHandMode,handTool,setHandTool,
     selectedNodeIds,setSelectedNodeIds,selectedNodeId,setSelectedNodeId,

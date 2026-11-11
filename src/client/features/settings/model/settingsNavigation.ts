@@ -40,6 +40,7 @@ export type SettingsNavSection =
   | 'chat'
   | 'image'
   | 'video'
+  | 'fal'
   | 'voice'
   | 'canvas'
   | 'pet'
@@ -75,6 +76,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'chat', label: '多模态', keywords: ['多模态', '对话', '视觉', '默认', '助手'] },
   { id: 'image', label: '绘画', keywords: ['绘画', '生图', '默认'] },
   { id: 'video', label: '视频', keywords: ['视频', '默认'] },
+  { id: 'fal', label: 'fal 模型', keywords: ['fal', '模型目录', '拉取', '选择'] },
   { id: 'voice', label: '语音', keywords: ['语音', '配音'] },
   { id: 'canvas', label: '画布功能', keywords: ['画布', '连线', '节点', '桌宠'] },
   { id: 'language', label: '语言', keywords: ['语言', '中文'] },

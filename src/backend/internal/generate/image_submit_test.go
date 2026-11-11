@@ -3,6 +3,7 @@ package generate
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -17,6 +18,129 @@ import (
 	"beike.local/cloud/src/backend/internal/gateway"
 	"beike.local/cloud/src/backend/internal/platform/database"
 )
+
+func TestFalQwenImage3QueueAndReceiptRecovery(t *testing.T) {
+	cfg := config.Config{DatabaseURL: "file:" + imageTaskDatabase(t), NodeEnv: "development"}
+	previous := gateway.ModelHTTP
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	submits := 0
+	upstream := &http.Client{Transport: specializedTestTransport(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host != "queue.fal.run" || r.Header.Get("Authorization") != "Key fixture-fal" {
+			t.Fatalf("unexpected endpoint or auth: %s", r.URL)
+		}
+		var output string
+		switch r.URL.Path {
+		case "/alibaba/qwen-image-3/text-to-image", "/alibaba/qwen-image-3/edit":
+			submits++
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			size, _ := body["image_size"].(map[string]any)
+			if size["width"] != float64(1536) || size["height"] != float64(2048) || body["quality"] != nil {
+				t.Fatalf("invalid fal body: %#v", body)
+			}
+			if strings.HasSuffix(r.URL.Path, "/edit") {
+				refs, _ := body["image_urls"].([]any)
+				if len(refs) != 1 || refs[0] != "https://media.example/a.png" {
+					t.Fatalf("invalid edit references: %#v", refs)
+				}
+			}
+			output = `{"request_id":"fal-` + Itoa(submits) + `"}`
+		case "/alibaba/qwen-image-3/requests/fal-2/status":
+			output = `{"status":"COMPLETED"}`
+		case "/alibaba/qwen-image-3/requests/fal-2":
+			output = `{"images":[{"url":"https://cdn.example/result.png"}]}`
+		default:
+			t.Fatalf("unexpected fal path: %s", r.URL.Path)
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(output))}, nil
+	})}
+	gateway.ModelHTTP = func() *http.Client { return upstream }
+	do := func(method, path, key, body string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, path, strings.NewReader(body))
+		r.Header.Set("x-custom-base-url", "https://queue.fal.run")
+		r.Header.Set("x-custom-api-key", "fixture-fal")
+		r.Header.Set("x-idempotency-key", key)
+		w := httptest.NewRecorder()
+		Image(cfg).ServeHTTP(w, r)
+		return w
+	}
+	const imagePath = "/api/generate/image"
+	const baseBody = `{"model":"qwen-image-3","prompt":"画一只猫","size":"1536x2048"`
+	if w := do("POST", imagePath, "fal-text", baseBody+"}"); w.Code != 200 || !strings.Contains(w.Body.String(), "fal-1") {
+		t.Fatalf("text submit: %d %s", w.Code, w.Body)
+	}
+	for range 2 {
+		w := do("POST", imagePath, "fal-edit", baseBody+`,"images":["https://media.example/a.png"]}`)
+		if w.Code != 200 || !strings.Contains(w.Body.String(), "fal-2") {
+			t.Fatalf("edit submit: %d %s", w.Code, w.Body)
+		}
+	}
+	if w := do("GET", imagePath+"?taskKey=fal-edit", "", ""); w.Code != 200 || !strings.Contains(w.Body.String(), "https://cdn.example/result.png") || submits != 2 {
+		t.Fatalf("receipt: %d %s, submissions: %d", w.Code, w.Body, submits)
+	}
+}
+
+func TestArkSeedreamImageUsesNativeEndpointAndActualSize(t *testing.T) {
+	previous := gateway.ModelHTTP
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	calls := 0
+	gateway.ModelHTTP = func() *http.Client {
+		return &http.Client{Transport: specializedTestTransport(func(r *http.Request) (*http.Response, error) {
+			calls++
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if r.URL.Path != "/api/v3/images/generations" || r.URL.RawQuery != "" || body["size"] != "1536x2730" || body["n"] != nil || body["quality"] != nil {
+				t.Fatalf("invalid Ark request: %s %#v", r.URL, body)
+			}
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"url":"https://cdn.example/seedream.png","size":"1536x2720"}]}`))}, nil
+		})}
+	}
+	base := "https://ark.cn-beijing.volces.com/api/v3"
+	protocol := resolveImageProtocol(base, "")
+	req := imageRequest{Ctx: t.Context(), Base: base, APIKey: "fixture-ark", Model: "doubao-seedream-5-0-260128", Prompt: "画一只猫", Size: "864x1536"}
+	if _, err := protocol.Submit(req); err == nil || calls != 0 {
+		t.Fatalf("out-of-range size sent to Ark: %v, %d calls", err, calls)
+	}
+	req.Size = "1536x2730"
+	result, err := protocol.Submit(req)
+	if err != nil || result.Direct != "https://cdn.example/seedream.png" || result.Adapted.size != "1536x2720" {
+		t.Fatalf("Ark response: %+v, %v", result, err)
+	}
+}
+
+func TestXAIImageEditUsesOfficialJSON(t *testing.T) {
+	previous := gateway.ModelHTTP
+	t.Cleanup(func() { gateway.ModelHTTP = previous })
+	gateway.ModelHTTP = func() *http.Client {
+		return &http.Client{Transport: specializedTestTransport(func(r *http.Request) (*http.Response, error) {
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if r.URL.Path != "/v1/images/edits" || r.URL.RawQuery != "" || body["size"] != nil || body["quality"] != nil {
+				t.Fatalf("invalid xAI request: %s %#v", r.URL, body)
+			}
+			refs, _ := body["images"].([]any)
+			if len(refs) != 2 || refs[1].(map[string]any)["url"] != "https://cdn.example/b.jpg" {
+				t.Fatalf("incorrect xAI references: %#v", refs)
+			}
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"url":"https://cdn.example/grok.png"}]}`))}, nil
+		})}
+	}
+	base := "https://api.x.ai/v1"
+	protocol := resolveImageProtocol(base, "")
+	result, err := protocol.Submit(imageRequest{
+		Ctx: t.Context(), Base: base, APIKey: "fixture-xai", Model: "grok-imagine-image-2.0", Prompt: "合并参考图", Size: "1536x2048",
+		Refs: []string{"https://cdn.example/a.jpg", "https://cdn.example/b.jpg"},
+	})
+	if err != nil || result.Direct != "https://cdn.example/grok.png" {
+		t.Fatalf("xAI response: %+v, %v", result, err)
+	}
+}
 
 func TestImageRejectsEmptyPromptAndUnknownModel(t *testing.T) {
 	handler := Image(config.Config{})

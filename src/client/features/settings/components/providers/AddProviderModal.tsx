@@ -16,6 +16,9 @@ const providerPresets: readonly ProviderPreset[] = [
   { name: 'Google Gemini', protocol: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com' },
   { name: 'DeepSeek', protocol: 'openai', baseUrl: 'https://api.deepseek.com' },
   { name: '阿里云百炼', protocol: 'dashscope', baseUrl: 'https://dashscope.aliyuncs.com' },
+  { name: 'fal', protocol: 'fal', baseUrl: 'https://queue.fal.run' },
+  { name: '火山方舟', protocol: 'custom', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' },
+  { name: '可灵官方', protocol: 'custom', baseUrl: 'https://api-singapore.klingai.com' },
   { name: '硅基流动', protocol: 'openai', baseUrl: 'https://api.siliconflow.cn' },
   { name: 'OpenRouter', protocol: 'openai', baseUrl: 'https://openrouter.ai/api/v1' },
 ];
@@ -48,6 +51,8 @@ export function AddProviderModal({ isOpen, onClose, onAdd }: Props) {
         setBaseUrl('https://api.openai.com');
       } else if (type === 'dashscope') {
         setBaseUrl('https://maas.qianwenaiapi.com');
+      } else if (type === 'fal') {
+        setBaseUrl('https://queue.fal.run');
       }
     }
   };

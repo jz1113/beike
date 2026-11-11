@@ -26,6 +26,10 @@ func pollVideoTask(cfg config.Config, w http.ResponseWriter, r *http.Request, ta
 		return
 	}
 	base, apiKey := pollCredentials(cfg, r)
+	if isFalImageBase(base) && (falOmniVideo(r.URL.Query().Get("model")) || strings.HasPrefix(pinnedQuery, falImageBase(base)+falOmniPath+"/")) {
+		pollFalOmniVideo(cfg, w, r, base, apiKey, taskID)
+		return
+	}
 	if (veoModel(r.URL.Query().Get("model")) || strings.HasPrefix(taskID, "veo-op.")) && veoNativeBase(base) {
 		model := r.URL.Query().Get("model")
 		if model == "" {
@@ -81,12 +85,14 @@ func videoPollURLs(base, taskID, model, protocol string) []string {
 			parsed, _ := url.Parse(base)
 			root := parsed.Scheme + "://" + parsed.Host + "/v1/videos/"
 			queries = append(queries, parsed.Scheme+"://"+parsed.Host+"/tasks?task_ids={taskId}")
-			paths := []string{"text2video", "image2video"}
-			if strings.Contains(strings.ToLower(model), "omni") {
-				paths = []string{"omni-video"}
-			}
-			for _, path := range paths {
-				queries = append(queries, root+path+"/{taskId}")
+			if !kling4Model(model) {
+				paths := []string{"text2video", "image2video"}
+				if strings.Contains(strings.ToLower(model), "omni") {
+					paths = []string{"omni-video"}
+				}
+				for _, path := range paths {
+					queries = append(queries, root+path+"/{taskId}")
+				}
 			}
 		} else {
 			a := videoAdapted{family: provider, modelID: model}
@@ -169,6 +175,15 @@ func readVideoPoll(data map[string]any) pollParsed {
 		progress = "100%"
 	}
 	result := extractVideoResult(data, task)
+	if done && result == "" {
+		// The Seedance gateway's unified query uses a string at data.output.
+		if nested, ok := data["data"].(map[string]any); ok {
+			candidate := firstString(nested, "output")
+			if parsed, err := url.ParseRequestURI(candidate); err == nil && parsed.Hostname() != "" && parsed.User == nil && (parsed.Scheme == "https" || parsed.Scheme == "http") {
+				result = candidate
+			}
+		}
+	}
 	state := "IN_PROGRESS"
 	reason := ""
 	if isFailure(raw) || raw == "FAILED" {

@@ -1,5 +1,6 @@
 import { parseModelDetails, type ParsedRawModel } from './modelParsing';
 import { VENDOR_PRIORITY } from './modelSorting';
+import { compareModelDisplayOrder, modelDisplayRank } from './modelCatalog';
 
 export { isLegacyOrDiscontinuedModel, parseModelDetails } from './modelParsing';
 export type { ParsedRawModel } from './modelParsing';
@@ -64,6 +65,8 @@ export function groupModelsByGeneration(
   kind?: string,
 ): VendorGenerationSection[] {
   const parsedList = modelIds.map((id) => parseModelDetails(id, kind));
+  const useCatalogOrder = kind === 'chat' || kind === 'image' || kind === 'video';
+  const rowRank = (row: GenerationRowItem) => Math.min(...row.allModelIds.map(modelDisplayRank));
 
   const vendorMap = new Map<string, { vendorName: string; rowsMap: Map<string, ParsedRawModel[]> }>();
 
@@ -124,6 +127,10 @@ export function groupModelsByGeneration(
       });
 
       variants.sort((a, b) => {
+        if (useCatalogOrder) {
+          const order = compareModelDisplayOrder(a.primaryModelId, b.primaryModelId);
+          if (order) return order;
+        }
         const left = TIER_WEIGHTS[a.variantKey.toLowerCase()] || 40;
         const right = TIER_WEIGHTS[b.variantKey.toLowerCase()] || 40;
         return right - left;
@@ -146,6 +153,10 @@ export function groupModelsByGeneration(
     rows.sort((a, b) => {
       if (a.isArchived && !b.isArchived) return 1;
       if (!a.isArchived && b.isArchived) return -1;
+      if (useCatalogOrder) {
+        const order = rowRank(a) - rowRank(b);
+        if (order) return order;
+      }
       if (b.versionScore !== a.versionScore) return b.versionScore - a.versionScore;
       return b.allModelIds.length - a.allModelIds.length;
     });
@@ -159,6 +170,10 @@ export function groupModelsByGeneration(
   }
 
   sections.sort((a, b) => {
+    if (useCatalogOrder) {
+      const order = Math.min(...a.rows.map(rowRank)) - Math.min(...b.rows.map(rowRank));
+      if (order) return order;
+    }
     const aIdx = VENDOR_PRIORITY.indexOf(a.vendorId);
     const bIdx = VENDOR_PRIORITY.indexOf(b.vendorId);
     if (aIdx >= 0 && bIdx >= 0) return aIdx - bIdx;

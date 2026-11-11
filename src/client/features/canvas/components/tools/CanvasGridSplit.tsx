@@ -2,8 +2,9 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Grid2X2, Layers, Redo2, Undo2, X } from 'lucide-react';
 import { apiFetch, proxyMediaUrl } from '@client/shared/api/apiClient';
-import { IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
+import { EXTENDED_IMAGE_RATIO_ITEMS, IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
 import { ModelIcon } from '@client/shared/ui/ModelIcons';
+import { agentTriggerModelName, PromptBarModelPickerModal } from '@client/shared/prompt-bar/controls/PromptBarModelPickerModal';
 import { prepareLayerImage, runLayerDecompositionTask } from '../../model/layerDecompositionTask';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import type { CanvasNode } from '../../model/types';
@@ -29,7 +30,7 @@ const backgroundModes = [
   { id: 'auto' as const, label: '默认' },
   { id: 'transparent' as const, label: '透明底' },
 ];
-const ALL_RATIO_IDS = ['smart', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '21:9', 'custom'] as const;
+const ALL_RATIO_IDS = ['smart', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '21:9', ...EXTENDED_IMAGE_RATIO_ITEMS.slice(2).map(item => item.id), 'custom'];
 
 function RatioFrameIcon({ ratio }: { ratio: string }) {
   const clean = String(ratio || '').trim();
@@ -67,7 +68,7 @@ function RatioFrameIcon({ ratio }: { ratio: string }) {
   );
 }
 
-export function CanvasImageControls({ config, model, onChange }: { config: ImageControlConfig; model?: string; onChange: (patch: Partial<ImageControlConfig>) => void }) {
+export function CanvasImageControls({ config, model, selection, onChange }: { config: ImageControlConfig; model?: string; selection?: string; onChange: (patch: Partial<ImageControlConfig>) => void }) {
   const [open, setOpen] = useState<'aspect' | 'quality' | 'count' | null>(null);
   const aspect = useRef<HTMLButtonElement>(null);
   const quality = useRef<HTMLButtonElement>(null);
@@ -88,7 +89,7 @@ export function CanvasImageControls({ config, model, onChange }: { config: Image
       setOpen(null);
     }
   };
-  const caps = useMemo(() => resolveImageModelCapabilities(model), [model]);
+  const caps = useMemo(() => resolveImageModelCapabilities(model, selection), [model, selection]);
   const activeQuality =
     caps.resolutions.find((item) => item.id === config.quality || item.short === config.quality) ||
     caps.resolutions[Math.min(1, Math.max(0, caps.resolutions.length - 1))] ||
@@ -474,8 +475,8 @@ export function CanvasLayerDecomposition({ node, projectId, menuItemClass, onMen
 
 interface PickerModel { id: string; name: string; modelId?: string; upstreamId?: string; provider?: string }
 
-export function CanvasModelPicker({ models, value, onChange, disabled = false, label = '绘图模型' }: {
-  models: PickerModel[]; value: string; onChange: (id: string) => void; disabled?: boolean; label?: string;
+export function CanvasModelPicker({ models, value, onChange, disabled = false, label = '绘图模型', placeholder, preferUp = true }: {
+  models: PickerModel[]; value: string; onChange: (id: string) => void; disabled?: boolean; label?: string; placeholder?: string; preferUp?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [channelTab, setChannelTab] = useState<ModelChannelTab>('api');
@@ -484,8 +485,9 @@ export function CanvasModelPicker({ models, value, onChange, disabled = false, l
   const popup = useRef<HTMLDivElement>(null);
   const id = useId();
   const isImagePicker = label === '绘图模型';
+  const isChatPicker = label !== '绘图模型' && label !== '视频模型';
   const hasFalModels = useMemo(
-    () => models.some((m) => /fal/i.test(`${m.id} ${m.name} ${m.modelId || ''} ${m.upstreamId || ''}`)),
+    () => resolveImagePickerModels(models, 'fal').length > 0 && resolveImagePickerModels(models, 'api').length > 0,
     [models],
   );
   const showChannelTabs = (label === '绘图模型' || label === '视频模型') && hasFalModels;
@@ -496,21 +498,23 @@ export function CanvasModelPicker({ models, value, onChange, disabled = false, l
   const builtins = isImagePicker ? BUILTIN_IMAGE_PICKER_MODELS : BUILTIN_VIDEO_PICKER_MODELS;
   const current =
     models.find((model) => model.id === value || model.modelId === value || model.upstreamId === value) ||
-    models[0] ||
+    (!placeholder ? models[0] : undefined) ||
     (label === '绘图模型' || label === '视频模型' ? builtins.find((model) => model.id === value || model.name === value) : undefined);
   const fallbackName = isImagePicker ? 'GPT Image 2' : label === '视频模型' ? 'Seedance 2.0 Mini' : '未配置模型';
-  const triggerDisplayName = current?.name ? current.name.split(' · ')[0] : value || fallbackName;
+  const triggerDisplayName = !current && placeholder ? placeholder : isChatPicker
+    ? agentTriggerModelName(current?.modelId || current?.upstreamId || value, current?.name || '')
+    : current?.name ? current.name.split(' · ')[0] : value || fallbackName;
   const close = () => { setOpen(false); trigger.current?.focus(); };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || isChatPicker) return;
     const place = () => {
       const rect = trigger.current?.getBoundingClientRect();
       if (!rect) return;
       const width = Math.min(288, window.innerWidth - 16);
       const above = rect.top - 16;
       const below = window.innerHeight - rect.bottom - 16;
-      const up = above >= Math.min(390, below);
+      const up = preferUp ? above >= Math.min(390, below) : below < Math.min(390, above);
       const height = Math.max(80, Math.min(390, up ? above : below));
       setPosition({ left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), ...(up ? { bottom: window.innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }), width, height });
     };
@@ -523,7 +527,7 @@ export function CanvasModelPicker({ models, value, onChange, disabled = false, l
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
     return () => { document.removeEventListener('pointerdown', outside); window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
-  }, [open]);
+  }, [open, isChatPicker, preferUp]);
 
   return (
     <div data-model-select-area="true" className="relative shrink-0 min-w-0">
@@ -547,7 +551,17 @@ export function CanvasModelPicker({ models, value, onChange, disabled = false, l
           {triggerDisplayName}
         </span>
       </button>
-      {open &&
+      {isChatPicker && <PromptBarModelPickerModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        triggerRef={trigger}
+        isUp={preferUp}
+        models={models.map((model) => ({ ...model, upstreamId: model.modelId || model.upstreamId, desc: '' }))}
+        selectedModelId={current?.id || value}
+        modalityKind="chat"
+        onSelectModel={onChange}
+      />}
+      {open && !isChatPicker &&
         createPortal(
           <div
             ref={popup}

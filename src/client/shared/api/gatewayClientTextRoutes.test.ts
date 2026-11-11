@@ -48,7 +48,7 @@ describe('configured text model gateway routes', () => {
 
     expect(selectedTextModel(selection).modelId).toBe('gemini-custom');
     expect(getMultimodalClientOverrides(selection)).toMatchObject({
-      customBaseUrl: compatible.baseUrl, customApiKey: compatible.apiKey, textProtocol: 'openai',
+      customBaseUrl: compatible.baseUrl, customApiKey: compatible.apiKey, textProtocol: 'gemini',
     });
     expect(getGatewayClientHeaders(selection)).toMatchObject({
       'x-custom-base-url': compatible.baseUrl, 'x-custom-api-key': compatible.apiKey,
@@ -57,7 +57,7 @@ describe('configured text model gateway routes', () => {
 
   it('keeps duplicate upstream models on their individually selected channels and protocols', () => {
     saveChat([
-      { id: 'compatible-entry', modelId: 'gemini-custom', channelId: compatible.id },
+      { id: 'compatible-entry', modelId: 'gemini-custom', channelId: compatible.id, textProtocol: 'openai' },
       { id: 'native-entry', modelId: 'gemini-custom', channelId: native.id },
     ]);
     for (const [selection, provider, protocol] of [
@@ -72,9 +72,9 @@ describe('configured text model gateway routes', () => {
     }
   });
 
-  it.each([undefined, 'auto'] as const)('inherits channel transport when the model protocol is %s', (textProtocol) => {
+  it.each([undefined, 'auto'] as const)('uses the native model transport when the model protocol is %s', (textProtocol) => {
     saveChat([{ id: 'entry', modelId: 'claude-custom', channelId: compatible.id, textProtocol }]);
-    expect(getMultimodalClientOverrides('entry').textProtocol).toBe('openai');
+    expect(getMultimodalClientOverrides('entry').textProtocol).toBe('anthropic');
   });
 
   it.each(['openai', 'gemini', 'anthropic'] as const)('retains an explicit %s model override over the channel protocol', (textProtocol) => {
@@ -117,7 +117,7 @@ describe('configured text model gateway routes', () => {
 
   it('supports older configured chat items that predate the modality field', () => {
     memory.set('beike_modality_models_v1_chat', JSON.stringify([{ id: 'older-entry', name: 'Older', modelId: 'gemini-custom', channelId: compatible.id }]));
-    expect(getMultimodalClientOverrides('older-entry')).toMatchObject({ customBaseUrl: compatible.baseUrl, textProtocol: 'openai' });
+    expect(getMultimodalClientOverrides('older-entry')).toMatchObject({ customBaseUrl: compatible.baseUrl, textProtocol: 'gemini' });
   });
 });
 

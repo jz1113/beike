@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"beike.local/cloud/src/backend/internal/config"
+	"beike.local/cloud/src/backend/internal/platform/media"
 )
 
 func TestResizeProxyThumbShrinksWidePNG(t *testing.T) {
@@ -108,5 +109,35 @@ func TestProxyImageStillAcceptsValidImage(t *testing.T) {
 		if err != nil || contentType != "image/png" || !bytes.Equal(body, raw.Bytes()) {
 			t.Fatalf("valid image: %s %v", contentType, err)
 		}
+	}
+}
+
+func TestProxySVGIsIsolatedForFreshCachedAndNotModifiedResponses(t *testing.T) {
+	body := []byte(`<svg xmlns="http://www.w3.org/2000/svg"><text>inert image</text></svg>`)
+	key := t.Name()
+	const contentType = "image/svg+xml; charset=utf-8"
+	const etag = `"svg-version"`
+	proxyCache.Store(key, media.ProxyCacheEntry{Body: body, ContentType: contentType, ETag: etag})
+	for _, mode := range []string{"fresh", "cached", "not-modified"} {
+		t.Run(mode, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodGet, "/", nil)
+			if mode == "fresh" {
+				writeProxyBytes(response, contentType, etag, body)
+			} else {
+				if mode == "not-modified" {
+					request.Header.Set("If-None-Match", etag)
+				}
+				if !serveCachedProxy(response, request, key) {
+					t.Fatal("cached SVG not found")
+				}
+			}
+			if !strings.Contains(response.Header().Get("Content-Security-Policy"), "sandbox") || response.Header().Get("X-Content-Type-Options") != "nosniff" {
+				t.Fatalf("SVG missing isolation: %v", response.Header())
+			}
+			if mode == "not-modified" && response.Code != http.StatusNotModified {
+				t.Fatalf("conditional request returned %d", response.Code)
+			}
+		})
 	}
 }

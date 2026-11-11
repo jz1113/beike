@@ -241,6 +241,8 @@ func DecodeObject(text string) map[string]any {
 }
 
 var imageModelIDs = []string{
+	"gpt-image-2.6-sunburst",
+	"gpt-image-2.6-flare",
 	"gpt-image-2.5-flare",
 	"gpt-image-2.5-sunburst",
 	"gpt-image-2",
@@ -255,13 +257,14 @@ var imageModelIDs = []string{
 	"doubao-seedream-4-5-251128",
 	"doubao-seedream-5-0-260128",
 	"seedream-v5-pro",
-	"qwen-image-max",
+	"doubao-seedream-5-0-pro-260628",
+	"doubao-seedream-5-0-flash-260915",
 	"z-image-turbo",
-	"qwen-image",
-	"qwen-image-edit",
+	"qwen-image-3",
 	"midjourney",
 	"flux",
 	"flux-pro-max",
+	"grok-imagine-image-2.0",
 	"grok-4.1-image",
 	"grok-4.2-image",
 	"grok-imagine-image-quality",
@@ -275,8 +278,8 @@ var modelAliases = map[string]string{
 	"gemini-3.1-flash-lite-image-preview": "gemini-3.1-flash-lite-image",
 	"gemini-3-pro-image-preview":          "gemini-3-pro-image",
 	"gemini-2.5-flash-image-preview":      "gemini-2.5-flash-image",
-	"qwen-image-3":                        "qwen-image-max",
-	"qwen-image-edit-2509":                "qwen-image-edit",
+	"alibaba/qwen-image-3/edit":           "qwen-image-3",
+	"alibaba/qwen-image-3/text-to-image":  "qwen-image-3",
 	"mjv7":                                "midjourney",
 	"mjv8.1":                              "midjourney",
 	"mjv8.2":                              "midjourney",
@@ -289,6 +292,10 @@ var videoModelIDs = []string{
 	"veo3.1-fast",
 	"veo3.1-pro",
 	"omni_flash-10s",
+	"gemini-omni-1.0-flash",
+	"gemini-omni-1.2-flash",
+	"kling-4.0",
+	"kling-4.0-flash",
 	"kling-video-v3",
 	"kling-video-v3-omni",
 	"kling-video-v2-5-turbo",
@@ -326,6 +333,10 @@ func approvedModel(id string, ids []string) bool {
 	if _, ok := known[strings.ToLower(trimmed)]; ok {
 		return true
 	}
+	if alias, ok := modelAliases[strings.ToLower(trimmed)]; ok {
+		_, approved := known[strings.ToLower(alias)]
+		return approved
+	}
 	slash := strings.LastIndex(trimmed, "/")
 	stripped := trimmed
 	if slash >= 0 {
@@ -357,7 +368,7 @@ func IsDashScopeGateway(raw string) bool {
 	if host == "" {
 		return false
 	}
-	if host == "qianwenaiapi.com" || host == "maas.qianwenaiapi.com" || strings.HasSuffix(host, ".qianwenaiapi.com") {
+	if host == "qianwenaiapi.com" || strings.HasSuffix(host, ".qianwenaiapi.com") || strings.HasSuffix(host, ".maas.aliyuncs.com") {
 		return true
 	}
 	return strings.Contains(host, "dashscope") && (host == "aliyuncs.com" || strings.HasSuffix(host, ".aliyuncs.com"))
@@ -389,6 +400,12 @@ func DashScopeRoot(base string) string {
 
 func openAICompatibleRoot(base string) string {
 	trimmed := strings.TrimRight(strings.TrimSpace(base), "/")
+	for _, suffix := range []string{"/chat/completions", "/models"} {
+		if strings.HasSuffix(strings.ToLower(trimmed), suffix) {
+			trimmed = trimmed[:len(trimmed)-len(suffix)]
+			break
+		}
+	}
 	lower := strings.ToLower(trimmed)
 	if strings.HasSuffix(lower, "/compatible-mode/v1") {
 		return trimmed
@@ -396,7 +413,12 @@ func openAICompatibleRoot(base string) string {
 	if IsDashScopeGateway(trimmed) {
 		return DashScopeRoot(trimmed) + "/compatible-mode/v1"
 	}
-	return strings.TrimRight(NormalizeGatewayBaseURL(trimmed), "/") + "/v1"
+	for _, suffix := range []string{"/v1", "/v1beta", "/api/v3", "/paas/v4"} {
+		if strings.HasSuffix(lower, suffix) {
+			return trimmed
+		}
+	}
+	return trimmed + "/v1"
 }
 
 func NormalizeGatewayBaseURL(raw string) string {

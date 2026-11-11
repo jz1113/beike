@@ -2,9 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { ModalityKind, ModalityModelItem } from '../../model/modalityModelStorage';
 import {
   MODALITY_TITLES,
-  MODALITY_VENDORS_BY_KIND,
   modelMatchesVendor,
+  orderedModalityVendors,
 } from '../../model/modalityMeta';
+import { compareModelDisplayOrder } from '@shared/domain/models/modelCatalog';
 import { useModalityModels } from '../../hooks/useModalityModels';
 import { useModalityChannelCatalog } from '../../hooks/useModalityChannelCatalog';
 import { ModalityModelCard } from './ModalityModelCard';
@@ -42,19 +43,19 @@ export function ModalityHubView({ kind, showToast }: Props) {
     resetToDefaultModels,
   } = useModalityModels(kind, showToast);
   const catalog = useModalityChannelCatalog(globalConfig, showToast);
+  const vendors = useMemo(() => orderedModalityVendors(kind), [kind]);
 
   const [selectedVendor, setSelectedVendor] = useState<string | null>(
-    () => MODALITY_VENDORS_BY_KIND[kind][0]?.id ?? null,
+    () => vendors[0]?.id ?? null,
   );
   const [viewMode, setViewMode] = useState<'focused' | 'list'>('focused');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
 
-  const vendors = MODALITY_VENDORS_BY_KIND[kind] || [];
   const activeVendor = vendors.find((vendor) => vendor.id === selectedVendor) || vendors[0];
 
   useEffect(() => {
-    setSelectedVendor(MODALITY_VENDORS_BY_KIND[kind][0]?.id ?? null);
-  }, [kind]);
+    setSelectedVendor(vendors[0]?.id ?? null);
+  }, [vendors]);
 
   const handleOpenSync = () => {
     catalog.refreshChannels();
@@ -73,8 +74,9 @@ export function ModalityHubView({ kind, showToast }: Props) {
   );
 
   const filteredModels = useMemo(() => {
-    return models.filter((m) => !activeVendor || modelMatchesVendor(m, activeVendor));
-  }, [models, activeVendor]);
+    const filtered = models.filter((m) => !activeVendor || modelMatchesVendor(m, activeVendor));
+    return kind === 'voice' ? filtered : filtered.sort((a, b) => compareModelDisplayOrder(a.modelId, b.modelId));
+  }, [models, activeVendor, kind]);
 
   const activeFocusedModel = useMemo(() => {
     const focused = models.find((m) => m.id === focusedModelId);

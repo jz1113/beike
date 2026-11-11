@@ -32,6 +32,43 @@ func videoInputError(payload map[string]json.RawMessage, model string, bases ...
 	images := videoFrameList(payload)
 	videos := rawStringList(payload["videos"])
 	mode := resolveVideoMode(model, videoRefMode(payload), len(images), len(videos))
+	if falOmniVideo(model) {
+		if !isFalImageBase(base) {
+			return "Gemini Omni Flash 需要绑定 fal 队列渠道"
+		}
+		if videoCapabilityModelID(model) == falOmni10Model && mode == "omni" && len(videos) > 0 {
+			return "Omni Flash 1.0 的全能参考只支持图片"
+		}
+		if mode == "omni" && len(images)+len(videos) == 0 {
+			return "全能参考需要至少一项素材，纯文字请切换文生视频"
+		}
+		if len(images) > 10 || len(videos) > 3 {
+			return "Gemini Omni Flash 1.2 最多支持 10 张参考图和 3 段参考视频"
+		}
+		if (mode == "edit" || mode == "extend") && (len(videos) != 1 || len(images) != 0) {
+			return "Gemini Omni Flash 1.2 的编辑和延长需要一段视频，不混用参考图"
+		}
+		if audio, supplied := rawBoolPresent(payload, "audio"); supplied && !audio {
+			return "Gemini Omni Flash 1.2 的 fal 接口使用原生音频，不提供静音开关"
+		}
+	}
+
+	if kling4Model(model) {
+		if nativeVideoProvider(base) != "kling" {
+			return "可灵 4.0 系列需要绑定可灵官方 API 渠道"
+		}
+		if len(images) > 10 || len(videos) > 5 || len(images)+len(videos) > 15 {
+			return "可灵 4.0 系列最多支持 10 张图片、5 段视频，合计最多 15 项"
+		}
+		if mode == "text" && rawString(payload, "aspect_ratio") == "adaptive" {
+			return "可灵 4.0 文生视频需要指定宽高比"
+		}
+		if mode == "first_frame" || mode == "first_last_frame" {
+			if ratio := rawString(payload, "aspect_ratio"); ratio != "" && ratio != "adaptive" {
+				return "可灵 4.0 图生视频的宽高比跟随关键帧，请选择自动比例"
+			}
+		}
+	}
 	if veoModel(model) {
 		if veoNativeBase(base) {
 			if _, err := veoNativeURL(base, model); err != nil {
@@ -144,11 +181,16 @@ func videoInputError(payload map[string]json.RawMessage, model string, bases ...
 	if minimaxH3(model) && (minimaxOfficialHost(base) || metasoH3 || minimaxComflyHost(base)) && (mode == "first_frame" || mode == "last_frame" || mode == "first_last_frame") && aspect == "adaptive" {
 		aspect = "16:9"
 	}
+	if falOmniVideo(model) && (mode == "edit" || mode == "extend") && aspect == "adaptive" {
+		aspect = "16:9"
+	}
 	duration := 5.0
 	if raw, ok := payload["duration"]; ok {
 		if json.Unmarshal(raw, &duration) != nil {
 			return ""
 		}
+	} else if falOmniVideo(model) {
+		duration = 8
 	} else if omniFlash(model) {
 		duration = 10
 	} else if regexp.MustCompile(`(?i)grok`).MatchString(model) && mode == "extend" {
@@ -246,11 +288,12 @@ func videoModeAllowed(model, mode string) bool {
 }
 
 func referenceVideoAllowed(model string) bool {
-	return regexp.MustCompile(`(?i)seedance`).MatchString(model) || regexp.MustCompile(`^wan3`).MatchString(model) || minimaxH3(model) || regexp.MustCompile(`(?i)kling.*omni|omni[_-]flash|gemini-omni`).MatchString(model)
+	model = videoCapabilityModelID(model)
+	return kling4Model(model) || regexp.MustCompile(`(?i)seedance`).MatchString(model) || regexp.MustCompile(`^wan3`).MatchString(model) || minimaxH3(model) || regexp.MustCompile(`(?i)kling.*omni|omni[_-]flash|gemini-omni`).MatchString(model)
 }
 
 func viduQ4Preview(id string) bool {
-	switch strings.ToLower(strings.TrimSpace(id)) {
+	switch videoCapabilityModelID(id) {
 	case "viduq4-preview", "vidu-q4-preview", "viduq4":
 		return true
 	default:
@@ -259,7 +302,7 @@ func viduQ4Preview(id string) bool {
 }
 
 func videoModes(model string) []string {
-	id := strings.ToLower(model)
+	id := videoCapabilityModelID(model)
 	full := []string{"omni", "first_frame", "first_last_frame", "text"}
 	framed := []string{"first_frame", "first_last_frame", "text"}
 	switch {
@@ -273,16 +316,22 @@ func videoModes(model string) []string {
 		return full
 	case viduQ4Preview(id):
 		return []string{"omni", "first_frame"}
-	case omniFlash(id):
+	case id == falOmni10Model:
+		return []string{"omni", "first_frame", "text", "edit"}
+	case omniFlash(id) || falOmniVideo(id):
 		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
 	case id == "veo3.1-pro":
 		return framed
-	case regexp.MustCompile(`^veo3\.1`).MatchString(id):
+	case regexp.MustCompile(`^veo-?3\.1`).MatchString(id):
 		return []string{"omni", "first_frame", "first_last_frame", "text", "extend"}
 	case regexp.MustCompile(`sora`).MatchString(id):
 		return []string{"first_frame", "text"}
 	case regexp.MustCompile(`grok`).MatchString(id):
 		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
+	case id == "kling-4.0-flash":
+		return []string{"omni", "first_frame", "text", "edit"}
+	case id == "kling-4.0":
+		return []string{"omni", "first_frame", "first_last_frame", "text", "edit"}
 	case regexp.MustCompile(`kling`).MatchString(id) && strings.Contains(id, "omni"):
 		return []string{"omni", "first_frame", "first_last_frame", "text", "edit", "extend"}
 	case regexp.MustCompile(`kling`).MatchString(id):

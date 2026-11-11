@@ -14,7 +14,7 @@ import {uploadStudioFile} from '@client/shared/api/uploadStudioFile';
 import {apiFetch} from '@client/shared/api/apiClient';
 import {invalidateGlobalAssetCache} from '@client/shared/api/assetLibraryCache';
 import {useCanvasStore} from '../../store/useCanvasStore';
-import {studioNodeMedia} from '../../model/studioConnections';
+import {studioEdgeSources,studioNodeMedia} from '../../model/studioConnections';
 import {
  compilerSettings,
  restoreStudioCompilerDraft,
@@ -28,6 +28,9 @@ import {studioChannels} from '../../model/studioGeneration';
 import {studioNodeTaskId,type StudioTaskCommands} from '../../model/studioTaskState';
 import {
  extractStudioStoryboard,
+ isStudioPersonCardSlot,
+ maskStudioPersonCard,
+ paintStudioPersonCardMasks,
  pendingStudioStoryboards,
  storyboardSourceChanged,
  storyboardSourceKey,
@@ -173,7 +176,8 @@ export function StudioPromptCompilerDialog({projectId,nodeId,commands,onSave,onC
 
 export function StudioStoryboardTools({commands:directCommands,onSave}:{commands:StudioTaskCommands;onSave:(scene:StudioScene)=>Promise<void>}) {
  const [sourceId,setSourceId]=useState<string|null>(null),[status,setStatus]=useState('');
- const [maskId,setMaskId]=useState<string|null>(null);
+ const [mask,setMask]=useState<{nodeId:string;person:boolean}|null>(null);
+ const editingPersonId=mask?.person?mask.nodeId:undefined;
  const active=useRef<AbortController|null>(null),saveRef=useRef(onSave);saveRef.current=onSave;
  const directRef=useRef(directCommands);directRef.current=directCommands;
  const commands=useCallback(()=>directRef.current,[]);
@@ -208,7 +212,10 @@ export function StudioStoryboardTools({commands:directCommands,onSave}:{commands
   };
   const receive=(event:MessageEvent)=>{
    if(event.origin!==location.origin || event.source!==window)return;
-   if(event.data?.kind==='studio:storyboard-mask'&&typeof event.data.nodeId==='string')setMaskId(event.data.nodeId);
+   if(typeof event.data?.nodeId==='string'){
+    if(event.data.kind==='studio:storyboard-mask')setMask({nodeId:event.data.nodeId,person:false});
+    if(event.data.kind==='studio:person-reference-mask')setMask({nodeId:event.data.nodeId,person:true});
+   }
    if(event.data?.kind==='studio:storyboard'){
     const id=event.data.nodeId;if(typeof id!=='string')return;
     if(event.data.preview)setSourceId(id);else void extract(id);
@@ -241,19 +248,75 @@ export function StudioStoryboardTools({commands:directCommands,onSave}:{commands
   return()=>{disposed=true;unsubscribe();window.removeEventListener('message',receive);active.current?.abort();};
 
  },[commands]);
- const maskNode=maskId&&commands().read().nodes.find(node=>node.id===maskId&&compilerSettings(node).beikeStoryboardSourceId);
+ useEffect(()=>{
+  const checked = new Map<string,string>();
+  const controller = new AbortController();
+  const hasActiveWork = (scene: StudioScene) => scene.nodes.some(node =>
+   node.isGenerating || node.beikeCompilerRunning || compilerSettings(node).textNodeIsAnalyzing);
+  let busy = false;
+  const scan = async () => {
+   if (busy || controller.signal.aborted) return;
+   const c = commands();
+   const scene = c.read();
+   if (hasActiveWork(scene)) return;
+   const person = scene.nodes.find(node => {
+    if (editingPersonId === node.id || !isStudioPersonCardSlot(scene, node.id) || node.type !== 'input-image' || node.missingMedia || compilerSettings(node).beikeLayerLocked) return false;
+    const url = studioNodeMedia(node).url;
+    return Boolean(url && !url.startsWith('local-asset://') && checked.get(node.id) !== url && compilerSettings(node).beikePersonMaskedUrl !== url);
+   });
+   if (!person) return;
+   const url = studioNodeMedia(person).url;
+   checked.set(person.id,url);
+   busy = true;
+   try {
+    const blob = await maskStudioPersonCard(url, controller.signal);
+    if (!blob) return;
+    controller.signal.throwIfAborted();
+    const next = await uploadStudioFile(new File([blob], 'person-reference-masked.png', {type:'image/png'}), 'assets', controller.signal);
+    controller.signal.throwIfAborted();
+    const current = c.read();
+    const live = current.nodes.find(node => node.id === person.id);
+    if (!live || studioNodeMedia(live).url !== url || compilerSettings(live).beikeLayerLocked) return;
+    if (hasActiveWork(current)) {
+     checked.delete(live.id);
+     return;
+    }
+    checked.set(live.id,next);
+    c.update(live.id,studioNodeTaskId(live),{content:next,imageUrl:next,_contentAssetId:undefined,assetId:undefined,
+     settings:{_localCacheAssetId:undefined,_contentAssetId:undefined,_assetId:undefined,_blobUrl:undefined,beikePersonMaskedUrl:next}});
+    const linked = new Set(current.connections.filter(edge => studioEdgeSources(edge,current).includes(live.id)).map(edge => edge.to));
+    for (const analysis of current.nodes.filter(node => linked.has(node.id) && compilerSettings(node).beikeTextResultRequired)) {
+     c.update(analysis.id,studioNodeTaskId(analysis),{settings:{beikePersonReferenceEditedAt:Math.max(Date.now(),Number(compilerSettings(analysis)._chatCompletedAt||0)+1)}});
+    }
+    await saveRef.current(c.read());
+   } catch (cause) {
+    if (!controller.signal.aborted) setStatus(cause instanceof Error ? cause.message : '人物参考图自动打码失败');
+   } finally {
+    busy = false;
+    queueMicrotask(scan);
+   }
+  };
+  const unsubscribe = useCanvasStore.subscribe((state,before) => {if (state.projects !== before.projects) queueMicrotask(scan);});
+  void scan();
+  return () => {controller.abort();unsubscribe();};
+ },[commands,editingPersonId]);
+ const currentScene=mask?commands().read():undefined;
+ const maskNode=mask&&currentScene?.nodes.find(node=>node.id===mask.nodeId&&
+  (mask.person ? node.type==='input-image'&&isStudioPersonCardSlot(currentScene,node.id) : compilerSettings(node).beikeStoryboardSourceId));
  return <>{status&&<div role="status" className="absolute right-3 top-14 z-30 flex items-center gap-3 rounded-lg bg-zinc-800 px-3 py-2 text-xs text-white">{status}<button aria-label="关闭抽帧提示" onClick={()=>setStatus('')}>×</button></div>}{sourceId&&<StudioStoryboardDialog sourceId={sourceId} commands={commands} onSave={onSave} onClose={()=>setSourceId(null)}/>}
- {maskNode&&<StoryboardMaskDialog key={maskNode.id} nodeId={maskNode.id} commands={commands} onSave={onSave} onClose={()=>setMaskId(null)}/>}</>;
+ {maskNode&&mask&&<ReferenceMaskDialog key={maskNode.id} nodeId={maskNode.id} person={mask.person} commands={commands} onSave={onSave} onClose={()=>setMask(null)}/>}</>;
 }
 
-function StoryboardMaskDialog({nodeId,commands,onSave,onClose}:{
- nodeId:string;commands:()=>StudioTaskCommands;onSave:(scene:StudioScene)=>Promise<void>;onClose:()=>void;
+function ReferenceMaskDialog({nodeId,person,commands,onSave,onClose}:{
+ nodeId:string;person:boolean;commands:()=>StudioTaskCommands;onSave:(scene:StudioScene)=>Promise<void>;onClose:()=>void;
 }) {
  const canvas=useRef<HTMLCanvasElement>(null),original=useRef<HTMLImageElement|null>(null);
  const last=useRef<{x:number;y:number}|null>(null),appliedUrl=useRef('');
  const [url]=useState(()=>studioNodeMedia(commands().read().nodes.find(node=>node.id===nodeId)!).url);
  const [ready,setReady]=useState(false),[dirty,setDirty]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState('');
  const [brush,setBrush]=useState(24);
+ const [fitsPreset,setFitsPreset]=useState(false);
+ const title=person?'三视图人脸打码':'人脸打码';
  const close=()=>{if(!saving)onClose();};
  const dialog=useModalDialog(true,close);
  useEffect(()=>{
@@ -270,11 +333,13 @@ function StoryboardMaskDialog({nodeId,commands,onSave,onClose}:{
     surface.width=image.naturalWidth;surface.height=image.naturalHeight;
     const context=surface.getContext('2d');
     if(!context)throw new Error('浏览器无法打开打码画布');
-    context.drawImage(image,0,0);original.current=image;setReady(true);
-   } catch(cause) {if(!disposed)setError(cause instanceof Error?cause.message:'分镜图片读取失败');}
+    context.drawImage(image,0,0);original.current=image;
+    setFitsPreset(person&&Math.abs(surface.width/surface.height-16/9)<=0.035);
+    setReady(true);
+   } catch(cause) {if(!disposed)setError(cause instanceof Error?cause.message:'参考图片读取失败');}
   })();
   return ()=>{disposed=true;if(objectUrl)URL.revokeObjectURL(objectUrl);};
- },[url]);
+ },[url,person]);
 
  const paint=(event:PointerEvent<HTMLCanvasElement>)=>{
   const surface=event.currentTarget,rect=surface.getBoundingClientRect(),context=surface.getContext('2d');
@@ -298,22 +363,24 @@ function StoryboardMaskDialog({nodeId,commands,onSave,onClose}:{
    const c=commands();
    const check=(expected:string)=>{
     const scene=c.read(),node=scene.nodes.find(item=>item.id===nodeId);
-    if(!node||studioNodeMedia(node).url!==expected||compilerSettings(node).beikeStoryboardActive===false)
-     throw new Error('分镜图已更换，请关闭后重新打开打码工具');
+    if(!node||studioNodeMedia(node).url!==expected||compilerSettings(node).beikeStoryboardActive===false||compilerSettings(node).beikeLayerLocked)
+     throw new Error('参考图片已更换，请关闭后重新打开打码工具');
     if(scene.nodes.some(item=>item.isGenerating||compilerSettings(item).textNodeIsAnalyzing||item.beikeCompilerRunning))
      throw new Error('请等待画布当前任务结束，再保存打码');
     return {scene,node};
    };
    check(appliedUrl.current||url);
    if(!appliedUrl.current){
-    const blob=await new Promise<Blob>((resolve,reject)=>surface.toBlob(result=>result?resolve(result):reject(new Error('无法导出打码图片')),'image/jpeg',0.95));
-    const next=await uploadStudioFile(new File([blob],'storyboard-masked.jpg',{type:'image/jpeg'}),'canvas-storyboards');
+    const mime=person?'image/png':'image/jpeg';
+    const blob=await new Promise<Blob>((resolve,reject)=>surface.toBlob(result=>result?resolve(result):reject(new Error('无法导出打码图片')),mime,0.95));
+    const file=new File([blob],person?'person-reference-masked.png':'storyboard-masked.jpg',{type:mime});
+    const next=await uploadStudioFile(file,person?'assets':'canvas-storyboards');
     const {scene,node}=check(url);
     c.update(nodeId,studioNodeTaskId(node),{content:next,imageUrl:next,_contentAssetId:undefined,assetId:undefined,
-     settings:{_localCacheAssetId:undefined,_contentAssetId:undefined,_assetId:undefined,_blobUrl:undefined}});
-    const linked=new Set(scene.connections.filter(edge=>edge.from===nodeId).map(edge=>edge.to));
+     settings:{_localCacheAssetId:undefined,_contentAssetId:undefined,_assetId:undefined,_blobUrl:undefined,...(person?{beikePersonMaskedUrl:next}:{})}});
+    const linked=new Set(scene.connections.filter(edge=>studioEdgeSources(edge,scene).includes(nodeId)).map(edge=>edge.to));
     for(const analysis of scene.nodes.filter(item=>linked.has(item.id)&&compilerSettings(item).beikeTextResultRequired))
-     c.update(analysis.id,studioNodeTaskId(analysis),{settings:{beikeStoryboardEditedAt:Math.max(Date.now(),Number(compilerSettings(analysis)._chatCompletedAt||0)+1)}});
+     c.update(analysis.id,studioNodeTaskId(analysis),{settings:{[person?'beikePersonReferenceEditedAt':'beikeStoryboardEditedAt']:Math.max(Date.now(),Number(compilerSettings(analysis)._chatCompletedAt||0)+1)}});
     appliedUrl.current=next;
    }
    await onSave(c.read());onClose();
@@ -321,10 +388,14 @@ function StoryboardMaskDialog({nodeId,commands,onSave,onClose}:{
   finally{setSaving(false);}
  };
  return createPortal(<div className="fixed inset-0 z-[200] grid place-items-center bg-black/70 p-4" onPointerDown={event=>event.stopPropagation()}>
-  <section ref={dialog} role="dialog" aria-modal="true" aria-label="人脸打码" className="flex max-h-[92dvh] max-w-full flex-col gap-3 rounded-xl bg-zinc-900 p-4 text-sm text-stone-100">
-   <h2 className="font-semibold">人脸打码</h2>
-   <p>在分镜图片上拖动笔刷补涂漏检的人脸。保存后请重新运行 05、06 并确认 07。</p>
+  <section ref={dialog} role="dialog" aria-modal="true" aria-label={title} className="flex max-h-[92dvh] max-w-full flex-col gap-3 rounded-xl bg-zinc-900 p-4 text-sm text-stone-100">
+   <h2 className="font-semibold">{title}</h2>
+   <p>{person?'标准四栏人物卡会自动打码。可在这里检查和补涂，保留右侧近景。':'在分镜图片上拖动笔刷补涂漏检的人脸。'}保存后请重新运行 05、06 并确认 07。</p>
    <div className="flex flex-wrap items-center gap-4">
+    {fitsPreset&&<button type="button" disabled={saving||!!appliedUrl.current} onClick={()=>{
+     const context=canvas.current?.getContext('2d');
+     if(context){paintStudioPersonCardMasks(context);setDirty(true);}
+    }}>遮挡正面和侧面</button>}
     <label className="flex items-center gap-2">画笔大小<input type="range" min={8} max={80} value={brush} onChange={event=>setBrush(Number(event.target.value))}/></label>
     <button type="button" disabled={!dirty||saving||!!appliedUrl.current} onClick={()=>{
      if(original.current)canvas.current?.getContext('2d')?.drawImage(original.current,0,0);
@@ -334,9 +405,9 @@ function StoryboardMaskDialog({nodeId,commands,onSave,onClose}:{
     <button type="button" disabled={saving} onClick={close}>关闭</button>
    </div>
    {error&&<p role="alert" className="text-red-300">{error}</p>}
-   {!ready&&!error&&<p role="status">正在加载分镜图片…</p>}
+   {!ready&&!error&&<p role="status">正在加载参考图片…</p>}
    <div className="min-h-0 overflow-auto">
-    <canvas ref={canvas} aria-label="分镜打码画布" className={ready?'mx-auto block max-h-[68dvh] max-w-full cursor-crosshair touch-none':'hidden'}
+    <canvas ref={canvas} aria-label={person?"人物参考打码画布":"分镜打码画布"} className={ready?'mx-auto block max-h-[68dvh] max-w-full cursor-crosshair touch-none':'hidden'}
      onPointerDown={event=>{if(event.button!==0||saving||appliedUrl.current)return;event.currentTarget.setPointerCapture(event.pointerId);paint(event);}}
      onPointerMove={event=>{if(last.current&&event.currentTarget.hasPointerCapture(event.pointerId))paint(event);}}
      onLostPointerCapture={()=>{last.current=null;}}/>

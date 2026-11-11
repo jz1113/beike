@@ -1,7 +1,7 @@
 import { apiFetch } from '@client/shared/api/apiClient';
 import { catalogRequestProtocol } from '../model/apiProviderTypes';
 import { parseGatewayModels, type GatewayModelItem, type GatewayChannel } from '../model/modelManagement';
-import { getApprovedModel } from '@shared/domain/models/modelCatalog';
+import { getSelectableModel } from '@shared/domain/models/modelCatalog';
 import { inferWorkflowCapabilitiesFromId } from '@shared/domain/models/workflowModels';
 
 /** CC Switch/Codex catalog is a local model list, not an authentication file. */
@@ -19,7 +19,8 @@ function parseCodexCatalog(raw: unknown): GatewayModelItem[] {
     if (!id || seen.has(id)) return [];
     seen.add(id);
     const item = entry && typeof entry === 'object' ? entry as { display_name?: unknown; displayName?: unknown } : {};
-    const approved = getApprovedModel(id);
+    const approved = getSelectableModel(id);
+    if (!approved || approved.vendor !== 'openai') return [];
     const caps = inferWorkflowCapabilitiesFromId(id);
     const name = approved?.name || (typeof item.display_name === 'string' ? item.display_name
       : typeof item.displayName === 'string' ? item.displayName : id);
@@ -29,7 +30,7 @@ function parseCodexCatalog(raw: unknown): GatewayModelItem[] {
       isVision: caps.isVision, isThinking: caps.isThinking, isImage: caps.isImage,
       isVideo: caps.isVideo, isAudio: caps.isAudio, isEmbedding: caps.isEmbedding,
       isTool: false, owned_by: 'openai', isCustom: false,
-      supported: Boolean(approved?.capability === 'multimodal' && /^gpt-(?:5\.6|6)(?:-|$)/i.test(id)),
+      supported: true,
     }];
   });
   if (models.length === 0) throw new Error('目录中没有可读取的模型 ID');
@@ -99,7 +100,7 @@ export function createGatewayCatalogActions(deps: GatewayCatalogDeps) {
         if (channel === 'openai' && typeof data?.suggestedBaseUrl === 'string') deps.setOpenAIModelSuggestedBaseUrl(data.suggestedBaseUrl);
         throw new Error(`获取${name}模型失败 (${data?.gatewayStatus || response.status})：${typeof data?.error === 'string' ? data.error : '网关未返回有效模型列表'}`);
       }
-      const parsed = parseGatewayModels(data.models, channel);
+      const parsed = parseGatewayModels(data.models);
       setModels(parsed);
       deps.cacheRef.current[channel] = identity;
       if (!parsed.length) {
@@ -123,7 +124,7 @@ export function createGatewayCatalogActions(deps: GatewayCatalogDeps) {
       if (file.size > 5_000_000) throw new Error('模型目录文件不能超过 5 MB');
       const contents = await file.text();
       if (!request.current()) return;
-      const models = parseGatewayModels(parseCodexCatalog(JSON.parse(contents)), 'openai');
+      const models = parseGatewayModels(parseCodexCatalog(JSON.parse(contents)));
       deps.setOpenAIModelSource('codex'); deps.setOpenAIModelError(''); deps.setOpenAIModelSuggestedBaseUrl('');
       deps.setOpenAIModels(models); deps.setIsGatewayModalOpen(true);
       delete deps.cacheRef.current.openai;

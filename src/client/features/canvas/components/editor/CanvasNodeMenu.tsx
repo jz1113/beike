@@ -1,7 +1,7 @@
 import { createContext, useContext, useCallback, useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  AlignLeft, AudioLines, Bold, Box, Check, ChevronsUpDown, Copy, FileText, GitCompare,
+  AlignLeft, AudioLines, Bold, Box, Check, ChevronRight, Copy, FileText, GitCompare,
   Italic, List, ListOrdered, Maximize2, Minimize2, Minus,
   Palette, Pilcrow, Table2, Upload, Video, WandSparkles,
 } from 'lucide-react';
@@ -210,12 +210,6 @@ export function CanvasRichTextEditor({node, selected, busy, onChange, onMessage,
       range.current = null;
     }
   }, [node.textHtml, node.content, fullscreen]);
-  useLayoutEffect(() => {
-    const root = editor.current;
-    if (!referenceStyle || !node.textAutoHeight || fullscreen || !root) return;
-    const height = Math.max(72, Math.min(1200, root.scrollHeight + 24));
-    if (Math.abs(height - node.height) > 1) onChange({ height });
-  }, [referenceStyle, node.textAutoHeight, node.height, node.width, node.content, node.textHtml, fullscreen, onChange]);
   useEffect(() => {
     const remember = () => {
       const selection = window.getSelection();
@@ -547,10 +541,6 @@ export function CanvasRichTextEditor({node, selected, busy, onChange, onMessage,
         )}
         <button type="button" aria-label="复制全部" data-tip="复制全部" className={btnClass(false)} onClick={handleCopyAll}><Copy size={18}/></button>
         {referenceStyle ? <>
-          {!fullscreen && (
-            <button type="button" aria-label="自适应高度" data-tip="自适应高度" aria-pressed={!!node.textAutoHeight} disabled={locked}
-              onClick={()=>onChange({textAutoHeight:!node.textAutoHeight})} className={btnClass(!!node.textAutoHeight)}><ChevronsUpDown size={18}/></button>
-          )}
           <button type="button" aria-label={fullscreen?'退出全屏':'全屏'} data-tip={fullscreen?'退出全屏':'全屏'}
             onMouseDown={e => {
               e.preventDefault();
@@ -592,7 +582,7 @@ export function CanvasRichTextEditor({node, selected, busy, onChange, onMessage,
           </div>
         )}
         {!node.content?.trim() && !hasRichStructure && !editing && <span className="pointer-events-none absolute text-sm text-slate-400 dark:text-zinc-500">双击开始编辑...</span>}
-        <div ref={editor} role="textbox" aria-label="文本内容" aria-multiline="true" aria-readonly={!editing || locked} contentEditable={editing && !locked} suppressContentEditableWarning className={`canvas-rich-text overflow-auto break-words text-sm leading-6 outline-none ${referenceStyle && node.textAutoHeight ? 'max-h-full min-h-5' : 'h-full'}`} onInput={save} onMouseDown={e=>{if(editing)e.stopPropagation();}} onKeyDown={e=>{if(editing)e.stopPropagation();if(e.key==='Escape'){setEditing(false);editor.current?.blur();}}} onWheel={e=>e.stopPropagation()} onPaste={e=>{if(!editing || locked)return;e.preventDefault();command('insertText',e.clipboardData.getData('text/plain'));}} onDrop={e=>e.preventDefault()} />
+        <div ref={editor} role="textbox" aria-label="文本内容" aria-multiline="true" aria-readonly={!editing || locked} contentEditable={editing && !locked} suppressContentEditableWarning className="canvas-rich-text h-full overflow-auto break-words text-sm leading-6 outline-none" onInput={save} onMouseDown={e=>{if(editing)e.stopPropagation();}} onKeyDown={e=>{if(editing)e.stopPropagation();if(e.key==='Escape'){setEditing(false);editor.current?.blur();}}} onWheel={e=>e.stopPropagation()} onPaste={e=>{if(!editing || locked)return;e.preventDefault();command('insertText',e.clipboardData.getData('text/plain'));}} onDrop={e=>e.preventDefault()} />
       </div>
     </>;
   }
@@ -644,7 +634,8 @@ const imageGenEntry: Entry = { id: 'gen-image', type: 'image-generation', label:
 const videoGenEntry: Entry = { id: 'gen-video', type: 'video-generation', label: '视频', Icon: Video, description: '使用模型生成动态画面', accepts: context };
 const threeDEntry: Entry = { id: 'gen-3d', type: 'gen-3d', label: '3D', Icon: Box, description: '生成 3D 物体或世界，并全屏预览', accepts: context };
 const audioEntry: Entry = { id: 'gen-music', type: 'audio', label: '音频', Icon: AudioLines, description: '生成语音、音乐与音效', accepts: context };
-const promptSkillEntry: Entry = { id: 'video-prompt-optimizer', type: 'video-prompt-optimizer', label: '提示词 Skill', Icon: WandSparkles, description: '调用大模型与专属 Skill 优化提示词并对比前后差异', accepts: context };
+const promptSkillEntry: Entry = { id: 'video-prompt-optimizer', type: 'video-prompt-optimizer', label: '视频提示词优化', Icon: WandSparkles, description: '调用大模型与专属 Skill 优化提示词并对比前后差异', accepts: context };
+const coverPromptEntry: Entry = { id: 'cover-prompt-writer', type: 'cover-prompt-writer', label: '封面提示词撰写', Icon: WandSparkles, description: '根据手机商品图撰写封面标题与绘图提示词', accepts: ['prompt', ...visual] };
 const compareEntry: Entry = { id: 'image-compare', type: 'compare', label: '对比', Icon: GitCompare, description: '用分割滑杆对照两张图片的差异', accepts: visual };
 
 const textConnectionEntries: Entry[] = [
@@ -707,6 +698,16 @@ export function CanvasNodeMenu({ x, y, onSelect, onClose, sourcePortType, source
     };
   }, [onClose]);
 
+  const [skillPosition, setSkillPosition] = useState<{ left: number; top: number }>();
+  const openSkills = (button: HTMLButtonElement) => {
+    const row = button.getBoundingClientRect();
+    const panel = menu.current?.getBoundingClientRect() ?? row;
+    const right = panel.right - 8;
+    setSkillPosition({
+      left: right + 216 <= window.innerWidth ? right : Math.max(8, panel.left - 208),
+      top: Math.max(8, Math.min(row.top, window.innerHeight - 112)),
+    });
+  };
   const entries = resolveMenuEntries(sourcePortType, sourceNode);
   const entryButton = 'group flex min-h-[46px] w-full items-center gap-3 rounded-[12px] px-2.5 py-1.5 text-left text-[13px] font-semibold text-zinc-800 transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] focus-visible:outline-none dark:text-[#f4f4f5] dark:hover:bg-white/[0.08] dark:focus-visible:bg-white/[0.08] disabled:opacity-50';
 
@@ -734,9 +735,16 @@ export function CanvasNodeMenu({ x, y, onSelect, onClose, sourcePortType, source
       className="canvas-node-menu fixed z-[200] w-[232px] max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain rounded-[16px] border border-black/10 bg-white p-1.5 text-zinc-800 shadow-[0_20px_50px_rgba(0,0,0,0.45)] outline-none dark:border-white/[0.08] dark:bg-[#1b1b1e] dark:text-[#f4f4f5] dark:shadow-[0_24px_60px_rgba(0,0,0,0.72)]"
       style={{ left: Math.max(8, Math.min(x, window.innerWidth - 244)), top: Math.max(8, Math.min(y, window.innerHeight - 460)), maxHeight: 'min(560px, calc(100dvh - 16px))' }}>
       <div role="menu" aria-label="节点类型" className="space-y-0.5">
-        {entries.map(({ id, type, label, description, Icon }) => (
+        {entries.map(({ id, type, label, description, Icon }) => id === promptSkillEntry.id ? (
+          <button key={id} role="menuitem" type="button" className={entryButton}
+            aria-haspopup="menu" aria-expanded={Boolean(skillPosition)}
+            onMouseEnter={event => openSkills(event.currentTarget)} onClick={event => openSkills(event.currentTarget)}>
+            <span className="grid size-8 shrink-0 place-items-center"><Icon size={16} /></span>
+            <span className="flex-1">提示词 Skill</span><ChevronRight size={14} />
+          </button>
+        ) : (
           <button key={id} role="menuitem" type="button" title={description || label}
-            data-testid={`canvas-context-menu-item-${type}`} className={entryButton} onClick={() => onSelect(type)}>
+            data-testid={`canvas-context-menu-item-${type}`} className={entryButton} onMouseEnter={() => setSkillPosition(undefined)} onClick={() => onSelect(type)}>
             <span className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-black/[0.05] text-zinc-700 transition-colors group-hover:bg-black/[0.08] dark:bg-white/[0.06] dark:text-zinc-200 dark:group-hover:bg-white/[0.1]"><Icon size={16} strokeWidth={1.75} /></span>
             <span className="min-w-0 flex-1">
               <span className="block truncate leading-tight">{label}</span>
@@ -745,6 +753,17 @@ export function CanvasNodeMenu({ x, y, onSelect, onClose, sourcePortType, source
           </button>
         ))}
       </div>
+      {skillPosition && (
+        <div role="menu" aria-label="提示词 Skill" style={skillPosition}
+          className="fixed w-[216px] rounded-[14px] border border-black/10 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-[#202022]">
+          {[promptSkillEntry, coverPromptEntry].filter(entry => !sourcePortType || entry.accepts?.includes(sourcePortType)).map(({ id, type, label, description, Icon }) => (
+            <button key={id} role="menuitem" type="button" title={description}
+              data-testid={`canvas-context-menu-item-${type}`} className={entryButton} onClick={() => onSelect(type)}>
+              <Icon size={16} />{label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>,
     document.body,
   );

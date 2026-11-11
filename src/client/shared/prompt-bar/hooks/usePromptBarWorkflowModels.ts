@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { compareModelDisplayOrder } from '@shared/domain/models/modelCatalog';
 import { useAppStore } from '@client/store';
 import { modalityPickerSelections, type ModalityStorageKind } from '@shared/domain/models/modalityStorage';
 import {
@@ -9,6 +10,10 @@ import {
   readWorkflowModelsFromStorage,
   repairWorkflowModelsInStorage,
 } from '@shared/domain/models/workflowModels';
+
+function compareOptions(a: { id: string; upstreamId?: string }, b: { id: string; upstreamId?: string }) {
+  return compareModelDisplayOrder(a.upstreamId || a.id, b.upstreamId || b.id);
+}
 
 export interface PreferenceModelItem {
   id: string;
@@ -85,16 +90,16 @@ export function usePreferenceModels() {
     const all = readWorkflowModelsFromStorage();
 
     setVideoModels(modalityPreferenceModels('video', '已同步的视频模型')
-      ?? getEnabledVideoModelsFromSettings(all).map((model) => toPreferenceModel(model, '已同步的视频模型')));
+      ?? getEnabledVideoModelsFromSettings(all).sort(compareOptions).map((model) => toPreferenceModel(model, '已同步的视频模型')));
     setImageModels(modalityPreferenceModels('image', '已同步的图片模型')
-      ?? getEnabledImageModelsFromSettings(all).map((model) => toPreferenceModel({
+      ?? getEnabledImageModelsFromSettings(all).sort(compareOptions).map((model) => toPreferenceModel({
         ...model,
         supportedResolutions: ['1K', '2K', '4K'],
       }, '已同步的图片模型')));
     setAudioModels(modalityPreferenceModels('voice', '已同步的音频模型')
       ?? getEnabledAudioModelsFromSettings(all).map((model) => toPreferenceModel(model, '已同步的音频模型')));
     setMultimodalModels(modalityPreferenceModels('chat', '已同步的对话模型')
-      ?? getEnabledMultimodalModelsFromSettings(all, 'assistant').map((model) => toPreferenceModel(
+      ?? getEnabledMultimodalModelsFromSettings(all, 'assistant').sort(compareOptions).map((model) => toPreferenceModel(
         model,
         model.isThinking ? '深度思考模型' : '已同步的对话模型',
       )));
@@ -143,7 +148,7 @@ export function usePromptBarWorkflowModels(
       const customAudio = syncedAudio ?? getEnabledAudioModelsFromSettings(all);
       const customMultimodal = syncedMultimodal ?? getEnabledMultimodalModelsFromSettings(all, 'assistant');
 
-      setAvailableImageModels(customImage);
+      setAvailableImageModels(customImage.toSorted(compareOptions));
       if (setQuickModel) {
         if (!customImage.length) setQuickModel('');
         if (customImage.length > 0) {
@@ -161,7 +166,7 @@ export function usePromptBarWorkflowModels(
         }
       }
 
-      setAvailableVideoModels(customVideo);
+      setAvailableVideoModels(customVideo.toSorted(compareOptions));
       if (setQuickVideoModel) {
         if (!customVideo.length) setQuickVideoModel('');
         if (customVideo.length > 0) {
@@ -188,7 +193,7 @@ export function usePromptBarWorkflowModels(
         }
       }
 
-      setAvailableMultimodalModels(customMultimodal);
+      setAvailableMultimodalModels(customMultimodal.toSorted(compareOptions));
     };
 
     loadCustomModels();

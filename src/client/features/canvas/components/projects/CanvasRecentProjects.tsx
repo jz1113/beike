@@ -345,7 +345,13 @@ export const CanvasRecentProjects: React.FC<CanvasRecentProjectsProps> = ({
       <div className={assetView ? 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,240px),1fr))] items-start gap-x-4 gap-y-7' : 'grid grid-cols-1 items-start gap-2 sm:grid-cols-2 lg:grid-cols-4'}>
         {assetView ? <div className="flex min-w-0 flex-col gap-2">{createCard}<span className="px-3 text-[13px]">新建项目</span></div> : createCard}
         {displayedProjects.map((proj) => {
-          const cover = studioCover(proj.studioScene) || proj.thumbnail;
+          const builtInCover = {
+            'canvas-proj-a714dcc3-884f-4d7e-8506-75bb9f236d51': 'cover-generation.jpg',
+            'canvas-proj-48b418d5-2107-4be4-aecf-15550440a32a': 'commerce-images.jpg',
+            'canvas-proj-ae2b76ea-4b54-486d-b93b-553972331709': 'commerce-video.jpg',
+          }[proj.id];
+          const cover = builtInCover ? `${import.meta.env.BASE_URL}canvas-covers/${builtInCover}`
+            : studioCover(proj.studioScene) || proj.thumbnail;
           const nodeCount = proj.studioScene?.nodes.length ?? proj.nodes.length;
           const detail = nodeCount ? `${nodeCount} 个节点` : proj.studioScene?.strokes?.length ? '手绘画布' : proj.studioScene?.textBoxes?.length ? '文本画布' : '项目画布';
           const isEditing = editingId === proj.id;

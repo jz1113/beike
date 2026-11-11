@@ -10,11 +10,16 @@ type videoSpec struct {
 
 var videoRatios = []string{"16:9", "9:16", "1:1", "4:3", "3:4", "21:9"}
 
+func videoCapabilityModelID(model string) string {
+	id := strings.ToLower(strings.TrimSpace(model))
+	return strings.TrimPrefix(id[strings.LastIndex(id, "/")+1:], "net-")
+}
+
 func videoSpecFor(model string) (videoSpec, bool) {
 	if spec, ok := videoSpecs[model]; ok {
 		return spec, true
 	}
-	id := strings.ToLower(strings.TrimSpace(model))
+	id := videoCapabilityModelID(model)
 	if spec, ok := videoSpecs[id]; ok {
 		return spec, true
 	}
@@ -49,7 +54,7 @@ func videoSpecFor(model string) (videoSpec, bool) {
 	return videoSpec{}, false
 }
 
-var videoResolutionOrder = []string{"480P", "720P", "1080P", "4K"}
+var videoResolutionOrder = []string{"360P", "480P", "720P", "1080P", "4K"}
 
 // defaultVideoResolution picks 480P, then 720P, then the lowest listed tier.
 func defaultVideoResolution(model string) string {
@@ -93,7 +98,7 @@ func videoSpecError(model, mode, resolution, aspect string, duration float64) st
 	if mode == "motion_control" && resolution == "4K" {
 		return "动作控制最高支持 1080P，请调整清晰度"
 	}
-	if mode == "motion_control" || mode == "edit" && !omniFlash(model) {
+	if mode == "motion_control" || mode == "edit" && !omniFlash(model) && !kling4Model(model) {
 		return ""
 	}
 	if veoModel(model) && mode == "extend" {
@@ -114,6 +119,9 @@ func videoDurations(model, resolution, mode string) []int {
 		return []int{8}
 	}
 	if spec, ok := videoSpecFor(model); ok {
+		if falOmniVideo(model) && mode == "extend" {
+			return ints(3, 10)
+		}
 		if strings.Contains(id, "grok") && mode == "extend" {
 			return ints(2, 10)
 		}
@@ -157,10 +165,14 @@ func withAdaptive(values []string) []string {
 }
 
 var videoSpecs = map[string]videoSpec{
+	falOmni10Model:                    {ints(3, 10), []string{"720P"}, []string{"16:9", "9:16"}},
+	falOmniModel:                      {ints(3, 15), []string{"360P", "720P", "1080P", "4K"}, []string{"16:9", "9:16"}},
 	"veo3.1":                          {[]int{4, 6, 8}, []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16"}},
 	"veo3.1-fast":                     {[]int{4, 6, 8}, []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16"}},
 	"veo3.1-pro":                      {[]int{8}, []string{"720P", "1080P"}, []string{"16:9", "9:16"}},
 	"omni_flash-10s":                  {[]int{10}, []string{"720P"}, []string{"16:9", "9:16"}},
+	"kling-4.0":                       {ints(3, 30), []string{"720P", "1080P"}, withAdaptive([]string{"16:9", "9:16", "1:1", "21:9"})},
+	"kling-4.0-flash":                 {ints(3, 20), []string{"720P"}, withAdaptive([]string{"16:9", "9:16", "1:1", "21:9"})},
 	"kling-video-v3":                  {ints(3, 15), []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16", "1:1"}},
 	"kling-video-v3-omni":             {ints(3, 15), []string{"720P", "1080P", "4K"}, []string{"16:9", "9:16", "1:1"}},
 	"kling-video-v2-5-turbo":          {[]int{5, 10}, []string{"720P", "1080P"}, []string{"16:9", "9:16", "1:1"}},

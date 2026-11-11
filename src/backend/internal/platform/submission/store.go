@@ -94,6 +94,22 @@ func claim(ctx context.Context, path, workspace, kind, key, fingerprint string) 
 	return row, count == 1, err
 }
 
+// CloseMissing fences a late submission without replacing an existing receipt.
+func CloseMissing(ctx context.Context, path, workspace, kind, key string) error {
+	db, err := database.OpenRequired(path)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	_, err = db.ExecContext(ctx, `INSERT INTO "GenerationSubmission"
+ ("id","workspaceId","kind","operationKey","fingerprint","httpStatus","response","createdAt","updatedAt")
+ VALUES (?,?,?,?,'closed',400,?,?,?)
+ ON CONFLICT("workspaceId","kind","operationKey") DO NOTHING`,
+		NewKey(), workspace, kind, key, `{"success":false,"submissionRejected":true,"submissionClosed":true,"error":"原请求未提交，已关闭旧回执，可以重新撰写"}`, now, now)
+	return err
+}
+
 func finish(ctx context.Context, path string, receipt Receipt, status int, body map[string]any) error {
 	encoded, err := json.Marshal(body)
 	if err != nil {

@@ -135,6 +135,7 @@ export function enqueueCanvasImageTool(projectId: string, node: Omit<CanvasNode,
     id: nodeId,
     taskId: task.id,
     status: 'generating',
+    errorMessage: undefined,
     progress: 0,
     drawing: { ...config, model, aspect: ratio.id },
     generationSize: sizeStr,
@@ -164,6 +165,7 @@ export async function retryCanvasGeneration(projectId: string, node: CanvasNode)
     taskId: attempt.id,
     generationIntent: attempt,
     status: 'generating',
+    errorMessage: undefined,
     progress: 0,
     imageUrl: undefined,
     videoUrl: undefined,
@@ -239,6 +241,7 @@ export function useCanvasGenerationSync(
           updateNode(projectId, targetNode.id, {
             ...runPatch,
             status: 'success',
+            errorMessage: undefined,
             generationIntent: undefined,
             progress: 100,
             imageUrl: isVideoTarget ? undefined : resultUrl,
@@ -247,6 +250,7 @@ export function useCanvasGenerationSync(
         } else if (isImageTaskFailed(status)) {
           updateNode(projectId, targetNode.id, {
             status: 'error',
+            errorMessage: detail.failReason || detail.updates?.failReason || '生成失败，请检查设置后重试',
             progress: 0,
           });
         }
@@ -279,7 +283,7 @@ export function useCanvasGenerationSync(
             status: 'IN_PROGRESS', submissionRecoveryRequired: true, failReason: '正在核对上次提交结果，请勿重复生成' }, false);
         } else {
           const run = node.runs?.[node.activeRunIndex ?? 0];
-          updateNode(projectId, node.id, { status: 'error', imageUrl: run?.imageUrl, videoUrl: run?.videoUrl,
+          updateNode(projectId, node.id, { status: 'error', errorMessage: '原生成任务不可用，请重新添加参考素材后生成', imageUrl: run?.imageUrl, videoUrl: run?.videoUrl,
             progress: 0 });
         }
         return;
@@ -305,6 +309,7 @@ export function useCanvasGenerationSync(
           updateNode(projectId, node.id, {
             ...runPatch,
             status: 'success',
+            errorMessage: undefined,
             generationIntent: undefined,
             progress: 100,
             imageUrl: isVideoTarget ? undefined : matchedTask.resultUrl,
@@ -312,9 +317,10 @@ export function useCanvasGenerationSync(
           });
         }
       } else if (isImageTaskFailed(matchedTask.status)) {
-        if (node.status !== 'error') {
+        if (node.status !== 'error' || node.errorMessage !== matchedTask.failReason) {
           updateNode(projectId, node.id, {
             status: 'error',
+            errorMessage: matchedTask.failReason,
             progress: 0,
           });
         }
@@ -323,7 +329,7 @@ export function useCanvasGenerationSync(
         if (parsed == null) return;
         const progress = parsed >= 100 ? 99 : parsed;
         if (progress > (node.progress || 0) || node.status !== 'generating') {
-          updateNode(projectId, node.id, { status: 'generating', progress });
+          updateNode(projectId, node.id, { status: 'generating', errorMessage: undefined, progress });
         }
       }
     });

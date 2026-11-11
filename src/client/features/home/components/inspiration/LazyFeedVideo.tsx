@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { videoPlaybackManager } from '@client/shared/media/videoPlaybackManager';
 import { useViewVisibility } from '@client/shared/hooks/useSafeTimeout';
 import { proxyMediaUrl } from '@client/shared/api/apiClient';
@@ -23,15 +23,15 @@ export function FeedImage({ src, fallbackSrc, alt = '', className, eager = false
     {!failed && <img key={`${src}:${attempt}`} src={retrySrc} alt={alt} loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : undefined} decoding="async" referrerPolicy="no-referrer" className={className}
       onError={() => { setFailed(true); if (attempt >= 2) onUnavailable?.(); }} />}
     {failed && <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-100 text-xs text-slate-500 dark:text-slate-400 dark:bg-white/10" role="status">
-      {attempt < 2 ? '素材重新加载中…' : <><span>素材暂时无法加载</span><button type="button" className="rounded-lg border bg-white px-3 py-1 dark:bg-[#18191c]" onClick={event => { event.stopPropagation(); setAttempt(0); setFailed(false); }}>重新加载</button></>}
+      {attempt < 2 ? '素材重新加载中…' : <><span>素材暂时无法加载</span><button type="button" className="absolute bottom-2 left-2 z-20 rounded-lg border bg-white px-3 py-1 dark:bg-[#18191c]" onClick={event => { event.stopPropagation(); setAttempt(0); setFailed(false); }}>重新加载</button></>}
     </div>}
   </>;
 }
 
-interface Props { src: string; poster?: string; className?: string }
+interface Props { src: string; poster?: string; className?: string; children?: ReactNode }
 
 /** Load posterless previews near the viewport; play only after deliberate pointer intent. */
-export function LazyFeedVideo({ src, poster, className }: Props) {
+export function LazyFeedVideo({ src, poster, className, children }: Props) {
   const isVisible = useViewVisibility();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -116,12 +116,13 @@ export function LazyFeedVideo({ src, poster, className }: Props) {
     {poster && !posterFailed && (!playing || hasError) && <FeedImage key={poster} src={poster} className={`absolute inset-0 pointer-events-none ${className || 'w-full h-full object-contain'}`} onUnavailable={() => { setPosterFailed(true); setMediaReady(true); }} />}
     {hasError && <div role="status" className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60 text-xs text-white">
       <span>视频暂时无法播放</span>
-      <button type="button" className="rounded-lg border border-white/30 px-3 py-1" onClick={event => {
+      <button type="button" className="absolute bottom-2 left-2 z-20 rounded-lg border border-white/30 px-3 py-1" onClick={event => {
         event.stopPropagation();
         setHasError(false);
         setMediaReady(true);
         setAttempt(value => value + 1);
       }}>重新加载</button>
     </div>}
+    {children}
   </div>;
 }

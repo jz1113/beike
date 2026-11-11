@@ -1,4 +1,4 @@
-import {beforeEach,expect,it,vi} from 'vitest';
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import type {GenerationTask} from '@client/store';
 import {submitSingleGenerationTask} from './generationTaskSubmitter';
 const mocks=vi.hoisted(()=>({tasks:[] as GenerationTask[],fetch:vi.fn(),compress:vi.fn(),headers:vi.fn(),credentials:vi.fn()}));
@@ -10,6 +10,7 @@ vi.mock('@client/shared/media/refMediaRegistry',()=>({resolveRefMediaFile:()=>un
 vi.mock('@shared/domain/media/videoCapabilities',async importOriginal=>({...await importOriginal<typeof import('@shared/domain/media/videoCapabilities')>(),videoInputError:()=>null}));
 vi.mock('@shared/domain/core/latencyAudit',()=>({logLatencyAudit:()=>{}}));
 vi.mock('@client/shared/utils/usageScope', async importOriginal => ({ ...await importOriginal<typeof import('@client/shared/utils/usageScope')>(), createUsageScope: () => ({}) }));
+afterEach(() => vi.unstubAllGlobals());
 beforeEach(()=>{vi.clearAllMocks();mocks.headers.mockReturnValue({});mocks.credentials.mockReturnValue({});mocks.fetch.mockResolvedValue(Response.json({success:true,resultUrl:'/storage/result.mp4'}));mocks.compress.mockImplementation(async source=>`data:image/png;base64,${source.includes('first')?'FIRST':'LAST'}`);});
 it('submits restored local first/last frames consistently in both the ordered list and explicit fields',async()=>{
  const task={id:'restored-frame-retry',prompt:'转身',model:'video-model',status:'IN_PROGRESS',mediaType:'video',videoRefMode:'first_last_frame',referenceImages:['blob:https://example.test/restored-first','blob:https://example.test/restored-last'],firstFrameImage:'blob:https://example.test/restored-first',lastFrameImage:'blob:https://example.test/restored-last'} as GenerationTask;
@@ -55,4 +56,24 @@ it.each([
  await submitSingleGenerationTask(task,update,{},new Set());
  expect(mocks.fetch).toHaveBeenCalledTimes(1);
  expect(update).toHaveBeenLastCalledWith(task.id,expect.objectContaining({status:'IN_PROGRESS',submissionRecoveryRequired:true}));
+});
+
+it('submits the audio settings captured by the task instead of current composer preferences', async () => {
+ vi.stubGlobal('window', {});
+ vi.stubGlobal('localStorage', { getItem: () => JSON.stringify({ audio: { format: 'mp3', voice: 'changed-voice', speed: 1.5 } }) });
+ const task = { id: 'queued-audio', prompt: '欢迎', model: 'speech-2.8-hd', status: 'IN_PROGRESS', mediaType: 'audio',
+  audioFormat: 'wav', audioVoice: 'saved-voice', audioSpeed: 0.8 } as GenerationTask;
+ mocks.tasks = [task];
+ await submitSingleGenerationTask(task, vi.fn(), {}, new Set());
+ expect(mocks.fetch.mock.calls[0][0]).toBe('/api/generate/audio');
+ expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).toMatchObject({ format: 'wav', voice: 'saved-voice', speed: 0.8 });
+});
+
+it('uses stable defaults for legacy audio records without saved preferences', async () => {
+ vi.stubGlobal('window', {});
+ vi.stubGlobal('localStorage', { getItem: () => JSON.stringify({ audio: { format: 'wav', voice: 'changed-voice', speed: 1.5 } }) });
+ const task = { id: 'legacy-audio', prompt: '欢迎', model: 'speech-2.8-hd', status: 'IN_PROGRESS', mediaType: 'audio' } as GenerationTask;
+ mocks.tasks = [task];
+ await submitSingleGenerationTask(task, vi.fn(), {}, new Set());
+ expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).toMatchObject({ format: 'mp3', voice: 'zh-female-commercial', speed: 1 });
 });

@@ -1,3 +1,4 @@
+import { listSelectableModels } from '@shared/domain/models/modelCatalog';
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Aperture, Camera, ChevronDown, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
@@ -16,55 +17,14 @@ export interface ImagePickerModelItem {
   modelId?: string;
   upstreamId?: string;
   channel?: ModelChannelTab;
+  provider?: string;
 }
 
-export const BUILTIN_IMAGE_PICKER_MODELS: ImagePickerModelItem[] = [
-  { id: 'nano-banana', name: 'Nano Banana', modelId: 'nano-banana', channel: 'api' },
-  { id: 'nano-banana-pro', name: 'Nano Banana Pro', modelId: 'nano-banana-pro', channel: 'api' },
-  { id: 'nano-banana-2', name: 'Nano Banana 2', modelId: 'nano-banana-2', channel: 'api' },
-  { id: 'nano-banana-2.1', name: 'Nano Banana 2.1', modelId: 'nano-banana-2.1', channel: 'api' },
-  { id: 'nano-banana-2-lite', name: 'Nano Banana 2 Lite', modelId: 'nano-banana-2-lite', channel: 'api' },
-  { id: 'gpt-4o-image', name: 'GPT-4o Image', modelId: 'gpt-4o-image', channel: 'api' },
-  { id: 'gpt-image-1.5', name: 'GPT Image 1.5', modelId: 'gpt-image-1.5', channel: 'api' },
-  { id: 'gpt-image-2', name: 'GPT Image 2', modelId: 'gpt-image-2', channel: 'api' },
-  { id: 'gpt-image-2.5-pro', name: 'GPT Image 2.5 Pro', modelId: 'gpt-image-2.5-pro', channel: 'api' },
-  { id: 'gpt-image-2.5-fast', name: 'GPT Image 2.5 Fast', modelId: 'gpt-image-2.5-fast', channel: 'api' },
-  { id: 'gpt-image-2-all', name: 'GPT Image 2 -All', modelId: 'gpt-image-2-all', channel: 'api' },
-  { id: 'seedream-5.0-pro', name: 'Seedream 5.0 Pro', modelId: 'doubao-seedream-5-0-pro', channel: 'api' },
-  { id: 'doubao-seedream-5-0-260128', name: 'Seedream 5.0', modelId: 'doubao-seedream-5-0-260128', channel: 'api' },
-  { id: 'doubao-seedream-4-5-251128', name: 'Seedream 4.5', modelId: 'doubao-seedream-4-5-251128', channel: 'api' },
-  { id: 'flux-2-pro', name: 'Flux 2 Pro', modelId: 'flux-2-pro', channel: 'api' },
-  { id: 'midjourney', name: 'Midjourney', modelId: 'midjourney', channel: 'api' },
-  { id: 'qwen-image', name: 'Qwen Image', modelId: 'qwen-image', channel: 'api' },
-  { id: 'z-image-turbo', name: 'Z-Image Turbo', modelId: 'z-image-turbo', channel: 'api' },
-];
+export const BUILTIN_IMAGE_PICKER_MODELS: ImagePickerModelItem[] = listSelectableModels('image')
+  .map(model => ({ id: model.id, modelId: model.id, name: model.name, channel: 'api' }));
 
-export const BUILTIN_VIDEO_PICKER_MODELS: ImagePickerModelItem[] = [
-  { id: 'metaso-h3', name: '秘塔H3', modelId: 'MiniMax-H3', channel: 'api' },
-  { id: 'hailuo-2.0', name: 'Hailuo 2.0', modelId: 'MiniMax-H3', channel: 'api' },
-  { id: 'MiniMax-H3', name: 'MiniMax-H3', modelId: 'MiniMax-H3', channel: 'api' },
-  { id: 'wan2.6-video', name: 'Wan 2.6', modelId: 'wan3.0-video', channel: 'api' },
-  { id: 'wan3.0-video', name: 'Wan 3.0', modelId: 'wan3.0-video', channel: 'api' },
-  { id: 'doubao-seedance-1-5-pro', name: 'Seedance 1.5', modelId: 'doubao-seedance-2.0-mini', channel: 'api' },
-  { id: 'doubao-seedance-1-0-pro', name: 'Seedance 1.0', modelId: 'doubao-seedance-2.0-mini', channel: 'api' },
-  { id: 'doubao-seedance-1-0-pro-fast', name: 'Seedance 1.0 Fast', modelId: 'doubao-seedance-2.0-mini', channel: 'api' },
-  { id: 'doubao-seedance-2-0-260128', name: 'Seedance 2.0', modelId: 'doubao-seedance-2-0-260128', channel: 'api' },
-  { id: 'doubao-seedance-2-0-fast-260128', name: 'Seedance 2.0 Fast', modelId: 'doubao-seedance-2-0-fast-260128', channel: 'api' },
-  { id: 'doubao-seedance-2.0-mini', name: 'Seedance 2.0 Mini', modelId: 'doubao-seedance-2.0-mini', channel: 'api' },
-  { id: 'doubao-seedance-2.5', name: 'Seedance 2.5', modelId: 'doubao-seedance-2.5', channel: 'api' },
-  { id: 'veo3.1', name: 'Veo 3.1', modelId: 'veo3.1', channel: 'api' },
-  { id: 'veo3.1-fast', name: 'Veo 3.1 Fast', modelId: 'veo3.1-fast', channel: 'api' },
-  { id: 'kling-video-v3', name: 'Kling 3.0', modelId: 'kling-video-v3', channel: 'api' },
-  { id: 'kling-video-v3-omni', name: 'Kling 3.0 Omni', modelId: 'kling-video-v3-omni', channel: 'api' },
-  { id: 'kling-video-v2-6', name: 'Kling v2.6', modelId: 'kling-video-v2-6', channel: 'api' },
-  { id: 'kling-video-v2-5-turbo', name: 'Kling v2.5 Turbo', modelId: 'kling-video-v2-5-turbo', channel: 'api' },
-  { id: 'sora-2', name: 'Sora 2', modelId: 'sora-2', channel: 'api' },
-  { id: 'sora-2-pro', name: 'Sora 2 Pro', modelId: 'sora-2-pro', channel: 'api' },
-  { id: 'viduq3', name: 'Vidu Q3', modelId: 'viduq3', channel: 'api' },
-  { id: 'viduq3-pro', name: 'Vidu Q3 Pro', modelId: 'viduq3-pro', channel: 'api' },
-  { id: 'viduq3-turbo', name: 'Vidu Q3 Turbo', modelId: 'viduq3-turbo', channel: 'api' },
-  { id: 'grok-imagine-video-1.5', name: 'Grok Imagine Video 1.5', modelId: 'grok-imagine-video-1.5', channel: 'api' },
-];
+export const BUILTIN_VIDEO_PICKER_MODELS: ImagePickerModelItem[] = listSelectableModels('video')
+  .map(model => ({ id: model.id, modelId: model.id, name: model.name, channel: model.adapter === 'fal-omni' ? 'fal' : 'api' }));
 
 export function resolveImagePickerModels(
   models: ImagePickerModelItem[],
@@ -78,11 +38,12 @@ export function resolveImagePickerModels(
     seen.add(key);
     merged.push(item);
   }
-  if (tab === 'fal') {
-    const falModels = merged.filter((m) => /fal/i.test(`${m.id} ${m.name} ${m.modelId || ''}`));
-    return falModels.length > 0 ? falModels : merged;
-  }
-  return merged;
+  return merged.filter(model => {
+    const onFal = model.channel === 'fal' || /(?:^|[\s/.-])fal(?:$|[\s/.-])/i.test(
+      [model.id, model.name, model.modelId, model.provider].filter(Boolean).join(' '),
+    );
+    return tab === 'fal' ? onFal : !onFal;
+  });
 }
 
 export interface CinemaDeviceOption {

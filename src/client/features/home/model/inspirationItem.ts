@@ -1,9 +1,10 @@
 import type { HomeSlice } from '@client/store/types';
 import { isVideoMediaUrl } from '@client/shared/media/mediaHelper';
 import { resolveVideoResolution } from '@shared/domain/media/video';
-import type { HomeCanvasNode } from '@client/shared/home-publish/homePublish';
+import { imageOutputTier, type ImageOutputTier } from '@shared/domain/media/imageCapabilities';
+import type { HomeCanvasNode, HomeGenerationSettings } from '@client/shared/home-publish/homePublish';
 
-export interface InspirationItem {
+export interface InspirationItem extends HomeGenerationSettings {
   id: string | number;
   category: string;
   tag: string;
@@ -33,12 +34,22 @@ export interface InspirationItem {
 }
 
 export interface InspirationUseOptions {
+  mediaType?: 'image' | 'video';
+  imageModel?: string;
+  imageAspectId?: string;
+  imageQuality?: ImageOutputTier;
+  imageGenerationQuality?: string;
+  inferenceStrength?: string;
+  generateAudio?: boolean;
+  videoContextIrEnabled?: boolean;
+  referenceAudioUrls?: string[];
+  referenceVideoUrls?: string[];
   referenceImages?: string[];
   videoRefMode?: string;
   videoDuration?: number;
   videoModel?: string;
   videoAspectId?: string;
-  videoResolution?: '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
+  videoResolution?: '360P' | '480P' | '540P' | '720P' | '768P' | '1080P' | '2K' | '4K';
 }
 
 /** 首屏优先加载的灵感条目数量 */
@@ -58,19 +69,37 @@ export function inspirationAspectRatio(item: Pick<InspirationItem, 'aspectRatio'
 
 export function inspirationVideoUseOptions(item: InspirationItem): InspirationUseOptions {
   return {
-    referenceImages: item.referenceImages,
+    mediaType: 'video',
+    referenceImages: item.referenceImages ?? [],
+    generateAudio: item.generateAudio,
+    videoContextIrEnabled: item.videoContextIrEnabled,
+    referenceAudioUrls: item.referenceAudioUrls,
+    referenceVideoUrls: item.referenceVideoUrls,
     videoRefMode: item.videoRefMode || 'omni',
     videoDuration: item.videoDuration,
-    videoModel: item.model,
+    videoModel: item.modelRouteKey || item.model,
     videoAspectId: item.aspectRatio,
-    videoResolution: resolveVideoResolution(item.quality),
+    videoResolution: /^(360P|480P|540P|720P|768P|1080P|2K|4K)$/i.test(item.videoResolution || item.quality || '') ? resolveVideoResolution(item.videoResolution || item.quality) : undefined,
+  };
+}
+
+export function inspirationImageUseOptions(item: InspirationItem): InspirationUseOptions {
+  const resolution = item.quality?.toUpperCase().match(/512PX|[124]K/)?.[0];
+  return {
+    mediaType: 'image',
+    imageModel: item.modelRouteKey || item.model,
+    referenceImages: item.referenceImages ?? [],
+    imageGenerationQuality: item.imageQuality,
+    inferenceStrength: item.inferenceStrength,
+    imageAspectId: item.aspectRatio,
+    imageQuality: ['high', 'medium', 'low'].includes(item.quality || '') ? item.quality as ImageOutputTier : resolution ? imageOutputTier(resolution === '512PX' ? '512px' : resolution as '1K' | '2K' | '4K') : undefined,
   };
 }
 
 /** Apply one complete reference selection without retaining frames from a previous draft. */
 export function inspirationComposerState(prompt: string, refMedia?: string, options?: InspirationUseOptions): Partial<HomeSlice> {
-  const video = Boolean(options || (refMedia && isVideoMediaUrl(refMedia)));
-  const references = options?.referenceImages?.length ? [...options.referenceImages] : refMedia ? [refMedia] : [];
+  const video = options?.mediaType !== 'image' && Boolean(options || (refMedia && isVideoMediaUrl(refMedia)));
+  const references = options?.referenceImages !== undefined ? [...options.referenceImages] : refMedia ? [refMedia] : [];
   const mode = options?.videoRefMode || 'omni';
   const state: Partial<HomeSlice> = {
     quickPrompt: prompt,
@@ -97,30 +126,33 @@ export function inspirationComposerState(prompt: string, refMedia?: string, opti
     if (options?.videoModel) state.quickVideoModel = options.videoModel;
     if (options?.videoAspectId) state.quickVideoAspectId = options.videoAspectId;
     if (options?.videoResolution) state.quickVideoResolution = options.videoResolution;
+    if (options?.videoContextIrEnabled !== undefined) state.quickVideoContextIrEnabled = options.videoContextIrEnabled;
+  } else {
+    if (options?.imageModel) state.quickModel = options.imageModel;
+    if (options?.imageAspectId) state.quickAspectId = options.imageAspectId;
+    if (options?.imageQuality) state.quickQuality = options.imageQuality;
   }
   return state;
 }
 
-export const INSPIRATION_CATEGORIES = [
-  { id: 'all', label: '精选', categories: [] },
-  { id: 'video', label: '影视创作', categories: ['video'] },
-  { id: 'animation', label: '插画·3D', categories: ['illustration', '3d'] },
-  { id: 'ecommerce', label: '广告电商', categories: ['ecommerce'] },
-  { id: 'design', label: '平面设计', categories: ['poster'] },
-  { id: 'photo', label: '摄影写真', categories: ['photo'] },
-  { id: 'social', label: '社交创作', categories: ['social'] },
-  { id: 'workbook', label: '工作簿', categories: ['workbook'] },
-] as const;
-export type InspirationCategory = typeof INSPIRATION_CATEGORIES[number]['id'];
+const CATEGORY_LABELS: Record<string, string> = {
+  video: '影视创作',
+  illustration: '插画·3D',
+  '3d': '插画·3D',
+  ecommerce: '广告电商',
+  poster: '平面设计',
+  photo: '摄影写真',
+  social: '社交创作',
+  workbook: '工作簿',
+};
 interface SearchableInspiration { title: string; prompt: string; category: string; tag: string; author?: { name: string } }
 const normalize = (text: string) => text.normalize('NFKC').toLocaleLowerCase();
 
-export function matchesInspirationSearch(item: SearchableInspiration, category: InspirationCategory, query: string) {
-  const selected = INSPIRATION_CATEGORIES.find(entry => entry.id === category)!;
-  if (category !== 'all' && !(selected.categories as readonly string[]).includes(item.category)) return false;
-  const categoryLabels = INSPIRATION_CATEGORIES.filter(entry => (entry.categories as readonly string[]).includes(item.category)).map(entry => entry.label);
-  const haystack = normalize([item.title, item.prompt, item.tag, item.category, item.author?.name ?? '', ...categoryLabels].join(' '));
-  return normalize(query).trim().split(/\s+/).filter(Boolean).every(term => haystack.includes(term));
+export function matchesInspirationSearch(item: SearchableInspiration, query: string) {
+  const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const haystack = normalize([item.title, item.prompt, item.tag, item.category, item.author?.name, CATEGORY_LABELS[item.category]].join(' '));
+  return terms.every(term => haystack.includes(term));
 }
 
 /** Partition the feed into complete rows with a shared height and original media ratios. */

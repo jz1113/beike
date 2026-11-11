@@ -133,20 +133,12 @@ func serveProxiedVideo(w http.ResponseWriter, r *http.Request, response *http.Re
 		writeProxyText(w, http.StatusBadGateway, "媒体响应缺少范围信息")
 		return
 	}
-	contentType := response.Header.Get("Content-Type")
-	if contentType == "" || contentType == "application/octet-stream" {
-		target, _ := url.Parse(r.URL.Query().Get("url"))
-		if target != nil {
-			contentType = mime.TypeByExtension(strings.ToLower(path.Ext(target.Path)))
-		}
-		if contentType == "" {
-			contentType = "video/mp4"
-			if r.URL.Query().Get("as") == "audio" {
-				contentType = "audio/mpeg"
-			}
-		}
+	contentType := proxiedMediaContentType(r, response.Header.Get("Content-Type"))
+	if contentType == "" {
+		writeProxyText(w, http.StatusBadGateway, "远程响应不是支持的视频或音频")
+		return
 	}
-	w.Header().Set("Content-Type", contentType)
+	setProxyContentHeaders(w, contentType)
 	w.Header().Set("Cache-Control", "no-store")
 	for _, key := range []string{"Accept-Ranges", "Content-Range", "ETag", "Last-Modified"} {
 		if value := response.Header.Get(key); value != "" {
@@ -164,6 +156,45 @@ func serveProxiedVideo(w http.ResponseWriter, r *http.Request, response *http.Re
 	if err != nil || written == 0 || (response.ContentLength >= 0 && written != response.ContentLength) {
 		// A truncated stream must fail rather than be cached as a complete file.
 		panic(http.ErrAbortHandler)
+	}
+}
+
+func proxiedMediaContentType(r *http.Request, declared string) string {
+	contentType := strings.TrimSpace(declared)
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if contentType != "" && err != nil {
+		return ""
+	}
+	if contentType == "" || mediaType == "application/octet-stream" {
+		target, _ := url.Parse(r.URL.Query().Get("url"))
+		contentType = ""
+		if target != nil {
+			contentType = mime.TypeByExtension(strings.ToLower(path.Ext(target.Path)))
+		}
+		if contentType == "" {
+			contentType = "video/mp4"
+			if r.URL.Query().Get("as") == "audio" || r.URL.Query().Get("type") == "audio" {
+				contentType = "audio/mpeg"
+			}
+		}
+		mediaType, params, err = mime.ParseMediaType(contentType)
+		if err != nil {
+			return ""
+		}
+	}
+	// Filename inference only applies to absent/generic types. An upstream
+	// document must not become an application-origin page, even at a .mp4 URL.
+	switch mediaType {
+	case "video/mp4", "video/webm", "video/quicktime", "video/mpeg", "video/ogg",
+		"video/x-m4v", "video/x-msvideo", "video/x-matroska", "video/mp2t",
+		"video/3gpp", "video/3gpp2", "video/x-flv",
+		"audio/mpeg", "audio/mp3", "audio/mp4", "audio/aac", "audio/aacp",
+		"audio/wav", "audio/wave", "audio/x-wav", "audio/vnd.wave",
+		"audio/ogg", "audio/opus", "audio/flac", "audio/x-flac", "audio/webm",
+		"audio/x-m4a", "audio/3gpp", "audio/3gpp2", "application/ogg":
+		return mime.FormatMediaType(mediaType, params)
+	default:
+		return ""
 	}
 }
 

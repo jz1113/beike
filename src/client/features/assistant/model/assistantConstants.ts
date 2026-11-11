@@ -1,5 +1,5 @@
 import { VISION_MODELS } from '@shared/domain/prompts/vision';
-import { listApprovedModels, vendorLabel } from '@shared/domain/models/modelCatalog';
+import { listSelectableModels, vendorLabel } from '@shared/domain/models/modelCatalog';
 import {
   getModelProviderName,
   isPlaceholderModelMeta,
@@ -44,40 +44,6 @@ export function getAssistantProductIdeaPrompt(title: string): string {
   return `根据商品「${title}」已提供的信息与参考素材，构思6条图片提示词，用标题和代码块分别给出。外观、材质或卖点无法确认时先标明，缺少关键素材时先提问。`;
 }
 
-export const DOC_EXT_RE = /\.(pdf|docx|pptx|xlsx|xls|md|txt|csv|json)$/i;
-export const LEGACY_OFFICE_EXT_RE = /\.(doc|ppt)$/i;
-export const PLAIN_TEXT_EXT_RE = /\.(txt|md|csv|json)$/i;
-export const MAX_DOC_CHARS = 80000;
-export const SUPPORTED_DOC_FORMATS = 'pdf、docx、pptx、xlsx、txt、md、csv、json';
-export const FILE_ACCEPT =
-  'image/*,video/*,.pdf,.docx,.pptx,.xlsx,.xls,.md,.txt,.csv,.json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/plain,text/markdown,text/csv,application/json';
-
-export function truncateDocText(text: string): { text: string; truncated: boolean } {
-  // eslint-disable-next-line no-control-regex
-  const cleaned = (text || '').replace(/\u0000/g, '').trim();
-  if (cleaned.length <= MAX_DOC_CHARS) return { text: cleaned, truncated: false };
-  return {
-    text: `【已截断：原文约 ${cleaned.length} 字，仅保留前 ${MAX_DOC_CHARS} 字】\n\n` + cleaned.slice(0, MAX_DOC_CHARS),
-    truncated: true,
-  };
-}
-
-export function isDocumentFile(file: File): boolean {
-  if (DOC_EXT_RE.test(file.name)) return true;
-  const t = (file.type || '').toLowerCase();
-  return (
-    t === 'application/pdf'
-    || t.includes('wordprocessingml')
-    || t.includes('presentationml')
-    || t.includes('spreadsheetml')
-    || t === 'application/vnd.ms-excel'
-    || t === 'text/plain'
-    || t === 'text/markdown'
-    || t === 'text/csv'
-    || t === 'application/json'
-  );
-}
-
 export const HISTORY_LIMIT_OPTIONS = [
   { value: 3, label: '回读3条' },
   { value: 5, label: '回读5条' },
@@ -89,7 +55,7 @@ export const HISTORY_LIMIT_OPTIONS = [
   { value: 200, label: '回读200条' }
 ];
 
-export const DEFAULT_ASSISTANT_MODELS = listApprovedModels('multimodal').map((m) => ({
+export const DEFAULT_ASSISTANT_MODELS = listSelectableModels('multimodal').map((m) => ({
   id: m.id,
   name: m.name,
   shortName: m.shortName,

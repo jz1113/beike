@@ -269,6 +269,7 @@ export function CanvasThreeDNode({
       {hasContent && selected && (
         <div
           data-three-d-node-toolbar=""
+          data-tapnow-float-toolbar=""
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           className="pointer-events-auto absolute -top-16 left-1/2 z-30 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-white/10 bg-[#1a1a1a]/95 px-2 py-1 text-xs text-white/90 shadow-2xl backdrop-blur-md whitespace-nowrap"

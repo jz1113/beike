@@ -136,9 +136,9 @@ export function CanvasDrawingReferenceBar({
             >
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute -left-1 -top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full border border-zinc-300 bg-white px-1 text-[10px] font-semibold leading-none text-zinc-700 shadow-xs dark:border-white/15 dark:bg-[#1b1b1e] dark:text-white/90"
+                className="canvas-reference-badge"
               >
-                {idx + 1}
+                文本{idx + 1}
               </span>
               <button
                 type="button"
@@ -254,9 +254,9 @@ export function CanvasDrawingReferenceBar({
             >
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute left-1 top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-black/65 px-1 text-[10px] font-semibold leading-none text-white backdrop-blur-xs"
+                className="canvas-reference-badge"
               >
-                {index + 1}
+                {refLabel}
               </span>
 
               <button

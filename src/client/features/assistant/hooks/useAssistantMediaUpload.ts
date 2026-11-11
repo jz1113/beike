@@ -1,5 +1,4 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { apiFetch } from '@client/shared/api/apiClient';
 import { isImageFile, isVideoFile, readImageFileAsDataUrl } from '@client/shared/api/mediaUpload';
 import { extractVideoThumbnail } from '@client/shared/media/mediaHelper';
 import { useFileDropZone } from '@client/shared/hooks/useFileDropZone';
@@ -8,11 +7,10 @@ import { SHORTCUT_REPEAT_GUARD_MS } from '@client/shared/hooks/useToast';
 import { formatUserError } from '@shared/domain/models/upstreamErrors';
 import {
   LEGACY_OFFICE_EXT_RE,
-  PLAIN_TEXT_EXT_RE,
   SUPPORTED_DOC_FORMATS,
   isDocumentFile,
-  truncateDocText,
-} from '@client/features/assistant/model/assistantConstants';
+  extractAssistantDocument,
+} from '@client/shared/api/assistantDocuments';
 import { useAppStore, type MediaAttachment } from '@client/store';
 
 interface UseAssistantMediaUploadOptions {
@@ -79,26 +77,7 @@ export function useAssistantMediaUpload({
             attachment = { type: 'video', url: createBlobUrl(file), thumbnailUrl: thumbnailUrl || undefined,
               name: file.name, size: file.size, mime: file.type || undefined };
           } else if (isDocumentFile(file)) {
-            let extractedText: string;
-            let truncated: boolean;
-            if (PLAIN_TEXT_EXT_RE.test(file.name) || file.type.startsWith('text/') || file.type === 'application/json') {
-              const text = truncateDocText(await file.text());
-              extractedText = text.text;
-              truncated = text.truncated;
-            } else {
-              const form = new FormData();
-              form.append('file', file);
-              const response = await apiFetch('/api/assistant/extract-document', {
-                method: 'POST', body: form, signal: controller.signal,
-              });
-              const data = await response.json();
-              if (!response.ok || !data.success || typeof data.text !== 'string') {
-                throw new Error(data.error || '文档解析失败');
-              }
-              extractedText = data.text;
-              truncated = Boolean(data.truncated);
-            }
-            if (!extractedText.trim()) throw new Error('未能提取到可读文本');
+            const { text: extractedText, truncated } = await extractAssistantDocument(file, controller.signal);
             attachment = { type: 'document', url: '', name: file.name, size: file.size,
               mime: file.type || undefined, extractedText };
             if (truncated) truncatedDocuments.push(file.name);

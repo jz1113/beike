@@ -1,3 +1,4 @@
+import { homeGenerationSettings } from '@client/shared/home-publish/homePublish';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, Copy, Home, Link2 } from 'lucide-react';
@@ -93,14 +94,18 @@ function toggleHomeShowcase(rawUrl: string, kind: 'image' | 'video'): 'published
   const task = [...store.generationTasks, ...store.sessions.flatMap(session => session.tasks)]
     .find(item => item.resultUrl && cleanOriginalMediaUrl(item.resultUrl) === url);
   if (task) {
-    publishMediaResult({ id: task.id || task.taskId || showcaseId(url), prompt: task.prompt || '', title: task.title, url, mediaType: kind });
+    publishMediaResult({ id: task.id || task.taskId || showcaseId(url), prompt: task.prompt || '', title: task.title, url, mediaType: kind, settings: homeGenerationSettings(task) });
     return 'published';
   }
   for (const project of useCanvasStore.getState().projects) {
     const node = project.nodes.find(item =>
       (item.imageUrl && cleanOriginalMediaUrl(item.imageUrl) === url) || (item.videoUrl && cleanOriginalMediaUrl(item.videoUrl) === url));
     if (!node) continue;
-    publishMediaResult({ id: `canvas-${node.id}`, prompt: node.content || '', title: node.title || project.title, url, mediaType: kind });
+    publishMediaResult({ id: `canvas-${node.id}`, prompt: node.content || '', title: node.title || project.title, url, mediaType: kind, settings: node.drawing ? {
+      model: node.drawing.model, quality: node.drawing.quality, aspectRatio: node.drawing.aspect,
+      imageQuality: node.drawing.generationQuality, videoDuration: node.drawing.duration, videoRefMode: node.drawing.refMode,
+      referenceImages: node.drawing.references, generateAudio: node.drawing.audio, videoContextIrEnabled: node.drawing.contextIrEnabled,
+    } : undefined });
     return 'published';
   }
   publishMediaResult({ id: showcaseId(url), prompt: '', url, mediaType: kind });

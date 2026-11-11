@@ -137,7 +137,7 @@ export function ModelManagementPanel({ models, scope, onAdd, onConfigure, onDisc
   const [capability, setCapability] = useState<CapabilityFilter>('all');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all' | 'enabled' | 'disabled'>('all');
-  const [sort, setSort] = useState<ModelDisplaySort>('configured');
+  const [sort, setSort] = useState<ModelDisplaySort>('catalog');
   const [dragged, setDragged] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const activeChannel = scope ?? channel;
@@ -237,6 +237,7 @@ export function ModelManagementPanel({ models, scope, onAdd, onConfigure, onDisc
               onChange={(event) => setSort(event.target.value as ModelDisplaySort)}
               className={inputClass}
             >
+              <option value="catalog">模型目录顺序</option>
               <option value="configured">手动排序</option>
               <option value="name">名称排序</option>
               <option value="price">文本价格升序</option>

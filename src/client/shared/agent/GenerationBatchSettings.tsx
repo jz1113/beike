@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react';
-import { getGatewayClientBaseUrl, getModelCredentials } from '@client/shared/api/gatewayClient';
+import { useState } from 'react';
 import { ConfiguredModelPicker } from '@client/shared/models/ConfiguredModelPicker';
 import { agentTriggerModelName } from '@client/shared/prompt-bar/controls/PromptBarModelPickerModal';
-import { EXTENDED_IMAGE_RATIO_ITEMS } from '@client/shared/prompt-bar/promptBarConstants';
 import {
   loadPromptPreferences,
   savePromptPreferences,
@@ -24,11 +22,9 @@ import {
   type PreferenceModelItem,
 } from '@client/shared/prompt-bar/hooks/usePromptBarWorkflowModels';
 import { useAppStore } from '@client/store';
-import { imageCapabilities } from '@shared/domain/media/imageCapabilities';
 import { DEFAULT_MODALITY_MODELS } from '@shared/domain/models/modalityDefaults';
 import { readEffectiveModalityModels, upstreamModalityModelId } from '@shared/domain/models/modalityStorage';
-import type { BatchGenerationSettings } from './buildGenerationPromptBatch';
-import { getVideoModelById } from '@shared/domain/media/video';
+import { batchImageParameters, batchVideoParameters, type BatchGenerationSettings } from './buildGenerationPromptBatch';
 
 export function resolvePreferredBatchModel(
   kind: 'image' | 'video',
@@ -118,7 +114,7 @@ export default function GenerationBatchSettings({
   video: boolean;
   disabled?: boolean;
 }) {
-  const { ready, imageModels, videoModels } = usePreferenceModels();
+  const { imageModels, videoModels } = usePreferenceModels();
   const [prefs, setPrefs] = useState<PromptComposerPreferences>(() => loadPromptPreferences());
 
   const persistPrefs = (next: PromptComposerPreferences) => {
@@ -128,58 +124,23 @@ export default function GenerationBatchSettings({
   };
 
   const patch = (update: Partial<BatchGenerationSettings>) => {
+    const applied = { ...update };
     const next = { ...value, ...update };
-    onChange(next, update);
-    syncBatchSettingsStore(update);
+    const fields = Object.keys(update);
+    if (image && fields.some(key => key.startsWith('image'))) {
+      const imageParams = batchImageParameters(next);
+      Object.assign(applied, { imageAspect: imageParams.aspect, imageQuality: imageParams.tier });
+    }
+    if (video && fields.some(key => key.startsWith('video'))) {
+      const params = batchVideoParameters(next);
+      Object.assign(applied, { videoRefMode: params.mode, videoAspect: params.aspect, videoResolution: params.resolution, videoDuration: params.duration });
+    }
+    onChange({ ...value, ...applied }, update);
+    syncBatchSettingsStore(applied);
   };
 
-  useEffect(() => {
-    if (!ready) return;
-    const updates: Partial<BatchGenerationSettings> = {};
-    if (image && imageModels.length > 0) {
-      const nextImage = resolvePreferredBatchModel('image', value.imageModel, imageModels);
-      if (nextImage && nextImage !== value.imageModel) updates.imageModel = nextImage;
-    }
-    if (video && videoModels.length > 0) {
-      const nextVideo = resolvePreferredBatchModel('video', value.videoModel, videoModels);
-      if (nextVideo && nextVideo !== value.videoModel) updates.videoModel = nextVideo;
-    }
-    if (Object.keys(updates).length > 0) patch(updates);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, image, video, imageModels, videoModels]);
-
-  const selectedImage = imageModels.find((model) => matchesStoredModel(model, value.imageModel));
-  const resolvedImageModel = selectedImage?.upstreamId
-    || upstreamModalityModelId('image', value.imageModel)
-    || value.imageModel;
-  const credentials = getModelCredentials(resolvedImageModel);
-  const imageCaps = imageCapabilities(resolvedImageModel, credentials.protocol, credentials.baseUrl);
-  const allowedResolutions = imageCaps.resolutions;
-  const allowedAspectRatios = imageCaps.aspectRatios;
-
-  useEffect(() => {
-    if (!image) return;
-    const isExtended = EXTENDED_IMAGE_RATIO_ITEMS.some((item) => item.id === value.imageAspect);
-    if (!isExtended || allowedAspectRatios?.includes(value.imageAspect)) return;
-    patch({ imageAspect: '3:4' });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [image, resolvedImageModel, (allowedAspectRatios || []).join(','), value.imageAspect]);
-
-  useEffect(() => {
-    if (!image || !allowedResolutions.length) return;
-    const current = imageResolutionLabel(value.imageQuality);
-    if (allowedResolutions.includes(current)) return;
-    const fallback = allowedResolutions[allowedResolutions.length - 1];
-    patch({ imageQuality: qualityForResolution(fallback) });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [image, resolvedImageModel, allowedResolutions.join(','), value.imageQuality]);
-
-  const selectedVideo = videoModels.find((model) => matchesStoredModel(model, value.videoModel));
-  const resolvedVideoModel = selectedVideo?.upstreamId
-    || upstreamModalityModelId('video', value.videoModel)
-    || value.videoModel;
-  const videoBaseUrl = getGatewayClientBaseUrl(value.videoModel);
-  const videoProfile = getVideoModelById(resolvedVideoModel, videoBaseUrl);
+  const imageParams = batchImageParameters(value);
+  const videoParams = batchVideoParameters(value);
 
   return (
     <div className="space-y-3">
@@ -192,7 +153,7 @@ export default function GenerationBatchSettings({
                 ariaLabel="批量图片模型"
                 modalityKind="image"
                 options={imageModels}
-                value={selectedImage?.id || value.imageModel}
+                value={value.imageModel}
                 disabled={disabled}
                 onChange={(imageModel) => patch({ imageModel })}
               />
@@ -200,14 +161,14 @@ export default function GenerationBatchSettings({
           </div>
           <PromptBarImageTab
             compact
-            aspect={value.imageAspect}
-            resolution={imageResolutionLabel(value.imageQuality)}
+            aspect={imageParams.aspect}
+            resolution={imageResolutionLabel(imageParams.tier)}
             strength={value.imageInferenceStrength || prefs.image.inferenceStrength}
-            quality={value.imageQualityTier || prefs.image.quality || value.imageQuality}
-            allowedResolutions={allowedResolutions}
-            allowedQualities={imageCaps.qualities}
-            allowedAspectRatios={allowedAspectRatios}
-            strengthMode={imageCaps.strength}
+            quality={imageParams.quality ?? 'high'}
+            allowedResolutions={imageParams.caps.resolutions}
+            allowedQualities={imageParams.caps.qualities}
+            allowedAspectRatios={imageParams.caps.aspectRatios}
+            strengthMode={imageParams.caps.strength}
             onAspect={(aspect) => {
               patch({ imageAspect: aspect });
               persistPrefs({ ...prefs, image: { ...prefs.image, aspect: aspect as PromptComposerPreferences['image']['aspect'] } });
@@ -221,10 +182,7 @@ export default function GenerationBatchSettings({
               persistPrefs({ ...prefs, image: { ...prefs.image, inferenceStrength: strength } });
             }}
             onQuality={(quality: ImageQualityTier) => {
-              patch({
-                imageQualityTier: quality,
-                ...(quality === 'low' || quality === 'medium' || quality === 'high' ? { imageQuality: quality } : {}),
-              });
+              patch({ imageQualityTier: quality });
               persistPrefs({ ...prefs, image: { ...prefs.image, quality } });
             }}
           />
@@ -236,23 +194,27 @@ export default function GenerationBatchSettings({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <legend className="text-xs font-semibold text-slate-800 dark:text-slate-100">视频设置</legend>
             <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-              <label className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/95 px-3 text-xs font-medium text-slate-700 shadow-2xs dark:border-white/10 dark:bg-[#1B1C20]/95 dark:text-slate-200">
+              {videoParams.audioSupported && <label className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/95 px-3 text-xs font-medium text-slate-700 shadow-2xs dark:border-white/10 dark:bg-[#1B1C20]/95 dark:text-slate-200">
                 <input
                   aria-label="视频生成音频"
                   type="checkbox"
                   disabled={disabled}
                   checked={value.videoGenerateAudio ?? false}
-                  onChange={(event) => patch({ videoGenerateAudio: event.target.checked })}
+                  onChange={(event) => {
+                    const generateAudio = event.target.checked;
+                    patch({ videoGenerateAudio: generateAudio });
+                    persistPrefs({ ...prefs, video: { ...prefs.video, generateAudio } });
+                  }}
                   className="h-3.5 w-3.5 accent-slate-900 dark:accent-white"
                 />
                 生成音频
-              </label>
+              </label>}
               <div className="min-w-[200px] flex-1 sm:w-64 sm:flex-initial">
                 <ConfiguredModelPicker
                   ariaLabel="批量视频模型"
                   modalityKind="video"
                   options={videoModels}
-                  value={selectedVideo?.id || value.videoModel}
+                  value={value.videoModel}
                   disabled={disabled}
                   onChange={(videoModel) => patch({ videoModel })}
                 />
@@ -261,14 +223,12 @@ export default function GenerationBatchSettings({
           </div>
           <PromptBarVideoTab
             compact
-            modelId={resolvedVideoModel}
-            baseUrl={videoBaseUrl}
-            supportedAspectRatios={videoProfile?.supportedAspectRatios || selectedVideo?.supportedAspectRatios}
-            supportedResolutions={videoProfile?.supportedResolutions || selectedVideo?.supportedResolutions}
-            mode={value.videoRefMode}
-            aspect={value.videoAspect}
-            resolution={value.videoResolution}
-            duration={value.videoDuration}
+            modelId={videoParams.model}
+            baseUrl={videoParams.baseUrl}
+            mode={videoParams.mode}
+            aspect={videoParams.aspect}
+            resolution={videoParams.resolution}
+            duration={videoParams.duration}
             contextIrEnabled={value.videoContextIrEnabled ?? true}
             onContextIrEnabled={(videoContextIrEnabled) => patch({ videoContextIrEnabled })}
             onMode={(videoRefMode) => patch({ videoRefMode })}

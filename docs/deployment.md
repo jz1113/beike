@@ -16,11 +16,13 @@ Nginx 默认请求体上限为 `64m`；仅九宫格裁切接口 `/api/sales/asse
 
 ## 浏览器凭据与入口边界
 
-当前应用不是独立账号登录系统。Go 静态页会下发 `app_token`，客户端也会读写此 Cookie 并生成 API 访问头；它不是 HttpOnly Cookie，不能把直接访问 Go 静态页视作已经登录。工作区密钥用于数据作用域，不替代入口身份认证。生产必须保留 Nginx 网页认证、HTTPS 与仅监听回环地址的 Go 端口，不能只依赖应用令牌对公网提供保护。
+当前应用不是独立账号登录系统。生产模式由 Go 在受信任入口签发 `app_token` Cookie，设置 `HttpOnly`、`Secure` 和 `SameSite=Lax`；浏览器通过 HTTPS 同源请求自动携带，前端脚本不能读取其值。开发模式保留 Vite 注入令牌及客户端可读 Cookie 的请求头兼容路径，不能用开发行为推断生产 Cookie 标志。工作区密钥用于数据作用域，不替代入口身份认证。生产必须保留 Nginx 网页认证、HTTPS 与仅监听回环地址的 Go 端口，不能只依赖应用令牌对公网提供保护。
 
-网页设置中的第三方凭据保存在浏览器 localStorage，属于明文、同源脚本可读的持久数据，不是系统钥匙串或加密保险箱。本机数据、浏览器配置和同源脚本应按此边界保护。迁移到 HttpOnly 会话需另行设计请求头、Cookie、媒体签名、过期与跨站保护的整体协议，当前没有仅切换 Cookie 标志。
+网页设置中的第三方渠道凭据仍保存在浏览器 localStorage，属于明文、同源脚本可读的持久数据，不是系统钥匙串或加密保险箱。应用访问令牌的 HttpOnly Cookie 不会加密这些渠道凭据，也不替代工作区密钥、媒体签名与入口认证。本机数据、浏览器配置和同源脚本应按此边界保护。
 
 生产模式下，服务级派生磁盘缓存清理需要管理员令牌和工作区密钥；普通应用令牌返回 `403`。本机开发模式可用本机访问令牌执行。
+
+生产 Nginx 的网页入口必须启用 `auth_basic`，并在代理位置使用 `proxy_set_header X-Beike-Web-User $remote_user;`，由 Nginx 覆盖客户端同名请求头。独立认证的 MCP 入口必须清空该头。升级已有部署时，将对应设置同步到实际启用的站点配置，确认入口认证正常后执行 `sudo nginx -t` 和 `sudo systemctl reload nginx`。新浏览器完成 HTTPS 网页认证后重新加载首页，应收到带 `HttpOnly`、`Secure` 的 `app_token` Cookie；仅核对标志，不复制或公开 Cookie 值。只访问 HTTP 首页无法完成生产 Cookie 的正常使用。
 
 ## OSS 参考视频存储
 
@@ -60,9 +62,11 @@ sudo bash /opt/beike/tools/deploy/bootstrap-ubuntu.sh
 sudo -u beike -H bash -lc 'cd /opt/beike && pnpm install --frozen-lockfile && pnpm build'
 ```
 
-安装脚本创建服务用户、数据目录、systemd 与 HTTP Nginx 配置；首次生成的网页访问凭据应妥善保存，文件位于 `/etc/nginx/.htpasswd`。已有服务升级不重复运行首次安装脚本。
+安装脚本创建服务用户、数据目录、systemd 与 HTTP Nginx 配置。首次随机生成的网页密码只在安装终端显示，须当场保存到密码管理器；`/etc/nginx/.htpasswd` 只保存密码哈希，不能取回原密码。遗失时执行 `sudo htpasswd /etc/nginx/.htpasswd beike` 交互式重设（用户名按实际配置替换，不加 `-c`，以免覆盖其他用户）。已有服务升级不重复运行首次安装脚本。
 
 编辑 `/var/lib/beike/.env`，至少设置 `LOCAL_ACCESS_TOKEN`、管理员操作所需的 `ADMIN_ACCESS_TOKEN`、`PUBLIC_WEB_ORIGIN`，核对 `AZHUO_DATA_DIR`、`DATABASE_URL`、`WEB_DIST_DIR`。已有环境的前端目录应为 `/opt/beike/tools/build/ui`，运行数据保持原位。
+
+生产启动和维护命令共用数据库选择规则：显式 `DATABASE_URL` 优先，否则使用数据目录中的 `azhuo.db`；进程环境优先于数据目录 `.env`。启动日志打印最终 SQLite 路径，应与备份命令所选源库核对一致。普通开发启动忽略根 `.env` 中的历史数据库 URL，但尊重进程显式配置；隔离开发强制使用独立 `AZHUO_DATA_DIR/azhuo.db`，不继承外部数据库 URL。路径变化不会自动移动、覆盖或合并任何旧库。
 
 个人网关模式下保持 `AI_DRAWING_BASE_URL` 与 `AI_DRAWING_API_KEY` 为空。用户在网页设置保存自己的渠道配置，凭证随当前请求转发，不把本机个人密钥同步为服务器共享密钥。
 
@@ -74,7 +78,7 @@ sudo systemctl status beike --no-pager
 curl --fail http://127.0.0.1:3000/api/health
 ```
 
-浏览器通过公网 IP 或域名访问，先通过 Nginx 网页认证，再检查电商图文、素材库及当前工作区。官方种子来自 `src/shared/domain/prompts/masterRecipes.ts` 与 `src/shared/data/`，启动时同步，不能当作无引用文件删除。`pnpm seed:export` 会改写仓库种子，应按[种子导出](database.md#官方种子导出)明确选择数据源，不是每次部署必跑步骤。
+此阶段只检查本机健康接口和证书签发所需的连通性；公网业务验收在下方 HTTPS 配置完成后进行，不在公网 HTTP 页面输入网页密码或上游凭据。官方种子来自 `src/shared/domain/prompts/masterRecipes.ts` 与 `src/shared/data/`，启动时同步，不能当作无引用文件删除。`pnpm seed:export` 会改写仓库种子，应按[种子导出](database.md#官方种子导出)明确选择数据源，不是每次部署必跑步骤。
 
 ## HTTPS
 
@@ -85,6 +89,16 @@ sudo bash /opt/beike/tools/deploy/enable-https.sh example.com ops@example.com
 ```
 
 随后将 `PUBLIC_WEB_ORIGIN` 改为实际 HTTPS 来源并重启服务。首次安装无需预先准备证书；不要直接启用依赖尚不存在证书文件的配置。
+
+开放业务访问前验收实际域名：HTTP 首页应跳转 HTTPS，HTTPS 证书校验应通过，未认证首页应返回 `401`。以下命令不输出 Cookie 或密码；最后一条会交互式询问网页密码：
+
+```bash
+curl --silent --show-error --head http://example.com/
+curl --silent --show-error --output /dev/null --write-out '%{http_code}\n' https://example.com/
+curl --fail --silent --show-error --user beike --output /dev/null https://example.com/
+```
+
+随后在浏览器通过 HTTPS 网页认证，检查首页、工作区和已有素材；无需触发收费生成。确认旧的 HTTP/IP 入口已关闭或限制为管理员来源，不能绕过域名的 HTTPS 入口。
 
 需要从 WorkBuddy 或 Codex 创建画布草稿时，按[画布远程 MCP](canvas-mcp.md)单独启用连接器。
 
@@ -137,24 +151,25 @@ curl --fail http://127.0.0.1:3000/api/health
 保留深度推理功能时，在仓库根目录为实际运行服务的用户准备 Python 环境：
 
 ```bash
-python3 -m pip install --user -r tools/scripts/depth/requirements.txt
-pnpm run setup:depth-env
 pnpm run setup:depth-model
+pnpm run setup:depth-env
 ```
 
-`requirements.txt` 包括图像处理、PyTorch、Transformers 与 Accelerate 依赖；模型安装需要网络和额外磁盘空间。使用虚拟环境时在其中安装依赖，并将 `DEPTH_VIDEO_PYTHON` 指向该环境的 Python。服务器服务用户必须能访问依赖与模型缓存。
+`setup:depth-model` 默认在 `AZHUO_DATA_DIR`（未设置时为系统应用数据目录）的 `depth-runtime` 创建独立 venv，不向系统 Python 或用户 site-packages 安装。安装与启动应使用相同的数据目录和服务用户；安装和检查命令会按 `pnpm start` 的规则读取数据目录 `.env`，显式进程环境变量优先；`DEPTH_SETUP_PYTHON` 可指定用于创建 venv 的基础解释器。也可将 `DEPTH_VIDEO_PYTHON` 指向已有 venv/Conda 的 Python；脚本先检查隔离状态，再安装依赖，不使用 `--user`，拒绝向指定的系统解释器安装。
+
+`requirements.txt` 包括图像处理、PyTorch、Transformers 与 Accelerate 依赖；安装需要网络和额外磁盘空间。当前依赖范围尚未形成逐平台锁定组合，升级后须验证目标机器实际推理，不将普通 TypeScript/Go 检查通过视为模型环境验收。服务器服务用户必须能访问依赖与模型缓存。
 
 `setup:depth-env` 检查 FFmpeg、ffprobe 与 Python 环境，并验证视频编码与探测链路；`setup:depth-model` 准备深度模型。FFmpeg 与 ffprobe 分别由 `@ffmpeg-installer/ffmpeg` 和 `@ffprobe-installer/ffprobe` 按当前操作系统和架构安装，执行权限由安装脚本自动处理。Go 解析安装器的真实目录以兼容 pnpm 链接结构，并转换 Windows、x64 与 ia32 平台名称；内置工具不可用时回退到系统 PATH。部署时在目标机器运行 `pnpm install --frozen-lockfile`，不要跨操作系统复制 node_modules，也不要使用 `--no-optional` 跳过媒体二进制。
 
 推理入口为 `tools/scripts/depth/infer_video_depth.py`，同目录 `depth_runtime.py`、`depth_processing.py` 与 `depth_subject.py` 必须一起部署。`setup:depth-model` 一次安装 requirements 中的依赖并检查环境，首次实际推理时下载权重。环境检查可单独执行：
 
 ```bash
-python3 tools/scripts/depth/infer_video_depth.py --check-env
+"/var/lib/beike/depth-runtime/bin/python" tools/scripts/depth/infer_video_depth.py --check-env
 ```
 
 动作捕捉视频从原始 RGB 帧逐帧提取人物蒙版，使用 `nvidia/segformer-b0-finetuned-ade-512-512`（首次运行自动下载并缓存）。按原片亮度边缘细化蒙版，利用当前帧深度补回与人物相连的漏分区域，保留与背景同深度的肢体间隙，再将人物深度映射为亮白轮廓，保留轻微灰度变化，背景置为纯黑；无人帧输出黑帧。标准档使用 518 像素推理并逐帧估计深度，避免跳帧插值及跨帧中值导致动作边缘模糊。该步骤增加逐帧推理开销；人物分割权重加载失败会使任务报错。原始灰度、伪彩色和深度图片沿用原有处理。已有深度视频无法恢复原片中已丢失的外观细节，建议上传原视频重新生成。
 
-`pnpm run setup:depth-env` 使用 `DEPTH_VIDEO_PYTHON` 指定的解释器；不设置时使用 `python3`。
+`pnpm dev`、`pnpm start` 和 `setup:depth-env` 优先使用 `DEPTH_VIDEO_PYTHON`，其次使用已安装的专用环境，最后兼容历史 `python3` 环境。直接运行 Go 二进制时须显式配置 `DEPTH_VIDEO_PYTHON` 指向专用环境。上面的独立检查命令应替换为本机实际路径；Windows 使用 `depth-runtime/Scripts/python.exe`。
 
 ## 商品图片文字识别
 

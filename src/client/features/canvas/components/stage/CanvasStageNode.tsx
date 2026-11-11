@@ -5,6 +5,8 @@ import { useCanvasStore } from '../../store/useCanvasStore';
 import { CanvasStageNodeMedia } from './CanvasStageNodeMedia';
 import { CanvasStageNodeToolbar, type CanvasStageNodeProps } from './CanvasStageNodeToolbar';
 import { CanvasSmartEditModal } from './CanvasSmartEditModal';
+import { CoverWorkflowNode } from '../nodes/CoverWorkflowNodes';
+import { coverWorkflowRole, getCoverBatch } from '../../model/coverBatch';
 import { useAppTheme } from '@client/shared/hooks/useAppTheme';
 import type { CanvasNode } from '../../model/types';
 
@@ -67,6 +69,11 @@ export function CanvasStageNode(props: CanvasStageNodeProps) {
     if (node.type === 'audio' && isCurrentDragging) setAudioPanelDismissed(true);
   }, [node.type, isCurrentDragging]);
   if (node.layerHidden) return null;
+  const coverBatch = node.id.endsWith('-product') ? getCoverBatch(node.studioRaw) : undefined;
+  const coverRole = coverWorkflowRole(node);
+  const hasCoverPanel = coverRole === 'layout' || coverRole === 'review';
+  const imageTool = node.type === 'image' || (node.type === 'drawing' && node.generationKind !== 'video')
+    ? node.activeUploadTool : null;
   const isGenerating = node.status === 'generating' && !node.imageUrl && !node.videoUrl;
   const displayX = isCurrentDragging && draggingNodePos ? draggingNodePos.x : node.x;
   const displayY = isCurrentDragging && draggingNodePos ? draggingNodePos.y : node.y;
@@ -136,13 +143,13 @@ export function CanvasStageNode(props: CanvasStageNodeProps) {
         setEditingDrawingId(node.id);
       }}
     >
-      {isSelected && !node.layerLocked && node.activeUploadTool !== 'cropSelect' && node.studioSubType !== 'jimeng-super-resolution' && (['image','video','prompt','note','frame','compare'].includes(node.type)) && !isGenerating && !node.missingMedia && (
+      {isSelected && !node.layerLocked && imageTool !== 'cropSelect' && node.studioSubType !== 'jimeng-super-resolution' && (['image','video','prompt','note','frame','compare','preview'].includes(node.type)) && !isGenerating && !node.missingMedia && (
         <CanvasResizeHandle width={node.width} height={node.height} zoom={zoom} onResize={(size) => updateNode(projectId, node.id, size)} />
       )}
       {(props.editingNodeTitleId === node.id || (
         !['prompt', 'note', 'frame'].includes(node.type) && (node.studioSubType !== 'jimeng-super-resolution' || Boolean(node.imageUrl))
       )) && <CanvasStageNodeToolbar {...props} isSelected={isSelected} isGenerating={isGenerating} />}
-      {node.activeUploadTool === 'cropSelect' && node.imageUrl && (
+      {imageTool === 'cropSelect' && node.imageUrl && (
         <CanvasImageInlineCropOverlay
           node={node}
           projectId={projectId}
@@ -150,7 +157,7 @@ export function CanvasStageNode(props: CanvasStageNodeProps) {
           setSelectedNodeId={setSelectedNodeId}
         />
       )}
-      {node.activeUploadTool === 'depth' && node.imageUrl && (
+      {imageTool === 'depth' && node.imageUrl && (
         <CanvasImageDepthProgressPanel
           node={node}
           projectId={projectId}
@@ -158,7 +165,7 @@ export function CanvasStageNode(props: CanvasStageNodeProps) {
           setSelectedNodeId={setSelectedNodeId}
         />
       )}
-      {node.activeUploadTool === 'smartEdit' && node.imageUrl && (
+      {imageTool === 'smartEdit' && node.imageUrl && (
         <CanvasSmartEditModal
           node={node}
           projectId={projectId}
@@ -167,7 +174,11 @@ export function CanvasStageNode(props: CanvasStageNodeProps) {
           setEditingDrawingId={setEditingDrawingId}
         />
       )}
-      <CanvasStageNodeMedia {...props} isSelected={isSelected} isGenerating={isGenerating} isCurrentDragging={isCurrentDragging} audioPanelDismissed={audioPanelDismissed} editingDrawingId={editingDrawingId} />
+      {hasCoverPanel
+        ? <CoverWorkflowNode node={node} nodes={props.nodes}
+            onPreview={url => props.setPreviewMedia({ url, type: 'image' })} />
+        : <CanvasStageNodeMedia {...props} coverBatch={coverBatch} isSelected={isSelected} isGenerating={isGenerating}
+            isCurrentDragging={isCurrentDragging} audioPanelDismissed={audioPanelDismissed} editingDrawingId={editingDrawingId} />}
     </div>
   );
 }

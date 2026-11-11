@@ -1,5 +1,4 @@
-import { canonicalModelId } from '@shared/domain/models/modelCatalog';
-import { APPROVED_VIDEO_MODELS } from '@shared/domain/models/model-catalog/approvedVideo';
+import { canonicalModelId, getSelectableModel, isSelectableVoiceModel, listSelectableModels } from '@shared/domain/models/modelCatalog';
 import { classifyModel, normalizeModelId, type ModalityKind, type ModalityModelItem, type ModalityVendorOption } from './modalityClassifier';
 
 export { isLegacyOrDiscontinuedModel } from '@shared/domain/models/modelParsing';
@@ -139,6 +138,18 @@ const LEGACY_VENDOR_IDS: Record<string, string> = {
   siliconcloud: 'siliconflow',
 };
 
+export function orderedModalityVendors(kind: ModalityKind): ModalityVendorOption[] {
+  const vendors = MODALITY_VENDORS_BY_KIND[kind];
+  if (kind === 'voice') return vendors;
+  const order = [...new Set(listSelectableModels(kind === 'chat' ? 'multimodal' : kind)
+    .map(model => inferVendorFromModelId(model.id, kind)))];
+  const rank = (id: string) => {
+    const index = order.indexOf(id);
+    return index < 0 ? order.length : index;
+  };
+  return vendors.toSorted((a, b) => rank(a.id) - rank(b.id));
+}
+
 function keywordHit(haystack: string, keyword: string): boolean {
   const key = keyword.toLowerCase();
   if (!key) return false;
@@ -205,48 +216,9 @@ export function isModelMatchModality(rawModelId: string, kind: ModalityKind): bo
   return classifyModel(rawModelId) === kind;
 }
 
-// 同步目录的准入规则与已保存模型、官方默认和运行时兼容性分开。
-const MULTIMODAL_SYNC_MINIMUMS: Record<string, readonly [RegExp, number, number]> = {
-  google: [/^gemini-?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 3, 8],
-  openai: [/^gpt-?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 5, 6],
-  anthropic: [/^claude-(?:(?:opus|sonnet|haiku|fable)-)?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 4, 8],
-  xai: [/^grok-?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 4, 6],
-  deepseek: [/^deepseek-v?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 4, 1],
-  moonshot: [/^kimi-k(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 3, 0],
-  qwen: [/^qwen-?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 3, 8],
-  bytedance: [/^doubao-(?:seed-)?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 2, 0],
-  minimax: [/^minimax-m(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 2, 7],
-  glm: [/^glm-?(\d{1,2})(?:[._-](\d{1,2}))?(?=-|$)/, 5, 2],
-};
-
-const IMAGE_SYNC_MODELS = [
-  /^gemini-3[.-]1-flash-image$/,
-  /^(?:gemini-)?nano-?banana-?2(?:[.-]1)?$/,
-  /^gpt-image-2(?:[.-](?:5|6))?(?:-(?:flare|sunburst))?$/,
-  /^grok-4[.-]2-image$/,
-  /^(?:doubao-)?seedream-v?(?:4[.-]5|5(?:[.-]0)?(?:-(?:pro|flash))?)(?:-\d{6})?$/,
-  /^kling-image-?v?3(?:-omni)?$/,
-];
-
-const VIDEO_SYNC_LEGACY = new Set([
-  'kling-video-v2-5-turbo',
-  'kling-video-v2-6',
-]);
-const VIDEO_SYNC_MODELS = new Set(
-  APPROVED_VIDEO_MODELS.map(({ id }) => id.toLowerCase()).filter((id) => !VIDEO_SYNC_LEGACY.has(id)),
-);
-
 export function videoSyncCandidateKey(modelId: string): string {
   return canonicalModelId(modelId.trim().replace(/^net-/i, '')).toLowerCase();
 }
-
-const VOICE_SYNC_MODELS = [
-  /^speech-(?:2[.-][89]|[3-9](?:[.-]\d+)?)(?:-(?:hd|turbo))?$/,
-  /^cosyvoice-v?[3-9](?:[.-]\d+)?(?:-(?:flash|plus|pro))?$/,
-  /^eleven-(?:v3|(?:flash|turbo)-v2[.-]5)$/,
-  /^gpt-4o-mini-tts$/,
-  /^(?:grok-voice|gemini-tts|doubao-tts|seed-tts)$/,
-];
 
 export function modalitySyncCandidateKey(modelId: string, kind: ModalityKind): string {
   if (kind === 'video') return videoSyncCandidateKey(modelId);
@@ -259,31 +231,8 @@ export function modalitySyncCandidateKey(modelId: string, kind: ModalityKind): s
 }
 
 export function isModalitySyncCandidate(rawModelId: string, kind: ModalityKind): boolean {
-  if (kind === 'video') return VIDEO_SYNC_MODELS.has(videoSyncCandidateKey(rawModelId));
-  if (kind === 'voice') return VOICE_SYNC_MODELS.some((pattern) => pattern.test(modalitySyncCandidateKey(rawModelId, kind)));
-  // 部分渠道用厂商命名空间包装模型 ID。
-  const id = normalizeModelId(rawModelId.split('/').at(-1) || rawModelId);
-  if (kind === 'image') return IMAGE_SYNC_MODELS.some((pattern) => pattern.test(id));
-
-  const vendor = inferVendorFromModelId(rawModelId, kind);
-  if (!vendor || vendor === 'mistral') return false;
-  const minimum = MULTIMODAL_SYNC_MINIMUMS[vendor];
-  if (!minimum) return isModelMatchModality(rawModelId, kind);
-
-  const modelClass = classifyModel(id);
-  if (modelClass !== 'chat' && modelClass !== 'unknown') return false;
-
-  const [pattern, minimumMajor, minimumMinor] = minimum;
-  const match = id.match(pattern);
-  if (!match) return false;
-  const major = Number(match[1]);
-  const minor = Number(match[2] || 0);
-  if (vendor === 'anthropic' && /(?:^|-)thinking(?:-|$)/.test(id)) return false;
-  const filtersGeminiReasoning = vendor === 'google' && (major === 4 || (major === 3 && minor === 8));
-  if (filtersGeminiReasoning && /(?:^|-)(?:low|medium|high)(?:-|$)/.test(id)) return false;
-  // 渠道把 Grok 4.2 的别名标为 4.20，截图要求同时排除。
-  if (vendor === 'xai' && major === 4 && minor === 20) return false;
-  return major > minimumMajor || (major === minimumMajor && minor >= minimumMinor);
+  if (kind === 'voice') return isSelectableVoiceModel(modalitySyncCandidateKey(rawModelId, kind));
+  return Boolean(getSelectableModel(rawModelId, kind === 'chat' ? 'multimodal' : kind));
 }
 
 export interface ModelVersionScore {

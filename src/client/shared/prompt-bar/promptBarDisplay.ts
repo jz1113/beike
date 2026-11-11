@@ -1,6 +1,8 @@
+import { FILE_ACCEPT } from '@client/shared/api/assistantDocuments';
 import type { QuickGenMode } from '@shared/domain/media/depthVideo';
 import { resolveGptImageSizeForModel } from '@shared/domain/models/model-adapters/image/gptImageSafeSizes';
 import { isGeminiImageModel, resolveGeminiPixelSize } from '@shared/domain/models/model-adapters/image/geminiImageSizes';
+import { resolveProviderImageSize } from '@shared/domain/media/imageCapabilities';
 import { t } from '@client/shared/i18n';
 
 /**
@@ -57,7 +59,7 @@ export function resolveFileAccept(quickGenMode: QuickGenMode): string {
   if (quickGenMode === 'depth-image') return 'image/*';
   if (quickGenMode === 'depth-video') return 'video/*';
   if (quickGenMode === 'agent') {
-    return 'image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.csv,.xls,.xlsx';
+    return FILE_ACCEPT;
   }
   return 'image/*,video/*';
 }
@@ -125,6 +127,11 @@ export function calculateImageDimensions(params: {
   baseRatio: { w: number; h: number };
 }): { w: number; h: number; sizeStr: string } {
   const { quickModel, quickAspectId, quickQuality, baseRatio } = params;
+  const providerSize = resolveProviderImageSize(quickModel || '', quickAspectId, quickQuality);
+  if (providerSize) {
+    const [w, h] = providerSize.split('x').map(Number);
+    return { w, h, sizeStr: providerSize };
+  }
   if (quickModel?.toLowerCase().includes('gpt-image')) {
     const sizeStr = resolveGptImageSizeForModel(
       quickAspectId,

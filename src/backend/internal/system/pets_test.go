@@ -59,6 +59,9 @@ func TestTrustedPetURLStaysOnSource(t *testing.T) {
 }
 
 func TestBuiltinPetsAreCompleteAtlases(t *testing.T) {
+	if _, _, err := builtinPet("the-real-tronald-dump"); err == nil {
+		t.Fatal("removed pet must not remain bundled")
+	}
 	for _, id := range builtinPetOrder {
 		view, sprite, err := builtinPet(id)
 		if err != nil {

@@ -18,6 +18,7 @@ import {
   studioMediaRunBlock,
   studioNodeTaskId,
   studioProjectGenerationHistory,
+  waitForStudioMediaRetry,
 } from './studioTaskState';
 import type { StudioScene } from './types';
 
@@ -169,4 +170,31 @@ it('lists distinct attempts and saved versions, merging archive copies by task i
   expect(entries.map(entry=>entry.id)).toEqual(['recent','original','old-only']);
   expect(entries[1]).toMatchObject({result:'/same.mp4',node:{id:'video'},task:{referenceAudioUrls:['/reference.wav']}});
   expect(entries[2]).toMatchObject({result:'/old.mp4',kind:'video'});
+});
+
+it('retries rows with existing covers and waits for an earlier stopped attempt to settle', async () => {
+  const completed = { id: 'cover', type: 'gen-image', content: '/storage/old.png',
+    beikeLastTaskId: 'node-task', settings: { beikeSizedCoverUrl: '/storage/old.png' } };
+  const signal = new AbortController().signal;
+  mocks.tasks = [task({ status: 'SUCCESS' })];
+  await expect(waitForStudioMediaRetry(() => completed, signal)).resolves.toBe(completed);
+
+  vi.useFakeTimers();
+  try {
+    const stopped = { ...completed, beikeTaskStopped: true };
+    mocks.tasks = [task()];
+    let ready = false;
+    const waiting = waitForStudioMediaRetry(() => stopped, signal).then(node => {
+      ready = true;
+      return node;
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(ready).toBe(false);
+    mocks.tasks = [task({ status: 'FAILURE' })];
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(waiting).resolves.toBe(stopped);
+  } finally {
+    vi.useRealTimers();
+  }
+  await expect(waitForStudioMediaRetry(() => undefined, signal)).rejects.toThrow('图片节点缺失');
 });

@@ -4,7 +4,7 @@ import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
 import { videoPromptSkill, type VideoPromptInput } from '@shared/domain/assistant/skills/videoPromptSkills';
 import { isVeoNativeBase, veoExtensionHint } from '@shared/domain/media/veoChannels';
 import { getVideoModelById, resolveVideoResolution } from '@shared/domain/media/video';
-import { resolveVideoMode, videoDurationOptions, videoModeLabel, videoModes, videoRatioLocked, videoResolutionOptions } from '@shared/domain/media/videoCapabilities';
+import { resolveVideoMode, videoDurationOptions, videoModeLabel, videoModes, videoRatioLocked, videoRatioOptions, videoResolutionOptions } from '@shared/domain/media/videoCapabilities';
 import { isMetasoH3 } from '@shared/domain/media/videoChannels';
 import { compilerSettings, inheritStudioCompiler, mirrorStudioCompilerConnections, resolveStudioInputs, stripVideoPromptRoles, studioCompilerKey, studioCompilerKeyMatches, studioCompilerSource, studioVideoPromptRoles } from './studioConnections';
 import { studioChannels } from './studioGeneration';
@@ -82,7 +82,7 @@ export function studioVideoSettings(node:StudioScene['nodes'][number],scene?:Stu
   const durations=videoDurationOptions(model,resolution,mode,baseUrl);
   const requested=(inherited||settings.beikeScriptOnly===true)&&scriptDuration!==undefined?scriptDuration:parseFloat(String(settings.duration || '5s'));
   const duration=durations.reduce((best,value)=>Math.abs(value-requested)<Math.abs(best-requested)?value:best,durations[0]);
-  const locked=videoRatioLocked(model,mode,baseUrl),ratios=locked?['adaptive']:profile.supportedAspectRatios;
+  const locked=videoRatioLocked(model,mode,baseUrl),ratios=videoRatioOptions(model,mode,baseUrl);
   const ratio=String(settings.ratio || 'adaptive').replace(/^Auto$/i,'adaptive');
   const aspect=locked?'adaptive':ratios.includes(ratio)?ratio:ratios[0];
   return {

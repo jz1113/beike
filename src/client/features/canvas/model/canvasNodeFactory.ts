@@ -2,11 +2,13 @@ import { apiFetch, proxyMediaUrl, readClientStorageConfig, storageConfigHeaders 
 import { getGatewayClientBaseUrl } from '@client/shared/api/gatewayClient';
 import { extractImageDimensionsFromFile, extractVideoMetadataFromFile } from '@client/shared/media/mediaHelper';
 import type { MultiAngleParams } from '@client/shared/modals/multi-angle/CanvasMultiAngleModal';
+import { videoModes } from '@shared/domain/media/videoCapabilities';
 import { getVideoModelById } from '@shared/domain/media/video';
 import {
   modalityPickerSelections,
   readEffectiveModalityModels,
   readStoredApiProviders,
+  readStoredModalityModels,
   selectableModalityModels,
   type ModalityPickerSelection,
   type ModalityStorageKind,
@@ -18,7 +20,7 @@ import {
   hasWorkflowModelConfiguration,
   readWorkflowModelsFromStorage,
 } from '@shared/domain/models/workflowModels';
-import { DEFAULT_MULTIMODAL_MODEL_ID } from '@shared/domain/models/modelCatalog';
+import { compareModelDisplayOrder, DEFAULT_MULTIMODAL_MODEL_ID } from '@shared/domain/models/modelCatalog';
 import type {
   CanvasLocalTool,
   CanvasNode,
@@ -141,7 +143,9 @@ export function loadCanvasModalitySelections(kind: ModalityStorageKind): Modalit
       const modelId = item.modelId.trim();
       counts.set(modelId, (counts.get(modelId) || 0) + 1);
     }
-    return selectableModalityModels(read.models, providers).map((item) => {
+    const models = selectableModalityModels(read.models, providers);
+    if (kind !== 'voice') models.sort((a, b) => compareModelDisplayOrder(a.modelId, b.modelId));
+    return models.map((item) => {
       const modelId = item.modelId.trim();
       const duplicated = (counts.get(modelId) || 0) > 1;
       const channel = item.channelId ? providers.find((provider) => provider.id === item.channelId)?.name || '' : '';
@@ -175,6 +179,7 @@ export function loadCanvasChatModels(): CanvasGenerationModel[] {
   }
   return getEnabledMultimodalModelsFromSettings(readWorkflowModelsFromStorage(), 'assistant')
     .filter((item) => typeof item.id === 'string' && item.id)
+    .sort((a, b) => compareModelDisplayOrder(a.id, b.id))
     .map((item) => ({
       id: String(item.id),
       name: typeof item.name === 'string' && item.name ? item.name : String(item.id),
@@ -200,7 +205,18 @@ export function resolveCanvasChatModel(
 }
 
 /** Preserve configured channel IDs so the picker and dispatch resolve one route. */
-export function loadCanvasGenerationModels(video = false): CanvasGenerationModel[] {
+export function loadCanvasGenerationModels(video = false, motionOnly = false): CanvasGenerationModel[] {
+  if (motionOnly) {
+    const providers = readStoredApiProviders();
+    // Motion Control still has its own API and uses previously configured routes.
+    return readStoredModalityModels('video').flatMap(item => {
+      const provider = providers.find(candidate => candidate.id === item.channelId);
+      if (item.channelId && (!provider || provider.enabled === false)) return [];
+      const baseUrl = getGatewayClientBaseUrl(item.id);
+      if (!videoModes(item.modelId, baseUrl).some(mode => mode.id === 'motion_control')) return [];
+      return [{ id: item.id, name: item.name, modelId: item.modelId }];
+    });
+  }
   const kind: ModalityStorageKind = video ? 'video' : 'image';
   const synced = modalityPickerSelections(kind);
   const effective = synced ?? (!hasWorkflowModelConfiguration() ? loadCanvasModalitySelections(kind) : null);
@@ -219,6 +235,7 @@ export function loadCanvasGenerationModels(video = false): CanvasGenerationModel
     });
   return (video ? getEnabledVideoModelsFromSettings : getEnabledImageModelsFromSettings)(readWorkflowModelsFromStorage())
     .filter((item) => typeof item.id === 'string' && item.id)
+    .sort((a, b) => compareModelDisplayOrder(a.id, b.id))
     .map((item) => ({
       id: String(item.id),
       name: typeof item.name === 'string' ? item.name : String(item.id),
@@ -290,6 +307,7 @@ export async function persistCanvasMedia(file: File, viewCenterX: number, viewCe
   return {
     missingMedia: false,
     type: isAudio ? ('audio' as const) : isVideo ? ('video' as const) : ('image' as const),
+    originalFileName: file.name,
     title: file.name.replace(/\.[^/.]+$/, '') || '本地素材',
     ...(isAudio ? { audioUrl: data.url } : isVideo ? { videoUrl: data.url, imageUrl: thumbnailUrl } : { imageUrl: data.url }),
     x: Math.round(viewCenterX - display.width / 2),
@@ -527,11 +545,17 @@ export function buildQuickCanvasNode(
       dimensions = { width: 250, height: 250 };
       title = '文本';
       break;
+    case 'cover-prompt-writer':
+      type = 'prompt';
+      studioSubType = 'cover-prompt-writer';
+      dimensions = { width: 250, height: 250 };
+      title = '封面提示词撰写';
+      break;
     case 'video-prompt-optimizer':
       type = 'prompt';
       studioSubType = 'video-prompt-optimizer';
       dimensions = { width: 300, height: 260 };
-      title = '提示词 Skill';
+      title = '视频提示词优化';
       textPrompt = '';
       drawing = {
         model: 'wan3.0-video',
@@ -612,8 +636,8 @@ export function buildQuickCanvasNode(
       break;
     case 'preview':
       type = 'preview';
-      dimensions = { width: 400, height: 420 };
-      title = '导演监视器';
+      dimensions = { width: 340, height: 300 };
+      title = '画面预览';
       break;
     case 'save':
       type = 'save';
